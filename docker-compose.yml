@@ -1,0 +1,37 @@
+version: "3.9"
+
+# Unlike the cloud-oriented AIRP repo, this compose file does NOT include
+# Postgres/Neo4j/Redis by default — the local-first pipeline runs in-process
+# (see backend/app/core/config.py). Add them back if you want persistence
+# across restarts; the backend already reads their connection settings from
+# env vars if you set them.
+#
+# This does NOT run Ollama — it can't reach GPUs on two separate physical
+# machines from inside a container on a third. Run Ollama natively on your
+# GPU boxes; see docs/LOCAL_SETUP.md.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend

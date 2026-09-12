@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Type-check safety-critical + new modules
+        # quant/evidence/confidence: zero-LLM-dependency, most safety-critical.
+        # context/llm/sandbox/data_ingestion: new for this repo — strict from day one
+        # rather than accumulating untyped debt the way the original AIRP repo did.
+        run: mypy --strict app/quant app/evidence app/confidence app/context app/llm app/sandbox app/data_ingestion
+
+      - name: Test with coverage
+        run: |
+          pytest -q \
+            --cov=app.quant --cov=app.evidence --cov=app.confidence \
+            --cov=app.context --cov=app.sandbox --cov=app.llm \
+            --cov-report=term-missing --cov-report=xml
+
+      - name: Enforce coverage floor on safety-critical modules
+        run: |
+          pip install --quiet coverage
+          coverage report --include="app/quant/*,app/sandbox/*,app/context/*" --fail-under=85
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-xml
+          path: backend/coverage.xml
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm install
+      - run: npx eslint app lib
+      - run: npm run build
