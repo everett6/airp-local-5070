@@ -37,5 +37,5 @@ async def start_research(req: StartResearchRequest, background_tasks: Background
 
 
 @router.get("/{run_id}/status")
-async def get_status(run_id: str) -> dict:
+async def get_status(run_id: str) -> dict[str, str]:
     return {"run_id": run_id, "status": _RUN_STATUS.get(run_id, "unknown")}

@@ -15,28 +15,43 @@ fork that diverged by accident — see "How this differs from AIRP" below.
   a historical date, get a prediction generated using only data available as
   of that date, then see it graded against what actually happened. Every run
   self-checks that the lookahead guarantee held and reports that
-  transparently. **This is fully wired end-to-end**, including a real
-  TypeScript UI — see `docs/SANDBOX.md`.
+  transparently. **Fully wired end-to-end**, including a TypeScript UI with
+  persisted history across restarts — see `docs/SANDBOX.md`.
+- **Context compression** (`backend/app/context/`): per-ticker compressed
+  research material with token-budget-aware retrieval, so agents don't need
+  an ever-growing prompt to know "what do we know about this ticker" —
+  compression never severs the link back to evidence. See
+  `docs/CONTEXT_COMPRESSION.md`.
 - **Local LLM routing** (`backend/app/llm/`): configure two Ollama endpoints
   (e.g. your 5070 for reasoning, your 3060 for extraction) and the backend
   routes agent calls to the right one. See `docs/LOCAL_SETUP.md`.
 - **Deterministic quant engine, evidence/claim model, debate orchestrator,
   knowledge graph schema** — carried over from AIRP unchanged, since none of
   it is LLM-provider-specific. See `docs/ARCHITECTURE.md`.
-- **Web UI** (`frontend/`, Next.js + TypeScript): a working Sandbox page
-  today; a live-research view is the next milestone (see `docs/ROADMAP.md`).
+- **Web UI** (`frontend/`, Next.js + TypeScript): a working Sandbox page with
+  single-run, multi-date-suite, and persisted history views; a live-research
+  view is the next milestone (see `docs/ROADMAP.md`).
 
-## Quickstart (mock mode — no GPUs needed yet)
+## Quickstart
 
 ```bash
-cd backend && pip install -e ".[dev]" && uvicorn app.main:app --reload
-cd frontend && npm install && npm run dev
+# macOS/Linux
+./scripts/setup.sh
+# Windows (PowerShell)
+.\scripts\setup.ps1
+```
+
+Then, in two terminals:
+```bash
+cd backend && source .venv/bin/activate && uvicorn app.main:app --reload   # .venv\Scripts\Activate.ps1 on Windows
+cd frontend && npm run dev
 ```
 
 Open `http://localhost:3000/sandbox` and run a backtest. With no LLM
 endpoints configured, everything still works — the quant/sandbox mechanism
 doesn't depend on an LLM at all; only the (not-yet-UI-wired) narrative
-synthesis agents would fall back to a mock response.
+synthesis agents would fall back to a mock response. See
+`docs/CROSS_PLATFORM.md` for OS-specific notes.
 
 ## Quickstart (with your two GPUs)
 
@@ -48,21 +63,24 @@ a 3060, and pointing `backend/.env` at both.
 
 ```
 airp-local/
+├── scripts/                setup.sh (macOS/Linux) and setup.ps1 (Windows)
 ├── backend/
 │   ├── app/
 │   │   ├── llm/            LLMClient protocol, Ollama-compatible client, GPU router
 │   │   ├── sandbox/        point-in-time clock, lookahead prevention, backtest runner
+│   │   ├── context/        per-ticker compressed context store, token-budget retrieval
+│   │   ├── store/          SQLite-backed backtest history (stdlib only, no compiled deps)
 │   │   ├── quant/          deterministic valuation/risk/options library (unchanged from AIRP)
 │   │   ├── evidence/       claim + provenance model (unchanged from AIRP)
 │   │   ├── debate/         adversarial multi-agent orchestrator (unchanged from AIRP)
 │   │   ├── agents/         specialist agents
 │   │   ├── data_ingestion/ connectors — sandbox-aware mock connectors included
 │   │   └── api/routes/     FastAPI routes, including /api/sandbox/*
-│   └── tests/              pytest — 67 tests, including sandbox lookahead-proof tests
+│   └── tests/              pytest — 106 tests
 ├── frontend/               Next.js + TypeScript UI (Sandbox page is live)
 └── docs/                   ARCHITECTURE, API_SPEC, AGENT_INTERFACES, ROADMAP,
-                            LOCAL_SETUP (two-GPU walkthrough), SANDBOX (how the
-                            lookahead guarantee actually works)
+                            LOCAL_SETUP (two-GPU walkthrough), SANDBOX,
+                            CONTEXT_COMPRESSION, CROSS_PLATFORM
 ```
 
 ## How this differs from AIRP (the original cloud-oriented repo)
@@ -70,9 +88,11 @@ airp-local/
 | | AIRP | AIRP Local |
 |---|---|---|
 | LLM provider | Anthropic API | Your own Ollama endpoints, routed by role across up to 2 GPUs |
-| Persistence | Postgres + Neo4j required | In-process by default; Postgres/Neo4j optional |
-| Backtesting | Not built (flagged as the top ROADMAP gap) | Built: `app/sandbox/`, enforced at the connector level, self-checking |
+| Persistence | Postgres + Neo4j required | SQLite (stdlib, zero compiled deps) by default; Postgres/Neo4j optional extras |
+| Backtesting | Not built (flagged as the top ROADMAP gap) | Built: `app/sandbox/`, enforced at the connector level, self-checking, persisted history |
+| Context management | Not built | `app/context/`: compressed, token-budgeted, evidence-preserving |
 | UI | Not built | Next.js/TypeScript, Sandbox page functional today |
+| Default install | Includes asyncpg/neo4j (platform-specific wheels) | Minimal — no compiled deps in the default install, `neo4j` is an opt-in extra |
 | Quant engine, evidence model, debate orchestrator | Same code | Same code — these never depended on the LLM provider or persistence choice |
 
 If you want the cloud/Postgres/Neo4j-backed version, that's the other repo.
@@ -81,15 +101,25 @@ actually check whether the predictions are any good before trusting them.
 
 ## Verified state (as of last commit)
 
-- Backend: 67/67 pytest passing, `ruff check` clean, `mypy --strict` clean on
-  `app/quant`/`app/evidence`/`app/confidence`.
+- Backend: **106/106 pytest passing**, `ruff check` clean, `mypy --strict`
+  clean across **38 modules** (quant/evidence/confidence/context/llm/sandbox/
+  data_ingestion/store/api) — re-verified in a fresh venv after a from-scratch
+  dependency install, not just trusted from a stale environment.
+- Backend default install has **zero compiled/platform-specific
+  dependencies** — `asyncpg`, `neo4j`, `sqlalchemy`, and several other
+  packages that were installed-but-never-imported were removed or moved to
+  an opt-in extra. Fresh install takes ~20s.
 - Frontend: `npm run build` clean under TypeScript strict mode, `eslint`
-  clean, both routes verified serving over real HTTP against the live
-  backend (not just unit-tested in isolation).
-- The sandbox self-check (`self_check_passed`) is verified both by a
-  dedicated pytest (`tests/test_sandbox.py`) and by the harness performing
-  the same check live on every single run — so a regression would surface
-  in production, not just in CI.
+  clean (including a genuinely new `react-hooks/set-state-in-effect` rule
+  that caught a real hydration-risk pattern, since fixed), 0 npm
+  vulnerabilities, standalone Docker output verified by actually booting
+  `node server.js` and confirming both pages plus a static asset serve.
+- The sandbox self-check (`self_check_passed`) is verified both by dedicated
+  pytest coverage and by the harness performing the same check live on every
+  single run — so a regression would surface in production, not just in CI.
+- `scripts/setup.sh` was actually executed end-to-end in CI-equivalent
+  conditions (not just syntax-checked) and confirmed to produce a working
+  venv that passes the full test suite.
 
 ## License
 

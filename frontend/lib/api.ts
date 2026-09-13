@@ -15,11 +15,29 @@ export class ApiError extends Error {
   }
 }
 
+// Thrown when a request is deliberately aborted (e.g. a newer request
+// superseded it) — callers should treat this as "ignore, don't show an
+// error", not as a real failure. See AbortController usage in sandbox/page.tsx.
+export class RequestAbortedError extends Error {
+  constructor() {
+    super("Request was aborted");
+    this.name = "RequestAbortedError";
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new RequestAbortedError();
+    }
+    throw err;
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -63,20 +81,37 @@ export interface BacktestSuiteRequest {
   step_days: number;
 }
 
-export async function runBacktest(req: BacktestRequest): Promise<BacktestResult> {
+export async function runBacktest(
+  req: BacktestRequest,
+  signal?: AbortSignal,
+): Promise<BacktestResult> {
   return request<BacktestResult>("/sandbox/backtest", {
     method: "POST",
     body: JSON.stringify(req),
+    signal,
   });
 }
 
 export async function runBacktestSuite(
   req: BacktestSuiteRequest,
+  signal?: AbortSignal,
 ): Promise<BacktestResult[]> {
   return request<BacktestResult[]>("/sandbox/backtest-suite", {
     method: "POST",
     body: JSON.stringify(req),
+    signal,
   });
+}
+
+export async function getBacktestHistory(
+  params: { ticker?: string; limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<BacktestResult[]> {
+  const query = new URLSearchParams();
+  if (params.ticker) query.set("ticker", params.ticker);
+  if (params.limit) query.set("limit", String(params.limit));
+  const qs = query.toString();
+  return request<BacktestResult[]>(`/sandbox/history${qs ? `?${qs}` : ""}`, { signal });
 }
 
 export async function checkHealth(): Promise<{ status: string }> {

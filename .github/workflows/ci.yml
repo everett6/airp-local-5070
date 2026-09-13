@@ -27,21 +27,22 @@ jobs:
 
       - name: Type-check safety-critical + new modules
         # quant/evidence/confidence: zero-LLM-dependency, most safety-critical.
-        # context/llm/sandbox/data_ingestion: new for this repo — strict from day one
-        # rather than accumulating untyped debt the way the original AIRP repo did.
-        run: mypy --strict app/quant app/evidence app/confidence app/context app/llm app/sandbox app/data_ingestion
+        # context/llm/sandbox/data_ingestion/store/api: real, tested modules
+        # for this repo — strict from day one rather than accumulating
+        # untyped debt the way stub-only route files otherwise would.
+        run: mypy --strict app/quant app/evidence app/confidence app/context app/llm app/sandbox app/data_ingestion app/store app/api
 
       - name: Test with coverage
         run: |
           pytest -q \
             --cov=app.quant --cov=app.evidence --cov=app.confidence \
-            --cov=app.context --cov=app.sandbox --cov=app.llm \
+            --cov=app.context --cov=app.sandbox --cov=app.llm --cov=app.store \
             --cov-report=term-missing --cov-report=xml
 
       - name: Enforce coverage floor on safety-critical modules
         run: |
           pip install --quiet coverage
-          coverage report --include="app/quant/*,app/sandbox/*,app/context/*" --fail-under=85
+          coverage report --include="app/quant/*,app/sandbox/*,app/context/*,app/store/*" --fail-under=85
 
       - uses: actions/upload-artifact@v4
         with:

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
   BacktestResult,
+  RequestAbortedError,
+  getBacktestHistory,
   runBacktest,
   runBacktestSuite,
 } from "@/lib/api";
@@ -69,52 +71,172 @@ function SingleResultCard({ result }: { result: BacktestResult }) {
   );
 }
 
+function ResultsTable({ results }: { results: BacktestResult[] }) {
+  return (
+    <div className="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>As of</th>
+            <th>Price</th>
+            <th>Predicted</th>
+            <th>Actual</th>
+            <th>Abs % err</th>
+            <th>Direction</th>
+            <th>Self-check</th>
+          </tr>
+        </thead>
+        <tbody>
+          {results.map((r) => (
+            <tr key={r.run_id}>
+              <td>{r.ticker}</td>
+              <td>{r.as_of.slice(0, 10)}</td>
+              <td>${r.price_at_as_of.toFixed(2)}</td>
+              <td>${r.predicted_price.toFixed(2)}</td>
+              <td>${r.actual_price.toFixed(2)}</td>
+              <td>{r.absolute_pct_error.toFixed(2)}%</td>
+              <td>
+                <span className={`badge ${r.directional_hit ? "good" : "bad"}`}>
+                  {r.directional_hit ? "hit" : "miss"}
+                </span>
+              </td>
+              <td>
+                <span className={`badge ${r.self_check_passed ? "good" : "bad"}`}>
+                  {r.self_check_passed ? "ok" : "FAILED"}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function SandboxPage() {
+  // Date-based defaults come from `new Date()`, which is unsafe to evaluate
+  // during the initial render: this "use client" component is still
+  // server-rendered once for the initial HTML, then the client re-runs the
+  // same render logic to hydrate it. If those two moments land on different
+  // calendar days (rare, but real right around midnight), React would warn
+  // about a hydration mismatch on these inputs' value/max attributes. Using
+  // an empty string — identical on server and client — as the initial value,
+  // then filling in the real defaults from an effect (which only ever runs
+  // client-side, after hydration) avoids the possibility entirely rather
+  // than just making it unlikely.
   const [ticker, setTicker] = useState("ACME");
-  const [asOf, setAsOf] = useState(todayMinus(60));
+  const [asOf, setAsOf] = useState("");
   const [horizonDays, setHorizonDays] = useState(30);
+  const [maxDate, setMaxDate] = useState<string | undefined>(undefined);
+
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [stepDays, setStepDays] = useState(30);
+
+  useEffect(() => {
+    // Deliberate exception to react-hooks/set-state-in-effect: these values
+    // are client-only by necessity (see the comment above this component) —
+    // there is no way to compute "today" identically on the server and
+    // client without this pattern, and this effect runs exactly once on
+    // mount, so there's no cascading-render risk the rule is protecting
+    // against here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAsOf(todayMinus(60));
+    setStartDate(todayMinus(365));
+    setEndDate(todayMinus(60));
+    setMaxDate(todayMinus(1));
+  }, []);
+
   const [singleResult, setSingleResult] = useState<BacktestResult | null>(null);
   const [singleLoading, setSingleLoading] = useState(false);
   const [singleError, setSingleError] = useState<string | null>(null);
+  const singleAbortRef = useRef<AbortController | null>(null);
 
-  const [startDate, setStartDate] = useState(todayMinus(365));
-  const [endDate, setEndDate] = useState(todayMinus(60));
-  const [stepDays, setStepDays] = useState(30);
   const [suiteResults, setSuiteResults] = useState<BacktestResult[] | null>(null);
   const [suiteLoading, setSuiteLoading] = useState(false);
   const [suiteError, setSuiteError] = useState<string | null>(null);
+  const suiteAbortRef = useRef<AbortController | null>(null);
+
+  const [history, setHistory] = useState<BacktestResult[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const historyAbortRef = useRef<AbortController | null>(null);
+
+  async function loadHistory() {
+    // Cancel any in-flight history request before starting a new one — a
+    // slow earlier request landing after a faster later one would otherwise
+    // silently show stale data as if it were current.
+    historyAbortRef.current?.abort();
+    const controller = new AbortController();
+    historyAbortRef.current = controller;
+
+    setHistoryLoading(true);
+    try {
+      const results = await getBacktestHistory({ limit: 20 }, controller.signal);
+      setHistory(results);
+    } catch (err) {
+      if (!(err instanceof RequestAbortedError)) {
+        // History is supplementary — a failure here shouldn't block the
+        // rest of the page, just leave the section empty.
+        setHistory([]);
+      }
+    } finally {
+      if (historyAbortRef.current === controller) setHistoryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    // Same deliberate exception: an on-mount data fetch is the standard
+    // pattern for "load this section's data once when the page opens", and
+    // loadHistory manages its own abort/loading state internally.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadHistory();
+    return () => historyAbortRef.current?.abort();
+  }, []);
 
   async function handleSingleRun() {
+    singleAbortRef.current?.abort();
+    const controller = new AbortController();
+    singleAbortRef.current = controller;
+
     setSingleLoading(true);
     setSingleError(null);
-    setSingleResult(null);
     try {
-      const result = await runBacktest({ ticker, as_of: asOf, horizon_days: horizonDays });
+      const result = await runBacktest(
+        { ticker, as_of: asOf, horizon_days: horizonDays },
+        controller.signal,
+      );
       setSingleResult(result);
+      loadHistory();
     } catch (err) {
+      if (err instanceof RequestAbortedError) return; // superseded by a newer request
       setSingleError(err instanceof ApiError ? err.message : "Request failed — is the backend running?");
+      setSingleResult(null);
     } finally {
-      setSingleLoading(false);
+      if (singleAbortRef.current === controller) setSingleLoading(false);
     }
   }
 
   async function handleSuiteRun() {
+    suiteAbortRef.current?.abort();
+    const controller = new AbortController();
+    suiteAbortRef.current = controller;
+
     setSuiteLoading(true);
     setSuiteError(null);
-    setSuiteResults(null);
     try {
-      const results = await runBacktestSuite({
-        ticker,
-        start_date: startDate,
-        end_date: endDate,
-        horizon_days: horizonDays,
-        step_days: stepDays,
-      });
+      const results = await runBacktestSuite(
+        { ticker, start_date: startDate, end_date: endDate, horizon_days: horizonDays, step_days: stepDays },
+        controller.signal,
+      );
       setSuiteResults(results);
+      loadHistory();
     } catch (err) {
+      if (err instanceof RequestAbortedError) return;
       setSuiteError(err instanceof ApiError ? err.message : "Request failed — is the backend running?");
+      setSuiteResults(null);
     } finally {
-      setSuiteLoading(false);
+      if (suiteAbortRef.current === controller) setSuiteLoading(false);
     }
   }
 
@@ -148,7 +270,7 @@ export default function SandboxPage() {
           </div>
           <div className="field">
             <label>As of (must be in the past)</label>
-            <input type="date" value={asOf} max={todayMinus(1)} onChange={(e) => setAsOf(e.target.value)} />
+            <input type="date" value={asOf} max={maxDate} onChange={(e) => setAsOf(e.target.value)} />
           </div>
           <div className="field">
             <label>Horizon (days)</label>
@@ -160,7 +282,7 @@ export default function SandboxPage() {
               onChange={(e) => setHorizonDays(Number(e.target.value))}
             />
           </div>
-          <button onClick={handleSingleRun} disabled={singleLoading}>
+          <button onClick={handleSingleRun} disabled={singleLoading || !asOf}>
             {singleLoading ? "Running…" : "Run backtest"}
           </button>
         </div>
@@ -182,7 +304,7 @@ export default function SandboxPage() {
           </div>
           <div className="field">
             <label>End date (must be in the past)</label>
-            <input type="date" value={endDate} max={todayMinus(1)} onChange={(e) => setEndDate(e.target.value)} />
+            <input type="date" value={endDate} max={maxDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
           <div className="field">
             <label>Step (days)</label>
@@ -194,7 +316,7 @@ export default function SandboxPage() {
               onChange={(e) => setStepDays(Number(e.target.value))}
             />
           </div>
-          <button onClick={handleSuiteRun} disabled={suiteLoading}>
+          <button onClick={handleSuiteRun} disabled={suiteLoading || !startDate || !endDate}>
             {suiteLoading ? "Running…" : "Run suite"}
           </button>
         </div>
@@ -226,42 +348,23 @@ export default function SandboxPage() {
           </>
         )}
 
-        {suiteResults && (
-          <table>
-            <thead>
-              <tr>
-                <th>As of</th>
-                <th>Price</th>
-                <th>Predicted</th>
-                <th>Actual</th>
-                <th>Abs % err</th>
-                <th>Direction</th>
-                <th>Self-check</th>
-              </tr>
-            </thead>
-            <tbody>
-              {suiteResults.map((r) => (
-                <tr key={r.run_id}>
-                  <td>{r.as_of.slice(0, 10)}</td>
-                  <td>${r.price_at_as_of.toFixed(2)}</td>
-                  <td>${r.predicted_price.toFixed(2)}</td>
-                  <td>${r.actual_price.toFixed(2)}</td>
-                  <td>{r.absolute_pct_error.toFixed(2)}%</td>
-                  <td>
-                    <span className={`badge ${r.directional_hit ? "good" : "bad"}`}>
-                      {r.directional_hit ? "hit" : "miss"}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`badge ${r.self_check_passed ? "good" : "bad"}`}>
-                      {r.self_check_passed ? "ok" : "FAILED"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        {suiteResults && <ResultsTable results={suiteResults} />}
+      </div>
+
+      <div className="card">
+        <div className="card-header-row">
+          <h2>Recent history</h2>
+          <button className="secondary" onClick={loadHistory} disabled={historyLoading}>
+            {historyLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+        <p className="muted">
+          Persisted across restarts (SQLite on disk) — every run above, plus
+          any you&apos;ve made before, up to the last 20.
+        </p>
+        {history === null && <p className="muted">Loading…</p>}
+        {history?.length === 0 && <p className="muted">No backtests run yet.</p>}
+        {history && history.length > 0 && <ResultsTable results={history} />}
       </div>
 
       <p className="muted">

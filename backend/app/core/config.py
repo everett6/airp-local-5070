@@ -47,6 +47,18 @@ class Settings(BaseSettings):
     fred_api_key: str = ""
     news_api_key: str = ""
 
+    # Frontend origins allowed to call this API. Comma-separated. Both
+    # localhost and 127.0.0.1 are included by default because some Windows
+    # setups (and some browsers regardless of OS) resolve "localhost" and
+    # "127.0.0.1" differently — hardcoding just one has bitten real users of
+    # similar local dev stacks. Override via env if you're serving the
+    # frontend from somewhere else (e.g. a LAN IP so you can use the UI from
+    # your phone).
+    allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
+    def allowed_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
+
     def llm_endpoints(self) -> dict[str, EndpointConfig]:
         return {
             "reasoning": EndpointConfig(
