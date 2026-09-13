@@ -22,7 +22,7 @@ from typing import Any, Generic, TypeVar, cast
 
 from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
-from app.sandbox.clock import LookaheadViolation
+from app.sandbox.clock import LookaheadViolation, get_active_clock
 
 T = TypeVar("T")
 
@@ -96,6 +96,13 @@ class DataConnector(abc.ABC, Generic[T]):
         retry=retry_if_not_exception_type(LookaheadViolation),
     )
     async def fetch(self, cache_key: str, **kwargs: Any) -> IngestedRecord[T]:
+        # A cache hit skips `_fetch_raw`, which is where point-in-time
+        # enforcement happens. Without namespacing, a record cached by a live
+        # (or later-dated) call could be served inside a sandbox under the
+        # same key, bypassing the lookahead check entirely.
+        clock = get_active_clock()
+        if clock is not None:
+            cache_key = f"sandbox@{clock.as_of.isoformat()}:{cache_key}"
         cached = await self._cache.get(cache_key)
         if cached is not None:
             # The cache is genuinely untyped (CacheBackend.get -> Any | None,
