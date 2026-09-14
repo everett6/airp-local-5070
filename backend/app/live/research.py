@@ -23,8 +23,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 from app.sandbox import provenance as prov
-from app.sandbox.jail import AgentJail, JailLimits
+from app.sandbox.jail import AgentJail, JailError, JailLimits
 from app.sandbox.walkforward import BACKEND, DATA, RESULTS, OllamaLLM
 from app.tools.gateway import TICKER_RE, ToolGateway
 from app.tools.netguard import SafeFetcher
@@ -37,13 +39,16 @@ async def research_one(ticker: str, jail: AgentJail, gateway: ToolGateway, llm: 
                        horizon: int, max_rounds: int, as_of: datetime) -> dict[str, Any]:
     t0 = time.monotonic()
     calls0 = llm.calls
+    overflows0 = getattr(llm, "context_overflows", 0)
     result = await jail.call({
         "task": "research",
         "subject": {"ticker": ticker, "horizon_days": horizon, "as_of": as_of.isoformat(timespec="seconds")},
         "tools": gateway.specs_for_prompt(), "max_rounds": max_rounds, "max_calls_per_round": 6,
+        "num_ctx": getattr(llm, "num_ctx", 8192), "num_predict": getattr(llm, "num_predict", 600),
     })
     return {"ticker": ticker, "as_of": as_of.isoformat(timespec="seconds"), "horizon_days": horizon,
             "model": model, **result, "tool_log": gateway.log, "llm_calls": llm.calls - calls0,
+            "context_overflows": getattr(llm, "context_overflows", 0) - overflows0,
             "elapsed_s": round(time.monotonic() - t0, 1)}
 
 
@@ -80,12 +85,26 @@ async def research_tickers(tickers: list[str], *, model: str = "qwen3:8b", horiz
             else:
                 gw = ToolGateway(mode="live", fetcher=fetcher, sec_user_agent=base.sec_user_agent,
                                  brave_api_key=base.brave_api_key, on_event=emit(ticker))
-            async with AgentJail(llm, tools=gw, limits=limits, allow_unjailed=allow_unjailed) as jail:
-                rec = await research_one(ticker, jail, gw, llm, model=model, horizon=horizon,
-                                         max_rounds=max_rounds, as_of=as_of)
-            rec |= {"provenance": provenance, "jail_limits": limits.as_dict(), "tool_calls": jail.tool_calls}
+            rec: dict[str, Any] | None = None
+            error = ""
+            for attempt in range(2):  # one retry: a transient model/network failure shouldn't cost the stock
+                try:
+                    async with AgentJail(llm, tools=gw, limits=limits, allow_unjailed=allow_unjailed) as jail:
+                        rec = await research_one(ticker, jail, gw, llm, model=model, horizon=horizon,
+                                                 max_rounds=max_rounds, as_of=as_of)
+                    rec |= {"tool_calls": jail.tool_calls, "attempts": attempt + 1}
+                    break
+                except (JailError, OSError, httpx.HTTPError, KeyError, ValueError) as e:
+                    error = f"{type(e).__name__}: {e}"[:500]
+            if rec is None:
+                # recorded as a failure, never silently turned into a 0.5 forecast
+                rec = {"ticker": ticker, "as_of": as_of.isoformat(timespec="seconds"), "horizon_days": horizon,
+                       "model": model, "p_up": None, "answered": False, "error": error, "reason": "", "sources": [],
+                       "rounds": 0, "tool_calls": 0, "elapsed_s": 0.0, "attempts": 2}
+            rec |= {"provenance": provenance, "jail_limits": limits.as_dict()}
             if on_event:
-                on_event({"ticker": ticker, "final": True, "p_up": rec["p_up"], "elapsed_s": rec["elapsed_s"]})
+                on_event({"ticker": ticker, "final": True, "p_up": rec["p_up"], "elapsed_s": rec["elapsed_s"],
+                          "error": rec.get("error", "")})
             if save:
                 rec["saved_to"] = str(save_decision(rec).relative_to(BACKEND))
             results[ticker] = rec

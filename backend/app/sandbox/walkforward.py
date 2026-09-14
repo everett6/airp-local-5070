@@ -84,6 +84,7 @@ class OllamaLLM:
                 self._cache[rec["k"]] = rec["v"]
         self.calls = 0
         self.cache_hits = 0
+        self.context_overflows = 0
 
     async def __call__(self, system: str, user: str) -> str:
         ctx = "" if self.num_ctx == 4096 else f"\0ctx={self.num_ctx}"  # keeps existing cache keys valid
@@ -101,7 +102,10 @@ class OllamaLLM:
                 try:
                     r = await self._client.post(f"{self.base_url}/api/chat", json=body)
                     r.raise_for_status()
-                    text: str = r.json()["message"]["content"]
+                    data = r.json()
+                    text: str = data["message"]["content"]
+                    if int(data.get("prompt_eval_count") or 0) >= self.num_ctx - self.num_predict:
+                        self.context_overflows += 1  # the prompt filled the window: Ollama may have cut its start
                     break
                 except (httpx.HTTPError, KeyError):
                     if attempt == 2:

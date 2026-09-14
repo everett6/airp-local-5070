@@ -143,6 +143,7 @@ async def run_once(cfg: dict[str, Any], ledger: Ledger, *, now: datetime | None 
         if table.dates[table.index_on_or_before(c)] != c:
             raise RuntimeError(f"price data does not contain the cutoff close {c}")
         arms: dict[str, dict[str, float]] = {}
+        failed: dict[str, list[str]] = {}
         web_paths: dict[str, str] = {}
         model = cfg["model"]
         if "live_plain" in cfg["arms"]:
@@ -156,16 +157,17 @@ async def run_once(cfg: dict[str, Any], ledger: Ledger, *, now: datetime | None 
                 research_fn = research_tickers
             web = await research_fn(tickers, model=model, horizon=cfg["horizon"], max_rounds=cfg["web_rounds"],
                                     concurrency=cfg.get("web_concurrency", 3))
-            arms["live_web"] = {r["ticker"]: r["p_up"] for r in web}
+            arms["live_web"] = {r["ticker"]: r["p_up"] for r in web if r.get("p_up") is not None}
+            failed["live_web"] = sorted(set(tickers) - set(arms["live_web"]))
             web_paths = {r["ticker"]: r.get("saved_to", "") for r in web}
-            log(f"  live_web done ({len(web)} stocks)")
+            log(f"  live_web done ({len(arms['live_web'])} stocks, {len(failed['live_web'])} failed)")
         decided_at = datetime.now(UTC) if real_clock else now  # the real time after all decisions finished
         cutoff_close = {t: table.closes[t][table.index_on_or_before(c)] for t in tickers}
         rec = ledger.append(
             "decision", cutoff=c.isoformat(), deadline=dl.isoformat(),
             decided_at=decided_at.isoformat(timespec="seconds"), on_time=decided_at < dl, horizon=cfg["horizon"],
             model=model, config_hash=cfg["config_hash"], arms=arms, cutoff_close=cutoff_close,
-            web_records=web_paths, git=prov.git_state(BACKEND.parent),
+            web_records=web_paths, failed=failed, git=prov.git_state(BACKEND.parent),
             model_digest=prov.ollama_digest(model))
         written.append(rec)
         log(f"  logged decision seq {rec['seq']} ({'on time' if rec['on_time'] else 'LATE: excluded'})")

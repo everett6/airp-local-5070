@@ -151,7 +151,11 @@ async def _fetch_page(gw: ToolGateway, a: dict[str, Any]) -> Any:
     url = a["url"]
     if not await gw.robots_allowed(url):
         raise FetchError("disallowed by the site's robots.txt")
-    r = await gw.fetcher.fetch(url, headers={"Accept": "text/html,text/plain;q=0.9"})
+    headers = {"Accept": "text/html,text/plain;q=0.9"}
+    host = (urlsplit(url).hostname or "").lower()
+    if gw.sec_user_agent and (host == "sec.gov" or host.endswith(".sec.gov")):
+        headers["User-Agent"] = gw.sec_user_agent  # SEC rejects requests without a declared contact
+    r = await gw.fetcher.fetch(url, headers=headers)
     if r.status != 200:
         raise FetchError(f"HTTP {r.status}")
     ctype = r.content_type.lower()

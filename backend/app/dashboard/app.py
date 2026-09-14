@@ -44,9 +44,19 @@ st.sidebar.caption("Every prediction was made by an agent in a process jail with
 tabs = st.tabs(["Overview", "Over time", "Calibration", "Self-improvement",
                 "Predictions", "Compare runs", "New run", "Live research"])
 
+@st.cache_data(show_spinner=False, max_entries=16)
+def _load_run(tag: str, mtime: float) -> tuple[dict, pd.DataFrame]:  # mtime busts the cache when a run is rewritten
+    return D.load_report(tag), D.load_predictions(tag)
+
+
+@st.cache_data(show_spinner=False, max_entries=256)
+def _gap(preds: pd.DataFrame, arm: str) -> dict | None:
+    return D.brier_gap_ci(preds, arm)
+
+
 if tag:
-    report = D.load_report(tag)
-    preds_all = D.load_predictions(tag)
+    _mtime = next(r["mtime"] for r in runs if r["tag"] == tag)
+    report, preds_all = _load_run(tag, _mtime)
     preds = D.warm_filter(preds_all, report, after_warmup)
     scores = D.scores_frame(report, after_warmup)
     saved_arms = D._ordered(sorted(preds["arm"].unique())) if not preds.empty else []
@@ -72,7 +82,7 @@ if tag:
         c[3].metric("Agent isolation", "✅ Jailed" if jail_ok else "❌ FAILED",
                     help="Live probe at start and end: no readable data files, no network.")
 
-        gaps = {a: D.brier_gap_ci(preds, a) for a in ("llm_plain", "llm_selfimprove") if a in saved_arms}
+        gaps = {a: _gap(preds, a) for a in ("llm_plain", "llm_selfimprove") if a in saved_arms}
         gaps = {a: g for a, g in gaps.items() if g}
         if "always_up" in saved_arms and gaps:
             winners = [a for a, g in gaps.items() if g["hi"] < 0]
@@ -133,7 +143,7 @@ if tag:
             for a in saved_arms:
                 if a == "always_up":
                     continue
-                g = D.brier_gap_ci(preds, a)
+                g = _gap(preds, a)
                 if g:
                     verdict = "better" if g["hi"] < 0 else ("worse" if g["lo"] > 0 else "no clear difference")
                     rows.append({"Arm": D.ARM_LABELS.get(a, a), "Brier gap": g["gap"], "95% CI low": g["lo"],
@@ -376,7 +386,9 @@ with tabs[7]:
         status = st.status(f"Researching {', '.join(tickers)}…", expanded=True)
 
         def on_event(e: dict) -> None:
-            if e.get("final"):
+            if e.get("final") and e.get("p_up") is None:
+                status.write(f"❌ **{e['ticker']}** failed: {e.get('error', '')[:120]}")
+            elif e.get("final"):
                 status.write(f"**{e['ticker']}** done: P(up) = {e['p_up']:.2f} in {e['elapsed_s']} s")
             else:
                 mark = "✅" if e["ok"] else "⚠️"
@@ -391,6 +403,9 @@ with tabs[7]:
             st.error(str(e))
             recs = []
         for rec in recs:
+            if rec.get("p_up") is None:
+                st.error(f"{rec['ticker']}: research failed ({rec.get('error', 'unknown error')})")
+                continue
             with st.container(border=True):
                 a1, a2 = st.columns([1, 4])
                 a1.metric(rec["ticker"], f"{rec['p_up']:.2f}", help=f"P(up in {rec['horizon_days']} trading days)")

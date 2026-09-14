@@ -298,3 +298,125 @@ async def test_live_research_end_to_end_offline(tmp_path, monkeypatch):
     assert json.loads(path.read_text())["p_up"] == 0.61
     with pytest.raises(ValueError, match="invalid tickers"):
         await R.research_tickers(["../etc"], llm=llm, save=False)
+
+
+# ---------------- network guard hardening (pinning, time budget, cache budget) ----------------
+
+@pytest.mark.parametrize("ip,public", [("2002:c0a8:0101::1", False), ("2002:0808:0808::1", False),  # all 6to4 is non-global in Python: stricter, fine
+                                       ("2001:0:4136:e378:8000:63bf:3f57:fefe", False)])
+def test_embedded_ipv4_in_ipv6_is_judged_by_the_ipv4(ip, public):
+    # 6to4 192.168.1.1 (private), 6to4 8.8.8.8 (public), Teredo whose client IPv4 is 192.168.1.1
+    assert is_public_ip(ip) is public
+
+
+async def test_connection_is_pinned_to_the_checked_address():
+    seen = []
+
+    def handler(request):
+        seen.append((str(request.url), request.headers["host"], request.extensions.get("sni_hostname")))
+        return httpx.Response(200, text="ok")
+
+    f = fetcher(handler)
+    r = await f.fetch("https://news.example/story?id=1")
+    assert r.text == "ok" and r.url == r.final_url == "https://news.example/story?id=1"
+    assert seen == [("https://93.184.216.34/story?id=1", "news.example", "news.example")]
+    await f.aclose()
+
+
+async def test_dns_rebinding_cannot_redirect_the_connection():
+    answers = iter([["93.184.216.34"], ["127.0.0.1"]])  # public for the check, loopback afterwards
+
+    async def rebinding_resolver(host):
+        return next(answers)
+
+    urls = []
+    f = SafeFetcher("t", resolver=rebinding_resolver,
+                    transport=httpx.MockTransport(lambda r: urls.append(str(r.url)) or httpx.Response(200)))
+    await f.fetch("http://rebind.example/")
+    assert urls == ["http://93.184.216.34/"]  # never re-resolved, never 127.0.0.1
+    await f.aclose()
+
+
+async def test_falls_back_to_the_next_address_when_connect_fails():
+    DNS["dual.example"] = ["2606:4700::1111", "93.184.216.40"]
+
+    def handler(request):
+        if request.url.host == "93.184.216.40":
+            raise httpx.ConnectError("unreachable")
+        return httpx.Response(200, text="v6")
+
+    f = fetcher(handler)
+    assert (await f.fetch("http://dual.example/")).text == "v6"
+    await f.aclose()
+
+
+async def test_trickling_server_hits_the_total_time_budget():
+    async def slow_body():
+        for _ in range(100):
+            await asyncio.sleep(0.05)
+            yield b"x"
+
+    f = fetcher(lambda r: httpx.Response(200, content=slow_body()), total_timeout_s=0.3)
+    t0 = time.monotonic()
+    with pytest.raises(FetchError, match="in total"):
+        await f.fetch("http://news.example/drip")
+    assert time.monotonic() - t0 < 2
+    await f.aclose()
+
+
+async def test_malformed_content_length_is_not_a_crash():
+    f = fetcher(lambda r: httpx.Response(200, headers={"content-length": "lots"}, content=b"hi"))
+    try:
+        r = await f.fetch("http://news.example/odd")
+        assert r.status == 200
+    except FetchError:
+        pass  # a transport may also reject the header; either way it's a FetchError, never a ValueError
+    await f.aclose()
+
+
+async def test_cache_respects_its_byte_budget():
+    f = fetcher(lambda r: httpx.Response(200, content=b"x" * 1000), cache_max_bytes=4000)
+    for i in range(10):
+        await f.fetch(f"http://news.example/p{i}")
+    assert f._cache_bytes <= 4000 and len(f._cache) == 4
+    await f.aclose()
+
+
+def test_research_history_never_exceeds_its_budget():
+    from app.sandbox import agent_worker as aw
+
+    obs = [{"tool": "fetch_page", "args": {"url": "u" * 150}, "ok": True, "result": "y" * 6000, "error": ""}] * 6
+    steps = [{"round": r, "thought": "t" * 700, "observations": obs} for r in (1, 2, 3)]
+    for budget in (500, 3000, 9000, 14000):
+        out = aw._render_history(steps, budget)
+        assert len(out) <= budget
+        assert "[round 3]" in out  # the newest round always survives
+    # the whole prompt fits the model window measured at ~2.4 chars/token
+    budget = aw.prompt_char_budget(8192, 600)
+    assert budget / 2.4 < 8192 - 600
+
+
+async def test_live_research_retries_once_then_records_failure():
+    from app.live import research as R
+
+    class BrokenLLM:
+        calls = 0
+        num_ctx, num_predict = 8192, 600
+
+        async def __call__(self, system, user):
+            self.calls += 1
+            raise httpx.ConnectError("ollama is down")
+
+    llm = BrokenLLM()
+    events = []
+    recs = await R.research_tickers(["NVDA"], llm=llm, save=False, on_event=events.append,
+                                    allow_unjailed=not HAS_BWRAP,
+                                    gateway_factory=lambda f, ev: G.ToolGateway(mode="live", fetcher=f, on_event=ev))
+    assert recs[0]["p_up"] is None and "ConnectError" in recs[0]["error"] and recs[0]["attempts"] == 2
+    assert llm.calls == 2 and events[-1]["final"] and events[-1]["p_up"] is None
+
+
+def test_rss_with_entity_declarations_is_refused():
+    bomb = '<?xml version="1.0"?><!DOCTYPE r [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;">]><rss><channel>' \
+           '<item><title>&b;</title><link>https://x.y/z</link></item></channel></rss>'
+    assert parse_rss(bomb) == []

@@ -115,3 +115,14 @@ def test_data_path_must_stay_under_backend_data():
     for bad in ["../README.md", "/etc/passwd", "app/sandbox/jail.py"]:
         with pytest.raises(SystemExit):
             resolve_data_path(bad)
+
+
+def test_reproduce_skips_forward_test_configs():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("reproduce", CONFIGS.parent / "scripts" / "reproduce.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.is_backtest_config(CONFIGS / "v2.toml")
+    assert not mod.is_backtest_config(CONFIGS / "forward_v1.toml")
+    assert mod.reproduce(CONFIGS / "forward_v1.toml") is True  # skipped, not crashed

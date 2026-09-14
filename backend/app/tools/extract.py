@@ -94,6 +94,8 @@ def _unwrap_bing(link: str) -> str:
 
 def parse_rss(xml_text: str, max_items: int = 20) -> list[dict[str, Any]]:
     try:
+        if "<!ENTITY" in xml_text[:10000]:
+            return []  # feeds never need entity declarations; refusing them rules out expansion attacks
         root = ET.fromstring(xml_text)
     except ET.ParseError:
         return []

@@ -164,3 +164,14 @@ async def test_yahoo_bars_retries_transient_failures(monkeypatch):
     monkeypatch.setattr(netguard.SafeFetcher, "fetch", lambda self, url, **kw: (_ for _ in ()).throw(netguard.FetchError("down")))
     with pytest.raises(netguard.FetchError):
         await F.yahoo_bars(["SPY"], attempts=2, backoff_s=0.01)
+
+
+async def test_failed_web_research_is_recorded_not_scored_as_half(cfg, tmp_path):
+    async def partly_failing(tickers, **kw):
+        return [{"ticker": "AAA", "p_up": 0.7}, {"ticker": "BBB", "p_up": None, "error": "JailError: boom"}]
+
+    led = Ledger(tmp_path / "forward.jsonl")
+    w = await F.run_once(cfg, led, now=ny(2026, 9, 13, 20), bars_fn=fake_bars_fn(date(2026, 9, 11)), llm=FakeLLM(),
+                         research_fn=partly_failing, allow_unjailed=not HAS_BWRAP, log=lambda s: None)
+    d = w[0]
+    assert d["arms"]["live_web"] == {"AAA": 0.7} and d["failed"] == {"live_web": ["BBB"]}

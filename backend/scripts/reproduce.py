@@ -20,6 +20,7 @@ import asyncio
 import json
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -84,7 +85,16 @@ def compare(ref: dict[str, Any], new: dict[str, Any], ref_preds: Path, new_preds
     return diffs
 
 
+def is_backtest_config(config: Path) -> bool:
+    with config.open("rb") as f:
+        raw = tomllib.load(f)
+    return "first_cutoff" not in raw  # forward-test configs describe live decisions, not a re-runnable backtest
+
+
 def reproduce(config: Path) -> bool:
+    if not is_backtest_config(config):
+        print(f"{config.stem}: forward-test config (live decisions can't be re-run), skipped")
+        return True
     cfg = prov.load_config_file(config)
     tag = cfg["tag"]
     ref_path = wf.RESULTS / f"walkforward_{tag}.json"

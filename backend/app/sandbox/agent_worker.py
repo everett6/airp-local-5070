@@ -297,20 +297,42 @@ def _json_object(text: str) -> dict[str, Any] | None:
     return obj if isinstance(obj, dict) else None
 
 
-def _render_history(steps: list[dict[str, Any]]) -> str:
-    """Newest observations keep full text; older ones are shortened to fit the context budget."""
+CHARS_PER_TOKEN = 2.2  # measured ~2.3-2.4 on real tool output (JSON, news); a little under for safety
+
+
+def prompt_char_budget(num_ctx: int, num_predict: int) -> int:
+    """Characters of prompt that fit the model's context next to its answer. Ollama silently drops the
+    START of an over-long prompt, which is where the instructions and the ticker are."""
+    return max(2000, int((num_ctx - num_predict - 128) * CHARS_PER_TOKEN))
+
+
+def _render_history(steps: list[dict[str, Any]], budget: int = MAX_OBS_CHARS) -> str:
+    """Newest observations get the most text; older ones shrink, then drop. Never exceeds `budget`."""
     blocks: list[str] = []
-    budget = MAX_OBS_CHARS
+    remaining = budget
     for step in reversed(steps):
-        lines = [f"[round {step['round']}] thought: {step.get('thought', '')}"]
-        for ob in step["observations"]:
+        head = f"[round {step['round']}] thought: {step.get('thought', '')}"[:600]
+        if remaining < len(head) + 50:
+            blocks.append(f"[round {step['round']}] (older research omitted to fit the context)")
+            break
+        remaining -= len(head)
+        lines = [head]
+        obs = step["observations"]
+        for i, ob in enumerate(obs):
+            call = f"  - {ob['tool']}({json.dumps(ob['args'])[:200]}) -> "
             body = ob["result"] if ob["ok"] else f"ERROR: {ob['error']}"
-            keep = max(200, min(len(body), budget // max(1, len(step["observations"]))))
-            budget -= min(len(body), keep)
-            lines.append(f"  - {ob['tool']}({json.dumps(ob['args'])[:200]}) -> "
-                         f"{body[:keep]}{'…' if len(body) > keep else ''}")
+            share = max(0, remaining // max(1, len(obs) - i) - len(call) - 2)
+            keep = min(len(body), share)
+            if keep == len(body) or keep >= 80:
+                text = body[:keep] + ("…" if len(body) > keep else "")
+            else:
+                text = "(omitted to fit the context)"
+            line = call + text
+            remaining -= len(line) + 1
+            lines.append(line)
         blocks.append("\n".join(lines))
-    return "\n\n".join(reversed(blocks))
+    out = "\n\n".join(reversed(blocks))
+    return out if len(out) <= budget else out[-budget:]
 
 
 def run_research(msg: dict[str, Any]) -> dict[str, Any]:
@@ -319,12 +341,14 @@ def run_research(msg: dict[str, Any]) -> dict[str, Any]:
     system = RESEARCH_SYSTEM.format(ticker=subj["ticker"], horizon=subj.get("horizon_days", 5),
                                    as_of=subj["as_of"], tools=json.dumps(msg["tools"], indent=1),
                                    max_calls=max_calls)
+    history_budget = min(MAX_OBS_CHARS, prompt_char_budget(int(msg.get("num_ctx", 8192)),
+                                                           int(msg.get("num_predict", 600))) - len(system) - 300)
     steps: list[dict[str, Any]] = []
     parse_failures = 0
     final: dict[str, Any] | None = None
     for rnd in range(1, max_rounds + 2):
         last = rnd > max_rounds
-        user = (f"Research so far:\n{_render_history(steps)}" if steps else "No research yet.")
+        user = (f"Research so far:\n{_render_history(steps, history_budget)}" if steps else "No research yet.")
         if last:
             user += "\n\nYou have used all tool rounds. Reply now with the final JSON object."
         _send({"llm_requests": [{"id": "r", "system": system, "user": user}]})
