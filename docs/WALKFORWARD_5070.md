@@ -321,3 +321,104 @@ Rules, all enforced in code (`app/forward`, `tests/test_forward.py`):
 8 scored weeks. The first decision (week ending 2026-09-11) was logged on
 time at 07:30 UTC on 2026-09-14. The dashboard's Live tab shows the verified
 ledger and scoreboard.
+
+## Phase C: SEC fundamentals, point-in-time
+
+**Universe (C0).** The 100 S&P 500 members with the highest prior-year dollar
+volume on 2025-06-02, from the same dated Wikipedia revision as v2b
+(`data/universe_2025-06-02_top100.csv`). 15 members couldn't be ranked because
+Yahoo no longer has their data (mostly companies acquired since, e.g. HES,
+JNPR, WBA); they're listed in the meta file. That is residual survivorship
+bias, small at this size.
+
+**Data (C1–C2, `app/data_ingestion/edgar.py`).** SEC submissions (the filing
+index, including paged older files) and XBRL values for diluted EPS and
+revenue, for all 100 companies, stored as `data/edgar/fundamentals.json`
+(public-domain SEC data, committed). Requests carry the contact User-Agent
+from `backend/.env` and are paced under SEC's limit. Two data quirks are
+handled:
+- The per-concept API returned empty values for some companies (e.g. KO),
+  so the downloader falls back to the company-facts file.
+- Multi-class companies (V, BRK-B) don't tag a single EPS, so net income is
+  used instead. The surprise measure is scale-free, so this is sound.
+
+Point-in-time rules (tested in `tests/test_edgar_pit.py`):
+- a filing or value counts only if **filed on a date before** the cutoff (a
+  filing on the cutoff day after the close would otherwise leak);
+- restated numbers count only from the restating filing's own date;
+- Q4 is derived as FY − Q1..Q3 once the 10-K is filed;
+- every date used is re-checked against the sandbox clock, so a bug aborts
+  the run instead of leaking.
+
+The features per stock and week are:
+- SUE (standardized unexpected earnings: year-over-year EPS change divided by
+  the spread of the prior 8 changes) for the last four quarters;
+- EPS and revenue growth versus the same quarter a year earlier;
+- days since the last quarterly report and the last earnings release (8-K
+  Item 2.02);
+- the number of 8-Ks in the last 30 days;
+- whether an earnings release is expected within the horizon, based on last
+  year's reporting calendar.
+
+**What the agent sees.** A numbers-only sentence: no names, no dates, no text
+from filings (`digest_text`).
+
+**Leak probe (C3).** For 100 stocks × 3 random weeks, the model was asked to
+name the company, once from anonymized prices and once from prices plus the
+digest. It identified the company 1.3% and 1.0% of the time respectively. It
+answered "T" (AT&T) or "BMY" for most stocks regardless of the data, which is
+chance level. Threshold 20%: **passed** (`results/leak_probe_qwen3_8b.json`).
+
+**New arms (C4–C5).**
+- `llm_fund`: the jailed agent with the digest.
+- `llm_selfimprove`: now also sees the digest.
+- `sue_rule`: multi-quarter surprise sign, weights 0.4/0.3/0.2/0.1, no fitting.
+- `feat_fund_logit`: walk-forward logistic regression on price + fundamental
+  features.
+
+**New scores (C6, `app/sandbox/scoring.py`).** Cross-sectional rank IC per
+week (Spearman between forecast and realized return) and the top-minus-bottom
+fifth return, both with confidence intervals that resample whole weeks.
+Tested against SciPy and on synthetic data with a known IC.
+
+## Phase R: deep reinforcement learning on top of the jailed LLM
+
+`app/learning/rl_agent.py` (numpy, deterministic). Each week, for each stock,
+the state has 26 inputs:
+- the 9 price features;
+- the 11 fundamentals features;
+- the logits of the three LLM arms' probabilities;
+- within-week percentile ranks of the 5- and 20-day returns and of the
+  fundamentals LLM's forecast.
+
+The policy picks {short, flat, long}. Its reward is position × standardized
+return − 5 bp costs − a risk penalty. The network is a shared 32×32 tanh trunk
+with an actor (softmax over the three positions), a critic (value of the
+current policy), and a forecast head for P(up) trained on the log score, so
+its probabilities stay calibrated.
+
+Every action's reward is known once a week resolves, so the policy gradient is
+computed exactly over all actions. Gradients are verified numerically in
+`tests/test_rl_agent.py`.
+
+**Continual training.** At every cutoff:
+1. **Data:** it retrains on outcomes resolved by that date, re-checked
+   against the sandbox clock.
+2. **Starting point:** it warm-starts from last week's weights.
+3. **Regularization:** weight decay, plus early stopping on the most recent
+   25% of resolved weeks.
+4. **Guard:** the forecast head is used only if it beats the base rate on
+   those held-out weeks, and the trader only if it beats staying flat.
+   Otherwise it falls back to the base rate or to flat.
+
+The weekly decisions are recorded in the results (`rl_log`) and shown on the
+dashboard.
+
+**Honest framing, written before any result.** This is a one-step contextual
+bandit: positions don't move future prices. With a proper scoring rule, the
+forecast head is equivalent to supervised learning. RL adds the trading
+objective with costs and risk. Training can only find signal that exists in
+the inputs, and the guard's job is to keep it at the base rate when there is
+none. The LLM's own weights are not trained: retraining them on 2025–26
+outcomes would teach the model the test window, the leak this whole setup
+exists to prevent.

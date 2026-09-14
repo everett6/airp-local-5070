@@ -132,3 +132,20 @@ def test_cli_main_routes_probes_and_runs(env, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["walkforward", "--tag", "cli"])
     wf.main()
     assert calls == ["cli"] and "scores_after_warmup" in capsys.readouterr().out
+
+
+async def test_success_criteria_script_on_a_finished_run(env):
+    import importlib.util
+
+    args = wf.parse_args(["--start", "2025-06-02", "--end", "2025-10-01", "--warmup", "4", "--fund", "--rl",
+                          "--tag", "crit", "--data", "data/prices_test.csv"])
+    await wf.run(args)
+    spec = importlib.util.spec_from_file_location("evaluate_criteria",
+                                                  wf.Path(__file__).resolve().parents[1] / "scripts" / "evaluate_criteria.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    ev = mod.evaluate("crit", env / "results")
+    assert set(ev["arms"]) >= {"llm_fund", "rl_forecast", "sue_rule"}
+    assert ev["phase_c"]["c3"] is False  # no leak probe file for this synthetic model: not assumed to pass
+    assert ev["phase_c"]["passed"] is False and "phase_r" in ev and isinstance(ev["phase_r"]["passed"], bool)
+    assert "Phase C criteria" in mod.markdown(ev) and (env / "results" / "criteria_crit.json").exists()
