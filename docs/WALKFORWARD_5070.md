@@ -11,9 +11,31 @@ pip install -e '.[dev]' && pip install yfinance
 python scripts/fetch_prices.py --end 2026-09-12          # real adjusted closes -> data/prices.csv
 ollama pull qwen3:8b
 python -m app.sandbox.walkforward --probe-memorization  # where does the model's knowledge stop?
-python -m app.sandbox.walkforward --tag v1              # full walk-forward, ~20 min on a 5070
-pytest tests/test_walkforward_sandbox.py                # leakage guarantees
+python -m app.sandbox.walkforward --config configs/v2.toml   # a frozen experiment, ~20 min on a 5070
+python scripts/reproduce.py                             # re-check every published run (seconds, no GPU)
+pytest tests/test_walkforward_sandbox.py tests/test_jail_hardening.py   # leakage and jail guarantees
 ```
+
+## Reproducibility and receipts
+
+- **Frozen experiments.** Each published run has a config in `backend/configs/`
+  (`v2.toml`, `v3_excess.toml`, `v4_14b.toml`). A tag always means one
+  experiment: re-running a tag with different parameters is refused unless you
+  pass `--force`.
+- **Receipts in every report.** `config`, `config_hash`, git commit and whether
+  source files had uncommitted changes, the sha256 of `prices.csv`, the Ollama
+  model digest, Python/platform/GPU, and the jail limits. The dashboard shows
+  these under "Receipts".
+- **Pinned data.** `configs/data.lock.json` records the price file's checksum.
+  Yahoo re-adjusts old prices after dividends, so a fresh download can differ.
+  `reproduce.py` reports a mismatch (exit 3) instead of silently comparing
+  against different data.
+- **Exact reproduction without a GPU.** The LLM response cache
+  (`results/llm_cache_*.jsonl`, ~1.3 MB) is committed. `scripts/reproduce.py`
+  re-runs every frozen config and compares every score and every individual
+  prediction with the published files. As of commit `ec59aff`, all three
+  published runs reproduce **identically** with 0 new LLM calls. A negative
+  control (one changed setting) is correctly reported as different.
 
 ## What the research says (and what we did about it)
 
@@ -43,7 +65,11 @@ window, and non-LLM baselines scored on the identical grid.
    source file. It cannot open `data/prices.csv`, the repo, or `$HOME`. The
    orchestrator relays its LLM prompts to Ollama. Every run probes this live
    and **refuses to start** if the probe fails; the result is saved in the
-   results JSON.
+   results JSON. Resource limits (via `prlimit`: 2 GB memory, CPU time, 64 open
+   files, 1 MB max file size), a response timeout, maximum message size, a cap
+   on LLM calls per message, and JSON validation mean a misbehaving agent is
+   killed with `JailError` and the run aborts before writing results
+   (`tests/test_jail_hardening.py` runs hostile workers both jailed and unjailed).
 3. **Memory** — resolved records enter memory at cutoff *c* only if the
    resolution date is `<= c`, re-checked by `enforce_point_in_time` inside
    `sandbox_scope(c)`.

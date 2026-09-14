@@ -22,16 +22,16 @@ what counts as success and what we do if nothing works.
 
 ---
 
-## Phase A — Provenance and reproducibility (~2 h). Do first.
+## Phase A — Provenance and reproducibility (~2 h). ✅ Done 2026-09-13 (commit `ec59aff`)
 
 Everything after this produces new results, so they must be stamped from the start.
 
 | # | Task | Done when |
 |---|---|---|
-| A1 | Record `git_commit`, `dirty` flag, sha256 of `prices.csv`, and the Ollama model digest (from `/api/show`) in every results JSON | Fields present; dashboard Overview shows them |
-| A2 | `--config configs/<name>.toml` for walkforward. The runner stores the config hash and refuses to write over a finished run with a different hash | Test: changed config and same tag → error |
-| A3 | `scripts/reproduce.sh`: fetch prices with a pinned end date, verify the checksum, re-run v2 from cache, diff the scores | Script exits 0 and prints "scores identical" |
-| A4 | Jail hardening: memory/CPU limits (`prlimit`), per-call timeout, max message size | Tests: an agent that allocates too much or hangs is killed and the run aborts cleanly |
+| A1 | Record `git_commit`, `dirty` flag, sha256 of `prices.csv`, and the Ollama model digest (from `/api/tags`) in every results JSON | ✅ Fields present; dashboard Overview has a Receipts panel |
+| A2 | `--config configs/<name>.toml` for walkforward. The runner stores the config hash and refuses to write over a finished run with a different hash | ✅ Tested, and checked on the real CLI |
+| A3 | `scripts/reproduce.py`: verify the pinned data checksum (optionally fetch), re-run every frozen config from the committed cache, diff every score and prediction | ✅ Exits 0, "ALL IDENTICAL" for v2, v3_excess, v4_14b; negative control detected |
+| A4 | Jail hardening: memory/CPU limits (`prlimit`), per-call timeout, max message size | ✅ 17 hostile-worker tests (memory hog, hang, oversized message, request flood, bad JSON, stderr flood), jailed and unjailed |
 
 ## Phase B — Airtight evaluation (~3 h of work, plus calendar time)
 
@@ -42,9 +42,8 @@ Everything after this produces new results, so they must be stamped from the sta
 | B3 | **Pre-registered forward test.** Freeze the best current config as `configs/forward_v1.toml`. A weekly job (Monday after close) fetches prices, predicts the next 5 days, and appends to a write-once log where each entry holds the previous entry's hash. Resolved outcomes are filled in later | First week's predictions are logged with timestamps *before* the outcomes exist. The dashboard has a "Live" tab |
 | B4 | Doc update: v2b plus the forward-test protocol | Pushed |
 
-B3 needs your OK to install a scheduled job (cron or systemd timer), and the
-PC must be on Monday evenings. The forward test needs **8–12 weeks** before
-its numbers mean anything.
+B3 runs as a catch-up job because the PC isn't always on (see Decisions). The
+forward test needs **8–12 weeks** before its numbers mean anything.
 
 ## Phase C — New signal: SEC filings and earnings (~1–1.5 days, runs overnight)
 
@@ -100,8 +99,11 @@ All three must hold. Anything else is reported as "no edge".
 | B3 forward test | 1.5 h to set up | ~10 min/week | then 8–12 weeks |
 | E decision | 1 h | — | after C7 (first read), after forward test (final) |
 
-## Decisions needed from you
+## Decisions (answered 2026-09-13)
 
-1. **SEC contact:** EDGAR requires a User-Agent with a name and email. Which email should it use?
-2. **Scheduled job:** OK to install a weekly timer for the forward test (B3), with the PC on Monday evenings?
-3. **Pushes:** OK to push to GitHub at the end of each phase?
+1. **SEC contact:** a User-Agent with name and email is set; see the EDGAR connector (C1).
+2. **Scheduled job:** the PC can't be guaranteed on Monday evenings. So B3 must
+   run whenever the PC is next on (e.g. a systemd user timer with
+   `Persistent=true`). A week whose prediction couldn't be made before its
+   cutoff's next market open is logged as **missed**, never backfilled.
+3. **Pushes:** approved at the end of each phase.

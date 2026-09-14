@@ -101,7 +101,7 @@ airp-local/
 │   │   ├── agents/         specialist agents
 │   │   ├── data_ingestion/ connectors — sandbox-aware mock connectors included
 │   │   └── api/routes/     FastAPI routes, including /api/sandbox/*
-│   └── tests/              pytest — 125 tests
+│   └── tests/              pytest — 154 tests
 ├── frontend/               Next.js + TypeScript UI (Sandbox page is live)
 └── docs/                   ARCHITECTURE, API_SPEC, AGENT_INTERFACES, ROADMAP,
                             LOCAL_SETUP (two-GPU walkthrough), SANDBOX,
@@ -126,7 +126,7 @@ actually check whether the predictions are any good before trusting them.
 
 ## Verified state (as of last commit)
 
-- **5070 edition:** 125/125 pytest passing (19 new walk-forward, jail, and dashboard tests,
+- **5070 edition:** 154/154 pytest passing (48 new walk-forward, jail-hardening, provenance, and dashboard tests,
   including live bubblewrap isolation), `ruff check` clean on app/tests/scripts,
   `mypy` clean on `app/sandbox`, `app/data_ingestion`, and `app/dashboard/data.py`. The bullets below
   describe the upstream `airp-local` verification and were not re-run here.
