@@ -83,25 +83,38 @@ def main() -> None:
     ap.add_argument("--top", type=int, default=20)
     ap.add_argument("--end", required=True, help="last price date to download (exclusive), e.g. 2026-09-12")
     ap.add_argument("--price-start", default="2024-01-01")
+    ap.add_argument("--overwrite", action="store_true")
     args = ap.parse_args()
     as_of = date.fromisoformat(args.as_of)
+    # the original top-20 files keep their names; other sizes get a suffix so nothing frozen is overwritten
+    suffix = "" if args.top == 20 else f"_top{args.top}"
+    for existing in (BACKEND / "data" / f"universe_{as_of}{suffix}.csv", BACKEND / "data" / f"prices_pit_{as_of}{suffix}.csv"):
+        if existing.exists() and not args.overwrite:
+            raise SystemExit(f"{existing.name} exists (a frozen run may depend on it); pass --overwrite to replace it")
     members, snapshot = membership_as_of(as_of)
     top, missing, cutoff_dv = rank_by_dollar_volume(members, as_of, args.top)
     data = BACKEND / "data"
     data.mkdir(exist_ok=True)
     out = top.assign(avg_dollar_volume_usd_bn=(top["avg_dollar_volume"] / 1e9).round(2))
     out[["rank", "yahoo", "name", "sector", "avg_dollar_volume_usd_bn", "days"]].rename(
-        columns={"yahoo": "ticker"}).to_csv(data / f"universe_{as_of}.csv", index=False)
+        columns={"yahoo": "ticker"}).to_csv(data / f"universe_{as_of}{suffix}.csv", index=False)
 
     import yfinance as yf
 
     tickers = [*out["yahoo"], "SPY"]
     px = yf.download(tickers, start=args.price_start, end=args.end, auto_adjust=True, progress=False)["Close"]
-    px = px[tickers]
+    px = px.reindex(columns=tickers)
+    # batch downloads drop whole symbols transiently (seen: NVDA, AAPL); retry any symbol with >10% gaps
+    for sym in [s for s in tickers if px[s].isna().mean() > 0.10]:
+        for _ in range(3):
+            one = yf.download(sym, start=args.price_start, end=args.end, auto_adjust=True, progress=False)
+            if len(one):
+                px[sym] = one["Close"].squeeze().reindex(px.index)
+                break
     gaps = {t: int(px[t].isna().sum()) for t in tickers if px[t].isna().any()}
     px = px.dropna(subset=["SPY"])
     px.index = px.index.strftime("%Y-%m-%d")
-    px.to_csv(data / f"prices_pit_{as_of}.csv")
+    px.to_csv(data / f"prices_pit_{as_of}{suffix}.csv")
     meta = {
         "as_of": str(as_of), "rule": f"S&P 500 members on as_of, top {args.top} by mean daily dollar volume over "
                                      "the prior 252 trading days (min 200)",
@@ -111,10 +124,10 @@ def main() -> None:
         "members_without_enough_data": missing, "price_gaps_after_download": gaps,
         "rank_cutoff_avg_dollar_volume_usd_bn": round(cutoff_dv / 1e9, 2),
         "dedupe": "one share class per company (the more traded one)",
-        "universe": list(out["yahoo"]), "price_file": f"prices_pit_{as_of}.csv",
+        "universe": list(out["yahoo"]), "price_file": f"prices_pit_{as_of}{suffix}.csv",
         "price_window": [args.price_start, args.end],
     }
-    (data / f"universe_{as_of}.meta.json").write_text(json.dumps(meta, indent=2) + "\n")
+    (data / f"universe_{as_of}{suffix}.meta.json").write_text(json.dumps(meta, indent=2) + "\n")
     print(json.dumps({k: meta[k] for k in ("members_on_as_of", "membership_snapshot", "universe",
                                            "price_gaps_after_download")}, indent=1))
     print("members without enough data:", len(missing), missing[:15], "| #N cutoff $bn/day:",
