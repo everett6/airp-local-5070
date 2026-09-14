@@ -12,6 +12,19 @@
 > [`docs/WALKFORWARD_5070.md`](docs/WALKFORWARD_5070.md) for the full results,
 > the research behind the design, and how to reproduce.
 
+### Results dashboard (Python)
+
+```bash
+cd backend && .venv/bin/pip install -e ".[ui]"
+.venv/bin/streamlit run app/dashboard/app.py      # opens http://localhost:8501
+```
+
+Browse every run: scores, week-clustered confidence intervals against
+"always up", accuracy and long/short growth over time, calibration, the
+self-improving agent's lessons and stacker decisions, every individual
+prediction, a cross-run comparison, the memorization probe, and a form to
+launch new runs on your local Ollama models with live progress.
+
 A local-first AI investment research platform: runs against **your own GPUs**
 (no cloud LLM API keys required) and includes a **point-in-time sandbox** for
 honestly backtesting predictions — the data connectors physically reject
@@ -88,7 +101,7 @@ airp-local/
 │   │   ├── agents/         specialist agents
 │   │   ├── data_ingestion/ connectors — sandbox-aware mock connectors included
 │   │   └── api/routes/     FastAPI routes, including /api/sandbox/*
-│   └── tests/              pytest — 119 tests
+│   └── tests/              pytest — 125 tests
 ├── frontend/               Next.js + TypeScript UI (Sandbox page is live)
 └── docs/                   ARCHITECTURE, API_SPEC, AGENT_INTERFACES, ROADMAP,
                             LOCAL_SETUP (two-GPU walkthrough), SANDBOX,
@@ -113,9 +126,9 @@ actually check whether the predictions are any good before trusting them.
 
 ## Verified state (as of last commit)
 
-- **5070 edition:** 119/119 pytest passing (13 new walk-forward/jail tests,
+- **5070 edition:** 125/125 pytest passing (19 new walk-forward, jail, and dashboard tests,
   including live bubblewrap isolation), `ruff check` clean on app/tests/scripts,
-  `mypy` clean on `app/sandbox` and `app/data_ingestion`. The bullets below
+  `mypy` clean on `app/sandbox`, `app/data_ingestion`, and `app/dashboard/data.py`. The bullets below
   describe the upstream `airp-local` verification and were not re-run here.
 - Backend: **106/106 pytest passing**, `ruff check` clean, `mypy --strict`
   clean across **38 modules** (quant/evidence/confidence/context/llm/sandbox/

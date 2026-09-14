@@ -150,6 +150,22 @@ overfit, which is why v2 added real L2 and the holdout guard.
 
 ### What the numbers say
 
+**Significance, done properly.** Stocks in the same week move together, so
+the ±SE above (which treats every prediction as independent) is too narrow.
+The dashboard's Brier-gap test resamples whole weeks (bootstrap, 2,000 draws)
+and compares each arm with `always_up` on identical predictions:
+
+| run | arm | Brier gap vs always_up | 95% CI | verdict |
+|---|---|---|---|---|
+| v2 | llm_plain | +0.0009 | [−0.0010, +0.0027] | no clear difference |
+| v2 | llm_selfimprove | +0.0107 | [+0.0035, +0.0183] | **significantly worse** |
+| v3_excess | llm_plain | +0.0013 | [+0.0004, +0.0023] | **significantly worse** |
+| v3_excess | llm_selfimprove | +0.0009 | [−0.0010, +0.0030] | no clear difference |
+| v4_14b | llm_plain | +0.0008 | [−0.0025, +0.0041] | no clear difference |
+| v4_14b | llm_selfimprove | +0.0030 | [−0.0029, +0.0086] | no clear difference |
+
+No arm in any run is significantly *better* than `always_up`.
+
 - **No LLM arm beat `always_up` on accuracy or Brier in any run.** With a 1-SE
   band of ±1.6 pts (n=1040) or ±2.2 pts (n=520), every arm is within noise of a
   coin flip or of the up-drift base rate. The LLM mostly learned to say "up" in

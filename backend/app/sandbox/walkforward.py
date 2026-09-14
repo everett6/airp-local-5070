@@ -317,7 +317,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / f"walkforward_{args.tag}.json").write_text(json.dumps(report, indent=2, default=str))
     rows = [{k: (v.isoformat() if isinstance(v, date) else v) for k, v in p.items() if k != "features"}
-            for arm, ps in arms.items() if arm.startswith(("llm", "feat")) for p in ({**q, "arm": arm} for q in ps)]
+            for arm, ps in arms.items() for p in ({**q, "arm": arm} for q in ps)]
     (RESULTS / f"walkforward_{args.tag}_predictions.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
     return report
 
