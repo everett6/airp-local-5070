@@ -72,6 +72,8 @@ async def download(tickers: list[str], user_agent: str, out: Path = OUT) -> dict
 
     try:
         mapping = await get_json("https://www.sec.gov/files/company_tickers.json")
+        if not mapping:
+            raise FetchError("SEC company tickers file unavailable")
         cik_of = {v["ticker"].upper().replace(".", "-"): int(v["cik_str"]) for v in mapping.values()}
         sem = asyncio.Semaphore(4)  # the fetcher also paces sec.gov hosts to ~8 requests/second
 
@@ -241,10 +243,10 @@ class PITFundamentals:
     def features(self, ticker: str, cutoff: date, horizon_days: int = 5) -> dict[str, float]:
         comp = self.companies.get(ticker) or {}
         c = cutoff.isoformat()
-        eps_facts = [tuple(f) for f in (comp.get("eps") or {}).get("facts", [])]
-        rev_facts = [tuple(f) for f in (comp.get("revenue") or {}).get("facts", [])]
-        eps_q = quarters_as_of(eps_facts, cutoff)  # type: ignore[arg-type]
-        rev_q = quarters_as_of(rev_facts, cutoff)  # type: ignore[arg-type]
+        eps_facts: list[Fact] = [(f[0], f[1], float(f[2]), f[3]) for f in (comp.get("eps") or {}).get("facts", [])]
+        rev_facts: list[Fact] = [(f[0], f[1], float(f[2]), f[3]) for f in (comp.get("revenue") or {}).get("facts", [])]
+        eps_q = quarters_as_of(eps_facts, cutoff)
+        rev_q = quarters_as_of(rev_facts, cutoff)
         filings = [f for f in comp.get("filings", []) if f[1] < c]
         for q in (eps_q[-1:] + rev_q[-1:]):
             enforce_point_in_time(_eod(q.first_filed), source=f"edgar:{ticker}")
@@ -253,7 +255,6 @@ class PITFundamentals:
         sues = [s for s in sue_series(eps_q)][-4:][::-1]
         sues += [None] * (4 - len(sues))
         earn8k = [f[1] for f in filings if f[0].startswith("8-K") and "2.02" in f[2]]
-        reports = [f[1] for f in filings if f[0].split("/")[0] in ("10-Q", "10-K")]
         last_year = cutoff - timedelta(days=364)
         window_end = last_year + timedelta(days=int(horizon_days * 7 / 5) + 3)
         expected = any(last_year.isoformat() < d <= window_end.isoformat()
