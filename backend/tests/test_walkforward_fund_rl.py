@@ -53,8 +53,19 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(wf, "_RealTrainer", __import__("app.learning.rl_agent", fromlist=["x"]).ContinualTrainer,
                         raising=False)
     if not HAS_BWRAP:
+        # CI has no bubblewrap. This test is about the data pipeline; the jail has its own tests. The run
+        # (correctly) refuses to start when isolation can't be verified, so the probe result is simulated here.
         orig = wf.AgentJail
-        monkeypatch.setattr(wf, "AgentJail", lambda llm, **kw: orig(llm, allow_unjailed=True, **kw))
+
+        class UnjailedForTest(orig):
+            def __init__(self, llm, **kw):
+                super().__init__(llm, allow_unjailed=True, **kw)
+
+            async def probe(self, forbidden_paths):
+                return {"readable_forbidden_paths": [], "network_reachable": False, "jailed": False,
+                        "passed": True, "simulated_for_test": True}
+
+        monkeypatch.setattr(wf, "AgentJail", UnjailedForTest)
     return tmp_path
 
 
@@ -64,7 +75,8 @@ async def test_fund_and_rl_arms_run_end_to_end(env):
     rep = await wf.run(args)
     arms = set(rep["scores_full"])
     assert {"llm_fund", "feat_fund_logit", "sue_rule", "rl_forecast", "llm_plain", "selector"} <= arms
-    assert rep["config"]["fund"] and rep["config"]["rl"] and rep["jail_probe_end"]["passed"] == HAS_BWRAP
+    assert rep["config"]["fund"] and rep["config"]["rl"] and rep["jail_probe_end"]["passed"]
+    assert rep["jail_probe_end"].get("simulated_for_test", False) is not HAS_BWRAP
     statuses = [r["status"] for r in rep["rl_log"]]
     assert statuses[0] == "not_enough_data" and any(s != "not_enough_data" for s in statuses)
     assert rep["rl_trader"]["full"]["weeks"] >= 2 and len(rep["rl_trader"]["state_keys"]) == len(wf.RL_STATE_KEYS)
