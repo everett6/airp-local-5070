@@ -138,3 +138,16 @@ async def test_real_worker_still_works_under_default_limits():
     async with AgentJail(_echo_llm, allow_unjailed=not shutil.which("bwrap")) as jail:
         probe = await jail.probe(["/etc/hostname"])
     assert probe["readable_forbidden_paths"] == [] or not jail.jailed
+
+
+@pytest.mark.parametrize("jailed", MODES, indirect=True)
+async def test_agent_that_stops_reading_cannot_block_a_large_send(tmp_path, jailed):
+    # The pipe holds ~64 KB. A hung agent that never reads must not leave the orchestrator stuck in drain().
+    path = tmp_path / "deaf_worker.py"
+    path.write_text("import time\ntime.sleep(60)\n")
+    t0 = time.monotonic()
+    jail = AgentJail(_echo_llm, allow_unjailed=not jailed, worker=path, limits=JailLimits(response_timeout_s=1))
+    async with jail:
+        with pytest.raises(JailError, match="not accept"):
+            await jail.call({"task": "x", "blob": "y" * (4 * 1024 * 1024)})
+    assert time.monotonic() - t0 < 10

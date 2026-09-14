@@ -54,6 +54,11 @@ def test_check_overwrite(tmp_path):
     with pytest.raises(prov.ProvenanceError, match="new tag"):
         prov.check_overwrite(path, "bbbb")
     prov.check_overwrite(path, "bbbb", force=True)
+    # same parameters but different price data is a different experiment too
+    path.write_text(json.dumps({"config_hash": "aaaa", "provenance": {"data": {"sha256": "d1"}}}))
+    prov.check_overwrite(path, "aaaa", data_sha256="d1")
+    with pytest.raises(prov.ProvenanceError, match="different price data"):
+        prov.check_overwrite(path, "aaaa", data_sha256="d2")
     path.write_text(json.dumps({"tag": "legacy"}))
     with pytest.raises(prov.ProvenanceError, match="no config hash"):
         prov.check_overwrite(path, "aaaa")
@@ -78,6 +83,10 @@ def test_git_state_detects_dirty_source(tmp_path):
     src.write_text("x = 2\n")
     s = prov.git_state(tmp_path)
     assert s["dirty"] is True and s["dirty_files"] == ["backend/app/m.py"]
+    git("checkout", "--", "backend/app/m.py")
+    (src.parent / "new_module.py").write_text("y = 1\n")  # uncommitted new source file also affects results
+    s = prov.git_state(tmp_path)
+    assert s["dirty"] is True and s["dirty_files"] == ["backend/app/new_module.py"]
 
 
 def test_git_state_outside_a_repo(tmp_path):

@@ -57,13 +57,13 @@ def sha256_file(path: Path) -> str | None:
 
 def git_state(repo: Path, source_paths: tuple[str, ...] = ("backend/app", "backend/scripts", "backend/configs")
               ) -> dict[str, Any]:
-    """Commit of HEAD, and whether any tracked result-affecting source differs from it."""
+    """Commit of HEAD, and whether result-affecting sources differ from it (modified or new files)."""
     def git(*a: str) -> str:
         return subprocess.run(["git", "-C", str(repo), *a], capture_output=True, text=True,
                               timeout=10, check=True).stdout
     try:
         commit = git("rev-parse", "HEAD").strip()
-        dirty_files = git("status", "--porcelain", "--untracked-files=no", "--", *source_paths)
+        dirty_files = git("status", "--porcelain", "--untracked-files=all", "--", *source_paths)
     except (OSError, subprocess.SubprocessError):
         return {"commit": None, "dirty": None}
     lines = [ln for ln in dirty_files.splitlines() if ln.strip()]
@@ -101,17 +101,23 @@ def collect(repo: Path, data_path: Path, model: str, host: str = "http://127.0.0
     }
 
 
-def check_overwrite(report_path: Path, new_hash: str, force: bool = False) -> None:
-    """A tag is one frozen experiment: re-running it is fine only with identical parameters."""
+def check_overwrite(report_path: Path, new_hash: str, force: bool = False,
+                    data_sha256: str | None = None) -> None:
+    """A tag is one frozen experiment: re-running it is fine only with identical parameters and data."""
     if force or not report_path.exists():
         return
     try:
-        old = json.loads(report_path.read_text()).get("config_hash")
+        report = json.loads(report_path.read_text())
     except (OSError, json.JSONDecodeError):
-        old = None
+        report = {}
+    old = report.get("config_hash")
+    old_data = ((report.get("provenance") or {}).get("data") or {}).get("sha256")
     if old is None:
         raise ProvenanceError(f"{report_path.name} has no config hash (made before provenance existed); "
                               "use a new tag, or --force to overwrite it")
     if old != new_hash:
         raise ProvenanceError(f"{report_path.name} was produced with config {old}, this run is {new_hash}; "
                               "use a new tag, or --force to overwrite it")
+    if old_data and data_sha256 and old_data != data_sha256:
+        raise ProvenanceError(f"{report_path.name} was produced from different price data "
+                              f"({old_data[:12]} vs {data_sha256[:12]}); use a new tag, or --force to overwrite it")

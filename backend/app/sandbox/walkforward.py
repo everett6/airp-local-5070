@@ -226,8 +226,9 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
               "horizon": args.horizon, "step": args.step, "warmup": args.warmup,
               "reflect_every": args.reflect_every, "target": args.target}
     cfg_hash = prov.config_hash(config)
-    prov.check_overwrite(RESULTS / f"walkforward_{args.tag}.json", cfg_hash, force=getattr(args, "force", False))
     provenance = prov.collect(BACKEND.parent, DATA, args.model)
+    prov.check_overwrite(RESULTS / f"walkforward_{args.tag}.json", cfg_hash, force=getattr(args, "force", False),
+                         data_sha256=provenance["data"]["sha256"])
 
     plain, selfimp, featlr = ArmState("llm_plain"), ArmState("llm_selfimprove"), ArmState("feat_logit")
     stacker_log: list[dict[str, Any]] = []

@@ -11,7 +11,7 @@ pip install -e '.[dev]' && pip install yfinance
 python scripts/fetch_prices.py --end 2026-09-12          # real adjusted closes -> data/prices.csv
 ollama pull qwen3:8b
 python -m app.sandbox.walkforward --probe-memorization  # where does the model's knowledge stop?
-python -m app.sandbox.walkforward --config configs/v2.toml   # a frozen experiment, ~20 min on a 5070
+python -m app.sandbox.walkforward --config configs/v2.toml   # a frozen experiment: seconds from the committed cache, ~20 min uncached
 python scripts/reproduce.py                             # re-check every published run (seconds, no GPU)
 pytest tests/test_walkforward_sandbox.py tests/test_jail_hardening.py   # leakage and jail guarantees
 ```
@@ -66,7 +66,7 @@ window, and non-LLM baselines scored on the identical grid.
    orchestrator relays its LLM prompts to Ollama. Every run probes this live
    and **refuses to start** if the probe fails; the result is saved in the
    results JSON. Resource limits (via `prlimit`: 2 GB memory, CPU time, 64 open
-   files, 1 MB max file size), a response timeout, maximum message size, a cap
+   files, 1 MB max file size), send and response timeouts, maximum message size, a cap
    on LLM calls per message, and JSON validation mean a misbehaving agent is
    killed with `JailError` and the run aborts before writing results
    (`tests/test_jail_hardening.py` runs hostile workers both jailed and unjailed).

@@ -41,6 +41,7 @@ def _write_run(tmp_path, tag="t1", n_cut=6, edge=0.0):
 def test_list_load_and_warm_filter(tmp_path):
     report = _write_run(tmp_path)
     (tmp_path / "walkforward_broken.json").write_text("{not json")
+    (tmp_path / "walkforward_partial.json").write_text('{"tag": "partial"}')  # not a finished report
     runs = D.list_runs(tmp_path)
     assert [r["tag"] for r in runs] == ["t1"] and runs[0]["jail_ok"]
     preds = D.load_predictions("t1", tmp_path)

@@ -49,6 +49,9 @@ def list_runs(results: Path = RESULTS) -> list[dict[str, Any]]:
             r = json.loads(p.read_text())
         except (OSError, json.JSONDecodeError):
             continue
+        if not isinstance(r, dict) or not {"tag", "model", "window", "n_cutoffs", "tickers",
+                                           "jail_probe_start", "jail_probe_end"} <= r.keys():
+            continue  # not a finished walk-forward report
         runs.append({
             "tag": r["tag"], "model": r["model"], "target": r.get("target", "abs"),
             "window": f"{r['window'][0]} → {r['window'][1]}", "cutoffs": r["n_cutoffs"],

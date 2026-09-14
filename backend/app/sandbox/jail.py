@@ -110,8 +110,9 @@ class AgentJail:
                  limits: JailLimits | None = None) -> None:
         self._llm = llm
         self.limits = limits or JailLimits()
+        bwrap = shutil.which("bwrap")
         self._cmd = build_command(allow_unjailed, worker, self.limits)
-        self.jailed = any(Path(c).name == "bwrap" for c in self._cmd)
+        self.jailed = bwrap is not None and bwrap in self._cmd
         self._proc: asyncio.subprocess.Process | None = None
         self._stderr_tail: deque[bytes] = deque(maxlen=64)
         self._stderr_task: asyncio.Task[None] | None = None
@@ -161,7 +162,10 @@ class AgentJail:
         assert self._proc and self._proc.stdin
         try:
             self._proc.stdin.write((json.dumps(obj) + "\n").encode())
-            await self._proc.stdin.drain()
+            # a hung agent that stops reading would otherwise block drain() forever once the pipe fills
+            await asyncio.wait_for(self._proc.stdin.drain(), self.limits.response_timeout_s)
+        except TimeoutError as e:
+            raise await self._fail(f"agent did not accept input within {self.limits.response_timeout_s}s") from e
         except (BrokenPipeError, ConnectionResetError) as e:
             raise await self._fail(f"agent process is gone: {self._stderr_text()}") from e
 

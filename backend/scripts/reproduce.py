@@ -95,12 +95,21 @@ def reproduce(config: Path) -> bool:
     tmp_tag = f"repro_{tag}"
     new_path = wf.RESULTS / f"walkforward_{tmp_tag}.json"
     new_preds = wf.RESULTS / f"walkforward_{tmp_tag}_predictions.jsonl"
+    if new_path.exists() or new_preds.exists():
+        print(f"{tag}: ERROR {new_path.name} already exists; it would be deleted, so refusing (rename it first)")
+        return False
     try:
         new = asyncio.run(wf.run(wf.parse_args(["--config", str(config), "--tag", tmp_tag, "--force"])))
         diffs = compare(ref, new, wf.RESULTS / f"walkforward_{tag}_predictions.jsonl", new_preds)
+    except (Exception, SystemExit) as e:  # noqa: BLE001 - any failure (incl. jail probe exit) is reported per config
+        print(f"{tag}: ERROR re-running: {type(e).__name__}: {e}")
+        return False
     finally:
         new_path.unlink(missing_ok=True)
         new_preds.unlink(missing_ok=True)
+    if ref.get("config_hash") and ref["config_hash"] != new["config_hash"]:
+        diffs.insert(0, f"config: {config.name} (hash {new['config_hash']}) no longer matches the published "
+                        f"run's config (hash {ref['config_hash']})")
     old_digest = (ref.get("provenance") or {}).get("model_digest")
     if old_digest and old_digest != new["provenance"]["model_digest"]:
         print(f"{tag}: note: Ollama model digest changed since publication")
