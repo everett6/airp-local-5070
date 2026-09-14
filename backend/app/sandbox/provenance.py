@@ -24,7 +24,7 @@ from typing import Any
 # Parameters that change results. Changing any of these changes the config hash.
 RESULT_FIELDS = ("model", "start", "end", "horizon", "step", "warmup", "reflect_every", "target")
 # Result-affecting fields added later: hashed only when present, so older hashes stay valid.
-OPTIONAL_RESULT_FIELDS = ("data",)
+OPTIONAL_RESULT_FIELDS = ("data", "fund", "rl")
 # Allowed in a config file but not hashed: they don't change what is computed.
 OTHER_FIELDS = ("tag", "concurrency", "description")
 

@@ -40,22 +40,29 @@ import json
 import math
 import statistics
 import time
+from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
 import httpx
+import numpy as np
 
+from app.data_ingestion.edgar import FUND_KEYS, PITFundamentals, digest_text
+from app.learning.linear import Logistic
+from app.learning.rl_agent import ContinualTrainer, score_trader
 from app.sandbox import agent_worker as aw
 from app.sandbox import provenance as prov
 from app.sandbox.clock import enforce_point_in_time, sandbox_scope
 from app.sandbox.jail import AgentJail
 from app.sandbox.pit_data import PriceTable
+from app.sandbox.scoring import cross_sectional
 
 BACKEND = Path(__file__).resolve().parents[2]
 DATA = BACKEND / "data" / "prices.csv"
 RESULTS = BACKEND / "results"
+FUND_PATH = BACKEND / "data" / "edgar" / "fundamentals.json"
 MARKET = "SPY"
 LOOKBACK = 120
 
@@ -253,10 +260,30 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     prov.check_overwrite(RESULTS / f"walkforward_{args.tag}.json", cfg_hash, force=getattr(args, "force", False),
                          data_sha256=provenance["data"]["sha256"])
 
+    use_fund, use_rl = bool(getattr(args, "fund", False)), bool(getattr(args, "rl", False))
+    if use_fund:
+        config["fund"] = True
+        fund = PITFundamentals.load(FUND_PATH)
+        provenance["fundamentals"] = {"path": str(FUND_PATH.relative_to(BACKEND)), "sha256": prov.sha256_file(FUND_PATH)}
+    if use_rl:
+        if not use_fund:
+            raise SystemExit("--rl needs --fund (its state includes fundamentals and every LLM arm)")
+        config["rl"] = True
+    if use_fund or use_rl:  # re-hash and re-check with the extra fields
+        cfg_hash = prov.config_hash(config)
+        prov.check_overwrite(RESULTS / f"walkforward_{args.tag}.json", cfg_hash, force=getattr(args, "force", False),
+                             data_sha256=provenance["data"]["sha256"])
+
     plain, selfimp, featlr = ArmState("llm_plain"), ArmState("llm_selfimprove"), ArmState("feat_logit")
+    fundarm, featfund, rlstate = ArmState("llm_fund"), ArmState("feat_fund_logit"), ArmState("rl")
+    rl_trainer = ContinualTrainer(len(RL_STATE_KEYS)) if use_rl else None
+    rl_log: list[dict[str, Any]] = []
     stacker_log: list[dict[str, Any]] = []
     t_start = time.time()
-    async with AgentJail(llm) as jail_plain, AgentJail(llm) as jail_self:
+    async with AsyncExitStack() as stack:
+        jail_plain = await stack.enter_async_context(AgentJail(llm))
+        jail_self = await stack.enter_async_context(AgentJail(llm))
+        jail_fund = await stack.enter_async_context(AgentJail(llm)) if use_fund else None
         probe = await jail_self.probe([str(data_path), str(Path.home() / ".bashrc"), str(BACKEND / "app")])
         if not probe["passed"]:
             raise SystemExit(f"jail probe FAILED, refusing to run: {probe}")
@@ -271,6 +298,10 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                 # the ids are tickers only on the orchestrator side of the pipe:
                 id_map = {f"a{k}": it for k, it in enumerate(items)}
                 sent = [{"id": k, "asset": it["asset"], "market": it["market"]} for k, it in id_map.items()]
+                fund_feats: dict[str, dict[str, float]] = {}
+                if use_fund:
+                    fund_feats = {k: fund.features(it["id"], cutoff, args.horizon) for k, it in id_map.items()}
+                    sent_fund = [{**s, "fund_text": digest_text(fund_feats[s["id"]])} for s in sent]
 
                 mem_recs = resolved_as_of(selfimp, cutoff)
                 if args.reflect_every and ci % args.reflect_every == 0 and len(mem_recs) >= 40:
@@ -283,28 +314,60 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                     selfimp.lesson_log.append({"cutoff": cutoff.isoformat(), "lessons": selfimp.lessons})
                 memory = {
                     "track_record": track_record(mem_recs), "lessons": selfimp.lessons,
-                    "resolved": [{"p_llm": r["p_llm"], "features": r["features"], "up": r["up"]} for r in mem_recs],
+                    # the stacker trains on the most recent 2000 resolved calls (every published run has fewer)
+                    "resolved": [{"p_llm": r["p_llm"], "features": r["features"], "up": r["up"]}
+                                 for r in mem_recs[-STACKER_WINDOW:]],
                 }
-                res_plain, res_self = await asyncio.gather(
-                    jail_plain.call({"task": "predict", "items": sent, "target": args.target}),
-                    jail_self.call({"task": "predict", "items": sent, "memory": memory,
-                                    "target": args.target}),
-                )
+                horizon_kw = {} if args.horizon == 5 else {"horizon": args.horizon}
+                calls = [
+                    jail_plain.call({"task": "predict", "items": sent, "target": args.target, **horizon_kw}),
+                    jail_self.call({"task": "predict", "items": sent_fund if use_fund else sent, "memory": memory,
+                                    "target": args.target, **horizon_kw}),
+                ]
+                if jail_fund is not None:
+                    calls.append(jail_fund.call({"task": "predict", "items": sent_fund, "target": args.target,
+                                                 **horizon_kw}))
+                results = await asyncio.gather(*calls)
+                res_plain, res_self = results[0], results[1]
+                res_fund = results[2] if use_fund else None
                 # feature-only stacker, same point-in-time rule, no LLM
                 feat_recs = resolved_as_of(featlr, cutoff)
                 w = None
                 if len(feat_recs) >= 200:
                     w = aw.fit_logistic([aw._row(0.5, r["features"]) for r in feat_recs],
                                         [int(r["up"]) for r in feat_recs])
+                p_self_by_id = {p["id"]: p for p in res_self["predictions"]}
+                p_fund_by_id = {p["id"]: p for p in res_fund["predictions"]} if res_fund else {}
+                p_plain_by_id = {p["id"]: p for p in res_plain["predictions"]}
+                ff_model = None
+                rl_p: dict[str, float] = {}
+                rl_pos: dict[str, float] = {}
+                if use_fund:
+                    ff_recs = resolved_as_of(featfund, cutoff)
+                    if len(ff_recs) >= 200:
+                        ff_model = Logistic().fit(np.array([r["xf"] for r in ff_recs]),
+                                                  np.array([float(r["up"]) for r in ff_recs]))
+                states: dict[str, list[float]] = {}
+                if use_rl and rl_trainer is not None:
+                    raw = {k: {**p_self_by_id[k]["features"], **fund_feats[k],
+                               "llm_plain": p_plain_by_id[k]["p_llm"], "llm_fund": p_fund_by_id[k]["p_llm"],
+                               "llm_self": p_self_by_id[k]["p_final"]} for k in id_map}
+                    states = rl_states(raw)
+                    fit = rl_trainer.fit([{"cutoff": r["cutoff"], "x": r["x"], "ret": r["ret"], "up": r["up"]}
+                                          for r in resolved_as_of(rlstate, cutoff)])
+                    rl_log.append({"cutoff": cutoff.isoformat(), **fit.as_dict()})
+                    ids = list(states)
+                    probs, positions = rl_trainer.act(np.array([states[k] for k in ids]))
+                    rl_p = {k: float(v) for k, v in zip(ids, probs, strict=True)}
+                    rl_pos = {k: float(v) for k, v in zip(ids, positions, strict=True)}
 
             # ---- outside the sandbox: attach outcomes (used only once resolved) ----
-            p_by_id = {p["id"]: p for p in res_plain["predictions"]}
             for sp in res_self["predictions"]:
                 ticker: str = id_map[sp["id"]]["id"]
                 resolve_date, ret = table.outcome(ticker, cutoff, args.horizon)
                 if args.target == "excess":
                     ret -= table.outcome(MARKET, cutoff, args.horizon)[1]
-                pp = p_by_id[sp["id"]]
+                pp = p_plain_by_id[sp["id"]]
                 f = sp["features"]
                 base = {"cutoff": cutoff, "ticker": ticker, "resolve_date": resolve_date, "ret": ret,
                         "up": ret > 0, "features": f}
@@ -313,11 +376,22 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                                       "stacker": res_self["stacker_active"]})
                 featlr.preds.append({**base, "p_llm": 0.5,
                                      "p": aw.predict_logistic(w, aw._row(0.5, f)) if w else 0.5})
+                if use_fund:
+                    ff = fund_feats[sp["id"]]
+                    fundarm.preds.append({**base, "fund": ff, "p_llm": p_fund_by_id[sp["id"]]["p_llm"],
+                                          "p": p_fund_by_id[sp["id"]]["p_llm"]})
+                    xf = [f[k] for k in PRICE_KEYS] + [ff[k] for k in FUND_KEYS]
+                    featfund.preds.append({**base, "xf": xf,
+                                           "p": float(ff_model.predict(np.array([xf]))[0]) if ff_model else 0.5})
+                if use_rl:
+                    rlstate.preds.append({**base, "x": states[sp["id"]], "p": rl_p[sp["id"]],
+                                          "position": rl_pos[sp["id"]]})
             stacker_log.append({"cutoff": cutoff.isoformat(), **res_self.get("stacker_info", {})})
             if ci % 5 == 0 or ci == len(cutoffs) - 1:
                 tr = track_record(selfimp.preds, "p")
+                extra = f" rl={rl_log[-1]['status']}" if rl_log else ""
                 print(f"[{ci + 1}/{len(cutoffs)}] {cutoff} llm_calls={llm.calls} cache={llm.cache_hits} "
-                      f"self_hit={tr.get('hit_rate', 0):.3f} elapsed={time.time() - t_start:.0f}s", flush=True)
+                      f"self_hit={tr.get('hit_rate', 0):.3f}{extra} elapsed={time.time() - t_start:.0f}s", flush=True)
 
         probe_end = await jail_plain.probe([str(data_path)])
 
@@ -330,6 +404,12 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         "momentum_20d": [{**p, "p": 0.51 if p["features"]["ret_20d"] > 0 else 0.49} for p in base_rows],
         "reversal_5d": [{**p, "p": 0.49 if p["features"]["ret_5d"] > 0 else 0.51} for p in base_rows],
     }
+    if use_fund:
+        arms["llm_fund"] = fundarm.preds
+        arms["feat_fund_logit"] = featfund.preds
+        arms["sue_rule"] = [{**p, "p": sue_rule(p["fund"])} for p in fundarm.preds]
+    if use_rl:
+        arms["rl_forecast"] = rlstate.preds
     arms["base_rate"], arms["selector"], selector_log = point_in_time_meta_arms(
         {k: v for k, v in arms.items() if k != "always_up"}, cutoffs,
     )
@@ -350,11 +430,127 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         "stacker_log": stacker_log,
         "selector_log": selector_log,
     }
+    if len(tickers) >= 10:
+        report["cross_sectional_after_warmup"] = {
+            k: cross_sectional([p for p in v if p["cutoff"] >= warm]) for k, v in arms.items()}
+    if use_rl:
+        report["rl_log"] = rl_log
+        report["rl_trader"] = {
+            "full": score_trader([{"cutoff": p["cutoff"], "position": p["position"], "ret": p["ret"]}
+                                  for p in rlstate.preds]),
+            "after_warmup": score_trader([{"cutoff": p["cutoff"], "position": p["position"], "ret": p["ret"]}
+                                          for p in rlstate.preds if p["cutoff"] >= warm]),
+            "state_keys": RL_STATE_KEYS,
+        }
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / f"walkforward_{args.tag}.json").write_text(json.dumps(report, indent=2, default=str))
-    rows = [{k: (v.isoformat() if isinstance(v, date) else v) for k, v in p.items() if k != "features"}
+    rows = [{k: (v.isoformat() if isinstance(v, date) else v) for k, v in p.items() if k not in ("features", "fund", "xf", "x")}
             for arm, ps in arms.items() for p in ({**q, "arm": arm} for q in ps)]
     (RESULTS / f"walkforward_{args.tag}_predictions.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    return report
+
+
+PRICE_KEYS = ["ret_1d", "ret_5d", "ret_20d", "ret_60d", "vol_20d_ann", "rsi_14", "dist_ma50", "mkt_ret_5d", "mkt_ret_20d"]
+RL_STATE_KEYS = [*PRICE_KEYS, *FUND_KEYS, "llm_plain", "llm_fund", "llm_self", "rank_ret_5d", "rank_ret_20d",
+                 "rank_llm_fund"]
+STACKER_WINDOW = 2000
+
+
+def _logit(p: float) -> float:
+    p = min(max(p, 0.01), 0.99)
+    return math.log(p / (1 - p))
+
+
+def rl_states(raw: dict[str, dict[str, float]]) -> dict[str, list[float]]:
+    """RL state per stock at one cutoff: features, LLM logits, and within-cutoff percentile ranks."""
+    ids = list(raw)
+
+    def pct_rank(key: str) -> dict[str, float]:
+        order = sorted(ids, key=lambda k: raw[k][key])
+        n = max(1, len(ids) - 1)
+        return {k: i / n for i, k in enumerate(order)}
+
+    ranks = {key: pct_rank(key) for key in ("ret_5d", "ret_20d", "llm_fund")}
+    out = {}
+    for k in ids:
+        r = raw[k]
+        out[k] = ([float(r[x]) for x in PRICE_KEYS] + [float(r[x]) for x in FUND_KEYS]
+                  + [_logit(r["llm_plain"]), _logit(r["llm_fund"]), _logit(r["llm_self"])]
+                  + [ranks["ret_5d"][k], ranks["ret_20d"][k], ranks["llm_fund"][k]])
+    return out
+
+
+def sue_rule(f: dict[str, float]) -> float:
+    """Multi-quarter earnings-surprise baseline: recent surprises weigh most (no fitting, no LLM)."""
+    if not f.get("fund_ok"):
+        return 0.5
+    s = 0.4 * f["sue_1"] + 0.3 * f["sue_2"] + 0.2 * f["sue_3"] + 0.1 * f["sue_4"]
+    return 0.51 if s > 0 else 0.49 if s < 0 else 0.5
+
+
+LEAK_SYSTEM = (
+    "You are shown anonymized data about one large US-listed company: its recent daily closing prices rebased to "
+    "100 (no dates) and possibly a few fundamental numbers. Guess which company it is. Reply with JSON only: "
+    '{"ticker": "<stock ticker>", "company": "<company name>"}'
+)
+
+
+async def probe_leak(model: str, data: str, n_cutoffs: int = 3, seed: int = 0) -> dict[str, Any]:
+    """Plan C3: can the model name the company from what the agent sees? Prices only vs prices + digest.
+    Identification = the guessed ticker equals the true one, or the guessed name shares a distinctive word
+    with the SEC-registered company name."""
+    import random
+    import re
+
+    data_path = resolve_data_path(data)
+    table = PriceTable.from_csv(data_path)
+    fund = PITFundamentals.load(FUND_PATH)
+    tickers = [t for t in table.tickers if t != MARKET]
+    llm = OllamaLLM(model)
+    rng = random.Random(seed)
+    lo = table.index_on_or_before(date(2025, 6, 2))
+    hi = len(table.dates) - 6
+    cut_ids = sorted(rng.sample(range(lo, hi), n_cutoffs))
+    generic = {"inc", "corp", "corporation", "company", "co", "holdings", "group", "the", "plc", "ltd", "class",
+               "and", "de", "new", "international", "technologies", "systems", "financial", "services"}
+
+    def words(s: str) -> set[str]:
+        return {w for w in re.findall(r"[a-z0-9]+", s.lower()) if len(w) > 2 and w not in generic}
+
+    tasks = []
+    for i in cut_ids:
+        c = table.dates[i]
+        with sandbox_scope(as_of=_dt(c), run_id=f"leak-{c}"):
+            view = table.view(c)
+            for t in tickers:
+                anon = view.anonymize(t, MARKET, LOOKBACK)
+                feats = aw.features(anon["asset"], anon["market"])
+                base = {"asset": anon["asset"], "market": anon["market"], "features": feats}
+                digest = digest_text(fund.features(t, c))
+                for cond, item in (("prices", base), ("prices+digest", {**base, "fund_text": digest})):
+                    tasks.append((cond, t, c, llm(LEAK_SYSTEM, aw.build_prompt(item, None))))
+    answers = await asyncio.gather(*(x[3] for x in tasks))
+    out: dict[str, dict[str, int]] = {}
+    examples: list[dict[str, str]] = []
+    for (cond, t, c, _), ans in zip(tasks, answers, strict=True):
+        try:
+            obj = json.loads(ans[ans.index("{"): ans.rindex("}") + 1])
+        except ValueError:
+            obj = {}
+        guess_t = str(obj.get("ticker", "")).upper().replace(".", "-").strip()
+        name = str(fund.companies.get(t, {}).get("name", ""))
+        hit = guess_t == t or bool(words(str(obj.get("company", ""))) & words(name))
+        s = out.setdefault(cond, {"n": 0, "identified": 0})
+        s["n"] += 1
+        s["identified"] += int(hit)
+        if hit and len(examples) < 20:
+            examples.append({"condition": cond, "ticker": t, "cutoff": c.isoformat(), "guess": ans[:120]})
+    report = {"model": model, "data": data, "cutoffs": [table.dates[i].isoformat() for i in cut_ids],
+              "rates": {k: round(v["identified"] / v["n"], 4) for k, v in out.items()}, "counts": out,
+              "threshold": 0.20, "passed": out.get("prices+digest", {}).get("identified", 0)
+              / max(1, out.get("prices+digest", {}).get("n", 1)) < 0.20, "identified_examples": examples}
+    RESULTS.mkdir(exist_ok=True)
+    (RESULTS / f"leak_probe_{model.replace(':', '_')}.json").write_text(json.dumps(report, indent=2))
     return report
 
 
@@ -415,7 +611,11 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--tag", default="run")
     ap.add_argument("--target", choices=["abs", "excess"], default="abs",
                     help="abs: will the price rise? excess: will it beat the market (SPY)?")
+    ap.add_argument("--fund", action="store_true", help="add point-in-time SEC fundamentals: llm_fund, sue_rule, "
+                    "feat_fund_logit arms; the self-improving arm also sees them")
+    ap.add_argument("--rl", action="store_true", help="add the deep RL agent (rl_forecast arm + trader); needs --fund")
     ap.add_argument("--probe-memorization", action="store_true")
+    ap.add_argument("--probe-leak", action="store_true", help="plan C3: can the model identify companies from its inputs?")
     return ap
 
 
@@ -430,6 +630,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.probe_leak:
+        rep_leak = asyncio.run(probe_leak(args.model, args.data or "data/prices_pit_2025-06-02_top100.csv"))
+        print(json.dumps({k: rep_leak[k] for k in ("rates", "counts", "passed", "cutoffs")}, indent=1))
+        return
     if args.probe_memorization:
         print(json.dumps(asyncio.run(probe_memorization(args.model)), indent=1))
         return

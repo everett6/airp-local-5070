@@ -46,6 +46,13 @@ SYSTEM_EXCESS = SYSTEM.replace(
     "than the market series) over the next 5 trading days",
 ).replace('"p_up"', '"p_up"')
 
+def system_prompt(target: str | None, horizon: int = 5) -> str:
+    base = SYSTEM_EXCESS if target == "excess" else SYSTEM
+    if horizon == 5:
+        return base  # unchanged text keeps every published run's cached prompts valid
+    return base.replace("5 trading days", f"{horizon} trading days").replace("5-trading-day", f"{horizon}-trading-day")
+
+
 REFLECT_SYSTEM = (
     "You review a forecaster's resolved 5-day direction calls on anonymized assets. "
     "Write at most 5 short, general, testable lessons (each under 25 words) that would "
@@ -109,6 +116,8 @@ def build_prompt(item: dict[str, Any], memory: dict[str, Any] | None) -> str:
             f"market 5d {_pct(f['mkt_ret_5d'])}, market 20d {_pct(f['mkt_ret_20d'])}."
         ),
     ]
+    if item.get("fund_text"):
+        parts.append(str(item["fund_text"])[:1500])
     if memory:
         tr = memory.get("track_record")
         if tr and tr.get("n", 0) >= 20:
@@ -198,7 +207,7 @@ def run_predict(msg: dict[str, Any]) -> dict[str, Any]:
     memory = msg.get("memory")
     for it in items:
         it["features"] = features(it["asset"], it["market"])
-    system = SYSTEM_EXCESS if msg.get("target") == "excess" else SYSTEM
+    system = system_prompt(msg.get("target"), int(msg.get("horizon", 5)))
     _send({"llm_requests": [
         {"id": it["id"], "system": system, "user": build_prompt(it, memory)} for it in items
     ]})
