@@ -69,17 +69,20 @@ def _recv() -> dict[str, Any]:
 
 def features(asset: list[float], market: list[float]) -> dict[str, float]:
     def ret(xs: list[float], n: int) -> float:
-        return xs[-1] / xs[-1 - n] - 1.0
+        # short histories (recent listings) use the longest available window instead of crashing;
+        # identical to before whenever the series is long enough
+        n = min(n, len(xs) - 1)
+        return xs[-1] / xs[-1 - n] - 1.0 if n > 0 else 0.0
 
     daily = [asset[i] / asset[i - 1] - 1.0 for i in range(1, len(asset))]
-    last20 = daily[-20:]
+    last20 = daily[-20:] or [0.0]
     mean = sum(last20) / len(last20)
     vol = math.sqrt(sum((r - mean) ** 2 for r in last20) / len(last20)) * math.sqrt(252)
     gains = [max(r, 0.0) for r in daily[-14:]]
     losses = [max(-r, 0.0) for r in daily[-14:]]
     avg_loss = sum(losses) / 14
     rsi = 100.0 if avg_loss == 0 else 100 - 100 / (1 + (sum(gains) / 14) / avg_loss)
-    ma50 = sum(asset[-50:]) / 50
+    ma50 = sum(asset[-50:]) / len(asset[-50:])
     return {
         "ret_1d": ret(asset, 1), "ret_5d": ret(asset, 5), "ret_20d": ret(asset, 20),
         "ret_60d": ret(asset, 60), "vol_20d_ann": vol, "rsi_14": rsi,

@@ -152,3 +152,11 @@ def test_meta_arms_only_use_resolved_outcomes():
     base, _sel, log = point_in_time_meta_arms({"llm_plain": preds}, [c1, c2])
     assert all(p["p"] == 0.5 for p in base)  # nothing resolved yet at either cutoff
     assert all(entry["chosen"] == "base_rate" for entry in log)
+
+
+def test_features_survive_short_histories():
+    f = aw.features([100.0, 101.0, 99.0], [100.0, 100.5, 101.0])
+    assert f["ret_60d"] == pytest.approx(99 / 100 - 1) and f["vol_20d_ann"] >= 0
+    assert aw.features([100.0], [100.0])["ret_1d"] == 0.0
+    long = [100.0 + i for i in range(120)]
+    assert aw.features(long, long)["ret_60d"] == pytest.approx(long[-1] / long[-61] - 1)

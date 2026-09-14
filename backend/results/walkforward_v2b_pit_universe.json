@@ -1,0 +1,1517 @@
+{
+  "tag": "v2b_pit_universe",
+  "config": {
+    "model": "qwen3:8b",
+    "start": "2025-06-02",
+    "end": "2026-09-02",
+    "horizon": 5,
+    "step": 5,
+    "warmup": 12,
+    "reflect_every": 4,
+    "target": "abs",
+    "data": "data/prices_pit_2025-06-02.csv"
+  },
+  "config_hash": "07de1b0faeba7524",
+  "provenance": {
+    "git": {
+      "commit": "edf899b172fe6d7001e23f7bd8617ac67d53b27d",
+      "dirty": true,
+      "dirty_files": [
+        "backend/app/sandbox/agent_worker.py",
+        "backend/app/forward/__init__.py",
+        "backend/app/forward/ledger.py",
+        "backend/app/forward/run.py",
+        "backend/app/forward/schedule.py",
+        "backend/configs/forward_v1.toml"
+      ]
+    },
+    "data": {
+      "path": "prices_pit_2025-06-02.csv",
+      "sha256": "d54ff1111102e3be209cc4a610620d8ff0d945126959cb71b41e38e089f5759b"
+    },
+    "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+    "python": "3.14.7",
+    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+    "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+  },
+  "jail_limits": {
+    "memory_mb": 2048,
+    "cpu_seconds": 14400,
+    "open_files": 64,
+    "file_size_mb": 1,
+    "response_timeout_s": 300.0,
+    "max_message_bytes": 16777216,
+    "max_llm_requests_per_message": 256,
+    "max_prompt_chars": 100000,
+    "max_tool_calls_per_message": 8
+  },
+  "model": "qwen3:8b",
+  "target": "abs",
+  "horizon_days": 5,
+  "step_days": 5,
+  "window": [
+    "2025-06-02",
+    "2026-09-02"
+  ],
+  "n_cutoffs": 64,
+  "tickers": [
+    "NVDA",
+    "TSLA",
+    "AAPL",
+    "MSFT",
+    "META",
+    "AMZN",
+    "PLTR",
+    "AVGO",
+    "AMD",
+    "GOOGL",
+    "SMCI",
+    "NFLX",
+    "UNH",
+    "LLY",
+    "COIN",
+    "MU",
+    "JPM",
+    "V",
+    "BRK-B",
+    "CRM"
+  ],
+  "jail_probe_start": {
+    "readable_forbidden_paths": [],
+    "network_reachable": false,
+    "jailed": true,
+    "passed": true
+  },
+  "jail_probe_end": {
+    "readable_forbidden_paths": [],
+    "network_reachable": false,
+    "jailed": true,
+    "passed": true
+  },
+  "llm_calls": 129,
+  "cache_hits": 2446,
+  "runtime_s": 81,
+  "scores_full": {
+    "llm_plain": {
+      "n": 1280,
+      "accuracy": 0.5242,
+      "pct_up_calls": 0.917,
+      "brier": 0.2496,
+      "log_loss": 0.6923,
+      "z_vs_coinflip": 1.73,
+      "ls_mean_weekly_ret_pct": 0.28,
+      "ls_sharpe_ann": 0.88
+    },
+    "llm_selfimprove": {
+      "n": 1280,
+      "accuracy": 0.532,
+      "pct_up_calls": 0.973,
+      "brier": 0.2509,
+      "log_loss": 0.6951,
+      "z_vs_coinflip": 2.29,
+      "ls_mean_weekly_ret_pct": 0.517,
+      "ls_sharpe_ann": 1.41
+    },
+    "feat_logit": {
+      "n": 1280,
+      "accuracy": 0.5367,
+      "pct_up_calls": 0.992,
+      "brier": 0.2539,
+      "log_loss": 0.7013,
+      "z_vs_coinflip": 2.63,
+      "ls_mean_weekly_ret_pct": 0.444,
+      "ls_sharpe_ann": 1.06
+    },
+    "always_up": {
+      "n": 1280,
+      "accuracy": 0.543,
+      "pct_up_calls": 1.0,
+      "brier": 0.2492,
+      "log_loss": 0.6916,
+      "z_vs_coinflip": 3.07,
+      "ls_mean_weekly_ret_pct": 0.71,
+      "ls_sharpe_ann": 1.77
+    },
+    "momentum_20d": {
+      "n": 1280,
+      "accuracy": 0.5148,
+      "pct_up_calls": 0.553,
+      "brier": 0.2498,
+      "log_loss": 0.6928,
+      "z_vs_coinflip": 1.06,
+      "ls_mean_weekly_ret_pct": 0.144,
+      "ls_sharpe_ann": 0.56
+    },
+    "reversal_5d": {
+      "n": 1280,
+      "accuracy": 0.5,
+      "pct_up_calls": 0.449,
+      "brier": 0.2501,
+      "log_loss": 0.6933,
+      "z_vs_coinflip": 0.0,
+      "ls_mean_weekly_ret_pct": 0.104,
+      "ls_sharpe_ann": 0.38
+    },
+    "base_rate": {
+      "n": 1280,
+      "accuracy": 0.543,
+      "pct_up_calls": 1.0,
+      "brier": 0.2509,
+      "log_loss": 0.6952,
+      "z_vs_coinflip": 3.07,
+      "ls_mean_weekly_ret_pct": 0.689,
+      "ls_sharpe_ann": 1.7
+    },
+    "selector": {
+      "n": 1280,
+      "accuracy": 0.5219,
+      "pct_up_calls": 0.751,
+      "brier": 0.2475,
+      "log_loss": 0.6881,
+      "z_vs_coinflip": 1.57,
+      "ls_mean_weekly_ret_pct": 0.154,
+      "ls_sharpe_ann": 0.48
+    }
+  },
+  "scores_after_warmup": {
+    "llm_plain": {
+      "n": 1040,
+      "accuracy": 0.4971,
+      "pct_up_calls": 0.907,
+      "brier": 0.2512,
+      "log_loss": 0.6955,
+      "z_vs_coinflip": -0.19,
+      "ls_mean_weekly_ret_pct": 0.147,
+      "ls_sharpe_ann": 0.44
+    },
+    "llm_selfimprove": {
+      "n": 1040,
+      "accuracy": 0.5058,
+      "pct_up_calls": 0.967,
+      "brier": 0.2535,
+      "log_loss": 0.7004,
+      "z_vs_coinflip": 0.37,
+      "ls_mean_weekly_ret_pct": 0.389,
+      "ls_sharpe_ann": 1.0
+    },
+    "feat_logit": {
+      "n": 1040,
+      "accuracy": 0.5115,
+      "pct_up_calls": 0.99,
+      "brier": 0.2553,
+      "log_loss": 0.704,
+      "z_vs_coinflip": 0.74,
+      "ls_mean_weekly_ret_pct": 0.462,
+      "ls_sharpe_ann": 1.09
+    },
+    "always_up": {
+      "n": 1040,
+      "accuracy": 0.5192,
+      "pct_up_calls": 1.0,
+      "brier": 0.2497,
+      "log_loss": 0.6926,
+      "z_vs_coinflip": 1.24,
+      "ls_mean_weekly_ret_pct": 0.627,
+      "ls_sharpe_ann": 1.46
+    },
+    "momentum_20d": {
+      "n": 1040,
+      "accuracy": 0.4981,
+      "pct_up_calls": 0.521,
+      "brier": 0.2501,
+      "log_loss": 0.6934,
+      "z_vs_coinflip": -0.12,
+      "ls_mean_weekly_ret_pct": 0.103,
+      "ls_sharpe_ann": 0.38
+    },
+    "reversal_5d": {
+      "n": 1040,
+      "accuracy": 0.5038,
+      "pct_up_calls": 0.469,
+      "brier": 0.25,
+      "log_loss": 0.6932,
+      "z_vs_coinflip": 0.25,
+      "ls_mean_weekly_ret_pct": 0.098,
+      "ls_sharpe_ann": 0.35
+    },
+    "base_rate": {
+      "n": 1040,
+      "accuracy": 0.5192,
+      "pct_up_calls": 1.0,
+      "brier": 0.254,
+      "log_loss": 0.7013,
+      "z_vs_coinflip": 1.24,
+      "ls_mean_weekly_ret_pct": 0.627,
+      "ls_sharpe_ann": 1.46
+    },
+    "selector": {
+      "n": 1040,
+      "accuracy": 0.4933,
+      "pct_up_calls": 0.693,
+      "brier": 0.2507,
+      "log_loss": 0.6947,
+      "z_vs_coinflip": -0.43,
+      "ls_mean_weekly_ret_pct": -0.021,
+      "ls_sharpe_ann": -0.06
+    }
+  },
+  "warmup_from": "2025-08-27",
+  "lessons": [
+    {
+      "cutoff": "2025-07-01",
+      "lessons": [
+        "Higher probability calls for UP tend to have higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 correlates with more accurate UP calls, indicating potential value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, highlighting the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, suggesting a bullish bias in the broader market.",
+        "Calls with lower probability (e.g., p_up=0.52) still show reasonable accuracy, indicating potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2025-07-30",
+      "lessons": [
+        "Higher probability calls for UP tend to have higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 correlates with more accurate UP calls, indicating potential value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, highlighting the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, suggesting a bullish bias in the broader market.",
+        "Calls with lower probability (e.g., p_up=0.52) still show reasonable accuracy, indicating potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2025-08-27",
+      "lessons": [
+        "Higher probability calls for UP tend to have higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 correlates with more accurate UP calls, indicating potential value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, highlighting the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, suggesting a bullish bias in the broader market.",
+        "Calls with lower probability (e.g., p_up=0.52) still show reasonable accuracy, indicating potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2025-09-25",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, indicating a bullish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2025-10-23",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, indicating a bullish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2025-11-20",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, indicating a bullish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2025-12-19",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, indicating a bullish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2026-01-21",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, indicating a bullish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2026-02-19",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, indicating a bullish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2026-03-19",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently negative, indicating a bearish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2026-04-17",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently negative, indicating a bearish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2026-05-15",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, indicating a bullish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2026-06-15",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, indicating a bullish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2026-07-15",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, indicating a bullish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    },
+    {
+      "cutoff": "2026-08-12",
+      "lessons": [
+        "Higher p_up correlates with higher 5-day returns, suggesting better calibration for UP outcomes.",
+        "RSI above 60 aligns with more accurate UP calls, indicating value in momentum indicators.",
+        "20-day returns often contradict 5-day outcomes, emphasizing the need for time horizon alignment.",
+        "Market movement (mkt5d) is consistently positive, indicating a bullish bias in the broader market.",
+        "Lower p_up calls still show reasonable accuracy, suggesting potential for calibration improvement."
+      ]
+    }
+  ],
+  "stacker_log": [
+    {
+      "cutoff": "2025-06-02",
+      "stacker": "not_enough_data",
+      "n": 0
+    },
+    {
+      "cutoff": "2025-06-09",
+      "stacker": "not_enough_data",
+      "n": 20
+    },
+    {
+      "cutoff": "2025-06-16",
+      "stacker": "not_enough_data",
+      "n": 40
+    },
+    {
+      "cutoff": "2025-06-24",
+      "stacker": "not_enough_data",
+      "n": 60
+    },
+    {
+      "cutoff": "2025-07-01",
+      "stacker": "not_enough_data",
+      "n": 80
+    },
+    {
+      "cutoff": "2025-07-09",
+      "stacker": "not_enough_data",
+      "n": 100
+    },
+    {
+      "cutoff": "2025-07-16",
+      "stacker": "not_enough_data",
+      "n": 120
+    },
+    {
+      "cutoff": "2025-07-23",
+      "stacker": "not_enough_data",
+      "n": 140
+    },
+    {
+      "cutoff": "2025-07-30",
+      "stacker": "not_enough_data",
+      "n": 160
+    },
+    {
+      "cutoff": "2025-08-06",
+      "stacker": "not_enough_data",
+      "n": 180
+    },
+    {
+      "cutoff": "2025-08-13",
+      "stacker_holdout_ll": 0.7386,
+      "llm_holdout_ll": 0.6897,
+      "n": 200,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-08-20",
+      "stacker_holdout_ll": 0.8035,
+      "llm_holdout_ll": 0.7137,
+      "n": 220,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-08-27",
+      "stacker_holdout_ll": 0.7117,
+      "llm_holdout_ll": 0.6905,
+      "n": 240,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-09-04",
+      "stacker_holdout_ll": 0.6431,
+      "llm_holdout_ll": 0.6693,
+      "n": 260,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-09-11",
+      "stacker_holdout_ll": 0.6542,
+      "llm_holdout_ll": 0.6753,
+      "n": 280,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-09-18",
+      "stacker_holdout_ll": 0.6145,
+      "llm_holdout_ll": 0.6505,
+      "n": 300,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-09-25",
+      "stacker_holdout_ll": 0.638,
+      "llm_holdout_ll": 0.6615,
+      "n": 320,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-10-02",
+      "stacker_holdout_ll": 0.6411,
+      "llm_holdout_ll": 0.6624,
+      "n": 340,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-10-09",
+      "stacker_holdout_ll": 0.6394,
+      "llm_holdout_ll": 0.6566,
+      "n": 360,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-10-16",
+      "stacker_holdout_ll": 0.6875,
+      "llm_holdout_ll": 0.6768,
+      "n": 380,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-10-23",
+      "stacker_holdout_ll": 0.6792,
+      "llm_holdout_ll": 0.6757,
+      "n": 400,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-10-30",
+      "stacker_holdout_ll": 0.6853,
+      "llm_holdout_ll": 0.6768,
+      "n": 420,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-11-06",
+      "stacker_holdout_ll": 0.6882,
+      "llm_holdout_ll": 0.6825,
+      "n": 440,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-11-13",
+      "stacker_holdout_ll": 0.7093,
+      "llm_holdout_ll": 0.6868,
+      "n": 460,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-11-20",
+      "stacker_holdout_ll": 0.7624,
+      "llm_holdout_ll": 0.7016,
+      "n": 480,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-11-28",
+      "stacker_holdout_ll": 0.7202,
+      "llm_holdout_ll": 0.6992,
+      "n": 500,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-12-05",
+      "stacker_holdout_ll": 0.7188,
+      "llm_holdout_ll": 0.702,
+      "n": 520,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-12-12",
+      "stacker_holdout_ll": 0.7103,
+      "llm_holdout_ll": 0.6974,
+      "n": 540,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-12-19",
+      "stacker_holdout_ll": 0.7232,
+      "llm_holdout_ll": 0.6992,
+      "n": 560,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-12-29",
+      "stacker_holdout_ll": 0.7204,
+      "llm_holdout_ll": 0.6982,
+      "n": 580,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-01-06",
+      "stacker_holdout_ll": 0.7347,
+      "llm_holdout_ll": 0.703,
+      "n": 600,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-01-13",
+      "stacker_holdout_ll": 0.7339,
+      "llm_holdout_ll": 0.7035,
+      "n": 620,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-01-21",
+      "stacker_holdout_ll": 0.7341,
+      "llm_holdout_ll": 0.7063,
+      "n": 640,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-01-28",
+      "stacker_holdout_ll": 0.7235,
+      "llm_holdout_ll": 0.7043,
+      "n": 660,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-02-04",
+      "stacker_holdout_ll": 0.7147,
+      "llm_holdout_ll": 0.7053,
+      "n": 680,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-02-11",
+      "stacker_holdout_ll": 0.7226,
+      "llm_holdout_ll": 0.7063,
+      "n": 700,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-02-19",
+      "stacker_holdout_ll": 0.7483,
+      "llm_holdout_ll": 0.7112,
+      "n": 720,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-02-26",
+      "stacker_holdout_ll": 0.7445,
+      "llm_holdout_ll": 0.7101,
+      "n": 740,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-03-05",
+      "stacker_holdout_ll": 0.729,
+      "llm_holdout_ll": 0.7075,
+      "n": 760,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-03-12",
+      "stacker_holdout_ll": 0.7492,
+      "llm_holdout_ll": 0.7151,
+      "n": 780,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-03-19",
+      "stacker_holdout_ll": 0.7445,
+      "llm_holdout_ll": 0.7152,
+      "n": 800,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-03-26",
+      "stacker_holdout_ll": 0.758,
+      "llm_holdout_ll": 0.7174,
+      "n": 820,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-04-02",
+      "stacker_holdout_ll": 0.7424,
+      "llm_holdout_ll": 0.7182,
+      "n": 840,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-04-10",
+      "stacker_holdout_ll": 0.7367,
+      "llm_holdout_ll": 0.7153,
+      "n": 860,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-04-17",
+      "stacker_holdout_ll": 0.724,
+      "llm_holdout_ll": 0.7125,
+      "n": 880,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-04-24",
+      "stacker_holdout_ll": 0.7097,
+      "llm_holdout_ll": 0.7064,
+      "n": 900,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-05-01",
+      "stacker_holdout_ll": 0.7075,
+      "llm_holdout_ll": 0.705,
+      "n": 920,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-05-08",
+      "stacker_holdout_ll": 0.7006,
+      "llm_holdout_ll": 0.7033,
+      "n": 940,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-05-15",
+      "stacker_holdout_ll": 0.7007,
+      "llm_holdout_ll": 0.7016,
+      "n": 960,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-05-22",
+      "stacker_holdout_ll": 0.6951,
+      "llm_holdout_ll": 0.6995,
+      "n": 980,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-06-01",
+      "stacker_holdout_ll": 0.6932,
+      "llm_holdout_ll": 0.6988,
+      "n": 1000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-06-08",
+      "stacker_holdout_ll": 0.6991,
+      "llm_holdout_ll": 0.7019,
+      "n": 1020,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-06-15",
+      "stacker_holdout_ll": 0.6979,
+      "llm_holdout_ll": 0.7005,
+      "n": 1040,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-06-23",
+      "stacker_holdout_ll": 0.702,
+      "llm_holdout_ll": 0.7045,
+      "n": 1060,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-06-30",
+      "stacker_holdout_ll": 0.6986,
+      "llm_holdout_ll": 0.7034,
+      "n": 1080,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-07-08",
+      "stacker_holdout_ll": 0.6946,
+      "llm_holdout_ll": 0.7004,
+      "n": 1100,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-07-15",
+      "stacker_holdout_ll": 0.6906,
+      "llm_holdout_ll": 0.695,
+      "n": 1120,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-07-22",
+      "stacker_holdout_ll": 0.6907,
+      "llm_holdout_ll": 0.6972,
+      "n": 1140,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-07-29",
+      "stacker_holdout_ll": 0.6917,
+      "llm_holdout_ll": 0.6978,
+      "n": 1160,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-08-05",
+      "stacker_holdout_ll": 0.6896,
+      "llm_holdout_ll": 0.696,
+      "n": 1180,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-08-12",
+      "stacker_holdout_ll": 0.6913,
+      "llm_holdout_ll": 0.6948,
+      "n": 1200,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-08-19",
+      "stacker_holdout_ll": 0.6924,
+      "llm_holdout_ll": 0.6964,
+      "n": 1220,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-08-26",
+      "stacker_holdout_ll": 0.6941,
+      "llm_holdout_ll": 0.698,
+      "n": 1240,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-09-02",
+      "stacker_holdout_ll": 0.6963,
+      "llm_holdout_ll": 0.6986,
+      "n": 1260,
+      "stacker": "adopted"
+    }
+  ],
+  "selector_log": [
+    {
+      "cutoff": "2025-06-02",
+      "chosen": "base_rate",
+      "rolling_brier": {}
+    },
+    {
+      "cutoff": "2025-06-09",
+      "chosen": "base_rate",
+      "rolling_brier": {}
+    },
+    {
+      "cutoff": "2025-06-16",
+      "chosen": "base_rate",
+      "rolling_brier": {}
+    },
+    {
+      "cutoff": "2025-06-24",
+      "chosen": "base_rate",
+      "rolling_brier": {}
+    },
+    {
+      "cutoff": "2025-07-01",
+      "chosen": "base_rate",
+      "rolling_brier": {}
+    },
+    {
+      "cutoff": "2025-07-09",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2351,
+        "llm_selfimprove": 0.2333,
+        "feat_logit": 0.25,
+        "momentum_20d": 0.2465,
+        "reversal_5d": 0.2523
+      }
+    },
+    {
+      "cutoff": "2025-07-16",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2365,
+        "llm_selfimprove": 0.2345,
+        "feat_logit": 0.25,
+        "momentum_20d": 0.2464,
+        "reversal_5d": 0.2526
+      }
+    },
+    {
+      "cutoff": "2025-07-23",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2375,
+        "llm_selfimprove": 0.2342,
+        "feat_logit": 0.25,
+        "momentum_20d": 0.2471,
+        "reversal_5d": 0.2522
+      }
+    },
+    {
+      "cutoff": "2025-07-30",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2385,
+        "llm_selfimprove": 0.2359,
+        "feat_logit": 0.25,
+        "momentum_20d": 0.2471,
+        "reversal_5d": 0.2516
+      }
+    },
+    {
+      "cutoff": "2025-08-06",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2408,
+        "llm_selfimprove": 0.2399,
+        "feat_logit": 0.25,
+        "momentum_20d": 0.2472,
+        "reversal_5d": 0.2513
+      }
+    },
+    {
+      "cutoff": "2025-08-13",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2408,
+        "llm_selfimprove": 0.2385,
+        "feat_logit": 0.25,
+        "momentum_20d": 0.2474,
+        "reversal_5d": 0.2511
+      }
+    },
+    {
+      "cutoff": "2025-08-20",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2433,
+        "llm_selfimprove": 0.242,
+        "feat_logit": 0.2561,
+        "momentum_20d": 0.2482,
+        "reversal_5d": 0.2506
+      }
+    },
+    {
+      "cutoff": "2025-08-27",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2428,
+        "llm_selfimprove": 0.2395,
+        "feat_logit": 0.2482,
+        "momentum_20d": 0.2483,
+        "reversal_5d": 0.2504
+      }
+    },
+    {
+      "cutoff": "2025-09-04",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2425,
+        "llm_selfimprove": 0.239,
+        "feat_logit": 0.2462,
+        "momentum_20d": 0.2483,
+        "reversal_5d": 0.2506
+      }
+    },
+    {
+      "cutoff": "2025-09-11",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2426,
+        "llm_selfimprove": 0.2382,
+        "feat_logit": 0.2449,
+        "momentum_20d": 0.2485,
+        "reversal_5d": 0.2504
+      }
+    },
+    {
+      "cutoff": "2025-09-18",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2424,
+        "llm_selfimprove": 0.2365,
+        "feat_logit": 0.2427,
+        "momentum_20d": 0.2488,
+        "reversal_5d": 0.2504
+      }
+    },
+    {
+      "cutoff": "2025-09-25",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.243,
+        "llm_selfimprove": 0.239,
+        "feat_logit": 0.2449,
+        "momentum_20d": 0.2488,
+        "reversal_5d": 0.2504
+      }
+    },
+    {
+      "cutoff": "2025-10-02",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2425,
+        "llm_selfimprove": 0.2366,
+        "feat_logit": 0.2421,
+        "momentum_20d": 0.2489,
+        "reversal_5d": 0.2505
+      }
+    },
+    {
+      "cutoff": "2025-10-09",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2419,
+        "llm_selfimprove": 0.2354,
+        "feat_logit": 0.2407,
+        "momentum_20d": 0.249,
+        "reversal_5d": 0.2507
+      }
+    },
+    {
+      "cutoff": "2025-10-16",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2432,
+        "llm_selfimprove": 0.2417,
+        "feat_logit": 0.2466,
+        "momentum_20d": 0.2493,
+        "reversal_5d": 0.2505
+      }
+    },
+    {
+      "cutoff": "2025-10-23",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.243,
+        "llm_selfimprove": 0.2412,
+        "feat_logit": 0.2444,
+        "momentum_20d": 0.2492,
+        "reversal_5d": 0.2504
+      }
+    },
+    {
+      "cutoff": "2025-10-30",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2434,
+        "llm_selfimprove": 0.2412,
+        "feat_logit": 0.2425,
+        "momentum_20d": 0.2492,
+        "reversal_5d": 0.2502
+      }
+    },
+    {
+      "cutoff": "2025-11-06",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2446,
+        "llm_selfimprove": 0.2429,
+        "feat_logit": 0.2447,
+        "momentum_20d": 0.2495,
+        "reversal_5d": 0.2499
+      }
+    },
+    {
+      "cutoff": "2025-11-13",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2455,
+        "llm_selfimprove": 0.244,
+        "feat_logit": 0.2473,
+        "momentum_20d": 0.2495,
+        "reversal_5d": 0.2498
+      }
+    },
+    {
+      "cutoff": "2025-11-20",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2464,
+        "llm_selfimprove": 0.2461,
+        "feat_logit": 0.2522,
+        "momentum_20d": 0.2495,
+        "reversal_5d": 0.2499
+      }
+    },
+    {
+      "cutoff": "2025-11-28",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2476,
+        "llm_selfimprove": 0.2467,
+        "feat_logit": 0.2485,
+        "momentum_20d": 0.2499,
+        "reversal_5d": 0.2495
+      }
+    },
+    {
+      "cutoff": "2025-12-05",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2479,
+        "llm_selfimprove": 0.2473,
+        "feat_logit": 0.2487,
+        "momentum_20d": 0.2502,
+        "reversal_5d": 0.2493
+      }
+    },
+    {
+      "cutoff": "2025-12-12",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2483,
+        "llm_selfimprove": 0.2484,
+        "feat_logit": 0.2505,
+        "momentum_20d": 0.25,
+        "reversal_5d": 0.2495
+      }
+    },
+    {
+      "cutoff": "2025-12-19",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2486,
+        "llm_selfimprove": 0.2485,
+        "feat_logit": 0.2511,
+        "momentum_20d": 0.2502,
+        "reversal_5d": 0.2497
+      }
+    },
+    {
+      "cutoff": "2025-12-29",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2476,
+        "llm_selfimprove": 0.2465,
+        "feat_logit": 0.2494,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.2498
+      }
+    },
+    {
+      "cutoff": "2026-01-06",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2483,
+        "llm_selfimprove": 0.2482,
+        "feat_logit": 0.2505,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.2498
+      }
+    },
+    {
+      "cutoff": "2026-01-13",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2477,
+        "llm_selfimprove": 0.2478,
+        "feat_logit": 0.2491,
+        "momentum_20d": 0.2498,
+        "reversal_5d": 0.25
+      }
+    },
+    {
+      "cutoff": "2026-01-21",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2489,
+        "llm_selfimprove": 0.2509,
+        "feat_logit": 0.2561,
+        "momentum_20d": 0.2496,
+        "reversal_5d": 0.2502
+      }
+    },
+    {
+      "cutoff": "2026-01-28",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2494,
+        "llm_selfimprove": 0.2515,
+        "feat_logit": 0.2568,
+        "momentum_20d": 0.2497,
+        "reversal_5d": 0.2499
+      }
+    },
+    {
+      "cutoff": "2026-02-04",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2501,
+        "llm_selfimprove": 0.2536,
+        "feat_logit": 0.2594,
+        "momentum_20d": 0.2497,
+        "reversal_5d": 0.2499
+      }
+    },
+    {
+      "cutoff": "2026-02-11",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2514,
+        "llm_selfimprove": 0.2564,
+        "feat_logit": 0.2626,
+        "momentum_20d": 0.2496,
+        "reversal_5d": 0.2497
+      }
+    },
+    {
+      "cutoff": "2026-02-19",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.252,
+        "llm_selfimprove": 0.2561,
+        "feat_logit": 0.2619,
+        "momentum_20d": 0.2496,
+        "reversal_5d": 0.2497
+      }
+    },
+    {
+      "cutoff": "2026-02-26",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2528,
+        "llm_selfimprove": 0.2587,
+        "feat_logit": 0.2648,
+        "momentum_20d": 0.2497,
+        "reversal_5d": 0.2497
+      }
+    },
+    {
+      "cutoff": "2026-03-05",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2537,
+        "llm_selfimprove": 0.2606,
+        "feat_logit": 0.2672,
+        "momentum_20d": 0.2499,
+        "reversal_5d": 0.2495
+      }
+    },
+    {
+      "cutoff": "2026-03-12",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2536,
+        "llm_selfimprove": 0.2568,
+        "feat_logit": 0.2636,
+        "momentum_20d": 0.2495,
+        "reversal_5d": 0.2497
+      }
+    },
+    {
+      "cutoff": "2026-03-19",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2545,
+        "llm_selfimprove": 0.2582,
+        "feat_logit": 0.2669,
+        "momentum_20d": 0.2495,
+        "reversal_5d": 0.25
+      }
+    },
+    {
+      "cutoff": "2026-03-26",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2557,
+        "llm_selfimprove": 0.2598,
+        "feat_logit": 0.2699,
+        "momentum_20d": 0.2498,
+        "reversal_5d": 0.25
+      }
+    },
+    {
+      "cutoff": "2026-04-02",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2553,
+        "llm_selfimprove": 0.2593,
+        "feat_logit": 0.2666,
+        "momentum_20d": 0.25,
+        "reversal_5d": 0.2498
+      }
+    },
+    {
+      "cutoff": "2026-04-10",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2545,
+        "llm_selfimprove": 0.2581,
+        "feat_logit": 0.2636,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.2501
+      }
+    },
+    {
+      "cutoff": "2026-04-17",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2534,
+        "llm_selfimprove": 0.256,
+        "feat_logit": 0.2577,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.2502
+      }
+    },
+    {
+      "cutoff": "2026-04-24",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2527,
+        "llm_selfimprove": 0.2563,
+        "feat_logit": 0.2614,
+        "momentum_20d": 0.2499,
+        "reversal_5d": 0.2506
+      }
+    },
+    {
+      "cutoff": "2026-05-01",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2523,
+        "llm_selfimprove": 0.2557,
+        "feat_logit": 0.2605,
+        "momentum_20d": 0.2497,
+        "reversal_5d": 0.2506
+      }
+    },
+    {
+      "cutoff": "2026-05-08",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2516,
+        "llm_selfimprove": 0.255,
+        "feat_logit": 0.2571,
+        "momentum_20d": 0.2496,
+        "reversal_5d": 0.2504
+      }
+    },
+    {
+      "cutoff": "2026-05-15",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.252,
+        "llm_selfimprove": 0.2569,
+        "feat_logit": 0.2583,
+        "momentum_20d": 0.2497,
+        "reversal_5d": 0.2503
+      }
+    },
+    {
+      "cutoff": "2026-05-22",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2524,
+        "llm_selfimprove": 0.2568,
+        "feat_logit": 0.259,
+        "momentum_20d": 0.2498,
+        "reversal_5d": 0.2501
+      }
+    },
+    {
+      "cutoff": "2026-06-01",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2524,
+        "llm_selfimprove": 0.2567,
+        "feat_logit": 0.2584,
+        "momentum_20d": 0.2498,
+        "reversal_5d": 0.2502
+      }
+    },
+    {
+      "cutoff": "2026-06-08",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2533,
+        "llm_selfimprove": 0.258,
+        "feat_logit": 0.2586,
+        "momentum_20d": 0.2499,
+        "reversal_5d": 0.2501
+      }
+    },
+    {
+      "cutoff": "2026-06-15",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2526,
+        "llm_selfimprove": 0.2567,
+        "feat_logit": 0.256,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.25
+      }
+    },
+    {
+      "cutoff": "2026-06-23",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2537,
+        "llm_selfimprove": 0.2587,
+        "feat_logit": 0.2585,
+        "momentum_20d": 0.25,
+        "reversal_5d": 0.2501
+      }
+    },
+    {
+      "cutoff": "2026-06-30",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.253,
+        "llm_selfimprove": 0.257,
+        "feat_logit": 0.2563,
+        "momentum_20d": 0.2499,
+        "reversal_5d": 0.2501
+      }
+    },
+    {
+      "cutoff": "2026-07-08",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2519,
+        "llm_selfimprove": 0.2556,
+        "feat_logit": 0.2544,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.2502
+      }
+    },
+    {
+      "cutoff": "2026-07-15",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2508,
+        "llm_selfimprove": 0.2541,
+        "feat_logit": 0.2533,
+        "momentum_20d": 0.2502,
+        "reversal_5d": 0.2505
+      }
+    },
+    {
+      "cutoff": "2026-07-22",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2514,
+        "llm_selfimprove": 0.2546,
+        "feat_logit": 0.2536,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.2502
+      }
+    },
+    {
+      "cutoff": "2026-07-29",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2517,
+        "llm_selfimprove": 0.2552,
+        "feat_logit": 0.2536,
+        "momentum_20d": 0.25,
+        "reversal_5d": 0.25
+      }
+    },
+    {
+      "cutoff": "2026-08-05",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2513,
+        "llm_selfimprove": 0.2525,
+        "feat_logit": 0.2507,
+        "momentum_20d": 0.2504,
+        "reversal_5d": 0.2498
+      }
+    },
+    {
+      "cutoff": "2026-08-12",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2506,
+        "llm_selfimprove": 0.2526,
+        "feat_logit": 0.2505,
+        "momentum_20d": 0.2505,
+        "reversal_5d": 0.2498
+      }
+    },
+    {
+      "cutoff": "2026-08-19",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.25,
+        "llm_selfimprove": 0.2521,
+        "feat_logit": 0.2495,
+        "momentum_20d": 0.2505,
+        "reversal_5d": 0.2498
+      }
+    },
+    {
+      "cutoff": "2026-08-26",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2501,
+        "llm_selfimprove": 0.2515,
+        "feat_logit": 0.2503,
+        "momentum_20d": 0.2504,
+        "reversal_5d": 0.25
+      }
+    },
+    {
+      "cutoff": "2026-09-02",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2508,
+        "llm_selfimprove": 0.2524,
+        "feat_logit": 0.2509,
+        "momentum_20d": 0.2504,
+        "reversal_5d": 0.2497
+      }
+    }
+  ]
+}
