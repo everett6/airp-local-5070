@@ -38,6 +38,7 @@ import asyncio
 import hashlib
 import json
 import math
+import statistics
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -370,17 +371,27 @@ async def probe_memorization(model: str) -> dict[str, Any]:
             q = f"What was the closing price of {t} stock on {table.dates[i].isoformat()} (split-adjusted)?"
             tasks.append((f"{y}-{m:02d}", table.closes[t][i], llm(sys_p, q)))
     answers = await asyncio.gather(*(t[2] for t in tasks))
+    unanswered: dict[str, int] = {}
     for (label, truth, _), ans in zip(tasks, answers, strict=True):
+        out.setdefault(label, [])
+        unanswered.setdefault(label, 0)
         try:
             p = float(json.loads(ans[ans.index("{"): ans.rindex("}") + 1])["price"])
-            err = abs(p / truth - 1)
+            if not math.isfinite(p) or p <= 0:
+                raise ValueError(p)
+            out[label].append(abs(p / truth - 1))
         except (ValueError, KeyError, TypeError, ZeroDivisionError):
-            err = 1.0
-        out.setdefault(label, []).append(err)
-    med = {k: round(sorted(v)[len(v) // 2] * 100, 1) for k, v in out.items()}
+            # a refusal or unparseable answer is NOT evidence of "not memorized": report it separately
+            unanswered[label] += 1
+    report = {
+        "model": model,
+        "median_abs_pct_error": {k: (round(statistics.median(v) * 100, 1) if v else None) for k, v in out.items()},
+        "unanswered_rate": {k: round(unanswered[k] / (len(out[k]) + unanswered[k]), 2) for k in out},
+        "note": "median over parseable answers only; unanswered_rate = refusals or unparseable replies",
+    }
     RESULTS.mkdir(exist_ok=True)
-    (RESULTS / f"memorization_probe_{model.replace(':', '_')}.json").write_text(json.dumps(med, indent=2))
-    return med
+    (RESULTS / f"memorization_probe_{model.replace(':', '_')}.json").write_text(json.dumps(report, indent=2))
+    return report
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -127,3 +127,26 @@ def test_live_decisions(tmp_path):
     (day / "bad.json").write_text("{")
     df = D.live_decisions(tmp_path)
     assert list(df["ticker"]) == ["JPM", "NVDA"]
+
+
+def test_memorization_probe_reads_old_and_new_formats(tmp_path):
+    (tmp_path / "memorization_probe_old.json").write_text(json.dumps({"2025-01": 12.0}))
+    (tmp_path / "memorization_probe_new.json").write_text(json.dumps(
+        {"median_abs_pct_error": {"2025-01": 10.0, "2025-02": None}, "unanswered_rate": {"2025-01": 0.2, "2025-02": 1.0}}))
+    m = D.memorization_probe(tmp_path)
+    assert sorted(m["model"]) == ["new", "old"]  # the all-unanswered month is skipped, not plotted as 0
+    assert m[m["model"] == "new"]["unanswered_rate"].iloc[0] == 0.2
+
+
+def test_forward_status_verifies_the_chain(tmp_path):
+    from app.forward.ledger import Ledger
+
+    led = Ledger(tmp_path / "f.jsonl")
+    led.append("decision", cutoff="2026-09-11", on_time=True, horizon=5, decided_at="x",
+               arms={"live_plain": {"A": 0.6, "B": 0.4}})
+    led.append("outcome", cutoff="2026-09-11", resolve_date="2026-09-18", returns={"A": 0.01, "B": 0.02},
+               up={"A": True, "B": True})
+    s = D.forward_status(led.path)
+    assert s["ok"] and s["weeks"][0]["live_plain accuracy"] == 0.5 and s["weeks"][0]["share up"] == 1.0
+    led.path.write_text(led.path.read_text().replace("0.6", "0.9"))
+    assert not D.forward_status(led.path)["ok"]

@@ -163,9 +163,45 @@ def memorization_probe(results: Path = RESULTS) -> pd.DataFrame:
     rows = []
     for p in sorted(results.glob("memorization_probe_*.json")):
         model = p.stem.removeprefix("memorization_probe_")
-        for month, err in json.loads(p.read_text()).items():
-            rows.append({"model": model, "month": pd.Timestamp(f"{month}-01"), "median_abs_pct_error": err})
+        raw = json.loads(p.read_text())
+        errs = raw.get("median_abs_pct_error", raw)  # older files were a plain month -> error map
+        unanswered = raw.get("unanswered_rate", {})
+        for month, err in errs.items():
+            if err is None:
+                continue
+            rows.append({"model": model, "month": pd.Timestamp(f"{month}-01"), "median_abs_pct_error": err,
+                         "unanswered_rate": unanswered.get(month)})
     return pd.DataFrame(rows)
+
+
+def forward_status(ledger_path: Path) -> dict[str, Any]:
+    """Verified forward-test ledger: scoreboard plus one row per decided or missed week."""
+    from app.forward.ledger import Ledger, LedgerError
+    from app.forward.run import scoreboard
+
+    led = Ledger(ledger_path)
+    try:
+        recs = led.verify()
+    except LedgerError as e:
+        return {"ok": False, "error": str(e), "weeks": [], "board": None}
+    outcomes = {r["cutoff"]: r for r in recs if r["type"] == "outcome"}
+    weeks = []
+    for r in recs:
+        if r["type"] not in ("decision", "missed"):
+            continue
+        o = outcomes.get(r["cutoff"])
+        row: dict[str, Any] = {"cutoff": r["cutoff"], "status": r["type"] if r["type"] == "missed" else
+                               ("on time" if r["on_time"] else "late (excluded)"),
+                               "decided_at": r.get("decided_at", ""), "resolved": o["resolve_date"] if o else "pending"}
+        for arm, ps in (r.get("arms") or {}).items():
+            row[f"{arm} mean P(up)"] = round(sum(ps.values()) / len(ps), 3) if ps else None
+            if o:
+                hits = [(ps[t] >= 0.5) == o["up"][t] for t in ps if t in o["up"]]
+                row[f"{arm} accuracy"] = round(sum(hits) / len(hits), 3) if hits else None
+        if o and o["up"]:
+            row["share up"] = round(sum(o["up"].values()) / len(o["up"]), 3)
+        weeks.append(row)
+    return {"ok": True, "records": len(recs), "weeks": weeks, "board": scoreboard(led)}
 
 
 def provenance_rows(report: dict[str, Any], lock_path: Path = BACKEND / "configs" / "data.lock.json"

@@ -139,3 +139,28 @@ async def test_dry_run_writes_nothing(cfg, tmp_path):
     w = await F.run_once(cfg, led, now=ny(2026, 9, 13, 20), bars_fn=fake_bars_fn(date(2026, 9, 11)),
                          dry_run=True, log=lambda s: None)
     assert w == [] and not led.path.exists()
+
+
+async def test_yahoo_bars_retries_transient_failures(monkeypatch):
+    from app.tools import netguard
+
+    calls = {"n": 0}
+    body = json.dumps({"chart": {"result": [{"timestamp": [1757620800], "indicators": {"adjclose": [{"adjclose": [10.0]}]}}]}})
+
+    class R:
+        status = 200
+        text = body
+
+    async def flaky_fetch(self, url, **kw):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise netguard.FetchError("cannot resolve host: ")
+        return R()
+
+    monkeypatch.setattr(netguard.SafeFetcher, "fetch", flaky_fetch)
+    bars = await F.yahoo_bars(["SPY"], backoff_s=0.01)
+    assert bars["SPY"][1] == [10.0] and calls["n"] == 3
+    calls["n"] = -100  # always failing now
+    monkeypatch.setattr(netguard.SafeFetcher, "fetch", lambda self, url, **kw: (_ for _ in ()).throw(netguard.FetchError("down")))
+    with pytest.raises(netguard.FetchError):
+        await F.yahoo_bars(["SPY"], attempts=2, backoff_s=0.01)

@@ -40,39 +40,71 @@ SEC filings, sandboxed Python). Live-only by design. See `docs/LIVE_TOOLS.md`. T
 the forward test logs **two** arms each week, price-only (`live_plain`) and web-informed
 (`live_web`), so we learn whether web information actually helps, measured before outcomes exist.
 
-## Phase B — Airtight evaluation (~3 h of work, plus calendar time)
+## Phase B — Airtight evaluation. ✅ Done 2026-09-14
+
+| # | Task | Result |
+|---|---|---|
+| B1 | Memorization probe for qwen3:14b | ✅ Done. Found and fixed a scoring bias: unparseable answers counted as "not memorized". Rescored from cache; the 2025-06-02 start holds for both models (`docs/WALKFORWARD_5070.md`) |
+| B2 | Survivorship-free universe + v2b re-run | ✅ S&P 500 as of 2025-06-02 (dated Wikipedia revision), top 20 by prior-year dollar volume. v2b: nothing beats always-up, same as v2 |
+| B3 | Pre-registered forward test | ✅ Hash-chained ledger, missed weeks never backfilled, catch-up systemd timer. First decision logged on time 2026-09-14 07:30 UTC and pushed before any outcome existed. Dashboard Live tab shows the verified ledger |
+| B4 | Docs | ✅ Probe fix, v2b, forward-test protocol |
+
+The forward test needs **8–12 scored weeks** before its numbers mean anything.
+
+## Revision 2026-09-14: what changed and why
+
+Web research before Phase C (sources in the executive summary) changed three things:
+1. **Earnings drift in large caps is weak for the latest quarter alone, but
+   multi-quarter surprise history still predicts returns.** The drift baseline
+   (C5) and the features use the last several standardized surprises, not one.
+2. **LLM + reinforcement learning literature adjusts a frozen LLM's outputs
+   with a trained policy** (PPO-style post-hoc adjustment) rather than retraining
+   the LLM. That fits a 12 GB card and avoids the LLM memorizing the test window
+   (retraining its weights on 2025–26 outcomes would do exactly that). Phase R below.
+3. **Free-text filing excerpts reveal company identity** (product names, segments),
+   which would break anonymization. Phase C starts with a numbers-only, point-in-time
+   fundamentals digest and *measures* identity leakage. Masked text excerpts are an
+   explicit follow-up, allowed only if their leak probe passes.
+
+More data for learning: the universe grows from 20 to **100** point-in-time S&P 500
+members, 5× more predictions per week on the same dates.
+
+## Phase C — Filings and earnings, point-in-time
 
 | # | Task | Done when |
 |---|---|---|
-| B1 | Memorization probe for qwen3:14b (~5 min GPU) | Both models on the dashboard chart; the doc says whether 14B's window start is still valid |
-| B2 | **Survivorship fix:** pick the universe *as of the window start*, e.g. the 20 largest S&P 500 members on 2025-06-01 by market cap, from a dated snapshot. Don't use today's winners | `data/universe_2025-06-01.csv` committed with its source; v2 re-run on it (v2b) |
-| B3 | **Pre-registered forward test.** Freeze the best current config as `configs/forward_v1.toml`. A weekly job (Monday after close) fetches prices, predicts the next 5 days, and appends to a write-once log where each entry holds the previous entry's hash. Resolved outcomes are filled in later | First week's predictions are logged with timestamps *before* the outcomes exist. The dashboard has a "Live" tab |
-| B4 | Doc update: v2b plus the forward-test protocol | Pushed |
+| C0 | Point-in-time top-100 universe and prices (same rule as B2) | `data/universe_2025-06-02_top100.csv` + prices, meta lists unrankable members |
+| C1 | **EDGAR data layer**: ticker→CIK, submissions (with acceptance timestamps, paged older files), XBRL companyfacts; SEC pacing ≤ 8 req/s, User-Agent from local `.env` only, disk cache | Tests: a fact or filing accepted after a cutoff's 16:00 ET close is invisible at that cutoff, including values later restated |
+| C2 | **Fundamentals digest per (stock, cutoff)**: quarterly EPS and revenue as known at the cutoff (latest filed value per period), SUE (seasonal random walk, standardized by the prior 8 changes) for the last 4 quarters, revenue and EPS YoY, days since the last earnings filing, 8-K count in the last 30 days, and whether an earnings report is expected inside the horizon (from last year's filing calendar) | Unit tests on synthetic facts incl. Q4 = FY − 9M derivation and restatements |
+| C3 | **Leak probe**: ask the model to name the company from the anonymized digest + prices, for a sample of (stock, cutoff) | Identification rate reported. The digest is only used if it's under 20% |
+| C4 | `llm_fund` arm: same jailed agent, prompt adds the digest (numbers only) | Jail probe passes; 8B stays 100% on GPU |
+| C5 | **Multi-quarter earnings-surprise baseline** (`sue_rule`, no LLM) and fundamentals in `feat_logit` | New arms in results and dashboard |
+| C6 | **New scores**: cross-sectional rank IC per week with a week-clustered CI, top-minus-bottom quintile return, 20-day horizon config | Scoring tested on synthetic data with a known IC |
+| C7 | Frozen configs **before** running: `v5_fund_top100` (5-day, weekly, 100 stocks, all arms incl. Phase R) and `v6_fund_rank20d` (20-day, non-overlapping) | Results with receipts; dashboard shows them |
 
-B3 runs as a catch-up job because the PC isn't always on (see Decisions). The
-forward test needs **8–12 weeks** before its numbers mean anything.
-
-## Phase C — New signal: SEC filings and earnings (~1–1.5 days, runs overnight)
-
-This is the main lever: the positive results in the literature come from text,
-not price series.
+## Phase R — Deep reinforcement learning on top of the jailed LLM (new)
 
 | # | Task | Done when |
 |---|---|---|
-| C1 | **EDGAR connector:** filing index (8-K, 10-Q, 10-K) with *acceptance timestamps*, text sections (MD&A, 8-K items), polite rate limiting, local cache. Point-in-time rule: `accepted_at <= cutoff close` | Tests: a filing accepted after a cutoff is invisible inside that cutoff's sandbox, including through the cache |
-| C2 | **Earnings surprise from XBRL** (companyfacts API), dated by filing date | A per-cutoff "latest reported quarter" feature with no future quarters (tested) |
-| C3 | **Text anonymization:** replace company names, tickers, people, and dates with placeholders. Leak probe: ask the model to name the company from the anonymized text | Identification rate reported. If it's above ~20%, results are flagged as possibly memorized |
-| C4 | Pass filings to the jailed agent (summaries only), with `num_ctx` 8192. Check VRAM on the 5070 | 8B still 100% on GPU; the jail probe still passes |
-| C5 | **Stronger non-LLM baseline:** post-earnings-announcement drift (a surprise-sign rule), so the LLM must beat a known effect, not only coin flips | New arm in results and dashboard |
-| C6 | **New targets:** 20-day horizon (non-overlapping steps), and cross-sectional ranking on a ~100-stock universe scored by rank IC (Spearman), plus a top-minus-bottom quintile return | Scoring functions tested on synthetic data with a known IC |
-| C7 | Write frozen configs `v5_filings_5d` and `v6_filings_rank20d` **before** running, then run both (~1–2 h GPU each on 8B) | Results JSON has provenance; dashboard shows them |
+| R1 | `rl_agent` (numpy, deterministic): shared MLP trunk; **actor** over {short, flat, long} trained by all-action (expected) policy gradient on reward = position × return − costs − risk penalty, with entropy bonus; **critic** value head; **forecast** head trained on log score for calibrated P(up) | Unit tests: learns a planted signal, stays near base rate on noise, gradients checked numerically |
+| R2 | **Continual walk-forward training**: at every cutoff retrain on resolved outcomes only (warm start, weight decay, time-ordered early stopping), inputs = price features + fundamentals + all LLM arms' outputs | Point-in-time test: an outcome resolving after the cutoff can't enter training |
+| R3 | **Guard**: adopt the updated policy only if it beats the base rate on a recent held-out slice; otherwise fall back | Adoption log in results; dashboard Self-improvement tab shows it |
+| R4 | Scores: `rl_forecast` (Brier/accuracy like every arm), `rl_trader` (weekly P&L and Sharpe **after costs**) | In v5 results |
 
-**Success criteria (set now, before any Phase C result exists):**
-1. Rank IC's week-clustered 95% CI is above 0 on the post-warm-up window, **and**
-2. It beats the post-earnings-drift baseline on the same predictions (paired CI above 0), **and**
-3. The leak-probe identification rate is under 20%.
+**Honest framing (written before any result):** this is a one-step contextual bandit.
+Positions don't change future prices, and every action's reward is known once the
+outcome resolves, so the policy gradient has no sampling noise. Its forecast head is
+equivalent to supervised learning with a proper scoring rule. RL adds the trading
+objective (costs, risk), which is not a likelihood. Training can only find signal that
+exists in the inputs. If the inputs have none, the guard should keep it at the base rate.
 
-All three must hold. Anything else is reported as "no edge".
+**Success criteria (unchanged from the original plan, plus R):**
+1. Rank IC's week-clustered 95% CI above 0 after warm-up, **and**
+2. beats the surprise baseline on the same predictions (paired CI), **and**
+3. leak probe under 20%.
+For Phase R: `rl_forecast` beats `always_up` on Brier with a week-clustered CI excluding 0,
+and `rl_trader` has positive after-cost Sharpe with a CI excluding 0.
+Anything else is reported as "no edge".
 
 ## Phase D — Engineering hygiene (~2–3 h, runs alongside B/C)
 
@@ -94,17 +126,19 @@ All three must hold. Anything else is reported as "no edge".
 
 ---
 
-## Order and timeline
+## Order and timeline (revised 2026-09-14)
 
-| Step | Work | GPU | Calendar |
-|---|---|---|---|
-| A (provenance) | 2 h | — | day 1 |
-| B1, B2 | 1.5 h | ~1 h | day 1 |
-| D1–D3 (alongside) | 2 h | — | day 1–2 |
-| C1–C6 | 1 day | short tests | day 2–3 |
-| C7 runs | 30 min | 2–4 h (overnight) | night of day 3 |
-| B3 forward test | 1.5 h to set up | ~10 min/week | then 8–12 weeks |
-| E decision | 1 h | — | after C7 (first read), after forward test (final) |
+| Step | Work | GPU |
+|---|---|---|
+| A, W, B | ✅ done | — |
+| Bug/optimization pass + full test | 1 h | short |
+| C0–C6 + R1–R3 | ~1 day of work | pilot runs |
+| C3 leak probe | 15 min | ~10 min |
+| C7 v5 long run (100 stocks × 64 weeks, 3 LLM arms + RL) | 30 min to set up | ~3–4 h |
+| C7 v6 (20-day) | — | ~1 h |
+| Two debugging/optimization passes, final verification, executive summary | 2 h | reproduce checks |
+| Forward test | automatic | ~10 min/week, 8–12 weeks |
+| E decision | after v5/v6 (first read), after the forward test (final) | — |
 
 ## Decisions (answered 2026-09-13)
 

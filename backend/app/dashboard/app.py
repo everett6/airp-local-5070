@@ -338,6 +338,26 @@ with tabs[7]:
 
     from app.live.research import research_tickers
 
+    st.header("Forward test (pre-registered)")
+    fwd = D.forward_status(D.BACKEND / "results" / "forward" / "forward_v1.jsonl")
+    if not fwd["ok"]:
+        st.error(f"Ledger verification FAILED: {fwd['error']}")
+    elif not fwd["weeks"]:
+        st.info("No forward-test decisions yet. `scripts/forward_timer.sh install` runs it automatically.")
+    else:
+        board = fwd["board"]
+        f1, f2, f3, f4 = st.columns(4)
+        f1.metric("Ledger", "✅ chain verified", f"{fwd['records']} records", delta_color="off")
+        f2.metric("Weeks decided", board["decisions"], f"{board['late']} late", delta_color="off")
+        f3.metric("Weeks missed", board["missed"])
+        f4.metric("Weeks scored", board["weeks_scored"], "need 8+ to judge", delta_color="off")
+        st.dataframe(pd.DataFrame(fwd["weeks"]), hide_index=True, width="stretch")
+        if board["arms"]:
+            st.dataframe(pd.DataFrame([{"arm": k, **v} for k, v in board["arms"].items()]),
+                         hide_index=True, width="stretch")
+        st.caption("Each week is decided before the next market open and written to a hash-chained ledger; "
+                   "weeks that couldn't be decided in time are logged as missed, never backfilled.")
+    st.divider()
     st.header("Live, web-informed research")
     st.caption("The jailed agent reads current prices, news, articles and SEC filings through guarded tools, "
                "then gives P(up) with sources. Valid only for decisions made now: this can't be backtested "

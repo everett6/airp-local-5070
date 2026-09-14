@@ -89,15 +89,32 @@ had released some VRAM, but at ~1 call/s. See `v4_14b` below for whether it was 
 
 ## Memorization probe (why the window starts 2025-06-02)
 
-`python -m app.sandbox.walkforward --probe-memorization --model qwen3:8b` asks
-the model, with no data, for each stock's month-end closing price. Median
-absolute percentage error by month is saved in
-`results/memorization_probe_qwen3_8b.json`. Recall is weak throughout (10–25%
-error, far worse than true memorization) and gets clearly worse from mid-2025
-on (26–32% for 2025-06..2025-11). The test window starts at 2025-06-02, after
-that shift. Combined with anonymization (no tickers, no dates, prices rebased
-to 100), recall of the specific outcomes is not a credible explanation for any
-score below.
+`python -m app.sandbox.walkforward --probe-memorization --model <model>` asks
+the model, with no data, for the closing price of 5 stocks (AAPL, MSFT, NVDA,
+KO, JPM) on the 15th of each month. The results file records, per month, the
+median absolute percentage error **over answers it could parse**, and
+separately the share of refusals or unparseable replies.
+
+The first version counted an unparseable reply as 100% error, which reads as
+"not memorized". That biases the check toward the reassuring answer. qwen3:14b
+left up to 60% of questions unanswered in some months, so the old scoring
+showed a misleading 100% for 2025-09. The scores were recomputed from the
+cached answers (no new model calls).
+
+| model | Jan 2024 – Apr 2025 | May – Dec 2025 | 2026 |
+|---|---|---|---|
+| qwen3:8b | 18.8% | 30.5% | 22.8% |
+| qwen3:14b | 15.6% | 31.6% | 35.3% |
+
+(medians of the monthly medians; lower = better recall)
+
+Both models recall prices poorly throughout, far from memorization, and
+recall gets clearly worse from about May 2025. So the 2025-06-02 window start
+is defensible for **both** models. Two caveats: only 5 stocks per month make
+each monthly number noisy (2025-09 for 14B is 19% on 2 answers), and poor
+price recall doesn't rule out the model knowing broad market events. Combined
+with anonymization (no tickers, no dates, prices rebased to 100), recall of
+specific outcomes is still not a credible explanation for any score below.
 
 ## Results
 
@@ -174,6 +191,34 @@ Stacker decisions: {'not_enough_data': 10, 'rejected': 12, 'adopted': 10}. Selec
 `llm_selfimprove` 49.8%, `always_up` 52.1%. The weak L2 let the stacker
 overfit, which is why v2 added real L2 and the holdout guard.
 
+### `v2b_pit_universe` (survivorship-free) — qwen3:8b, target=abs, 2025-06-02..2026-09-02, 64 cutoffs x 20 tickers
+
+Scored after warm-up (from 2025-08-27), n=1040; 1 standard error of accuracy is about ±1.6 pts. Jail probe passed: True (start), True (end). LLM calls: 129 new + 2446 cached.
+
+| arm | accuracy | % 'up' calls | Brier (lower=better) | long/short weekly ret | L/S Sharpe |
+|---|---|---|---|---|---|
+| always_up | 51.9% | 100% | **0.2497** | +0.63% | 1.46 |
+| base_rate | 51.9% | 100% | 0.2540 | +0.63% | 1.46 |
+| momentum_20d | 49.8% | 52% | 0.2501 | +0.10% | 0.38 |
+| reversal_5d | 50.4% | 47% | 0.2500 | +0.10% | 0.35 |
+| feat_logit | 51.1% | 99% | 0.2553 | +0.46% | 1.09 |
+| llm_plain | 49.7% | 91% | 0.2512 | +0.15% | 0.44 |
+| llm_selfimprove | 50.6% | 97% | 0.2535 | +0.39% | 1.00 |
+| selector | 49.3% | 69% | 0.2507 | -0.02% | -0.06 |
+
+Stacker decisions: {'not_enough_data': 10, 'rejected': 31, 'adopted': 23}. Selector choices: {'base_rate': 5, 'llm_selfimprove': 25, 'llm_plain': 4, 'momentum_20d': 21, 'reversal_5d': 8, 'feat_logit': 1}.
+
+
+The universe is the S&P 500 as it stood on 2025-06-02 (a dated Wikipedia
+revision), ranked by prior-year dollar volume, top 20, one share class per
+company (`scripts/build_universe.py`, `data/universe_2025-06-02.meta.json`).
+v2 used today's well-known names, which quietly favours stocks that did well.
+v2b's settings are v2's, frozen before its first run. Week-clustered Brier gap
+vs `always_up` (negative = better): `llm_plain` +0.0014 [−0.0005, +0.0033],
+`llm_selfimprove` +0.0038 [−0.0021, +0.0098], `feat_logit` +0.0056
+[−0.0028, +0.0140], `reversal_5d` +0.0003 [−0.0009, +0.0016]. **Same
+conclusion as v2: nothing beats always-up.**
+
 ### What the numbers say
 
 **Significance, done properly.** Stocks in the same week move together, so
@@ -247,3 +292,32 @@ effort is better spent on better inputs (below), not on the model.
 4. A test window that starts after the model's cutoff, re-measured with the
    probe for every new model.
 
+## Forward test (pre-registered, live)
+
+Backtests can always be doubted. The forward test can't be tuned after the
+fact. Every week, after the last close and **before the next market open**,
+`python -m app.forward.run` records for each stock of the frozen universe:
+
+- `live_plain`: the backtest's price-only agent, unchanged;
+- `live_web`: the web research agent (news, articles, SEC filings, prices
+  through guarded tools; `docs/LIVE_TOOLS.md`).
+
+Rules, all enforced in code (`app/forward`, `tests/test_forward.py`):
+- Settings and success criteria are frozen in `configs/forward_v1.toml`
+  before the first decision.
+- Records go into an append-only, hash-chained ledger
+  (`results/forward/forward_v1.jsonl`). Editing, deleting or reordering any
+  past line breaks verification. Pushing the ledger to GitHub adds an
+  independent timestamp.
+- A week not decided before its deadline (09:30 ET on the next weekday) is
+  logged as **missed** and never backfilled. A decision that finishes after
+  the deadline is logged as late and excluded from scoring.
+- Outcomes are appended only after the 5-trading-day horizon has closed.
+- `scripts/forward_timer.sh install` runs the idempotent job hourly and after
+  boot (systemd user timer, `Persistent=true`), since the PC isn't always on.
+
+**Success criterion (pre-registered):** `live_web` beats both `live_plain` and
+`always_up` on Brier, with a week-clustered 95% CI excluding 0, after at least
+8 scored weeks. The first decision (week ending 2026-09-11) was logged on
+time at 07:30 UTC on 2026-09-14. The dashboard's Live tab shows the verified
+ledger and scoreboard.
