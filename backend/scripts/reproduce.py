@@ -110,6 +110,9 @@ def reproduce(config: Path) -> bool:
     if ref.get("config_hash") and ref["config_hash"] != new["config_hash"]:
         diffs.insert(0, f"config: {config.name} (hash {new['config_hash']}) no longer matches the published "
                         f"run's config (hash {ref['config_hash']})")
+    ref_data = ((ref.get("provenance") or {}).get("data") or {}).get("sha256")
+    if ref_data and ref_data != new["provenance"]["data"]["sha256"]:
+        diffs.insert(0, "data: the price file differs from the one the published run used")
     old_digest = (ref.get("provenance") or {}).get("model_digest")
     if old_digest and old_digest != new["provenance"]["model_digest"]:
         print(f"{tag}: note: Ollama model digest changed since publication")

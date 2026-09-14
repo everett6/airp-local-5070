@@ -98,3 +98,20 @@ def test_sha256_file(tmp_path):
     f.write_text("a,b\n")
     assert prov.sha256_file(f) == hashlib.sha256(b"a,b\n").hexdigest()
     assert prov.sha256_file(tmp_path / "missing") is None
+
+
+def test_optional_data_field_changes_hash_only_when_set():
+    base = {"model": "m", "start": "a", "end": "b", "horizon": 5, "step": 5, "warmup": 12, "reflect_every": 4,
+            "target": "abs"}
+    assert prov.config_hash(base) == prov.config_hash(base | {"data": None})
+    assert prov.config_hash(base) != prov.config_hash(base | {"data": "data/prices_pit_2025-06-02.csv"})
+
+
+def test_data_path_must_stay_under_backend_data():
+    from app.sandbox.walkforward import DATA, resolve_data_path
+
+    assert resolve_data_path(None) == DATA
+    assert resolve_data_path("data/prices_pit_2025-06-02.csv").name == "prices_pit_2025-06-02.csv"
+    for bad in ["../README.md", "/etc/passwd", "app/sandbox/jail.py"]:
+        with pytest.raises(SystemExit):
+            resolve_data_path(bad)

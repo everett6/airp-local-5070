@@ -23,6 +23,8 @@ from typing import Any
 
 # Parameters that change results. Changing any of these changes the config hash.
 RESULT_FIELDS = ("model", "start", "end", "horizon", "step", "warmup", "reflect_every", "target")
+# Result-affecting fields added later: hashed only when present, so older hashes stay valid.
+OPTIONAL_RESULT_FIELDS = ("data",)
 # Allowed in a config file but not hashed: they don't change what is computed.
 OTHER_FIELDS = ("tag", "concurrency", "description")
 
@@ -34,7 +36,7 @@ class ProvenanceError(RuntimeError):
 def load_config_file(path: Path) -> dict[str, Any]:
     with path.open("rb") as f:
         cfg = tomllib.load(f)
-    unknown = set(cfg) - set(RESULT_FIELDS) - set(OTHER_FIELDS)
+    unknown = set(cfg) - set(RESULT_FIELDS) - set(OPTIONAL_RESULT_FIELDS) - set(OTHER_FIELDS)
     if unknown:
         raise ProvenanceError(f"{path}: unknown config keys {sorted(unknown)}")
     return cfg
@@ -42,6 +44,7 @@ def load_config_file(path: Path) -> dict[str, Any]:
 
 def config_hash(cfg: dict[str, Any]) -> str:
     canon = {k: cfg.get(k) for k in RESULT_FIELDS}
+    canon |= {k: cfg[k] for k in OPTIONAL_RESULT_FIELDS if cfg.get(k)}
     return hashlib.sha256(json.dumps(canon, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 

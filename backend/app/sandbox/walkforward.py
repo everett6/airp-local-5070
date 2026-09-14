@@ -214,8 +214,18 @@ def point_in_time_meta_arms(
     return base_rate, selector, choices
 
 
+def resolve_data_path(data: str | Path | None) -> Path:
+    if not data:
+        return DATA
+    path = (BACKEND / data).resolve()
+    if BACKEND / "data" not in path.parents:
+        raise SystemExit(f"--data must be a file under backend/data, got {data}")
+    return path
+
+
 async def run(args: argparse.Namespace) -> dict[str, Any]:
-    table = PriceTable.from_csv(DATA)
+    data_path = resolve_data_path(getattr(args, "data", None))
+    table = PriceTable.from_csv(data_path)
     tickers = [t for t in table.tickers if t != MARKET]
     llm = OllamaLLM(args.model, concurrency=args.concurrency)
 
@@ -231,8 +241,10 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     config = {"model": args.model, "start": cutoffs[0].isoformat(), "end": cutoffs[-1].isoformat(),
               "horizon": args.horizon, "step": args.step, "warmup": args.warmup,
               "reflect_every": args.reflect_every, "target": args.target}
+    if data_path != DATA:  # only non-default data enters the hash, so published hashes stay valid
+        config["data"] = str(data_path.relative_to(BACKEND))
     cfg_hash = prov.config_hash(config)
-    provenance = prov.collect(BACKEND.parent, DATA, args.model)
+    provenance = prov.collect(BACKEND.parent, data_path, args.model)
     prov.check_overwrite(RESULTS / f"walkforward_{args.tag}.json", cfg_hash, force=getattr(args, "force", False),
                          data_sha256=provenance["data"]["sha256"])
 
@@ -240,7 +252,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     stacker_log: list[dict[str, Any]] = []
     t_start = time.time()
     async with AgentJail(llm) as jail_plain, AgentJail(llm) as jail_self:
-        probe = await jail_self.probe([str(DATA), str(Path.home() / ".bashrc"), str(BACKEND / "app")])
+        probe = await jail_self.probe([str(data_path), str(Path.home() / ".bashrc"), str(BACKEND / "app")])
         if not probe["passed"]:
             raise SystemExit(f"jail probe FAILED, refusing to run: {probe}")
 
@@ -302,7 +314,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                 print(f"[{ci + 1}/{len(cutoffs)}] {cutoff} llm_calls={llm.calls} cache={llm.cache_hits} "
                       f"self_hit={tr.get('hit_rate', 0):.3f} elapsed={time.time() - t_start:.0f}s", flush=True)
 
-        probe_end = await jail_plain.probe([str(DATA)])
+        probe_end = await jail_plain.probe([str(data_path)])
 
     base_rows = selfimp.preds
     arms: dict[str, list[dict[str, Any]]] = {
@@ -384,6 +396,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--warmup", type=int, default=12, help="cutoffs before 'after warm-up' scoring")
     ap.add_argument("--reflect-every", type=int, default=4)
     ap.add_argument("--concurrency", type=int, default=4)
+    ap.add_argument("--data", default=None, help="price CSV under backend/data (default data/prices.csv)")
     ap.add_argument("--tag", default="run")
     ap.add_argument("--target", choices=["abs", "excess"], default="abs",
                     help="abs: will the price rise? excess: will it beat the market (SPY)?")
