@@ -165,6 +165,39 @@ def memorization_probe(results: Path = RESULTS) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def provenance_rows(report: dict[str, Any], lock_path: Path = BACKEND / "configs" / "data.lock.json"
+                    ) -> list[dict[str, str]] | None:
+    """Human-readable receipts for a run, or None if it predates provenance tracking."""
+    pv = report.get("provenance")
+    if not pv:
+        return None
+    git = pv.get("git") or {}
+    commit = (git.get("commit") or "unknown")[:10]
+    if git.get("dirty"):
+        commit += " (uncommitted changes: " + ", ".join(git.get("dirty_files", [])[:3]) + ")"
+    data_sha = (pv.get("data") or {}).get("sha256")
+    try:
+        locked = json.loads(lock_path.read_text())["sha256"]
+    except (OSError, ValueError, KeyError):
+        locked = None
+    data_note = "matches configs/data.lock.json" if data_sha and data_sha == locked else \
+        "differs from configs/data.lock.json" if data_sha and locked else ""
+    rows = [
+        {"item": "Config hash", "value": str(report.get("config_hash", "—"))},
+        {"item": "Code commit", "value": commit},
+        {"item": "Price data sha256", "value": f"{(data_sha or 'missing')[:16]}… {data_note}".strip()},
+        {"item": "Ollama model digest", "value": (pv.get("model_digest") or "unknown")[:16]},
+        {"item": "Python / platform", "value": f"{pv.get('python')} · {pv.get('platform')}"},
+        {"item": "GPU", "value": pv.get("gpu") or "not detected (nvidia-smi unavailable)"},
+    ]
+    lim = report.get("jail_limits")
+    if lim:
+        rows.append({"item": "Jail limits", "value": f"{lim['memory_mb']} MB memory, {lim['cpu_seconds']} s CPU, "
+                     f"{lim['response_timeout_s']:.0f} s response timeout, "
+                     f"{lim['max_llm_requests_per_message']} LLM calls/message"})
+    return rows
+
+
 # ---------- launching runs ----------
 
 def ollama_models(host: str = "http://127.0.0.1:11434") -> list[str]:

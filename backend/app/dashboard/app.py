@@ -117,6 +117,16 @@ if tag:
             st.altair_chart(chart, width="stretch")
             st.caption("Black lines = ±1 standard error.")
 
+        with st.expander("🧾 Receipts: exactly what produced this run"):
+            rows_pv = D.provenance_rows(report)
+            if rows_pv is None:
+                st.info("This run predates provenance tracking. Re-run it with `--config configs/<tag>.toml` "
+                        "to stamp it, or check it with `python scripts/reproduce.py`.")
+            else:
+                st.dataframe(pd.DataFrame(rows_pv), hide_index=True, width="stretch")
+                if report.get("config"):
+                    st.json(report["config"], expanded=False)
+
         if gaps or "always_up" in saved_arms:
             st.subheader("Is any arm really better than 'always up'?")
             rows = []

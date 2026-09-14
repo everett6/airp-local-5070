@@ -47,6 +47,7 @@ from typing import Any
 import httpx
 
 from app.sandbox import agent_worker as aw
+from app.sandbox import provenance as prov
 from app.sandbox.clock import enforce_point_in_time, sandbox_scope
 from app.sandbox.jail import AgentJail
 from app.sandbox.pit_data import PriceTable
@@ -218,6 +219,15 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         last = min(last, table.index_on_or_before(date.fromisoformat(args.end)))
     cut_idx = list(range(i0, last + 1, args.step))
     cutoffs = [table.dates[i] for i in cut_idx]
+    if not cutoffs:
+        raise SystemExit("no cutoffs in the requested window")
+    # the resolved window is what gets hashed, so '--end' omitted vs pinned to the same date match
+    config = {"model": args.model, "start": cutoffs[0].isoformat(), "end": cutoffs[-1].isoformat(),
+              "horizon": args.horizon, "step": args.step, "warmup": args.warmup,
+              "reflect_every": args.reflect_every, "target": args.target}
+    cfg_hash = prov.config_hash(config)
+    prov.check_overwrite(RESULTS / f"walkforward_{args.tag}.json", cfg_hash, force=getattr(args, "force", False))
+    provenance = prov.collect(BACKEND.parent, DATA, args.model)
 
     plain, selfimp, featlr = ArmState("llm_plain"), ArmState("llm_selfimprove"), ArmState("feat_logit")
     stacker_log: list[dict[str, Any]] = []
@@ -303,7 +313,9 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     # (after warm-up) as well as on the full window, so warm-up can't flatter or hide anything.
     warm = cutoffs[min(len(cutoffs) - 1, args.warmup)]
     report: dict[str, Any] = {
-        "tag": args.tag, "model": args.model, "target": args.target, "horizon_days": args.horizon, "step_days": args.step,
+        "tag": args.tag, "config": config, "config_hash": cfg_hash, "provenance": provenance,
+        "jail_limits": jail_plain.limits.as_dict(),
+        "model": args.model, "target": args.target, "horizon_days": args.horizon, "step_days": args.step,
         "window": [cutoffs[0].isoformat(), cutoffs[-1].isoformat()], "n_cutoffs": len(cutoffs),
         "tickers": tickers, "jail_probe_start": probe, "jail_probe_end": probe_end,
         "llm_calls": llm.calls, "cache_hits": llm.cache_hits, "runtime_s": round(time.time() - t_start),
@@ -352,8 +364,11 @@ async def probe_memorization(model: str) -> dict[str, Any]:
     return med
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--config", type=Path, default=None,
+                    help="TOML file of run parameters (see backend/configs); explicit flags override it")
+    ap.add_argument("--force", action="store_true", help="overwrite a finished run made with a different config")
     ap.add_argument("--model", default="qwen3:8b")
     ap.add_argument("--start", default="2025-06-02")
     ap.add_argument("--end", default=None)
@@ -366,7 +381,20 @@ def main() -> None:
     ap.add_argument("--target", choices=["abs", "excess"], default="abs",
                     help="abs: will the price rise? excess: will it beat the market (SPY)?")
     ap.add_argument("--probe-memorization", action="store_true")
-    args = ap.parse_args()
+    return ap
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    ap = build_parser()
+    pre, _ = ap.parse_known_args(argv)
+    if pre.config is not None:
+        cfg = prov.load_config_file(pre.config)
+        ap.set_defaults(**{k: v for k, v in cfg.items() if k != "description"})
+    return ap.parse_args(argv)
+
+
+def main() -> None:
+    args = parse_args()
     if args.probe_memorization:
         print(json.dumps(asyncio.run(probe_memorization(args.model)), indent=1))
         return

@@ -96,3 +96,21 @@ def test_launch_and_status_roundtrip(tmp_path):
         time.sleep(0.1)
     assert (s["done"], s["total"]) == (2, 2) and not s["failed"]
     assert D.ui_launched_tags(tmp_path) == ["demo"]
+
+
+def test_provenance_rows(tmp_path):
+    assert D.provenance_rows({"tag": "legacy"}) is None
+    lock = tmp_path / "lock.json"
+    lock.write_text(json.dumps({"sha256": "ab" * 32}))
+    report = {"config_hash": "1234", "provenance": {
+        "git": {"commit": "f" * 40, "dirty": True, "dirty_files": ["backend/app/x.py"]},
+        "data": {"sha256": "ab" * 32}, "model_digest": "500a1f067a9f" + "0" * 52,
+        "python": "3.12", "platform": "Linux", "gpu": None},
+        "jail_limits": {"memory_mb": 2048, "cpu_seconds": 14400, "response_timeout_s": 300.0,
+                        "max_llm_requests_per_message": 256}}
+    rows = {r["item"]: r["value"] for r in D.provenance_rows(report, lock)}
+    assert rows["Config hash"] == "1234"
+    assert "uncommitted changes: backend/app/x.py" in rows["Code commit"]
+    assert "matches" in rows["Price data sha256"]
+    assert rows["GPU"].startswith("not detected")
+    assert "2048 MB" in rows["Jail limits"]

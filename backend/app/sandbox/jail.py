@@ -20,13 +20,23 @@ every simulation run verify these properties live instead of assuming them.
 If bubblewrap is unavailable the jail refuses to start unless
 `allow_unjailed=True` (tests only) — a silent downgrade would make every
 accuracy number after it untrustworthy.
+
+Resource limits (`JailLimits`, applied with `prlimit` in both modes) stop a
+misbehaving agent from taking the orchestrator down with it: address space,
+CPU seconds, open files, file size; a response timeout between messages
+(LLM time is not counted); a maximum message size; and a cap on how many LLM
+calls one message may request. Any violation kills the agent and raises
+`JailError`, which aborts the run before a results file is written.
 """
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import shutil
 import sys
+from collections import deque
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Self
 
@@ -38,20 +48,50 @@ def _python_root() -> Path:
     return Path(sys.base_prefix).resolve()
 
 
-def build_command(allow_unjailed: bool = False) -> list[str]:
+class JailError(RuntimeError):
+    """The agent broke a jail limit or protocol rule; it has been killed."""
+
+
+@dataclass(frozen=True)
+class JailLimits:
+    memory_mb: int = 2048          # address space
+    cpu_seconds: int = 4 * 3600    # total CPU time of the agent process (backstop for runaway loops)
+    open_files: int = 64
+    file_size_mb: int = 1          # largest file it may write (only /tmp is writable anyway)
+    response_timeout_s: float = 300.0  # max time for the agent to answer, excluding LLM calls
+    max_message_bytes: int = 16 * 1024 * 1024
+    max_llm_requests_per_message: int = 256
+    max_prompt_chars: int = 100_000
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _prlimit_prefix(limits: JailLimits) -> list[str]:
+    prlimit = shutil.which("prlimit")
+    if prlimit is None:
+        raise RuntimeError("prlimit (util-linux) not found; refusing to run the agent without resource limits")
+    mb = 1024 * 1024
+    return [prlimit, f"--as={limits.memory_mb * mb}", f"--cpu={limits.cpu_seconds}",
+            f"--nofile={limits.open_files}", f"--fsize={limits.file_size_mb * mb}", "--"]
+
+
+def build_command(allow_unjailed: bool = False, worker: Path = WORKER_PATH,
+                  limits: JailLimits | None = None) -> list[str]:
     py = str(Path(sys.base_prefix) / "bin" / f"python{sys.version_info.major}.{sys.version_info.minor}")
+    prefix = _prlimit_prefix(limits) if limits else []
     bwrap = shutil.which("bwrap")
     if bwrap is None:
         if not allow_unjailed:
             raise RuntimeError("bubblewrap (bwrap) not found; refusing to run the agent unjailed")
-        return [sys.executable, "-I", "-S", str(WORKER_PATH)]
+        return [*prefix, sys.executable, "-I", "-S", str(worker)]
     root = str(_python_root())
     cmd = [
         bwrap, "--unshare-all", "--die-with-parent", "--new-session", "--clearenv",
         "--ro-bind", "/usr", "/usr",
         "--ro-bind", root, root,
         "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
-        "--ro-bind", str(WORKER_PATH), "/agent/agent_worker.py",
+        "--ro-bind", str(worker), "/agent/agent_worker.py",
         "--chdir", "/agent",
     ]
     for lib in ("/lib", "/lib64", "/bin"):
@@ -59,26 +99,50 @@ def build_command(allow_unjailed: bool = False) -> list[str]:
             cmd += ["--symlink", str(Path(lib).readlink()), lib]
         elif Path(lib).exists():
             cmd += ["--ro-bind", lib, lib]
-    return [*cmd, py, "-I", "-S", "/agent/agent_worker.py"]
+    return [*prefix, *cmd, py, "-I", "-S", "/agent/agent_worker.py"]
 
 
 LLMFn = Any  # async (system: str, user: str) -> str
 
 
 class AgentJail:
-    def __init__(self, llm: LLMFn, allow_unjailed: bool = False) -> None:
+    def __init__(self, llm: LLMFn, allow_unjailed: bool = False, *, worker: Path = WORKER_PATH,
+                 limits: JailLimits | None = None) -> None:
         self._llm = llm
-        self._cmd = build_command(allow_unjailed)
-        self.jailed = "bwrap" in Path(self._cmd[0]).name
+        self.limits = limits or JailLimits()
+        self._cmd = build_command(allow_unjailed, worker, self.limits)
+        self.jailed = any(Path(c).name == "bwrap" for c in self._cmd)
         self._proc: asyncio.subprocess.Process | None = None
+        self._stderr_tail: deque[bytes] = deque(maxlen=64)
+        self._stderr_task: asyncio.Task[None] | None = None
         self.llm_calls = 0
 
     async def __aenter__(self) -> Self:
         self._proc = await asyncio.create_subprocess_exec(
             *self._cmd, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE, limit=16 * 1024 * 1024,
+            stderr=asyncio.subprocess.PIPE, limit=self.limits.max_message_bytes,
         )
+        # drain stderr continuously: a full pipe would otherwise block the agent forever
+        self._stderr_task = asyncio.create_task(self._drain_stderr())
         return self
+
+    async def _drain_stderr(self) -> None:
+        assert self._proc and self._proc.stderr
+        while chunk := await self._proc.stderr.read(4096):
+            self._stderr_tail.append(chunk)
+
+    def _stderr_text(self) -> str:
+        return b"".join(self._stderr_tail).decode(errors="replace")[-2000:]
+
+    async def _kill(self) -> None:
+        if self._proc and self._proc.returncode is None:
+            self._proc.kill()
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self._proc.wait(), 5)
+
+    async def _fail(self, reason: str) -> JailError:
+        await self._kill()
+        return JailError(reason)
 
     async def __aexit__(self, *exc: object) -> None:
         if self._proc and self._proc.returncode is None:
@@ -87,21 +151,50 @@ class AgentJail:
             try:
                 await asyncio.wait_for(self._proc.wait(), 5)
             except TimeoutError:
-                self._proc.kill()
+                await self._kill()
+        if self._stderr_task:
+            self._stderr_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._stderr_task
 
     async def _write(self, obj: dict[str, Any]) -> None:
         assert self._proc and self._proc.stdin
-        self._proc.stdin.write((json.dumps(obj) + "\n").encode())
-        await self._proc.stdin.drain()
+        try:
+            self._proc.stdin.write((json.dumps(obj) + "\n").encode())
+            await self._proc.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError) as e:
+            raise await self._fail(f"agent process is gone: {self._stderr_text()}") from e
 
     async def _read(self) -> dict[str, Any]:
-        assert self._proc and self._proc.stdout and self._proc.stderr
-        line = await self._proc.stdout.readline()
+        assert self._proc and self._proc.stdout
+        try:
+            line = await asyncio.wait_for(self._proc.stdout.readline(), self.limits.response_timeout_s)
+        except TimeoutError as e:
+            raise await self._fail(f"agent did not respond within {self.limits.response_timeout_s}s") from e
+        except ValueError as e:  # asyncio's "chunk exceeds the limit"
+            raise await self._fail(f"agent message larger than {self.limits.max_message_bytes} bytes") from e
         if not line:
-            err = (await self._proc.stderr.read()).decode()[-2000:]
-            raise RuntimeError(f"agent process exited: {err}")
-        out: dict[str, Any] = json.loads(line)
+            await self._kill()
+            raise JailError(f"agent process exited: {self._stderr_text()}")
+        try:
+            out = json.loads(line)
+        except json.JSONDecodeError as e:
+            raise await self._fail(f"agent sent invalid JSON: {line[:200]!r}") from e
+        if not isinstance(out, dict):
+            raise await self._fail("agent message is not a JSON object")
         return out
+
+    async def _validate_requests(self, reqs: object) -> list[dict[str, str]]:
+        lim = self.limits
+        if not isinstance(reqs, list) or len(reqs) > lim.max_llm_requests_per_message:
+            raise await self._fail(f"agent requested too many LLM calls (max {lim.max_llm_requests_per_message})")
+        for r in reqs:
+            ok = (isinstance(r, dict) and isinstance(r.get("id"), str | int) and isinstance(r.get("system"), str)
+                  and isinstance(r.get("user"), str)
+                  and len(r["system"]) + len(r["user"]) <= lim.max_prompt_chars)
+            if not ok:
+                raise await self._fail("agent sent a malformed or oversized LLM request")
+        return reqs
 
     async def call(self, task: dict[str, Any]) -> dict[str, Any]:
         """Send a task; service any LLM requests the agent makes; return its result."""
@@ -109,15 +202,15 @@ class AgentJail:
         while True:
             msg = await self._read()
             if "llm_requests" in msg:
-                reqs = msg["llm_requests"]
+                reqs = await self._validate_requests(msg["llm_requests"])
                 texts = await asyncio.gather(*(self._llm(r["system"], r["user"]) for r in reqs))
                 self.llm_calls += len(reqs)
                 await self._write({"llm_responses": {r["id"]: t for r, t in zip(reqs, texts, strict=True)}})
-            elif "result" in msg:
+            elif "result" in msg and isinstance(msg["result"], dict):
                 result: dict[str, Any] = msg["result"]
                 return result
             else:
-                raise RuntimeError(f"agent error: {msg}")
+                raise await self._fail(f"agent error: {str(msg)[:500]}")
 
     async def probe(self, forbidden_paths: list[str]) -> dict[str, Any]:
         r = await self.call({"task": "probe", "paths": forbidden_paths})
