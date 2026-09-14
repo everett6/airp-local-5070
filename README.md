@@ -12,6 +12,18 @@
 > [`docs/WALKFORWARD_5070.md`](docs/WALKFORWARD_5070.md) for the full results,
 > the research behind the design, and how to reproduce.
 
+### Live, web-informed research
+
+```bash
+cd backend && .venv/bin/python -m app.live.research NVDA JPM
+```
+
+The jailed agent researches current prices, news, articles and SEC filings
+through guarded tools (about 8–20 s per ticker on a 5070), then returns
+P(up) with reasoning, sources, and a full tool trace. Web tools are live-only:
+backtests refuse them because today's web already contains the future. See
+[`docs/LIVE_TOOLS.md`](docs/LIVE_TOOLS.md).
+
 ### Results dashboard (Python)
 
 ```bash
@@ -101,7 +113,7 @@ airp-local/
 │   │   ├── agents/         specialist agents
 │   │   ├── data_ingestion/ connectors — sandbox-aware mock connectors included
 │   │   └── api/routes/     FastAPI routes, including /api/sandbox/*
-│   └── tests/              pytest — 154 tests
+│   └── tests/              pytest — 200 tests
 ├── frontend/               Next.js + TypeScript UI (Sandbox page is live)
 └── docs/                   ARCHITECTURE, API_SPEC, AGENT_INTERFACES, ROADMAP,
                             LOCAL_SETUP (two-GPU walkthrough), SANDBOX,
@@ -126,9 +138,9 @@ actually check whether the predictions are any good before trusting them.
 
 ## Verified state (as of last commit)
 
-- **5070 edition:** 154/154 pytest passing (48 new walk-forward, jail-hardening, provenance, and dashboard tests,
+- **5070 edition:** 200/200 pytest passing (94 new walk-forward, jail, provenance, web-tool, and dashboard tests,
   including live bubblewrap isolation), `ruff check` clean on app/tests/scripts,
-  `mypy` clean on `app/sandbox`, `app/data_ingestion`, and `app/dashboard/data.py`. The bullets below
+  `mypy` clean on `app/sandbox`, `app/data_ingestion`, `app/tools`, `app/live`, and `app/dashboard/data.py`. The bullets below
   describe the upstream `airp-local` verification and were not re-run here.
 - Backend: **106/106 pytest passing**, `ruff check` clean, `mypy --strict`
   clean across **38 modules** (quant/evidence/confidence/context/llm/sandbox/

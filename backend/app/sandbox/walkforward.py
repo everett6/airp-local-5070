@@ -65,8 +65,12 @@ class OllamaLLM:
     Responses are cached on disk by prompt hash, so re-running a suite after
     changing only the scoring/stacker costs no GPU time."""
 
-    def __init__(self, model: str, base_url: str = "http://127.0.0.1:11434", concurrency: int = 4) -> None:
+    def __init__(self, model: str, base_url: str = "http://127.0.0.1:11434", concurrency: int = 4,
+                 num_ctx: int = 4096, cache: bool = True, num_predict: int = 300) -> None:
         self.model = model
+        self.num_predict = num_predict
+        self.num_ctx = num_ctx
+        self.use_cache = cache
         self.base_url = base_url
         self._sem = asyncio.Semaphore(concurrency)
         self._client = httpx.AsyncClient(timeout=300)
@@ -81,14 +85,15 @@ class OllamaLLM:
         self.cache_hits = 0
 
     async def __call__(self, system: str, user: str) -> str:
-        key = hashlib.sha256(f"{self.model}\0{system}\0{user}".encode()).hexdigest()
-        if key in self._cache:
+        ctx = "" if self.num_ctx == 4096 else f"\0ctx={self.num_ctx}"  # keeps existing cache keys valid
+        key = hashlib.sha256(f"{self.model}\0{system}\0{user}{ctx}".encode()).hexdigest()
+        if self.use_cache and key in self._cache:
             self.cache_hits += 1
             return self._cache[key]
         body = {
             "model": self.model, "stream": False, "think": False, "format": "json",
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "options": {"temperature": 0, "num_ctx": 4096, "num_predict": 300},
+            "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": self.num_predict},
         }
         async with self._sem:
             for attempt in range(3):
@@ -102,9 +107,10 @@ class OllamaLLM:
                         raise
                     await asyncio.sleep(2)
         self.calls += 1
-        self._cache[key] = text
-        with self._cache_path.open("a") as f:
-            f.write(json.dumps({"k": key, "v": text}) + "\n")
+        if self.use_cache:
+            self._cache[key] = text
+            with self._cache_path.open("a") as f:
+                f.write(json.dumps({"k": key, "v": text}) + "\n")
         return text
 
 

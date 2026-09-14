@@ -201,6 +201,22 @@ def provenance_rows(report: dict[str, Any], lock_path: Path = BACKEND / "configs
     return rows
 
 
+def live_decisions(root: Path = RESULTS / "live") -> pd.DataFrame:
+    """Saved live research decisions, newest first."""
+    rows = []
+    for p in sorted(root.glob("*/*.json")):
+        try:
+            r = json.loads(p.read_text())
+            rows.append({"as_of": pd.Timestamp(r["as_of"]), "ticker": r["ticker"], "p_up": r["p_up"],
+                         "horizon_days": r["horizon_days"], "model": r["model"], "rounds": r["rounds"],
+                         "tool_calls": r.get("tool_calls", 0), "elapsed_s": r["elapsed_s"],
+                         "answered": r.get("answered", True), "path": str(p)})
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    df = pd.DataFrame(rows)
+    return df.sort_values("as_of", ascending=False) if not df.empty else df
+
+
 # ---------- launching runs ----------
 
 def ollama_models(host: str = "http://127.0.0.1:11434") -> list[str]:

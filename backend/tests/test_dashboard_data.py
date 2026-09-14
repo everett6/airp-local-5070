@@ -115,3 +115,15 @@ def test_provenance_rows(tmp_path):
     assert "matches" in rows["Price data sha256"]
     assert rows["GPU"].startswith("not detected")
     assert "2048 MB" in rows["Jail limits"]
+
+
+def test_live_decisions(tmp_path):
+    assert D.live_decisions(tmp_path).empty
+    day = tmp_path / "2026-09-14"
+    day.mkdir()
+    base = {"ticker": "NVDA", "p_up": 0.55, "horizon_days": 5, "model": "m", "rounds": 2, "elapsed_s": 9.0}
+    (day / "NVDA-1.json").write_text(json.dumps({**base, "as_of": "2026-09-14T04:00:00+00:00"}))
+    (day / "JPM-2.json").write_text(json.dumps({**base, "ticker": "JPM", "as_of": "2026-09-14T05:00:00+00:00"}))
+    (day / "bad.json").write_text("{")
+    df = D.live_decisions(tmp_path)
+    assert list(df["ticker"]) == ["JPM", "NVDA"]

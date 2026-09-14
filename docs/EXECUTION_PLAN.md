@@ -33,6 +33,13 @@ Everything after this produces new results, so they must be stamped from the sta
 | A3 | `scripts/reproduce.py`: verify the pinned data checksum (optionally fetch), re-run every frozen config from the committed cache, diff every score and prediction | ✅ Exits 0, "ALL IDENTICAL" for v2, v3_excess, v4_14b; negative control detected |
 | A4 | Jail hardening: memory/CPU limits (`prlimit`), per-call timeout, max message size | ✅ 17 hostile-worker tests (memory hog, hang, oversized message, request flood, bad JSON, stderr flood), jailed and unjailed |
 
+## Phase W — Live web tools. ✅ Done 2026-09-13 (added at your request)
+
+The jailed agent can research in real time through guarded tools (news, articles, prices,
+SEC filings, sandboxed Python). Live-only by design. See `docs/LIVE_TOOLS.md`. This changes B3:
+the forward test logs **two** arms each week, price-only (`live_plain`) and web-informed
+(`live_web`), so we learn whether web information actually helps, measured before outcomes exist.
+
 ## Phase B — Airtight evaluation (~3 h of work, plus calendar time)
 
 | # | Task | Done when |

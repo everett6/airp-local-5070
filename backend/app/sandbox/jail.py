@@ -62,6 +62,7 @@ class JailLimits:
     max_message_bytes: int = 16 * 1024 * 1024
     max_llm_requests_per_message: int = 256
     max_prompt_chars: int = 100_000
+    max_tool_calls_per_message: int = 8
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -103,12 +104,15 @@ def build_command(allow_unjailed: bool = False, worker: Path = WORKER_PATH,
 
 
 LLMFn = Any  # async (system: str, user: str) -> str
+ToolExecutor = Any  # object with async execute(list[dict]) -> dict[str, dict]; see app/tools/gateway.py
 
 
 class AgentJail:
     def __init__(self, llm: LLMFn, allow_unjailed: bool = False, *, worker: Path = WORKER_PATH,
-                 limits: JailLimits | None = None) -> None:
+                 limits: JailLimits | None = None, tools: ToolExecutor | None = None) -> None:
         self._llm = llm
+        self._tools = tools
+        self.tool_calls = 0
         self.limits = limits or JailLimits()
         bwrap = shutil.which("bwrap")
         self._cmd = build_command(allow_unjailed, worker, self.limits)
@@ -200,6 +204,19 @@ class AgentJail:
                 raise await self._fail("agent sent a malformed or oversized LLM request")
         return reqs
 
+    async def _validate_tool_requests(self, reqs: object) -> list[dict[str, Any]]:
+        if self._tools is None:
+            raise await self._fail("agent requested tools, but no tools are enabled for this jail")
+        lim = self.limits.max_tool_calls_per_message
+        if not isinstance(reqs, list) or not reqs or len(reqs) > lim:
+            raise await self._fail(f"agent sent an empty or oversized tool batch (max {lim})")
+        for r in reqs:
+            ok = (isinstance(r, dict) and isinstance(r.get("id"), str | int) and isinstance(r.get("tool"), str)
+                  and len(r["tool"]) <= 40 and isinstance(r.get("args", {}), dict))
+            if not ok:
+                raise await self._fail("agent sent a malformed tool request")
+        return reqs
+
     async def call(self, task: dict[str, Any]) -> dict[str, Any]:
         """Send a task; service any LLM requests the agent makes; return its result."""
         await self._write(task)
@@ -210,6 +227,12 @@ class AgentJail:
                 texts = await asyncio.gather(*(self._llm(r["system"], r["user"]) for r in reqs))
                 self.llm_calls += len(reqs)
                 await self._write({"llm_responses": {r["id"]: t for r, t in zip(reqs, texts, strict=True)}})
+            elif "tool_requests" in msg:
+                treqs = await self._validate_tool_requests(msg["tool_requests"])
+                assert self._tools is not None  # checked in _validate_tool_requests
+                responses = await self._tools.execute(treqs)
+                self.tool_calls += len(treqs)
+                await self._write({"tool_responses": responses})
             elif "result" in msg and isinstance(msg["result"], dict):
                 result: dict[str, Any] = msg["result"]
                 return result

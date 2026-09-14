@@ -42,7 +42,7 @@ st.sidebar.caption("Every prediction was made by an agent in a process jail with
                    "access, on anonymized prices, using only outcomes resolved before its cutoff.")
 
 tabs = st.tabs(["Overview", "Over time", "Calibration", "Self-improvement",
-                "Predictions", "Compare runs", "New run"])
+                "Predictions", "Compare runs", "New run", "Live research"])
 
 if tag:
     report = D.load_report(tag)
@@ -330,3 +330,64 @@ with tabs[6]:
                 if s["total"]:
                     st.progress(s["done"] / s["total"], text=f"cutoff {s['done']} of {s['total']}")
                 st.code(s["log_tail"] or "(no output yet)", language=None)
+
+# ---------------- live research ----------------
+with tabs[7]:
+    import asyncio
+    import json
+
+    from app.live.research import research_tickers
+
+    st.header("Live, web-informed research")
+    st.caption("The jailed agent reads current prices, news, articles and SEC filings through guarded tools, "
+               "then gives P(up) with sources. Valid only for decisions made now: this can't be backtested "
+               "honestly, so its accuracy is measured forward in time.")
+    with st.form("live_form"):
+        l1, l2, l3, l4 = st.columns([3, 1, 1, 1])
+        tick_text = l1.text_input("Tickers (comma-separated)", "NVDA, JPM")
+        live_models = D.ollama_models() or ["qwen3:8b"]
+        live_model = l2.selectbox("Model", live_models,
+                                  index=live_models.index("qwen3:8b") if "qwen3:8b" in live_models else 0)
+        rounds = l3.number_input("Tool rounds", 1, 5, 3)
+        horizon = l4.number_input("Horizon (days)", 1, 60, 5)
+        go = st.form_submit_button("Research now", type="primary")
+    if go:
+        tickers = [x.strip().upper() for x in tick_text.split(",") if x.strip()][:8]
+        status = st.status(f"Researching {', '.join(tickers)}…", expanded=True)
+
+        def on_event(e: dict) -> None:
+            if e.get("final"):
+                status.write(f"**{e['ticker']}** done: P(up) = {e['p_up']:.2f} in {e['elapsed_s']} s")
+            else:
+                mark = "✅" if e["ok"] else "⚠️"
+                status.write(f"{mark} `{e['ticker']}` {e['tool']} {json.dumps(e.get('args'))[:90]} "
+                             f"· {e['elapsed_ms']} ms" + ("" if e["ok"] else f" · {e['error'][:80]}"))
+        try:
+            recs = asyncio.run(research_tickers(tickers, model=live_model, horizon=int(horizon),
+                                                max_rounds=int(rounds), concurrency=3, on_event=on_event))
+            status.update(label=f"Done: {len(recs)} decision(s)", state="complete", expanded=False)
+        except (ValueError, RuntimeError, OSError) as e:
+            status.update(label="Failed", state="error")
+            st.error(str(e))
+            recs = []
+        for rec in recs:
+            with st.container(border=True):
+                a1, a2 = st.columns([1, 4])
+                a1.metric(rec["ticker"], f"{rec['p_up']:.2f}", help=f"P(up in {rec['horizon_days']} trading days)")
+                a1.caption(f"{rec['rounds']} rounds · {rec['tool_calls']} tools · {rec['elapsed_s']} s")
+                a2.markdown(rec["reason"])
+                for s in rec["sources"]:
+                    a2.markdown(f"- {s}" if not s.startswith("http") else f"- [{s[:90]}]({s})")
+                with st.expander("Tool trace"):
+                    st.dataframe(pd.DataFrame([{"tool": x["tool"], "args": json.dumps(x["args"])[:120],
+                                                "ok": x["ok"], "ms": x["elapsed_ms"], "chars": x["chars"],
+                                                "error": x["error"] or ""} for x in rec["tool_log"]]),
+                                 hide_index=True, width="stretch")
+
+    past = D.live_decisions()
+    st.subheader("Past live decisions")
+    if past.empty:
+        st.info("None yet.")
+    else:
+        st.dataframe(past.drop(columns="path").style.format({"p_up": "{:.2f}", "as_of": "{:%Y-%m-%d %H:%M}"}),
+                     hide_index=True, width="stretch")
