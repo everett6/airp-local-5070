@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class MemoryKind(str, Enum):
@@ -36,8 +36,8 @@ class MemoryRecord:
     confidence: float
     source: str               # run_id or external source that generated this memory
     citations: list[str]      # evidence_ids
-    content: dict             # structured payload (schema depends on `kind`)
-    outcome: dict | None   # filled in later once the real-world result is known
+    content: dict[str, Any]   # structured payload (schema depends on `kind`)
+    outcome: dict[str, Any] | None   # filled in later once the real-world result is known
     retrieval_tags: list[str]
     embedding: list[float] | None = None
 
@@ -55,7 +55,7 @@ class MemoryStore(Protocol):
         self, namespace: str, query: str, tags: list[str], top_k: int = 5
     ) -> list[MemoryQueryResult]: ...
 
-    async def record_outcome(self, memory_id: str, outcome: dict) -> None:
+    async def record_outcome(self, memory_id: str, outcome: dict[str, Any]) -> None:
         """Called once ground truth is known (e.g. earnings actually reported,
         price moved). This is what powers 'continuously learns from previous
         trades' — accuracy stats are computed FROM this data by

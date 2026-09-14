@@ -38,13 +38,14 @@ def build_calibration_report(records: list[MemoryRecord]) -> CalibrationReport:
 
     errors = []
     correct_flags = []
-    conf_correct = []
-    conf_wrong = []
+    conf_correct: list[float] = []
+    conf_wrong: list[float] = []
 
     for r in with_outcome:
+        outcome = r.outcome or {}
         predicted = r.content.get("price_target")
-        actual = r.outcome.get("actual_price")
-        entry = r.outcome.get("price_at_prediction")
+        actual = outcome.get("actual_price")
+        entry = outcome.get("price_at_prediction")
         if predicted is None or actual is None or entry is None or entry == 0:
             continue
         pct_error = abs(actual - predicted) / entry

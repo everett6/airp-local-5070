@@ -25,7 +25,7 @@ from pydantic import BaseModel
 
 from app.core.message_protocol import AgentMessage, AgentRole, MessageBus, MessageType
 from app.evidence.models import ClaimBundle
-from app.memory.interface import MemoryStore
+from app.memory.interface import MemoryQueryResult, MemoryStore
 
 TIn = TypeVar("TIn", bound=BaseModel)
 TOut = TypeVar("TOut", bound=BaseModel)
@@ -68,7 +68,8 @@ class SpecialistAgent(abc.ABC, Generic[TIn, TOut]):
             )
         return await self.tools[name](**kwargs)
 
-    async def recall(self, ctx: AgentContext, query: str, tags: list[str] | None = None, k: int = 5):
+    async def recall(self, ctx: AgentContext, query: str, tags: list[str] | None = None,
+                     k: int = 5) -> list[MemoryQueryResult]:
         """Retrieval-only access to this agent's own memory namespace — enforces
         Layer 3's 'use retrieval instead of increasing context length'."""
         return await ctx.memory.query(

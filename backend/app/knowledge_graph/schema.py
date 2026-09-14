@@ -9,6 +9,7 @@ untyped mess.
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -63,7 +64,7 @@ VALID_TRIPLES: set[tuple[NodeLabel, RelationshipType, NodeLabel]] = {
 class GraphNode(BaseModel):
     node_id: str
     label: NodeLabel
-    properties: dict
+    properties: dict[str, Any]
 
 
 class GraphRelationship(BaseModel):
@@ -72,7 +73,7 @@ class GraphRelationship(BaseModel):
     rel_type: RelationshipType
     target_id: str
     target_label: NodeLabel
-    properties: dict = {}
+    properties: dict[str, Any] = {}
     evidence_id: str | None = None  # ties the edge back to evidence/models.EvidenceRef
 
     def is_valid(self) -> bool:

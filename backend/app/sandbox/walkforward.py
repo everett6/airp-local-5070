@@ -554,7 +554,8 @@ async def probe_leak(model: str, data: str, n_cutoffs: int = 3, seed: int = 0) -
     return report
 
 
-async def probe_memorization(model: str) -> dict[str, Any]:
+async def probe_memorization(model: str, tickers: tuple[str, ...] = ("AAPL", "MSFT", "NVDA", "KO", "JPM")
+                             ) -> dict[str, Any]:
     """Lopez-Lira et al. (2025) / Gao et al. (2025, arXiv:2512.23847): ask for
     exact historical closes. Low error = memorized = inside training data =
     unusable for a clean backtest. Error jumping up marks the real cutoff."""
@@ -567,7 +568,7 @@ async def probe_memorization(model: str) -> dict[str, Any]:
     for (y, m) in months:
         d = date(y, m, 15)
         i = table.index_on_or_before(d)
-        for t in ("AAPL", "MSFT", "NVDA", "KO", "JPM"):
+        for t in tickers:
             q = f"What was the closing price of {t} stock on {table.dates[i].isoformat()} (split-adjusted)?"
             tasks.append((f"{y}-{m:02d}", table.closes[t][i], llm(sys_p, q)))
     answers = await asyncio.gather(*(t[2] for t in tasks))

@@ -8,6 +8,8 @@ stage a genuine adversarial check rather than two agents converging early.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.agents.base import AgentContext, SpecialistAgent
@@ -17,7 +19,7 @@ from app.evidence.models import Claim, ClaimBundle
 
 class ThesisRequest(BaseModel):
     ticker: str
-    specialist_findings: dict[str, dict]  # keyed by AgentRole.value -> finding dump
+    specialist_findings: dict[str, dict[str, Any]]  # keyed by AgentRole.value -> finding dump
 
 
 @register_payload

@@ -13,8 +13,11 @@ silently incomplete-but-confident report.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
+
+from pydantic import BaseModel
 
 from app.agents.base import AgentContext
 from app.core.message_protocol import AgentRole, MessageBus
@@ -92,7 +95,8 @@ class DebateOrchestrator:
         state.stage = DebateStage.DONE
         return state
 
-    async def _run_agent_stage(self, ctx, state: DebateRunState, role: AgentRole, request_builder) -> None:
+    async def _run_agent_stage(self, ctx: AgentContext, state: DebateRunState, role: AgentRole,
+                               request_builder: Callable[[AgentRole, DebateRunState], BaseModel]) -> None:
         agent = self._agents.get(role)
         if agent is None:
             state.errors.append(StageError(stage=state.stage, agent=role, error="agent not registered"))
@@ -110,17 +114,17 @@ class DebateOrchestrator:
             logger.exception("stage %s failed for agent %s", state.stage, role)
             state.errors.append(StageError(stage=state.stage, agent=role, error=str(exc)))
 
-    def _build_specialist_request(self, role: AgentRole, state: DebateRunState):
+    def _build_specialist_request(self, role: AgentRole, state: DebateRunState) -> BaseModel:
         from app.agents.fundamental_analyst import FundamentalAnalysisRequest
         # In production this dispatches to a per-role request-model factory
         # registered alongside each agent; kept simple here for the skeleton.
         return FundamentalAnalysisRequest(ticker=state.ticker, fiscal_period="latest")
 
-    def _build_thesis_request(self, role: AgentRole, state: DebateRunState):
+    def _build_thesis_request(self, role: AgentRole, state: DebateRunState) -> BaseModel:
         from app.agents.thesis_agents import ThesisRequest
         return ThesisRequest(ticker=state.ticker, specialist_findings=dict(state.findings))
 
-    async def _cross_examine(self, ctx, state: DebateRunState) -> int:
+    async def _cross_examine(self, ctx: AgentContext, state: DebateRunState) -> int:
         """Deterministic rule-based challenge detector: flags theses whose
         stated assumptions contradict a specialist finding already on record.
         This is intentionally simple and auditable rather than another LLM

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
+from typing import Any
 
 from app.memory.interface import MemoryQueryResult, MemoryRecord, MemoryStore
 
@@ -53,7 +54,7 @@ class InMemoryStore(MemoryStore):
         scored.sort(key=lambda r: r.relevance_score, reverse=True)
         return scored[:top_k]
 
-    async def record_outcome(self, memory_id: str, outcome: dict) -> None:
+    async def record_outcome(self, memory_id: str, outcome: dict[str, Any]) -> None:
         rec = self._by_id.get(memory_id)
         if rec is None:
             raise KeyError(f"no memory record with id {memory_id}")

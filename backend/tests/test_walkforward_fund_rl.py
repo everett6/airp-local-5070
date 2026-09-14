@@ -1,6 +1,7 @@
 """Offline end-to-end walk-forward with fundamentals and the RL agent (fake LLM, synthetic data)."""
 import json
 import shutil
+import sys
 from datetime import date, timedelta
 
 import numpy as np
@@ -97,3 +98,25 @@ def test_sue_rule():
     assert wf.sue_rule({"fund_ok": 0}) == 0.5
     assert wf.sue_rule({"fund_ok": 1, "sue_1": 1, "sue_2": 0, "sue_3": 0, "sue_4": -1}) == 0.51
     assert wf.sue_rule({"fund_ok": 1, "sue_1": -2, "sue_2": 1, "sue_3": 0, "sue_4": 0}) == 0.49
+
+
+async def test_probe_leak_and_memorization_offline(env):
+    rep = await wf.probe_leak("m", "data/prices_test.csv", n_cutoffs=2)
+    assert set(rep["rates"]) == {"prices", "prices+digest"} and rep["counts"]["prices"]["n"] == 24
+    assert rep["passed"] is True  # the fake model never names a company
+    mem = await wf.probe_memorization("m", tickers=("T00", "T01"))
+    assert mem["unanswered_rate"] and all(v == 1.0 for v in mem["unanswered_rate"].values())
+
+
+def test_cli_main_routes_probes_and_runs(env, monkeypatch, capsys):
+    calls = []
+
+    async def fake_run(args):
+        calls.append(args.tag)
+        return {"window": ["a", "b"], "n_cutoffs": 1, "llm_calls": 0, "runtime_s": 0,
+                "scores_full": {"x": {}}, "scores_after_warmup": {"x": {}}}
+
+    monkeypatch.setattr(wf, "run", fake_run)
+    monkeypatch.setattr(sys, "argv", ["walkforward", "--tag", "cli"])
+    wf.main()
+    assert calls == ["cli"] and "scores_after_warmup" in capsys.readouterr().out

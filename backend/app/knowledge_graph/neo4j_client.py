@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from neo4j import AsyncDriver, AsyncGraphDatabase
 
 from app.knowledge_graph.schema import GraphNode, GraphRelationship
@@ -44,7 +46,7 @@ class KnowledgeGraphClient:
                 properties=rel.properties, evidence_id=rel.evidence_id,
             )
 
-    async def neighbors(self, node_id: str, rel_type: str | None = None, depth: int = 1) -> list[dict]:
+    async def neighbors(self, node_id: str, rel_type: str | None = None, depth: int = 1) -> list[dict[str, Any]]:
         rel_clause = f":{rel_type}" if rel_type else ""
         query = (
             f"MATCH (n {{node_id: $node_id}})-[r{rel_clause}*1..{depth}]-(m) "

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # make `app` importable under streamlit
 
@@ -20,7 +21,8 @@ st.set_page_config(page_title="AIRP Walk-Forward Lab", page_icon="🧪", layout=
 COLORS = {
     "Always 'up'": "#9aa0a6", "Base rate": "#bdc1c6", "Momentum (20d)": "#80868b",
     "Reversal (5d)": "#5f6368", "Logistic (no LLM)": "#f9ab00", "LLM": "#1a73e8",
-    "LLM + self-improve": "#d93025", "Selector": "#188038",
+    "LLM + self-improve": "#d93025", "Selector": "#188038", "Earnings surprise rule": "#a142f4",
+    "Logistic + fundamentals": "#e37400", "LLM + fundamentals": "#12b5cb", "Deep RL agent": "#000000",
 }
 COLOR_SCALE = alt.Scale(domain=list(COLORS), range=list(COLORS.values()))
 
@@ -45,12 +47,12 @@ tabs = st.tabs(["Overview", "Over time", "Calibration", "Self-improvement",
                 "Predictions", "Compare runs", "New run", "Live research"])
 
 @st.cache_data(show_spinner=False, max_entries=16)
-def _load_run(tag: str, mtime: float) -> tuple[dict, pd.DataFrame]:  # mtime busts the cache when a run is rewritten
+def _load_run(tag: str, mtime: float) -> tuple[dict[str, Any], pd.DataFrame]:  # mtime busts the cache when a run is rewritten
     return D.load_report(tag), D.load_predictions(tag)
 
 
 @st.cache_data(show_spinner=False, max_entries=256)
-def _gap(preds: pd.DataFrame, arm: str) -> dict | None:
+def _gap(preds: pd.DataFrame, arm: str) -> dict[str, float] | None:
     return D.brier_gap_ci(preds, arm)
 
 
@@ -82,8 +84,11 @@ if tag:
         c[3].metric("Agent isolation", "✅ Jailed" if jail_ok else "❌ FAILED",
                     help="Live probe at start and end: no readable data files, no network.")
 
-        gaps = {a: _gap(preds, a) for a in ("llm_plain", "llm_selfimprove") if a in saved_arms}
-        gaps = {a: g for a, g in gaps.items() if g}
+        gaps: dict[str, dict[str, float]] = {}
+        for arm_name in ("llm_plain", "llm_fund", "llm_selfimprove", "rl_forecast"):
+            gap = _gap(preds, arm_name) if arm_name in saved_arms else None
+            if gap:
+                gaps[arm_name] = gap
         if "always_up" in saved_arms and gaps:
             winners = [a for a, g in gaps.items() if g["hi"] < 0]
             if winners:
@@ -105,9 +110,9 @@ if tag:
                                           "ls_mean_weekly_ret_pct": "L/S weekly %", "ls_sharpe_ann": "L/S Sharpe"})
             show = show[["Arm", "Accuracy", "% up calls", "Brier", "Log loss", "L/S weekly %", "L/S Sharpe"]]
             st.dataframe(
-                show.style.format({"Accuracy": pct, "% up calls": pct, "Brier": "{:.4f}", "Log loss": "{:.4f}",
-                                   "L/S weekly %": "{:+.2f}", "L/S Sharpe": "{:.2f}"})
-                .highlight_min(subset=["Brier", "Log loss"], color="#d2e3fc"),
+                cast(Any, show.style.format(cast(Any, {"Accuracy": pct, "% up calls": pct, "Brier": "{:.4f}", "Log loss": "{:.4f}",
+                                   "L/S weekly %": "{:+.2f}", "L/S Sharpe": "{:.2f}"}))
+                .highlight_min(subset=["Brier", "Log loss"], color="#d2e3fc")),
                 hide_index=True, width="stretch")
             st.caption(f"1 standard error of accuracy ≈ ±{se * 100:.1f} pts (assumes independent predictions; "
                        "the real uncertainty is larger, see the Brier gap table). L/S figures ignore costs.")
@@ -126,6 +131,19 @@ if tag:
             ).properties(height=260)
             st.altair_chart(chart, width="stretch")
             st.caption("Black lines = ±1 standard error.")
+
+        cs_df = D.cross_sectional_frame(report)
+        if cs_df is not None:
+            st.subheader("Does it rank stocks correctly within each week? (rank IC)")
+            show_cs = cs_df.rename(columns={"label": "Arm", "rank_ic_mean": "Rank IC", "rank_ic_lo": "95% CI low",
+                                            "rank_ic_hi": "95% CI high", "q_spread_pct": "Top−bottom fifth, weekly %",
+                                            "rank_ic_weeks": "Weeks"})
+            st.dataframe(show_cs[["Arm", "Rank IC", "95% CI low", "95% CI high", "Top−bottom fifth, weekly %", "Weeks"]]
+                         .style.format({"Rank IC": "{:+.4f}", "95% CI low": "{:+.4f}", "95% CI high": "{:+.4f}",
+                                        "Top−bottom fifth, weekly %": "{:+.3f}"}), hide_index=True, width="stretch")
+            st.caption("Spearman correlation between forecast and realized return across stocks each week, averaged "
+                       "over weeks; the interval resamples whole weeks. 0 = no ranking skill. Rule arms that output "
+                       "only two values rank coarsely.")
 
         with st.expander("🧾 Receipts: exactly what produced this run"):
             rows_pv = D.provenance_rows(report)
@@ -205,8 +223,8 @@ if tag:
         st.markdown("The self-improving agent sees its own resolved track record, writes itself lessons, and may "
                     "switch on a small learned correction (the *stacker*). That correction is **only adopted if "
                     "it beats the raw LLM on a held-out slice of past outcomes.**")
-        a, b = st.columns(2)
-        with a:
+        left_col, right_col = st.columns(2)
+        with left_col:
             st.subheader("Stacker decisions")
             sl = pd.DataFrame(report.get("stacker_log", []))
             if sl.empty:
@@ -220,7 +238,7 @@ if tag:
                                                     range=["#188038", "#d93025", "#9aa0a6"]))),
                     width="stretch")
                 st.caption(" · ".join(f"{k}: {v}" for k, v in sl["stacker"].value_counts().items()))
-        with b:
+        with right_col:
             st.subheader("Selector's choice each cutoff")
             sel = pd.DataFrame(report.get("selector_log", []))
             if sel.empty:
@@ -231,6 +249,31 @@ if tag:
                 st.altair_chart(alt.Chart(sel).mark_tick(thickness=4, size=30).encode(
                     x="cutoff:T", y=alt.Y("label:N", title=None),
                     color=alt.Color("label:N", scale=COLOR_SCALE, legend=None)), width="stretch")
+        rl = D.rl_frames(report)
+        if rl is not None:
+            rl_df, trader = rl
+            st.subheader("Deep RL agent: retrained every week on resolved outcomes")
+            st.caption("Actor-critic network over {short, flat, long} with a calibrated forecast head. Each week it "
+                       "continues training from last week's weights; the new forecast head is used only if it beats "
+                       "the base rate on the most recent held-out weeks, and the trader only if it beats staying flat.")
+            k1, k2, k3, k4 = st.columns(4)
+            k1.metric("Weeks trained", int((rl_df["status"] != "not_enough_data").sum()))
+            k2.metric("Forecast head adopted", int(rl_df["status"].isin(["adopted", "rejected_trader"]).sum()))
+            k3.metric("Trader adopted", int(rl_df["status"].isin(["adopted", "rejected_forecast"]).sum()))
+            aw_ = trader.get("after_warmup", {})
+            k4.metric("Trader Sharpe after costs", aw_.get("sharpe_after_costs", "—"),
+                      f"CI {aw_.get('sharpe_ci_lo', '—')} to {aw_.get('sharpe_ci_hi', '—')}", delta_color="off")
+            st.altair_chart(alt.Chart(rl_df).mark_tick(thickness=4, size=30).encode(
+                x="cutoff:T", y=alt.Y("status:N", title=None), color=alt.Color("status:N", legend=None),
+                tooltip=list(rl_df.columns.astype(str))), width="stretch")
+            ll = rl_df.dropna(subset=["holdout model log loss"]).melt(
+                "cutoff", ["holdout model log loss", "holdout base log loss"], var_name="series", value_name="log loss")
+            if not ll.empty:
+                st.altair_chart(alt.Chart(ll).mark_line(point=True).encode(
+                    x="cutoff:T", y=alt.Y("log loss:Q", scale=alt.Scale(zero=False)), color="series:N"),
+                    width="stretch")
+            st.caption(f"Trader after warm-up: {aw_}")
+
         st.subheader("Lessons the agent wrote for itself")
         lessons = report.get("lessons", [])
         if not lessons:
@@ -260,9 +303,10 @@ if tag:
                               actual=view["up"].map(lambda u: "up" if u else "down"),
                               correct=((view["p"] >= 0.5) == view["up"]))
             out = out[["cutoff", "ticker", "p", "call", "actual", "ret", "correct", "resolve_date"]]
-            st.dataframe(out.sort_values(["cutoff", "ticker"], ascending=[False, True]).style.format(
-                {"p": "{:.2f}", "ret": lambda r: f"{r * 100:+.2f}%", "cutoff": "{:%Y-%m-%d}",
-                 "resolve_date": "{:%Y-%m-%d}"}), hide_index=True, width="stretch", height=380)
+            fmt_pred: dict[str, Any] = {"p": "{:.2f}", "ret": lambda r: f"{r * 100:+.2f}%", "cutoff": "{:%Y-%m-%d}",
+                                        "resolve_date": "{:%Y-%m-%d}"}
+            st.dataframe(cast(Any, out.sort_values(["cutoff", "ticker"], ascending=[False, True]).style.format(fmt_pred)),
+                         hide_index=True, width="stretch", height=380)
             st.download_button("Download CSV", out.to_csv(index=False), f"{tag}_{arm_p}.csv", "text/csv")
             st.subheader("Accuracy by stock")
             by = preds[preds["arm"] == arm_p].assign(hit=lambda d: (d["p"] >= 0.5) == d["up"]) \
@@ -280,7 +324,7 @@ with tabs[5]:
     if runs:
         cmp = D.compare_runs(after_warmup=after_warmup)
         fmts = {c: (pct if c.endswith("acc") else "{:.4f}") for c in cmp.columns if c.endswith(("acc", "Brier"))}
-        st.dataframe(cmp.style.format(fmts, na_rep="—"), hide_index=True, width="stretch")
+        st.dataframe(cast(Any, cmp.style.format(cast(Any, fmts), na_rep="—")), hide_index=True, width="stretch")
     mem = D.memorization_probe()
     st.subheader("What does the model remember about real prices?")
     if mem.empty:
@@ -385,7 +429,7 @@ with tabs[7]:
         tickers = [x.strip().upper() for x in tick_text.split(",") if x.strip()][:8]
         status = st.status(f"Researching {', '.join(tickers)}…", expanded=True)
 
-        def on_event(e: dict) -> None:
+        def on_event(e: dict[str, Any]) -> None:
             if e.get("final") and e.get("p_up") is None:
                 status.write(f"❌ **{e['ticker']}** failed: {e.get('error', '')[:120]}")
             elif e.get("final"):

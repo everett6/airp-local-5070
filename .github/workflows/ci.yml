@@ -20,7 +20,9 @@ jobs:
           cache: "pip"
 
       - name: Install
-        run: pip install -e ".[dev]"
+        # ui = streamlit (+ pandas/altair) for the dashboard and its tests. bubblewrap is deliberately not
+        # installed: hosted runners restrict user namespaces, so jailed tests skip and the same checks run unjailed.
+        run: pip install -e ".[dev,ui]"
 
       - name: Lint (ruff)
         run: ruff check .
@@ -30,7 +32,10 @@ jobs:
         # context/llm/sandbox/data_ingestion/store/api: real, tested modules
         # for this repo — strict from day one rather than accumulating
         # untyped debt the way stub-only route files otherwise would.
-        run: mypy --strict app/quant app/evidence app/confidence app/context app/llm app/sandbox app/data_ingestion app/store app/api
+        run: mypy --strict app/quant app/evidence app/confidence app/context app/llm app/sandbox app/data_ingestion app/store app/api app/learning app/forward app/tools app/live app/dashboard/data.py
+
+      - name: Type-check everything (non-strict)
+        run: mypy app
 
       - name: Test with coverage
         run: |

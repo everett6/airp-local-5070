@@ -21,8 +21,8 @@ BACKEND = Path(__file__).resolve().parents[2]
 RESULTS = BACKEND / "results"
 DATA_CSV = BACKEND / "data" / "prices.csv"
 
-ARM_ORDER = ["always_up", "base_rate", "momentum_20d", "reversal_5d", "feat_logit",
-             "llm_plain", "llm_selfimprove", "selector"]
+ARM_ORDER = ["always_up", "base_rate", "momentum_20d", "reversal_5d", "feat_logit", "sue_rule", "feat_fund_logit",
+             "llm_plain", "llm_fund", "llm_selfimprove", "rl_forecast", "selector"]
 ARM_LABELS = {
     "always_up": "Always 'up'",
     "base_rate": "Base rate",
@@ -32,6 +32,10 @@ ARM_LABELS = {
     "llm_plain": "LLM",
     "llm_selfimprove": "LLM + self-improve",
     "selector": "Selector",
+    "sue_rule": "Earnings surprise rule",
+    "feat_fund_logit": "Logistic + fundamentals",
+    "llm_fund": "LLM + fundamentals",
+    "rl_forecast": "Deep RL agent",
 }
 TAG_RE = re.compile(r"^[A-Za-z0-9_\-]{1,40}$")
 
@@ -81,6 +85,28 @@ def scores_frame(report: dict[str, Any], after_warmup: bool = True) -> pd.DataFr
     s = report["scores_after_warmup" if after_warmup else "scores_full"]
     rows = [{"arm": a, "label": ARM_LABELS.get(a, a), **s[a]} for a in _ordered(list(s))]
     return pd.DataFrame(rows)
+
+
+def cross_sectional_frame(report: dict[str, Any]) -> pd.DataFrame | None:
+    cs = report.get("cross_sectional_after_warmup")
+    if not cs:
+        return None
+    rows = [{"arm": a, "label": ARM_LABELS.get(a, a), **cs[a]} for a in _ordered(list(cs))
+            if cs[a].get("rank_ic_mean") is not None]
+    return pd.DataFrame(rows) if rows else None
+
+
+def rl_frames(report: dict[str, Any]) -> tuple[pd.DataFrame, dict[str, Any]] | None:
+    log = report.get("rl_log")
+    if not log:
+        return None
+    df = pd.DataFrame([{"cutoff": pd.Timestamp(r["cutoff"]), "status": r["status"], "n_train": r["n_train"],
+                        "n_holdout": r["n_holdout"], "epochs": r["epochs"],
+                        "holdout model log loss": r["holdout"].get("model_log_loss"),
+                        "holdout base log loss": r["holdout"].get("base_log_loss"),
+                        "holdout trader reward": r["holdout"].get("trader_reward"),
+                        "mean |position|": r["holdout"].get("mean_abs_position")} for r in log])
+    return df, report.get("rl_trader", {})
 
 
 def warm_filter(df: pd.DataFrame, report: dict[str, Any], after_warmup: bool) -> pd.DataFrame:
