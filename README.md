@@ -1,4 +1,16 @@
-# AIRP Local
+# AIRP Local — 5070 edition
+
+> **This repo is `airp-local-5070`, a clone of `airp-local` tuned for a single
+> RTX 5070 (12 GB).** It adds a leakage-proof walk-forward test of a local LLM
+> forecasting agent on **real** prices: a bubblewrap process jail (no network,
+> no data access), point-in-time data and memory, anonymized inputs, a test
+> window after the model's measured training cutoff, a self-improving agent
+> arm, and non-LLM baselines on the identical grid. It also fixes a cache
+> bypass in the original sandbox. **Headline result: across 520–1,040
+> post-warm-up predictions per run, no LLM arm (qwen3 8B or 14B, plain or
+> self-improving) beat simply predicting "up"** — see
+> [`docs/WALKFORWARD_5070.md`](docs/WALKFORWARD_5070.md) for the full results,
+> the research behind the design, and how to reproduce.
 
 A local-first AI investment research platform: runs against **your own GPUs**
 (no cloud LLM API keys required) and includes a **point-in-time sandbox** for
@@ -76,7 +88,7 @@ airp-local/
 │   │   ├── agents/         specialist agents
 │   │   ├── data_ingestion/ connectors — sandbox-aware mock connectors included
 │   │   └── api/routes/     FastAPI routes, including /api/sandbox/*
-│   └── tests/              pytest — 106 tests
+│   └── tests/              pytest — 119 tests
 ├── frontend/               Next.js + TypeScript UI (Sandbox page is live)
 └── docs/                   ARCHITECTURE, API_SPEC, AGENT_INTERFACES, ROADMAP,
                             LOCAL_SETUP (two-GPU walkthrough), SANDBOX,
@@ -101,6 +113,10 @@ actually check whether the predictions are any good before trusting them.
 
 ## Verified state (as of last commit)
 
+- **5070 edition:** 119/119 pytest passing (13 new walk-forward/jail tests,
+  including live bubblewrap isolation), `ruff check` clean on app/tests/scripts,
+  `mypy` clean on `app/sandbox` and `app/data_ingestion`. The bullets below
+  describe the upstream `airp-local` verification and were not re-run here.
 - Backend: **106/106 pytest passing**, `ruff check` clean, `mypy --strict`
   clean across **38 modules** (quant/evidence/confidence/context/llm/sandbox/
   data_ingestion/store/api) — re-verified in a fresh venv after a from-scratch

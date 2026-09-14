@@ -11,9 +11,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-TICKERS = (
-    "AAPL MSFT NVDA AMZN GOOGL META JPM XOM JNJ PG KO WMT UNH HD CAT BA DIS NFLX AMD INTC SPY"
-).split()
+TICKERS = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "JPM", "XOM", "JNJ", "PG", "KO", "WMT", "UNH", "HD", "CAT", "BA", "DIS", "NFLX", "AMD", "INTC", "SPY"]
 
 
 def main() -> None:
