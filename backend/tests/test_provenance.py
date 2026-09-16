@@ -126,3 +126,17 @@ def test_reproduce_skips_forward_test_configs():
     assert mod.is_backtest_config(CONFIGS / "v2.toml")
     assert not mod.is_backtest_config(CONFIGS / "forward_v1.toml")
     assert mod.reproduce(CONFIGS / "forward_v1.toml") is True  # skipped, not crashed
+
+
+def test_criteria_evaluator_handles_runs_without_fundamentals_or_rl():
+    """v2 predates the fundamentals and RL arms: the evaluator must report, not crash."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("evaluate_criteria",
+                                                  CONFIGS.parent / "scripts" / "evaluate_criteria.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    ev = mod.evaluate("v2")
+    assert "llm_fund" not in ev["arms"] and "phase_r" not in ev
+    assert ev["phase_c"]["passed"] is False and ev["arms"]["llm_plain"]["brier_gap_vs_always_up"]["gap"] is not None
+    assert "NOT PASSED" in mod.markdown(ev)

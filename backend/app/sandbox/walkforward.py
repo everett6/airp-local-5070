@@ -263,6 +263,9 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     use_fund, use_rl = bool(getattr(args, "fund", False)), bool(getattr(args, "rl", False))
     if use_fund:
         config["fund"] = True
+        if not FUND_PATH.exists():
+            raise SystemExit(f"--fund needs {FUND_PATH.relative_to(BACKEND)}; build it with: "
+                             "python -m app.data_ingestion.edgar --universe <universe csv>")
         fund = PITFundamentals.load(FUND_PATH)
         provenance["fundamentals"] = {"path": str(FUND_PATH.relative_to(BACKEND)), "sha256": prov.sha256_file(FUND_PATH)}
     if use_rl:

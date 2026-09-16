@@ -149,3 +149,11 @@ async def test_success_criteria_script_on_a_finished_run(env):
     assert ev["phase_c"]["c3"] is False  # no leak probe file for this synthetic model: not assumed to pass
     assert ev["phase_c"]["passed"] is False and "phase_r" in ev and isinstance(ev["phase_r"]["passed"], bool)
     assert "Phase C criteria" in mod.markdown(ev) and (env / "results" / "criteria_crit.json").exists()
+
+
+async def test_missing_fundamentals_file_gives_a_clear_error(env, monkeypatch):
+    monkeypatch.setattr(wf, "FUND_PATH", env / "backend" / "data" / "edgar" / "missing.json")
+    args = wf.parse_args(["--start", "2025-06-02", "--end", "2025-07-01", "--fund", "--tag", "nofund",
+                          "--data", "data/prices_test.csv"])
+    with pytest.raises(SystemExit, match="app.data_ingestion.edgar"):
+        await wf.run(args)
