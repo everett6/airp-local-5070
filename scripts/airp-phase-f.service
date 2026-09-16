@@ -1,0 +1,19 @@
+# One-shot: after the next boot/login, run the remaining Phase F GPU chain (scripts/phase_f_pipeline.sh).
+# Never runs again once results/criteria_summary.md exists. Install: scripts/install_phase_f_service.sh
+# Undo: systemctl --user disable airp-phase-f.service
+[Unit]
+Description=airp-local-5070 Phase F GPU pipeline (one-shot)
+Wants=airp-ollama-tuned.service
+After=airp-ollama-tuned.service
+ConditionPathExists=!%h/airp-local-5070/backend/results/criteria_summary.md
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/airp-local-5070
+# wait up to 3 minutes for the GPU driver and both Ollama servers after boot
+ExecStartPre=/bin/bash -c 'for i in $(seq 90); do nvidia-smi -L >/dev/null 2>&1 && curl -sf http://127.0.0.1:11434/api/version >/dev/null && curl -sf http://127.0.0.1:11435/api/version >/dev/null && exit 0; sleep 2; done; exit 1'
+ExecStart=%h/airp-local-5070/scripts/phase_f_pipeline.sh
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=default.target

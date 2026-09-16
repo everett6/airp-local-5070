@@ -148,7 +148,7 @@ limits rank IC.
 
 **Run `v7_phase_f`** (`backend/configs/v7_phase_f.toml`, frozen before its first run): same 100 stocks, window and
 grid as v5, with every F option on. Order (one GPU job at a time): finish v5 → v6 → Kronos forecasts → LAP probe →
-v7 → LAP interaction test → evaluate. `scripts/phase_f_pipeline.sh` runs the whole chain.
+v7 → LAP interaction test → evaluate. `scripts/phase_f_pipeline.sh` runs the whole chain; a one-shot user service (`scripts/airp-phase-f.service`, enabled 2026-09-16) starts it automatically after the next boot and login, and never again once `results/criteria_summary.md` exists.
 
 **Pre-registered success criteria for v7 (written before any v7 output exists):**
 - **F1:** `llm_fund_lp` rank IC after warm-up has a week-clustered 95% CI above 0.
