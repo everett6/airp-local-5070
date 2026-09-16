@@ -22,7 +22,8 @@ RESULTS = BACKEND / "results"
 DATA_CSV = BACKEND / "data" / "prices.csv"
 
 ARM_ORDER = ["always_up", "base_rate", "momentum_20d", "reversal_5d", "feat_logit", "sue_rule", "feat_fund_logit",
-             "llm_plain", "llm_fund", "llm_selfimprove", "rl_forecast", "selector"]
+             "anomaly_rank", "anomaly_logit", "kronos", "llm_plain", "llm_lp", "llm_fund", "llm_fund_lp",
+             "llm_selfimprove", "rl_forecast", "selector"]
 ARM_LABELS = {
     "always_up": "Always 'up'",
     "base_rate": "Base rate",
@@ -36,6 +37,11 @@ ARM_LABELS = {
     "feat_fund_logit": "Logistic + fundamentals",
     "llm_fund": "LLM + fundamentals",
     "rl_forecast": "Deep RL agent",
+    "llm_lp": "LLM (log-prob)",
+    "llm_fund_lp": "LLM + fundamentals (log-prob)",
+    "anomaly_rank": "Anomaly composite",
+    "anomaly_logit": "Logistic + anomalies",
+    "kronos": "Kronos (candlestick model)",
 }
 TAG_RE = re.compile(r"^[A-Za-z0-9_\-]{1,40}$")
 

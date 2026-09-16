@@ -127,15 +127,47 @@ Anything else is reported as "no edge".
 
 ---
 
-## Phase F — Research-driven optimization (proposed 2026-09-16, not started)
+## Phase F — Research-driven optimization. 🔧 Built 2026-09-16; runs pending (GPU needs a reboot, see below)
 
 From a review of public repos, Hugging Face models, and recent papers: [`RESEARCH_OPTIMIZATION.md`](RESEARCH_OPTIMIZATION.md).
 Main finding in our own data: 19,319 cached LLM answers use only 18 distinct `p_up` values (42% are 0.52), which
-limits rank IC. Planned fixes, each in a new config frozen before its first run: a log-prob `llm_lp` arm, a Lookahead
-Propensity leak test, Kronos (pre-training ends June 2024, clean for our window) and classical-anomaly baselines,
-a warm-started stacker, and Deflated Sharpe in reporting. v5/v6 finish first, unchanged.
+limits rank IC.
 
-## Order and timeline (revised 2026-09-14)
+**Built (all tested offline, 26 new tests):**
+
+| Item | Where |
+|---|---|
+| F1 Tuned Ollama: benchmarked, runs as a user service on :11435 (no sudo); parallel slots 1.6× faster | `scripts/ollama/`, `docs/LOCAL_SETUP.md` |
+| F2 Log-prob scoring: one-word UP/DOWN, P from token log-probabilities (`llm_lp`, `llm_fund_lp`) | `walkforward.OllamaLLM`, `agent_worker.system_prompt_updown`, jail `mode` |
+| F3 Lookahead Propensity probe + interaction test (arXiv 2512.23847) | `walkforward --probe-lap`, `scripts/lap_test.py` |
+| F4 Exact Newton stacker (≈10 passes instead of 300 GD steps) | `agent_worker.fit_logistic_newton`, `solver = "newton"` |
+| F5 Classical anomalies (12−1 momentum, 1-month reversal, 52-week high, idiosyncratic vol, SUE) | `app/sandbox/anomalies.py` |
+| F6 Kronos-small baseline (MIT, pre-training ends June 2024), pinned code and weights, point-in-time windows | `app/sandbox/ohlcv.py`, `scripts/kronos_forecasts.py` |
+| F7 Probabilistic and Deflated Sharpe in the evaluator | `app/sandbox/scoring.py`, `scripts/evaluate_criteria.py` |
+| F8 Safety fixes found on the way: torn-cache recovery, refuse CPU-fallback answers, one GPU job at a time | `walkforward`, `app/sandbox/gpu_lock.py` |
+
+**Run `v7_phase_f`** (`backend/configs/v7_phase_f.toml`, frozen before its first run): same 100 stocks, window and
+grid as v5, with every F option on. Order (one GPU job at a time): finish v5 → v6 → Kronos forecasts → LAP probe →
+v7 → LAP interaction test → evaluate. `scripts/phase_f_pipeline.sh` runs the whole chain.
+
+**Pre-registered success criteria for v7 (written before any v7 output exists):**
+- **F1:** `llm_fund_lp` rank IC after warm-up has a week-clustered 95% CI above 0.
+- **F2:** `llm_fund_lp` beats **each** of `anomaly_rank`, `kronos` and `sue_rule` on the paired weekly rank-IC gap
+  (CI above 0 for all three).
+- **F3:** no leak: company identification under 20% **and** the LAP interaction coefficient's CI is not above 0.
+- **Phase F passes only if F1, F2 and F3 all pass.**
+- **R (v7):** `rl_forecast` beats always-up on Brier (paired week-clustered CI below 0) **and** the RL trader's
+  Deflated Sharpe exceeds 0.95, where the number of trials is every arm of every published walk-forward run.
+- Reported but not a criterion: `llm_fund_lp` vs `llm_fund` IC gap (does log-prob scoring help?), PSR/DSR per arm.
+
+**Decision gates for the two large items:**
+- **LLM fine-tuning (GRPO/ReMax LoRA on Qwen3-4B):** start only if `llm_lp` or `llm_fund_lp` passes F1 and F3 in v7.
+  Otherwise there is no signal for outcome-RL to amplify, and the leak risk (qwen3 knows pre-2025 outcomes) dominates.
+- **ChronoGPT long-history study** (1.55B, MIT, yearly point-in-time cutoffs): needs a survivorship-free price history
+  back to ~2000, which Yahoo does not provide (delisted names are missing). Start only once such data is available;
+  a survivor-only universe would bias every arm upward and could not answer the question.
+
+## Order and timeline (revised 2026-09-14; Phase F order above)
 
 | Step | Work | GPU |
 |---|---|---|

@@ -135,3 +135,26 @@ instance with two different models (or even the same model for both roles)
 just different named configs. Performance will be lower since reasoning and
 extraction calls now queue behind each other on one card instead of running
 in parallel across two.
+
+## Tuned Ollama for walk-forward runs (RTX 5070, measured)
+
+For the walk-forward experiments this repo runs a second, tuned Ollama as a **user** service on
+`127.0.0.1:11435` (no sudo): flash attention and 4 parallel slots with 16k total context (4k per slot). On the 5070
+with qwen3:8b and 4 concurrent requests it served **4.3 req/s vs 2.7** for the stock server. A q8_0 KV cache gave
+no speedup and changed answers, so it is not used. Details and the full table: `docs/RESEARCH_OPTIMIZATION.md` §2.3.
+
+```bash
+scripts/ollama/install_user_service.sh              # installs, enables and starts it
+systemctl --user disable --now airp-ollama-tuned    # undo
+```
+
+Point a run at it with `ollama_url = "http://127.0.0.1:11435"` in its config, `--ollama-url`, or
+`AIRP_OLLAMA_URL`. To tune the system service instead (sudo), see `scripts/ollama/system-override.conf`.
+
+Two rules learned the hard way (2026-09-16):
+- **One GPU job at a time.** Running a second GPU program alongside Ollama made the card fall off the PCIe bus
+  (Xid 79), which needs a reboot. Walk-forward, the LAP probe and the Kronos script take a shared lock
+  (`app/sandbox/gpu_lock.py`). Don't start other GPU work during a run.
+- **Ollama falls back to CPU silently** if the GPU disappears. Walk-forward runs detect this through `/api/ps` and
+  stop rather than mix CPU answers into a run.
+

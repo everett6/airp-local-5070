@@ -65,28 +65,33 @@ machinery:
 This upgrades criterion C3 from "can it name the stock" to "does what it remembers change its
 forecast." Add it to `--probe-leak`, not as a new criterion for runs that are already frozen.
 
-### 2.3 Ollama server settings (throughput)
-The installed `ollama.service` sets only `PATH`. Ollama's own recommendation is
-`OLLAMA_FLASH_ATTENTION=1` and `OLLAMA_KV_CACHE_TYPE=q8_0` (about half the KV memory, minimal quality
-change) ([issue #13337](https://github.com/ollama/ollama/issues/13337),
-[guide](https://modelpiper.com/blog/ollama-kv-cache-quantization)). Also set `OLLAMA_NUM_PARALLEL=4` to
-match the client's `concurrency=4` (`walkforward.py:76`). Otherwise requests may queue on the server.
-- The saved KV memory lets qwen3:14b run with `num_ctx=8192` on 12 GB without spilling to CPU.
-- **Reproducibility guard:** KV quantization can change greedy outputs slightly. Record the server
-  environment in provenance and in the cache key for new runs. Frozen runs replay from cache and are
-  not affected.
-- This is a system service setting, so you apply it yourself (`sudo systemctl edit ollama`).
+### 2.3 Ollama server settings (throughput). Measured and applied 2026-09-16
+The installed `ollama.service` sets only `PATH`. Ollama's documentation recommends flash attention and a
+q8_0 KV cache ([issue #13337](https://github.com/ollama/ollama/issues/13337),
+[guide](https://modelpiper.com/blog/ollama-kv-cache-quantization)). **Measured on this machine** (qwen3:8b,
+48 walk-forward prompts, 4 concurrent clients, same prompts on every setting):
 
-### 2.4 Remove the per-week CPU slowdown
-`fit_logistic` (`agent_worker.py:155`) is pure Python: 300 iterations over up to 2,000 rows × 7 inputs
-for every stacker fit, every week, per arm. That is why later v5 weeks take ~120 s even when every
-LLM call is cached. Options, in order:
-1. Warm-start from last week's weights and cut iterations to ~50. The data changes little from week
-   to week. This is the standard online update.
-2. Use numpy inside the jail (the host already uses `app/learning/linear.py`). Check first that the jail
-   binds the venv's site-packages read-only. It must not widen the jail's view of the data.
+| Server setting | req/s | answers identical to stock |
+|---|---|---|
+| stock (flash attention already on by default in 0.34, 1 slot, f16 KV) | 2.7 | reference |
+| `FLASH_ATTENTION=1`, 1 slot | ~2.7 (one noisy run at 1.9) | 48/48 |
+| + `KV_CACHE_TYPE=q8_0` | 2.7 | 20/48 |
+| `NUM_PARALLEL=4` with the default 4k total context | 0.9 (slots starve) | 19/48 |
+| **`NUM_PARALLEL=4`, `CONTEXT_LENGTH=16384` (4k per slot)** | **4.3 (1.6×)**, repeated | 19–22/48 (batch-dependent) |
 
-Use only in new configs, because warm starts change the fitted numbers slightly.
+So: q8_0 KV brings no speed here and changes answers, so it is not used. Parallel slots are the real win, but
+only with enough total context, and answers then depend on batch composition (max |Δp| 0.04). Applied as a
+**user service on :11435** (no sudo; `scripts/ollama/`), used by v6/v7 via `ollama_url`. v5 finishes on the stock
+server it started on. Every run records the URL, and every answer is cached, so finished runs still reproduce
+exactly.
+
+### 2.4 Remove the per-week CPU slowdown. Done: exact Newton solver
+`fit_logistic` (`agent_worker.py`) is pure Python with 300 gradient steps. It runs for every stacker fit every
+week, and on the host for `feat_logit` over all resolved rows. That is why later v5 weeks took ~120 s even
+when every LLM call was cached. Instead of warm starts (which would still stop short of the optimum),
+`fit_logistic_newton` solves the **same objective** exactly with Newton's method in ≈10 passes. It is
+stdlib-only, so the jail stays numpy-free. A test checks that it matches 5,000 gradient steps and that the
+gradient is ~0 at its solution. It is used only by configs with `solver = "newton"` (v7).
 
 ### 2.5 Multiple-testing-aware reporting
 We report 6–9 arms per run and the RL trader's Sharpe. Add the **Probabilistic and Deflated Sharpe
@@ -156,19 +161,23 @@ license before adopting.
 
 | # | Change | Kind | Cost | Why first |
 |---|---|---|---|---|
-| 1 | Resume v5, then v6 (cache replays weeks 1–41) | finish pre-registered work | GPU ~1 h + v6 | results were promised before new work |
-| 2 | Ollama FA + q8_0 KV + NUM_PARALLEL (you apply) | infra | 5 min | faster everything after |
-| 3 | Warm-started stacker (§2.4) | speed | small | removes the late-week slowdown |
-| 4 | `llm_lp` log-prob arm + LAP probe (§2.1–2.2) | new arm, frozen `v7` | medium | fixes the measured 18-value problem, sharper leak test |
-| 5 | Anomaly ranks + Kronos arms (§3.1, §3.3) | baselines in `v7` | medium | honest bar for rank IC |
-| 6 | Deflated Sharpe in the evaluator (§2.5) | reporting | small | multiple arms, multiple configs |
-| 7 | ChronoGPT long-history walk-forward | new study | large | statistical power |
-| 8 | GRPO/ReMax LoRA on Qwen3-4B | experiment | large | only if 4–7 show signal |
+| 1 | 🔁 Resume v5, then v6 (blocked by the GPU crash until reboot; `scripts/phase_f_pipeline.sh`) | finish pre-registered work | GPU ~1 h + v6 | results were promised before new work |
+| 2 | ✅ Tuned Ollama user service on :11435 (measured 1.6×; q8_0 rejected) | infra | done | faster everything after |
+| 3 | ✅ Exact Newton stacker (§2.4) | speed | done | removes the late-week slowdown |
+| 4 | ✅ built, run pending: `llm_lp` log-prob arm + LAP probe (§2.1–2.2) | new arm, frozen `v7` | GPU | fixes the measured 18-value problem, sharper leak test |
+| 5 | ✅ built, run pending: anomaly ranks + Kronos arms (§3.1, §3.3) | baselines in `v7` | GPU | honest bar for rank IC |
+| 6 | ✅ Deflated Sharpe in the evaluator (§2.5) | reporting | done | multiple arms, multiple configs |
+| 7 | ⏸ gated: ChronoGPT long-history walk-forward (needs survivorship-free history back to ~2000) | new study | large | statistical power |
+| 8 | ⏸ gated: GRPO/ReMax LoRA on Qwen3-4B, only if v7 passes F1 and F3 | experiment | large | only if v7 shows signal |
 
-## Operational note (2026-09-16)
-The PC restarted at 15:00 on 2026-09-16, which stopped `airp-v5` at week 41/64. `systemd-run` transient
-units do not survive a reboot. The v5 LLM cache is saved, so re-running the same command replays
-weeks 1–41 without GPU calls:
-
-    cd backend && systemd-run --user --unit=airp-v5 --working-directory="$PWD" \
-      .venv/bin/python -m app.sandbox.walkforward --config configs/v5_fund_top100.toml --force
+## Operational notes (2026-09-16)
+- **Reboot at 15:00** stopped `airp-v5` at week 41/64 and left 755 NUL bytes at the end of the LLM cache, so
+  every resume crashed on load. Fixed: the loader skips damaged lines and appends always start a fresh line.
+- **GPU fell off the bus at 16:11 (NVIDIA Xid 79)** while a Kronos pilot and Ollama (v5, week 46) used the GPU
+  at the same time. The card is unusable until a reboot. Ollama then silently reloaded qwen3:8b **on CPU** and
+  answered one v5 request there. Fixes: walk-forward runs check `/api/ps` after every uncached answer and refuse
+  (and never cache) answers not computed fully on the GPU. The two answers around the crash were removed from the
+  cache. Every GPU entry point now takes one exclusive lock (`app/sandbox/gpu_lock.py`). Xid 79 is usually power
+  or PCIe related: if it recurs with a single GPU job, check the PSU and cables, and consider lowering the power
+  limit (`sudo nvidia-smi -pl 220`).
+- After the reboot, `scripts/phase_f_pipeline.sh` runs the whole remaining GPU chain, one job at a time.

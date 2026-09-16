@@ -1,0 +1,23 @@
+# Tuned second Ollama server for this repo, run as your user (no sudo): flash attention and 4 parallel slots.
+# Measured on the RTX 5070 with qwen3:8b, 48 walk-forward prompts, 4 concurrent clients (2026-09-16):
+#   stock server (1 slot)                         2.7 req/s
+#   this server (4 slots, 16k total context)      4.3 req/s   (1.6x)
+#   q8_0 KV cache                                 no faster, changes answers -> not used
+# Parallel slots batch requests together, so answers are not bit-identical run to run; walk-forward runs
+# cache every answer, so a finished run still reproduces exactly from the cache.
+[Unit]
+Description=Ollama (tuned for airp-local-5070) on 127.0.0.1:11435
+
+[Service]
+ExecStart=/usr/local/bin/ollama serve
+Environment=OLLAMA_HOST=127.0.0.1:11435
+Environment=OLLAMA_MODELS=/usr/share/ollama/.ollama/models
+Environment=OLLAMA_NOPRUNE=1
+Environment=OLLAMA_FLASH_ATTENTION=1
+Environment=OLLAMA_NUM_PARALLEL=4
+Environment=OLLAMA_CONTEXT_LENGTH=16384
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

@@ -12,6 +12,14 @@
 > [`docs/WALKFORWARD_5070.md`](docs/WALKFORWARD_5070.md) for the full results,
 > the research behind the design, and how to reproduce.
 
+### Phase F: research-driven optimization (built 2026-09-16, GPU runs pending)
+
+Log-prob LLM scores (the verbalized answers used only 18 distinct values), a Lookahead Propensity leak test,
+Kronos and classical-anomaly baselines, an exact Newton stacker, Deflated Sharpe, and a tuned Ollama service
+(measured 1.6× faster). Success criteria for the `v7_phase_f` run were pre-registered before it ran. See
+[`docs/RESEARCH_OPTIMIZATION.md`](docs/RESEARCH_OPTIMIZATION.md) and `docs/EXECUTION_PLAN.md` (Phase F).
+After a reboot, `scripts/phase_f_pipeline.sh` runs the remaining GPU work one job at a time.
+
 ### Live, web-informed research
 
 ```bash
@@ -113,7 +121,7 @@ airp-local/
 │   │   ├── agents/         specialist agents
 │   │   ├── data_ingestion/ connectors — sandbox-aware mock connectors included
 │   │   └── api/routes/     FastAPI routes, including /api/sandbox/*
-│   └── tests/              pytest — 200 tests
+│   └── tests/              pytest — 288 tests
 ├── frontend/               Next.js + TypeScript UI (Sandbox page is live)
 └── docs/                   ARCHITECTURE, API_SPEC, AGENT_INTERFACES, ROADMAP,
                             LOCAL_SETUP (two-GPU walkthrough), SANDBOX,
@@ -153,6 +161,9 @@ Everything below was re-run for this repo; claims inherited from upstream that w
   closed), with size and total-time limits; live research fits the model's context (measured, with
   overflow detection).
 - **Forward test:** hash-chained ledger verified by the dashboard and by tests; first decision logged on time.
+- **Failure handling (2026-09-16):** a power loss that corrupted the LLM cache and a GPU crash (Xid 79) that made
+  Ollama fall back to CPU are both handled now: damaged cache lines are skipped, CPU answers are refused, and GPU
+  jobs take one shared lock.
 - Frontend (`frontend/`) is the upstream Next.js app, built in CI; it has not been extended for the walk-forward
   work (the Streamlit dashboard covers that).
 

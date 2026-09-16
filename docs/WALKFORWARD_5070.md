@@ -422,3 +422,54 @@ the inputs, and the guard's job is to keep it at the base rate when there is
 none. The LLM's own weights are not trained: retraining them on 2025–26
 outcomes would teach the model the test window, the leak this whole setup
 exists to prevent.
+
+## Phase F: log-prob scores, stronger baselines, sharper leak test (methods written before any v7 result)
+
+Background and sources: [`RESEARCH_OPTIMIZATION.md`](RESEARCH_OPTIMIZATION.md). Criteria: `EXECUTION_PLAN.md`, Phase F.
+
+**Why.** The verbalized arms answer with a handful of round numbers: 19,319 cached answers use 18 distinct
+values, 42% of them 0.52. Ranking 100 stocks with that many ties is mostly tie-breaking.
+
+**Log-prob arms (`llm_lp`, `llm_fund_lp`).** Same anonymized inputs as `llm_plain` and `llm_fund`, but the system
+prompt ends "Answer with exactly one word: UP or DOWN." Ollama returns the top-20 token log-probabilities of that
+single generated token, and P(up) = P(UP) / (P(UP) + P(DOWN)), summing case and punctuation variants. qwen3 emits
+`UP` and `DOWN` as single tokens (checked on the real model). If neither word appears, the answer is 0.5 and
+counted in `updown_no_mass`. The jail relays only the mode flag: the agent still never sees the network or the
+data. These probabilities are sharp (the pilot gave P(DOWN) = 0.98), so they are for ranking. Brier results are
+reported but expected to be poor without calibration.
+
+**Anomaly baselines.** Computed point-in-time from the same price view: 12−1 momentum, 1-month reversal,
+52-week-high proximity, 60-day idiosyncratic volatility, plus the SEC surprise composite. `anomaly_rank` averages
+signed within-week percentile ranks with the published signs, with a fixed mapping to P(up) of 0.45–0.55 and
+nothing fitted. `anomaly_logit` is a walk-forward logistic on those features plus the price features. A test
+rewrites all prices after the cutoff and checks that no feature changes.
+
+**Kronos.** Kronos-small (24.7M, MIT; code commit `67b630e`, weights revision `901c26c`, tokenizer `0e01173`) is
+pre-trained on candlesticks up to June 2024, before this window. For each cutoff and stock it sees the last 256
+daily OHLCV bars dated on or before the cutoff. Future timestamps are generated business days, not read from
+data. It draws 24 sampled 5-day paths, and P(up) = Φ(mean/sd of the sampled returns), shrunk halfway to 0.5.
+Forecasts are made once, before the v7 run, into `results/kronos_v7_phase_f.jsonl`. The run refuses them unless
+the OHLCV sha256, parameters, cutoffs, horizon and file hash all match.
+
+**Leak test: Lookahead Propensity** (Gao et al., arXiv 2512.23847). With real tickers and dates, the model is asked
+whether a stock closed higher over a given 5-day span: UP, DOWN, or UNKNOWN. LAP is the probability it puts on a
+direction. Monthly LAP over 2024–26 should fall after the training cutoff. On v7's own grid, `scripts/lap_test.py`
+fits up ~ s + LAP + s×LAP (s = p − 0.5) with a week-clustered bootstrap. A positive interaction means forecasts are
+better exactly where the model remembers more: the leak signature. A planted-leak test shows the procedure catches
+one.
+
+**Stacker.** The self-improving arm's stacker and `feat_logit` use an exact Newton solver for the same penalized
+objective. That removes the late-run slowdown and the early stopping that made the old fits depend on the step
+count.
+
+**RL.** The agent's state adds `llm_fund_lp`, the anomaly composite and Kronos (raw values and within-week ranks).
+Nothing else about training or its guard changes.
+
+**Multiple testing.** Every long/short arm gets a Probabilistic Sharpe Ratio and a Deflated Sharpe Ratio (Bailey &
+López de Prado). The number of trials is every arm of every published walk-forward run, and the luck benchmark
+comes from the spread of Sharpes across arms. The RL trader must reach DSR > 0.95.
+
+**Serving.** v7 runs on the tuned Ollama user service (:11435, 4 parallel slots; 1.6× measured). Parallel batching
+makes regenerated answers non-bit-identical, but every answer is cached, so v7 reproduces exactly from its cache.
+Its verbalized arms reuse v5's cached answers for identical prompts.
+

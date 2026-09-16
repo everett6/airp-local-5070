@@ -23,6 +23,8 @@ COLORS = {
     "Reversal (5d)": "#5f6368", "Logistic (no LLM)": "#f9ab00", "LLM": "#1a73e8",
     "LLM + self-improve": "#d93025", "Selector": "#188038", "Earnings surprise rule": "#a142f4",
     "Logistic + fundamentals": "#e37400", "LLM + fundamentals": "#12b5cb", "Deep RL agent": "#000000",
+    "LLM (log-prob)": "#8ab4f8", "LLM + fundamentals (log-prob)": "#007b83", "Anomaly composite": "#b06000",
+    "Logistic + anomalies": "#fcc934", "Kronos (candlestick model)": "#6d4c41",
 }
 COLOR_SCALE = alt.Scale(domain=list(COLORS), range=list(COLORS.values()))
 
