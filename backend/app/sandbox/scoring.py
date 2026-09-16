@@ -87,3 +87,61 @@ def paired_ic_gap(a: list[dict[str, Any]], b: list[dict[str, Any]], min_names: i
     d = np.array([wa[c] - wb[c] for c in common])
     lo, hi = _boot_ci(d)
     return {"gap": round(float(d.mean()), 4), "lo": round(lo, 4), "hi": round(hi, 4), "weeks": len(common)}
+
+
+def _moments(r: np.ndarray) -> tuple[float, float, float]:
+    """Per-period Sharpe, skewness, and (non-excess) kurtosis of a return series."""
+    sd = float(r.std(ddof=1))
+    if sd == 0 or len(r) < 3:
+        return 0.0, 0.0, 3.0
+    z = (r - r.mean()) / r.std(ddof=0)
+    return float(r.mean() / sd), float(np.mean(z ** 3)), float(np.mean(z ** 4))
+
+
+def probabilistic_sharpe(returns: list[float] | np.ndarray, sr_benchmark: float = 0.0) -> float | None:
+    """PSR (Bailey & Lopez de Prado 2012): probability that the true per-period Sharpe exceeds `sr_benchmark`,
+    given the sample length, skewness and kurtosis of the returns."""
+    from statistics import NormalDist
+
+    r = np.asarray(returns, dtype=float)
+    if len(r) < 3:
+        return None
+    sr, skew, kurt = _moments(r)
+    denom = 1 - skew * sr + (kurt - 1) / 4 * sr ** 2
+    if denom <= 0:
+        return None
+    return float(NormalDist().cdf((sr - sr_benchmark) * np.sqrt(len(r) - 1) / np.sqrt(denom)))
+
+
+def deflated_sharpe(returns: list[float] | np.ndarray, n_trials: int, trial_sharpes: list[float] | None = None
+                    ) -> dict[str, float | None]:
+    """DSR (Bailey & Lopez de Prado 2014): PSR against the Sharpe the best of `n_trials` unskilled strategies would
+    reach by luck. The spread of Sharpes across trials comes from `trial_sharpes` (per-period) when there are at
+    least 2, otherwise from the null sampling variance 1/(T-1). Returns the per-period and annualized (weekly x
+    sqrt(52)) benchmark too."""
+    from statistics import NormalDist
+
+    r = np.asarray(returns, dtype=float)
+    if len(r) < 3 or n_trials < 1:
+        return {"dsr": None, "sr0_per_period": None, "sr0_annual": None}
+    if trial_sharpes is not None and len(trial_sharpes) >= 2:
+        var = float(np.var(trial_sharpes, ddof=1))
+    else:
+        var = 1.0 / (len(r) - 1)
+    nd, gamma = NormalDist(), 0.5772156649
+    if n_trials == 1:
+        sr0 = 0.0
+    else:
+        sr0 = float(np.sqrt(var) * ((1 - gamma) * nd.inv_cdf(1 - 1 / n_trials)
+                                    + gamma * nd.inv_cdf(1 - 1 / (n_trials * np.e))))
+    return {"dsr": probabilistic_sharpe(r, sr0), "sr0_per_period": round(sr0, 4),
+            "sr0_annual": round(sr0 * float(np.sqrt(52)), 3)}
+
+
+def weekly_long_short(preds: list[dict[str, Any]], key: str = "p") -> list[float]:
+    """Equal-weight long/short by the sign of each call per cutoff (same rule as walkforward.score), in cutoff order."""
+    by: dict[Any, list[float]] = {}
+    for p in preds:
+        if p[key] != 0.5:
+            by.setdefault(p["cutoff"], []).append((1.0 if p[key] > 0.5 else -1.0) * p["ret"])
+    return [float(np.mean(v)) for _, v in sorted(by.items(), key=lambda kv: kv[0])]

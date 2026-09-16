@@ -38,6 +38,7 @@ import asyncio
 import hashlib
 import json
 import math
+import os
 import statistics
 import time
 from contextlib import AsyncExitStack
@@ -53,8 +54,11 @@ from app.data_ingestion.edgar import FUND_KEYS, PITFundamentals, digest_text
 from app.learning.linear import Logistic
 from app.learning.rl_agent import ContinualTrainer, score_trader
 from app.sandbox import agent_worker as aw
+from app.sandbox import anomalies as anom
+from app.sandbox import ohlcv
 from app.sandbox import provenance as prov
 from app.sandbox.clock import enforce_point_in_time, sandbox_scope
+from app.sandbox.gpu_lock import gpu_job
 from app.sandbox.jail import AgentJail
 from app.sandbox.pit_data import PriceTable
 from app.sandbox.scoring import cross_sectional
@@ -64,6 +68,7 @@ DATA = BACKEND / "data" / "prices.csv"
 RESULTS = BACKEND / "results"
 FUND_PATH = BACKEND / "data" / "edgar" / "fundamentals.json"
 MARKET = "SPY"
+DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 LOOKBACK = 120
 
 
@@ -73,13 +78,13 @@ class OllamaLLM:
     Responses are cached on disk by prompt hash, so re-running a suite after
     changing only the scoring/stacker costs no GPU time."""
 
-    def __init__(self, model: str, base_url: str = "http://127.0.0.1:11434", concurrency: int = 4,
+    def __init__(self, model: str, base_url: str | None = None, concurrency: int = 4,
                  num_ctx: int = 4096, cache: bool = True, num_predict: int = 300, require_gpu: bool = True) -> None:
         self.model = model
         self.num_predict = num_predict
         self.num_ctx = num_ctx
         self.use_cache = cache
-        self.base_url = base_url
+        self.base_url = (base_url or os.environ.get("AIRP_OLLAMA_URL") or DEFAULT_OLLAMA_URL).rstrip("/")
         self._sem = asyncio.Semaphore(concurrency)
         self._client = httpx.AsyncClient(timeout=300)
         RESULTS.mkdir(exist_ok=True)
@@ -102,18 +107,26 @@ class OllamaLLM:
         self.calls = 0
         self.cache_hits = 0
         self.context_overflows = 0
+        self.updown_no_mass = 0
 
-    async def __call__(self, system: str, user: str) -> str:
+    async def __call__(self, system: str, user: str, mode: str | None = None) -> str:
         ctx = "" if self.num_ctx == 4096 else f"\0ctx={self.num_ctx}"  # keeps existing cache keys valid
+        ctx += f"\0mode={mode}" if mode else ""
         key = hashlib.sha256(f"{self.model}\0{system}\0{user}{ctx}".encode()).hexdigest()
         if self.use_cache and key in self._cache:
             self.cache_hits += 1
             return self._cache[key]
-        body = {
+        body: dict[str, Any] = {
             "model": self.model, "stream": False, "think": False, "format": "json",
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": self.num_predict},
         }
+        if mode in ("updown", "lap"):
+            del body["format"]
+            body["options"]["num_predict"] = 1
+            body |= {"logprobs": True, "top_logprobs": 20}
+        elif mode is not None:
+            raise ValueError(f"unknown LLM mode {mode!r}")
         async with self._sem:
             for attempt in range(3):
                 try:
@@ -121,6 +134,13 @@ class OllamaLLM:
                     r.raise_for_status()
                     data = r.json()
                     text: str = data["message"]["content"]
+                    if mode == "updown":
+                        p_up, mass = updown_probability(data.get("logprobs") or [])
+                        self.updown_no_mass += int(mass == 0)
+                        text = json.dumps({"p_up": round(p_up, 6), "mass": round(mass, 6), "token": text[:12]})
+                    elif mode == "lap":
+                        probs = word_probabilities(data.get("logprobs") or [], ("UP", "DOWN", "UNKNOWN"))
+                        text = json.dumps({k.lower(): round(v, 6) for k, v in probs.items()} | {"token": text[:12]})
                     if int(data.get("prompt_eval_count") or 0) >= self.num_ctx - self.num_predict:
                         self.context_overflows += 1  # the prompt filled the window: Ollama may have cut its start
                     if self.require_gpu:
@@ -135,7 +155,6 @@ class OllamaLLM:
             self._cache[key] = text
             _append_line(self._cache_path, json.dumps({"k": key, "v": text}))
         return text
-
 
     async def _check_on_gpu(self) -> None:
         r = await self._client.get(f"{self.base_url}/api/ps")
@@ -153,6 +172,33 @@ class GPUFallbackError(RuntimeError):
     pass
 
 
+def word_probabilities(logprobs: list[dict[str, Any]], words: tuple[str, ...]) -> dict[str, float]:
+    """Probability of each word at the first generated token, summing case/punctuation/space variants among the
+    top candidates. qwen3 emits UP and DOWN as single tokens (checked 2026-09-16); a word split into several tokens
+    is still counted through its first token when that token (2+ characters) is the prefix of exactly one word."""
+    out = dict.fromkeys(words, 0.0)
+    if not logprobs:
+        return out
+    first = logprobs[0]
+    cands = first.get("top_logprobs") or [{"token": first.get("token", ""), "logprob": first.get("logprob", 0.0)}]
+    for c in cands:
+        tok = str(c.get("token", "")).strip(" _.*\"'\n\t").upper()
+        match = [w for w in words if w == tok] or [w for w in words if len(tok) >= 2 and w.startswith(tok)]
+        if len(match) == 1:
+            out[match[0]] += math.exp(float(c["logprob"]))
+    return out
+
+
+def updown_probability(logprobs: list[dict[str, Any]]) -> tuple[float, float]:
+    """P(UP) / (P(UP) + P(DOWN)) at the first generated token. Returns (p_up, total probability mass on the two
+    words); (0.5, 0) if neither appears among the top candidates."""
+    probs = word_probabilities(logprobs, ("UP", "DOWN"))
+    up, down = probs["UP"], probs["DOWN"]
+    if up + down <= 0:
+        return 0.5, 0.0
+    return up / (up + down), up + down
+
+
 def _append_line(path: Path, line: str) -> None:
     """Append one JSONL record, starting a fresh line if a previous write was cut off."""
     with path.open("ab") as f:
@@ -162,6 +208,7 @@ def _append_line(path: Path, line: str) -> None:
                 if r.read(1) != b"\n":
                     f.write(b"\n")
         f.write(line.encode() + b"\n")
+
 
 @dataclass
 class ArmState:
@@ -276,7 +323,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     data_path = resolve_data_path(getattr(args, "data", None))
     table = PriceTable.from_csv(data_path)
     tickers = [t for t in table.tickers if t != MARKET]
-    llm = OllamaLLM(args.model, concurrency=args.concurrency)
+    llm = OllamaLLM(args.model, base_url=getattr(args, "ollama_url", None), concurrency=args.concurrency)
     if getattr(llm, "cache_bad_lines", 0):
         print(f"warning: skipped {llm.cache_bad_lines} damaged line(s) in {llm._cache_path.name}", flush=True)
 
@@ -311,14 +358,54 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         if not use_fund:
             raise SystemExit("--rl needs --fund (its state includes fundamentals and every LLM arm)")
         config["rl"] = True
-    if use_fund or use_rl:  # re-hash and re-check with the extra fields
-        cfg_hash = prov.config_hash(config)
-        prov.check_overwrite(RESULTS / f"walkforward_{args.tag}.json", cfg_hash, force=getattr(args, "force", False),
-                             data_sha256=provenance["data"]["sha256"])
+    # Phase F options (docs/RESEARCH_OPTIMIZATION.md); each is hashed only when set, so older hashes stay valid
+    use_lp = bool(getattr(args, "score_logprob", False))
+    use_anom = bool(getattr(args, "anomalies", False))
+    use_kronos = bool(getattr(args, "kronos", False))
+    solver = getattr(args, "solver", None) or None
+    rl_state = getattr(args, "rl_state", None) or None
+    if use_lp:
+        config["score_logprob"] = True
+    if solver:
+        if solver != "newton":
+            raise SystemExit(f"unknown solver {solver!r} (only 'newton'; omit for the original gradient descent)")
+        config["solver"] = solver
+    if use_anom:
+        if not use_fund:
+            raise SystemExit("--anomalies needs --fund (the composite includes the earnings surprise)")
+        config["anomalies"] = True
+    kronos_p: dict[tuple[date, str], float] = {}
+    if use_kronos:
+        if not getattr(args, "ohlcv", None):
+            raise SystemExit("--kronos needs --ohlcv (the bars the forecasts were made from)")
+        ohlcv_path = resolve_data_path(args.ohlcv)
+        config["kronos"], config["ohlcv"] = True, str(ohlcv_path.relative_to(BACKEND))
+        kronos_path = RESULTS / f"kronos_{args.tag}.jsonl"
+        if not kronos_path.exists():
+            raise SystemExit(f"missing results/{kronos_path.name}; make it first with: "
+                             f".venv-kronos/bin/python scripts/kronos_forecasts.py <this config>")
+        ohlcv_sha = prov.sha256_file(ohlcv_path) or ""
+        kronos_p = ohlcv.load_forecasts(kronos_path, ohlcv_sha, cutoffs, args.horizon)
+        provenance["kronos"] = {"forecasts": f"results/{kronos_path.name}",
+                                "forecasts_sha256": prov.sha256_file(kronos_path),
+                                "ohlcv": config["ohlcv"], "ohlcv_sha256": ohlcv_sha, "params": ohlcv.KRONOS_PARAMS}
+    if rl_state:
+        if rl_state != "v7" or not (use_rl and use_lp and use_anom and use_kronos):
+            raise SystemExit("rl_state = 'v7' needs rl, score_logprob, anomalies and kronos")
+        config["rl_state"] = rl_state
+    provenance["ollama_url"] = getattr(llm, "base_url", None)
+    # re-hash and re-check with any optional fields (identical to the first hash when none are set)
+    cfg_hash = prov.config_hash(config)
+    prov.check_overwrite(RESULTS / f"walkforward_{args.tag}.json", cfg_hash, force=getattr(args, "force", False),
+                         data_sha256=provenance["data"]["sha256"])
 
     plain, selfimp, featlr = ArmState("llm_plain"), ArmState("llm_selfimprove"), ArmState("feat_logit")
     fundarm, featfund, rlstate = ArmState("llm_fund"), ArmState("feat_fund_logit"), ArmState("rl")
-    rl_trainer = ContinualTrainer(len(RL_STATE_KEYS)) if use_rl else None
+    lp_plain, lp_fund = ArmState("llm_lp"), ArmState("llm_fund_lp")
+    anomrank, anomlogit, kron = ArmState("anomaly_rank"), ArmState("anomaly_logit"), ArmState("kronos")
+    state_keys = RL_STATE_KEYS_V7 if rl_state == "v7" else RL_STATE_KEYS
+    rl_trainer = ContinualTrainer(len(state_keys)) if use_rl else None
+    fit_lr = aw.fit_logistic_newton if solver == "newton" else aw.fit_logistic
     rl_log: list[dict[str, Any]] = []
     stacker_log: list[dict[str, Any]] = []
     t_start = time.time()
@@ -326,6 +413,8 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         jail_plain = await stack.enter_async_context(AgentJail(llm))
         jail_self = await stack.enter_async_context(AgentJail(llm))
         jail_fund = await stack.enter_async_context(AgentJail(llm)) if use_fund else None
+        jail_lp = await stack.enter_async_context(AgentJail(llm)) if use_lp else None
+        jail_fund_lp = await stack.enter_async_context(AgentJail(llm)) if use_lp and use_fund else None
         probe = await jail_self.probe([str(data_path), str(Path.home() / ".bashrc"), str(BACKEND / "app")])
         if not probe["passed"]:
             raise SystemExit(f"jail probe FAILED, refusing to run: {probe}")
@@ -344,6 +433,13 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                 if use_fund:
                     fund_feats = {k: fund.features(it["id"], cutoff, args.horizon) for k, it in id_map.items()}
                     sent_fund = [{**s, "fund_text": digest_text(fund_feats[s["id"]])} for s in sent]
+                anom_feats: dict[str, dict[str, float]] = {}
+                sue_c: dict[str, float | None] = {}
+                anom_score: dict[str, float] = {}
+                if use_anom:
+                    anom_feats = {k: anom.features(view, it["id"], MARKET) for k, it in id_map.items()}
+                    sue_c = {k: anom.sue_composite(fund_feats[k]) for k in id_map}
+                    anom_score = anom.anomaly_scores(anom_feats, sue_c)
 
                 mem_recs = resolved_as_of(selfimp, cutoff)
                 if args.reflect_every and ci % args.reflect_every == 0 and len(mem_recs) >= 40:
@@ -361,23 +457,32 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                                  for r in mem_recs[-STACKER_WINDOW:]],
                 }
                 horizon_kw = {} if args.horizon == 5 else {"horizon": args.horizon}
-                calls = [
-                    jail_plain.call({"task": "predict", "items": sent, "target": args.target, **horizon_kw}),
-                    jail_self.call({"task": "predict", "items": sent_fund if use_fund else sent, "memory": memory,
-                                    "target": args.target, **horizon_kw}),
-                ]
+                solver_kw = {"solver": solver} if solver else {}
+                calls = {
+                    "plain": jail_plain.call({"task": "predict", "items": sent, "target": args.target, **horizon_kw}),
+                    "self": jail_self.call({"task": "predict", "items": sent_fund if use_fund else sent,
+                                            "memory": memory, "target": args.target, **horizon_kw, **solver_kw}),
+                }
                 if jail_fund is not None:
-                    calls.append(jail_fund.call({"task": "predict", "items": sent_fund, "target": args.target,
-                                                 **horizon_kw}))
-                results = await asyncio.gather(*calls)
-                res_plain, res_self = results[0], results[1]
-                res_fund = results[2] if use_fund else None
+                    calls["fund"] = jail_fund.call({"task": "predict", "items": sent_fund, "target": args.target,
+                                                    **horizon_kw})
+                if jail_lp is not None:
+                    calls["lp"] = jail_lp.call({"task": "predict", "items": sent, "target": args.target,
+                                                "score": "logprob", **horizon_kw})
+                if jail_fund_lp is not None:
+                    calls["fund_lp"] = jail_fund_lp.call({"task": "predict", "items": sent_fund, "target": args.target,
+                                                          "score": "logprob", **horizon_kw})
+                results = dict(zip(calls, await asyncio.gather(*calls.values()), strict=True))
+                res_plain, res_self = results["plain"], results["self"]
+                res_fund = results.get("fund")
+                p_lp_by_id = {p["id"]: p for p in results["lp"]["predictions"]} if "lp" in results else {}
+                p_fund_lp_by_id = ({p["id"]: p for p in results["fund_lp"]["predictions"]}
+                                   if "fund_lp" in results else {})
                 # feature-only stacker, same point-in-time rule, no LLM
                 feat_recs = resolved_as_of(featlr, cutoff)
                 w = None
                 if len(feat_recs) >= 200:
-                    w = aw.fit_logistic([aw._row(0.5, r["features"]) for r in feat_recs],
-                                        [int(r["up"]) for r in feat_recs])
+                    w = fit_lr([aw._row(0.5, r["features"]) for r in feat_recs], [int(r["up"]) for r in feat_recs])
                 p_self_by_id = {p["id"]: p for p in res_self["predictions"]}
                 p_fund_by_id = {p["id"]: p for p in res_fund["predictions"]} if res_fund else {}
                 p_plain_by_id = {p["id"]: p for p in res_plain["predictions"]}
@@ -389,12 +494,25 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                     if len(ff_recs) >= 200:
                         ff_model = Logistic().fit(np.array([r["xf"] for r in ff_recs]),
                                                   np.array([float(r["up"]) for r in ff_recs]))
+                anom_x: dict[str, list[float]] = {}
+                al_model = None
+                if use_anom:
+                    anom_x = {k: [anom_feats[k][x] for x in anom.ANOMALY_KEYS] + [sue_c[k] or 0.0]
+                              + [p_self_by_id[k]["features"][x] for x in PRICE_KEYS] for k in id_map}
+                    al_recs = resolved_as_of(anomlogit, cutoff)
+                    if len(al_recs) >= 200:
+                        al_model = Logistic().fit(np.array([r["xa"] for r in al_recs]),
+                                                  np.array([float(r["up"]) for r in al_recs]))
                 states: dict[str, list[float]] = {}
                 if use_rl and rl_trainer is not None:
                     raw = {k: {**p_self_by_id[k]["features"], **fund_feats[k],
                                "llm_plain": p_plain_by_id[k]["p_llm"], "llm_fund": p_fund_by_id[k]["p_llm"],
                                "llm_self": p_self_by_id[k]["p_final"]} for k in id_map}
-                    states = rl_states(raw)
+                    if rl_state == "v7":
+                        for k, it in id_map.items():
+                            raw[k] |= {"llm_fund_lp": p_fund_lp_by_id[k]["p_llm"], "anomaly": anom_score[k],
+                                       "kronos": kronos_p[(cutoff, it["id"])]}
+                    states = rl_states(raw, v7=rl_state == "v7")
                     fit = rl_trainer.fit([{"cutoff": r["cutoff"], "x": r["x"], "ret": r["ret"], "up": r["up"]}
                                           for r in resolved_as_of(rlstate, cutoff)])
                     rl_log.append({"cutoff": cutoff.isoformat(), **fit.as_dict()})
@@ -428,6 +546,20 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                 if use_rl:
                     rlstate.preds.append({**base, "x": states[sp["id"]], "p": rl_p[sp["id"]],
                                           "position": rl_pos[sp["id"]]})
+                if use_lp:
+                    lp_plain.preds.append({**base, "p_llm": p_lp_by_id[sp["id"]]["p_llm"],
+                                           "p": p_lp_by_id[sp["id"]]["p_llm"]})
+                    if use_fund:
+                        lp_fund.preds.append({**base, "p_llm": p_fund_lp_by_id[sp["id"]]["p_llm"],
+                                              "p": p_fund_lp_by_id[sp["id"]]["p_llm"]})
+                if use_anom:
+                    xa = anom_x[sp["id"]]
+                    anomrank.preds.append({**base, "anomaly": round(anom_score[sp["id"]], 6),
+                                           "p": anom.anomaly_probability(anom_score[sp["id"]])})
+                    anomlogit.preds.append({**base, "xa": xa,
+                                            "p": float(al_model.predict(np.array([xa]))[0]) if al_model else 0.5})
+                if use_kronos:
+                    kron.preds.append({**base, "p": kronos_p[(cutoff, ticker)]})
             stacker_log.append({"cutoff": cutoff.isoformat(), **res_self.get("stacker_info", {})})
             if ci % 5 == 0 or ci == len(cutoffs) - 1:
                 tr = track_record(selfimp.preds, "p")
@@ -450,6 +582,15 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         arms["llm_fund"] = fundarm.preds
         arms["feat_fund_logit"] = featfund.preds
         arms["sue_rule"] = [{**p, "p": sue_rule(p["fund"])} for p in fundarm.preds]
+    if use_lp:
+        arms["llm_lp"] = lp_plain.preds
+        if use_fund:
+            arms["llm_fund_lp"] = lp_fund.preds
+    if use_anom:
+        arms["anomaly_rank"] = anomrank.preds
+        arms["anomaly_logit"] = anomlogit.preds
+    if use_kronos:
+        arms["kronos"] = kron.preds
     if use_rl:
         arms["rl_forecast"] = rlstate.preds
     arms["base_rate"], arms["selector"], selector_log = point_in_time_meta_arms(
@@ -475,6 +616,8 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     if len(tickers) >= 10:
         report["cross_sectional_after_warmup"] = {
             k: cross_sectional([p for p in v if p["cutoff"] >= warm]) for k, v in arms.items()}
+    if use_lp:
+        report["updown_no_mass"] = llm.updown_no_mass  # log-prob answers where neither UP nor DOWN was a top token
     if use_rl:
         report["rl_log"] = rl_log
         report["rl_trader"] = {
@@ -482,11 +625,11 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                                   for p in rlstate.preds]),
             "after_warmup": score_trader([{"cutoff": p["cutoff"], "position": p["position"], "ret": p["ret"]}
                                           for p in rlstate.preds if p["cutoff"] >= warm]),
-            "state_keys": RL_STATE_KEYS,
+            "state_keys": state_keys,
         }
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / f"walkforward_{args.tag}.json").write_text(json.dumps(report, indent=2, default=str))
-    rows = [{k: (v.isoformat() if isinstance(v, date) else v) for k, v in p.items() if k not in ("features", "fund", "xf", "x")}
+    rows = [{k: (v.isoformat() if isinstance(v, date) else v) for k, v in p.items() if k not in ("features", "fund", "xf", "x", "xa")}
             for arm, ps in arms.items() for p in ({**q, "arm": arm} for q in ps)]
     (RESULTS / f"walkforward_{args.tag}_predictions.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
     return report
@@ -495,6 +638,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
 PRICE_KEYS = ["ret_1d", "ret_5d", "ret_20d", "ret_60d", "vol_20d_ann", "rsi_14", "dist_ma50", "mkt_ret_5d", "mkt_ret_20d"]
 RL_STATE_KEYS = [*PRICE_KEYS, *FUND_KEYS, "llm_plain", "llm_fund", "llm_self", "rank_ret_5d", "rank_ret_20d",
                  "rank_llm_fund"]
+RL_STATE_KEYS_V7 = [*RL_STATE_KEYS, "llm_fund_lp", "anomaly", "kronos", "rank_llm_fund_lp", "rank_anomaly", "rank_kronos"]
 STACKER_WINDOW = 2000
 
 
@@ -503,8 +647,9 @@ def _logit(p: float) -> float:
     return math.log(p / (1 - p))
 
 
-def rl_states(raw: dict[str, dict[str, float]]) -> dict[str, list[float]]:
-    """RL state per stock at one cutoff: features, LLM logits, and within-cutoff percentile ranks."""
+def rl_states(raw: dict[str, dict[str, float]], v7: bool = False) -> dict[str, list[float]]:
+    """RL state per stock at one cutoff: features, LLM logits, and within-cutoff percentile ranks.
+    v7 appends the log-prob fundamentals LLM, the anomaly composite and Kronos (order = RL_STATE_KEYS_V7)."""
     ids = list(raw)
 
     def pct_rank(key: str) -> dict[str, float]:
@@ -513,12 +658,17 @@ def rl_states(raw: dict[str, dict[str, float]]) -> dict[str, list[float]]:
         return {k: i / n for i, k in enumerate(order)}
 
     ranks = {key: pct_rank(key) for key in ("ret_5d", "ret_20d", "llm_fund")}
+    if v7:
+        ranks |= {key: pct_rank(key) for key in ("llm_fund_lp", "anomaly", "kronos")}
     out = {}
     for k in ids:
         r = raw[k]
         out[k] = ([float(r[x]) for x in PRICE_KEYS] + [float(r[x]) for x in FUND_KEYS]
                   + [_logit(r["llm_plain"]), _logit(r["llm_fund"]), _logit(r["llm_self"])]
                   + [ranks["ret_5d"][k], ranks["ret_20d"][k], ranks["llm_fund"][k]])
+        if v7:
+            out[k] += [_logit(r["llm_fund_lp"]), float(r["anomaly"]), _logit(r["kronos"]),
+                       ranks["llm_fund_lp"][k], ranks["anomaly"][k], ranks["kronos"][k]]
     return out
 
 
@@ -596,6 +746,85 @@ async def probe_leak(model: str, data: str, n_cutoffs: int = 3, seed: int = 0) -
     return report
 
 
+LAP_SYSTEM = ("Answer from memory about real US stock prices. Reply with exactly one word: UP, DOWN, or UNKNOWN "
+              "(UNKNOWN if you do not actually remember).")
+
+
+def lap_question(ticker: str, start: date, end: date) -> str:
+    return f"Did {ticker} stock close higher on {end.isoformat()} than on {start.isoformat()}?"
+
+
+def lap_from_answer(ans: str) -> dict[str, float]:
+    """Lookahead Propensity (arXiv:2512.23847): LAP = share of the model's UP/DOWN/UNKNOWN probability on a
+    direction; recall = its P(UP) among the two directions."""
+    try:
+        obj = json.loads(ans)
+        up, down, unk = float(obj["up"]), float(obj["down"]), float(obj["unknown"])
+    except (ValueError, KeyError, TypeError):
+        return {"lap": math.nan, "p_up_recall": 0.5, "mass": 0.0}
+    tot = up + down + unk
+    if tot <= 0:
+        return {"lap": math.nan, "p_up_recall": 0.5, "mass": 0.0}
+    return {"lap": (up + down) / tot, "p_up_recall": up / (up + down) if up + down > 0 else 0.5, "mass": tot}
+
+
+async def probe_lap(model: str, data: str, tag: str | None = None, horizon: int = 5, step: int = 5,
+                    start: str | None = None, end: str | None = None, ollama_url: str | None = None) -> dict[str, Any]:
+    """Lookahead Propensity probe with real tickers and dates (it must see them: it measures recall).
+    Part 1, cutoff check: one date per month over the whole price file. If LAP and directional recall fall after
+    the model's training cutoff, the probe measures memorization and the test window is clean.
+    Part 2 (with --config): LAP for every (cutoff, ticker) of that run, saved for scripts/lap_test.py, which tests
+    whether the run's forecasts are more accurate where the model remembers more (the leak signature)."""
+    table = PriceTable.from_csv(resolve_data_path(data))
+    tickers = [t for t in table.tickers if t != MARKET]
+    llm = OllamaLLM(model, base_url=ollama_url)
+    months: dict[tuple[int, int], int] = {}
+    for i, d in enumerate(table.dates[:-horizon]):
+        if d.day >= 15:
+            months.setdefault((d.year, d.month), i)
+    tasks = []
+    for (y, m), i in sorted(months.items()):
+        for t in tickers:
+            ret = table.closes[t][i + horizon] / table.closes[t][i] - 1
+            tasks.append((f"{y}-{m:02d}", t, ret, llm(LAP_SYSTEM, lap_question(t, table.dates[i], table.dates[i + horizon]),
+                                                      mode="lap")))
+    answers = await asyncio.gather(*(x[3] for x in tasks))
+    by_month: dict[str, dict[str, list[float]]] = {}
+    for (label, _, ret, _), ans in zip(tasks, answers, strict=True):
+        a = lap_from_answer(ans)
+        b = by_month.setdefault(label, {"lap": [], "hit": []})
+        if not math.isnan(a["lap"]):
+            b["lap"].append(a["lap"])
+        if a["p_up_recall"] != 0.5:
+            b["hit"].append(float((a["p_up_recall"] > 0.5) == (ret > 0)))
+    report: dict[str, Any] = {
+        "model": model, "data": data, "horizon": horizon, "system": LAP_SYSTEM,
+        "by_month": {k: {"mean_lap": round(statistics.fmean(v["lap"]), 4) if v["lap"] else None,
+                         "recall_accuracy": round(statistics.fmean(v["hit"]), 4) if v["hit"] else None,
+                         "n": len(v["lap"])} for k, v in by_month.items()},
+    }
+    if tag and start:
+        i0 = table.index_on_or_before(date.fromisoformat(start))
+        last = len(table.dates) - 1 - horizon
+        if end:
+            last = min(last, table.index_on_or_before(date.fromisoformat(end)))
+        grid = [(table.dates[i], table.dates[i + horizon], t) for i in range(i0, last + 1, step) for t in tickers]
+        answers2 = await asyncio.gather(*(llm(LAP_SYSTEM, lap_question(t, c, e), mode="lap") for c, e, t in grid))
+        RESULTS.mkdir(exist_ok=True)
+        path = RESULTS / f"lap_{tag}.jsonl"
+        def row(c: date, t: str, a: str) -> str:
+            m = lap_from_answer(a)
+            return json.dumps({"cutoff": c.isoformat(), "ticker": t, **m, "lap": None if math.isnan(m["lap"]) else m["lap"]})
+        path.write_text("\n".join(row(c, t, a) for (c, _, t), a in zip(grid, answers2, strict=True)) + "\n")
+        report["grid_file"] = f"results/{path.name}"
+        report["grid_mean_lap"] = round(statistics.fmean(
+            x for x in (lap_from_answer(a)["lap"] for a in answers2) if not math.isnan(x)), 4)
+    RESULTS.mkdir(exist_ok=True)
+    (RESULTS / f"lap_probe_{model.replace(':', '_')}{'_' + tag if tag else ''}.json").write_text(
+        json.dumps(report, indent=2))
+    return report
+
+
 async def probe_memorization(model: str, tickers: tuple[str, ...] = ("AAPL", "MSFT", "NVDA", "KO", "JPM")
                              ) -> dict[str, Any]:
     """Lopez-Lira et al. (2025) / Gao et al. (2025, arXiv:2512.23847): ask for
@@ -657,8 +886,18 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--fund", action="store_true", help="add point-in-time SEC fundamentals: llm_fund, sue_rule, "
                     "feat_fund_logit arms; the self-improving arm also sees them")
     ap.add_argument("--rl", action="store_true", help="add the deep RL agent (rl_forecast arm + trader); needs --fund")
+    ap.add_argument("--score-logprob", action="store_true",
+                    help="add llm_lp / llm_fund_lp arms: one-word UP/DOWN answers scored from token log-probabilities")
+    ap.add_argument("--solver", default=None, help="'newton': exact, fast stacker fits (default: original GD)")
+    ap.add_argument("--anomalies", action="store_true", help="add anomaly_rank and anomaly_logit baselines; needs --fund")
+    ap.add_argument("--ohlcv", default=None, help="OHLCV CSV under backend/data (for --kronos)")
+    ap.add_argument("--kronos", action="store_true", help="add the Kronos arm from results/kronos_<tag>.jsonl")
+    ap.add_argument("--rl-state", default=None, help="'v7': RL state also sees llm_fund_lp, anomalies and Kronos")
+    ap.add_argument("--ollama-url", default=None, help="Ollama base URL (default $AIRP_OLLAMA_URL or :11434)")
     ap.add_argument("--probe-memorization", action="store_true")
     ap.add_argument("--probe-leak", action="store_true", help="plan C3: can the model identify companies from its inputs?")
+    ap.add_argument("--probe-lap", action="store_true",
+                    help="Lookahead Propensity probe (monthly cutoff check; with --config also the run's full grid)")
     return ap
 
 
@@ -673,6 +912,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.probe_lap:
+        with gpu_job(f"probe-lap {args.tag}"):
+            rep_lap = asyncio.run(probe_lap(args.model, args.data or "data/prices_pit_2025-06-02_top100.csv",
+                                            tag=args.tag if args.config else None, horizon=args.horizon,
+                                            step=args.step, start=args.start, end=args.end,
+                                            ollama_url=args.ollama_url))
+        print(json.dumps(rep_lap, indent=1)[:4000])
+        return
     if args.probe_leak:
         rep_leak = asyncio.run(probe_leak(args.model, args.data or "data/prices_pit_2025-06-02_top100.csv"))
         print(json.dumps({k: rep_leak[k] for k in ("rates", "counts", "passed", "cutoffs")}, indent=1))
@@ -680,7 +927,8 @@ def main() -> None:
     if args.probe_memorization:
         print(json.dumps(asyncio.run(probe_memorization(args.model)), indent=1))
         return
-    rep = asyncio.run(run(args))
+    with gpu_job(f"walkforward {args.tag}"):
+        rep = asyncio.run(run(args))
     print(json.dumps({k: rep[k] for k in ("window", "n_cutoffs", "llm_calls", "runtime_s")}))
     for section in ("scores_full", "scores_after_warmup"):
         print(section)

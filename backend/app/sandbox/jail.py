@@ -103,7 +103,10 @@ def build_command(allow_unjailed: bool = False, worker: Path = WORKER_PATH,
     return [*prefix, *cmd, py, "-I", "-S", "/agent/agent_worker.py"]
 
 
-LLMFn = Any  # async (system: str, user: str) -> str
+LLMFn = Any  # async (system: str, user: str, mode: str = ...) -> str
+# request modes the agent may ask for; None = ordinary text completion. "updown" = one-word UP/DOWN answer scored
+# from token log-probabilities (the LLM function must accept mode=... to be used with it)
+LLM_MODES = (None, "updown")
 ToolExecutor = Any  # object with async execute(list[dict]) -> dict[str, dict]; see app/tools/gateway.py
 
 
@@ -198,7 +201,7 @@ class AgentJail:
             raise await self._fail(f"agent requested too many LLM calls (max {lim.max_llm_requests_per_message})")
         for r in reqs:
             ok = (isinstance(r, dict) and isinstance(r.get("id"), str | int) and isinstance(r.get("system"), str)
-                  and isinstance(r.get("user"), str)
+                  and isinstance(r.get("user"), str) and r.get("mode") in LLM_MODES
                   and len(r["system"]) + len(r["user"]) <= lim.max_prompt_chars)
             if not ok:
                 raise await self._fail("agent sent a malformed or oversized LLM request")
@@ -224,7 +227,8 @@ class AgentJail:
             msg = await self._read()
             if "llm_requests" in msg:
                 reqs = await self._validate_requests(msg["llm_requests"])
-                texts = await asyncio.gather(*(self._llm(r["system"], r["user"]) for r in reqs))
+                texts = await asyncio.gather(*(self._llm(r["system"], r["user"], mode=r["mode"]) if r.get("mode")
+                                               else self._llm(r["system"], r["user"]) for r in reqs))
                 self.llm_calls += len(reqs)
                 await self._write({"llm_responses": {r["id"]: t for r, t in zip(reqs, texts, strict=True)}})
             elif "tool_requests" in msg:

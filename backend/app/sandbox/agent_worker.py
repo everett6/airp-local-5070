@@ -11,7 +11,8 @@ never adds data.
 
 Protocol (one JSON object per line):
   in : {"task": "predict", "arm": ..., "items": [...], "memory": {...}}
-  out: {"llm_requests": [{"id": ..., "system": ..., "user": ...}, ...]}
+  out: {"llm_requests": [{"id": ..., "system": ..., "user": ..., "mode"?: "updown"}, ...]}
+       (mode "updown": the orchestrator replies {"p_up": P(UP)/(P(UP)+P(DOWN))} read from token log-probabilities)
   in : {"llm_responses": {"<id>": "<text>", ...}}
   out: {"result": {...}}
 
@@ -51,6 +52,13 @@ def system_prompt(target: str | None, horizon: int = 5) -> str:
     if horizon == 5:
         return base  # unchanged text keeps every published run's cached prompts valid
     return base.replace("5 trading days", f"{horizon} trading days").replace("5-trading-day", f"{horizon}-trading-day")
+
+
+def system_prompt_updown(target: str | None, horizon: int = 5) -> str:
+    """Same task as `system_prompt`, but the reply is a single word so the orchestrator can read the model's
+    probability from token log-probabilities (continuous, no ties) instead of a verbalized number."""
+    base = system_prompt(target, horizon)
+    return base[: base.index("Markets are noisy")] + "Answer with exactly one word: UP or DOWN."
 
 
 REFLECT_SYSTEM = (
@@ -175,11 +183,70 @@ def fit_logistic(rows: list[list[float]], ys: list[int], l2: float = 0.05, iters
     return w
 
 
+def _solve(a: list[list[float]], b: list[float]) -> list[float]:
+    """Gaussian elimination with partial pivoting (stdlib only: the jail has no numpy)."""
+    n = len(b)
+    m = [row[:] + [bi] for row, bi in zip(a, b, strict=True)]
+    for col in range(n):
+        piv = max(range(col, n), key=lambda r: abs(m[r][col]))
+        m[col], m[piv] = m[piv], m[col]
+        d = m[col][col] if abs(m[col][col]) > 1e-12 else 1e-12
+        for r in range(col + 1, n):
+            f = m[r][col] / d
+            if f:
+                for c in range(col, n + 1):
+                    m[r][c] -= f * m[col][c]
+    x = [0.0] * n
+    for r in range(n - 1, -1, -1):
+        d = m[r][r] if abs(m[r][r]) > 1e-12 else 1e-12
+        x[r] = (m[r][n] - sum(m[r][c] * x[c] for c in range(r + 1, n))) / d
+    return x
+
+
+def fit_logistic_newton(rows: list[list[float]], ys: list[int], l2: float = 0.05, iters: int = 25,
+                        tol: float = 1e-9) -> list[float]:
+    """Same objective as `fit_logistic` (mean log loss + l2/2 * |weights|^2, intercept unpenalized), solved
+    exactly by Newton's method: ~10 passes over the data instead of 300, and converged rather than stopped early.
+    Used only by configs that set solver = "newton", so published runs are unchanged."""
+    k = len(rows[0]) + 1
+    n = len(rows)
+    xs = [[1.0, *x] for x in rows]
+    w = [0.0] * k
+    for _ in range(iters):
+        g = [0.0] * k
+        h = [[0.0] * k for _ in range(k)]
+        for x, y in zip(xs, ys, strict=True):
+            z = sum(wi * xi for wi, xi in zip(w, x, strict=True))
+            p = 1 / (1 + math.exp(-max(min(z, 30), -30)))
+            err, s = p - y, p * (1 - p)
+            for i in range(k):
+                g[i] += err * x[i]
+                si = s * x[i]
+                hi = h[i]
+                for j in range(i + 1):
+                    hi[j] += si * x[j]
+        for i in range(k):
+            g[i] /= n
+            for j in range(i + 1):
+                h[i][j] /= n
+                h[j][i] = h[i][j]
+        for i in range(1, k):
+            g[i] += l2 * w[i]
+            h[i][i] += l2
+        h[0][0] += 1e-9
+        step = _solve(h, g)
+        w = [wi - si for wi, si in zip(w, step, strict=True)]
+        if max(abs(si) for si in step) < tol:
+            break
+    return w
+
+
 def _log_loss(ps: list[float], ys: list[int]) -> float:
     return -sum(math.log(p if y else 1 - p) for p, y in zip(ps, ys, strict=True)) / len(ys)
 
 
-def guarded_stacker(resolved: list[dict[str, Any]], min_n: int = 200) -> tuple[list[float] | None, dict[str, Any]]:
+def guarded_stacker(resolved: list[dict[str, Any]], min_n: int = 200,
+                    solver: str = "gd") -> tuple[list[float] | None, dict[str, Any]]:
     """Self-improvement with a guardrail: fit on the older 70% of resolved
     records, and adopt the stacker only if it beats the raw LLM probability
     on the most recent 30% (out-of-sample, still all in the past)."""
@@ -187,14 +254,15 @@ def guarded_stacker(resolved: list[dict[str, Any]], min_n: int = 200) -> tuple[l
         return None, {"stacker": "not_enough_data", "n": len(resolved)}
     rows = [_row(r["p_llm"], r["features"]) for r in resolved]
     ys = [int(r["up"]) for r in resolved]
+    fit = fit_logistic_newton if solver == "newton" else fit_logistic
     cut = int(len(rows) * 0.7)
-    w_tr = fit_logistic(rows[:cut], ys[:cut])
+    w_tr = fit(rows[:cut], ys[:cut])
     ll_stack = _log_loss([predict_logistic(w_tr, x) for x in rows[cut:]], ys[cut:])
     ll_llm = _log_loss([r["p_llm"] for r in resolved[cut:]], ys[cut:])
     info = {"stacker_holdout_ll": round(ll_stack, 4), "llm_holdout_ll": round(ll_llm, 4), "n": len(rows)}
     if ll_stack >= ll_llm:
         return None, {**info, "stacker": "rejected"}
-    return fit_logistic(rows, ys), {**info, "stacker": "adopted"}
+    return fit(rows, ys), {**info, "stacker": "adopted"}
 
 
 def predict_logistic(w: list[float], x: list[float]) -> float:
@@ -207,13 +275,17 @@ def run_predict(msg: dict[str, Any]) -> dict[str, Any]:
     memory = msg.get("memory")
     for it in items:
         it["features"] = features(it["asset"], it["market"])
-    system = system_prompt(msg.get("target"), int(msg.get("horizon", 5)))
+    updown = msg.get("score") == "logprob"
+    target, horizon = msg.get("target"), int(msg.get("horizon", 5))
+    system = system_prompt_updown(target, horizon) if updown else system_prompt(target, horizon)
+    extra = {"mode": "updown"} if updown else {}
     _send({"llm_requests": [
-        {"id": it["id"], "system": system, "user": build_prompt(it, memory)} for it in items
+        {"id": it["id"], "system": system, "user": build_prompt(it, memory), **extra} for it in items
     ]})
     replies = _recv()["llm_responses"]
 
-    stack_w, stack_info = guarded_stacker((memory or {}).get("resolved", [])) if memory else (None, {})
+    solver = str(msg.get("solver", "gd"))
+    stack_w, stack_info = guarded_stacker((memory or {}).get("resolved", []), solver=solver) if memory else (None, {})
 
     out = []
     for it in items:

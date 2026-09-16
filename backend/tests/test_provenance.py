@@ -128,15 +128,21 @@ def test_reproduce_skips_forward_test_configs():
     assert mod.reproduce(CONFIGS / "forward_v1.toml") is True  # skipped, not crashed
 
 
-def test_criteria_evaluator_handles_runs_without_fundamentals_or_rl():
-    """v2 predates the fundamentals and RL arms: the evaluator must report, not crash."""
+def test_criteria_evaluator_handles_runs_without_fundamentals_or_rl(tmp_path):
+    """v2 predates the fundamentals and RL arms: the evaluator must report, not crash (on a copy, so the
+    test never writes into the repo's results directory)."""
     import importlib.util
+    import shutil
+
+    results = CONFIGS.parent / "results"
+    for name in ("walkforward_v2.json", "walkforward_v2_predictions.jsonl"):
+        shutil.copy(results / name, tmp_path / name)
 
     spec = importlib.util.spec_from_file_location("evaluate_criteria",
                                                   CONFIGS.parent / "scripts" / "evaluate_criteria.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    ev = mod.evaluate("v2")
+    ev = mod.evaluate("v2", tmp_path)
     assert "llm_fund" not in ev["arms"] and "phase_r" not in ev
     assert ev["phase_c"]["passed"] is False and ev["arms"]["llm_plain"]["brier_gap_vs_always_up"]["gap"] is not None
-    assert "NOT PASSED" in mod.markdown(ev)
+    assert "NOT PASSED" in mod.markdown(ev) and (tmp_path / "criteria_v2.json").exists()
