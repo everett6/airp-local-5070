@@ -76,7 +76,7 @@ if tag:
                    f"{report['window'][0]} → {report['window'][1]} · {report['horizon_days']}-day horizon · "
                    f"{len(report['tickers'])} stocks")
         n = int(scores["n"].iloc[0])
-        best = scores.loc[scores["brier"].idxmin()]
+        best = scores.iloc[int(scores["brier"].to_numpy().argmin())]
         jail_ok = report["jail_probe_start"]["passed"] and report["jail_probe_end"]["passed"]
         c = st.columns(4)
         c[0].metric("Predictions scored", f"{n:,}", help=f"{report['n_cutoffs']} cutoffs; "
