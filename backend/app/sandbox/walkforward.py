@@ -277,7 +277,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     table = PriceTable.from_csv(data_path)
     tickers = [t for t in table.tickers if t != MARKET]
     llm = OllamaLLM(args.model, concurrency=args.concurrency)
-    if llm.cache_bad_lines:
+    if getattr(llm, "cache_bad_lines", 0):
         print(f"warning: skipped {llm.cache_bad_lines} damaged line(s) in {llm._cache_path.name}", flush=True)
 
     i0 = table.index_on_or_before(date.fromisoformat(args.start))
