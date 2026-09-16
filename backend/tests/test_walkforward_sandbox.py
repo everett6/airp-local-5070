@@ -160,3 +160,18 @@ def test_features_survive_short_histories():
     assert aw.features([100.0], [100.0])["ret_1d"] == 0.0
     long = [100.0 + i for i in range(120)]
     assert aw.features(long, long)["ret_60d"] == pytest.approx(long[-1] / long[-61] - 1)
+
+
+def test_llm_cache_survives_torn_and_nul_lines(tmp_path, monkeypatch):
+    """A power loss mid-append left a NUL-filled last line; loading must skip it and appends must stay valid."""
+    import json as _json
+
+    from app.sandbox import walkforward as wf
+
+    monkeypatch.setattr(wf, "RESULTS", tmp_path)
+    path = tmp_path / "llm_cache_m.jsonl"
+    path.write_bytes(b'{"k": "a", "v": "1"}\n{"k": "b", "v"' + b"\x00" * 50)
+    llm = wf.OllamaLLM("m")
+    assert llm._cache == {"a": "1"} and llm.cache_bad_lines == 1
+    wf._append_line(path, _json.dumps({"k": "c", "v": "3"}))
+    assert wf.OllamaLLM("m")._cache == {"a": "1", "c": "3"}

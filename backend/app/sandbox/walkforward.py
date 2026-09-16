@@ -85,10 +85,17 @@ class OllamaLLM:
         RESULTS.mkdir(exist_ok=True)
         self._cache_path = RESULTS / f"llm_cache_{model.replace(':', '_').replace('/', '_')}.jsonl"
         self._cache: dict[str, str] = {}
+        self.cache_bad_lines = 0
         if self._cache_path.exists():
-            for line in self._cache_path.open():
-                rec = json.loads(line)
-                self._cache[rec["k"]] = rec["v"]
+            with self._cache_path.open("rb") as fh:
+                for raw in fh:
+                    try:
+                        rec = json.loads(raw)
+                        self._cache[rec["k"]] = rec["v"]
+                    except (ValueError, KeyError, TypeError):
+                        # a crash or power loss mid-append can leave a torn or NUL-filled line;
+                        # skipping it only costs one re-query, while aborting would block every resume
+                        self.cache_bad_lines += 1
         self.calls = 0
         self.cache_hits = 0
         self.context_overflows = 0
@@ -121,10 +128,19 @@ class OllamaLLM:
         self.calls += 1
         if self.use_cache:
             self._cache[key] = text
-            with self._cache_path.open("a") as f:
-                f.write(json.dumps({"k": key, "v": text}) + "\n")
+            _append_line(self._cache_path, json.dumps({"k": key, "v": text}))
         return text
 
+
+def _append_line(path: Path, line: str) -> None:
+    """Append one JSONL record, starting a fresh line if a previous write was cut off."""
+    with path.open("ab") as f:
+        if f.tell() > 0:
+            with path.open("rb") as r:
+                r.seek(-1, 2)
+                if r.read(1) != b"\n":
+                    f.write(b"\n")
+        f.write(line.encode() + b"\n")
 
 @dataclass
 class ArmState:
@@ -240,6 +256,8 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     table = PriceTable.from_csv(data_path)
     tickers = [t for t in table.tickers if t != MARKET]
     llm = OllamaLLM(args.model, concurrency=args.concurrency)
+    if llm.cache_bad_lines:
+        print(f"warning: skipped {llm.cache_bad_lines} damaged line(s) in {llm._cache_path.name}", flush=True)
 
     i0 = table.index_on_or_before(date.fromisoformat(args.start))
     last = len(table.dates) - 1 - args.horizon
