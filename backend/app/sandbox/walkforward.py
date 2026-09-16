@@ -74,7 +74,7 @@ class OllamaLLM:
     changing only the scoring/stacker costs no GPU time."""
 
     def __init__(self, model: str, base_url: str = "http://127.0.0.1:11434", concurrency: int = 4,
-                 num_ctx: int = 4096, cache: bool = True, num_predict: int = 300) -> None:
+                 num_ctx: int = 4096, cache: bool = True, num_predict: int = 300, require_gpu: bool = True) -> None:
         self.model = model
         self.num_predict = num_predict
         self.num_ctx = num_ctx
@@ -96,6 +96,9 @@ class OllamaLLM:
                         # a crash or power loss mid-append can leave a torn or NUL-filled line;
                         # skipping it only costs one re-query, while aborting would block every resume
                         self.cache_bad_lines += 1
+        # Ollama silently falls back to CPU if the GPU disappears (seen 2026-09-16: Xid 79 "fallen off the bus");
+        # CPU answers differ numerically, so a run refuses them instead of mixing them into a frozen experiment
+        self.require_gpu = require_gpu
         self.calls = 0
         self.cache_hits = 0
         self.context_overflows = 0
@@ -120,6 +123,8 @@ class OllamaLLM:
                     text: str = data["message"]["content"]
                     if int(data.get("prompt_eval_count") or 0) >= self.num_ctx - self.num_predict:
                         self.context_overflows += 1  # the prompt filled the window: Ollama may have cut its start
+                    if self.require_gpu:
+                        await self._check_on_gpu()
                     break
                 except (httpx.HTTPError, KeyError):
                     if attempt == 2:
@@ -130,6 +135,22 @@ class OllamaLLM:
             self._cache[key] = text
             _append_line(self._cache_path, json.dumps({"k": key, "v": text}))
         return text
+
+
+    async def _check_on_gpu(self) -> None:
+        r = await self._client.get(f"{self.base_url}/api/ps")
+        r.raise_for_status()
+        for m in r.json().get("models") or []:
+            if self.model in (m.get("name"), m.get("model")):
+                size, vram = int(m.get("size") or 0), int(m.get("size_vram") or 0)
+                if size and vram < 0.99 * size:
+                    raise GPUFallbackError(f"{self.model} is running {100 * (1 - vram / size):.0f}% on CPU "
+                                           f"(size={size}, size_vram={vram}); refusing its answers. Is the GPU healthy?")
+                return
+
+
+class GPUFallbackError(RuntimeError):
+    pass
 
 
 def _append_line(path: Path, line: str) -> None:

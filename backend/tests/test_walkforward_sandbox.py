@@ -175,3 +175,38 @@ def test_llm_cache_survives_torn_and_nul_lines(tmp_path, monkeypatch):
     assert llm._cache == {"a": "1"} and llm.cache_bad_lines == 1
     wf._append_line(path, _json.dumps({"k": "c", "v": "3"}))
     assert wf.OllamaLLM("m")._cache == {"a": "1", "c": "3"}
+
+
+def _mock_ollama(tmp_path, monkeypatch, size_vram: int):
+    import httpx
+
+    from app.sandbox import walkforward as wf
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/ps":
+            return httpx.Response(200, json={"models": [{"name": "m", "model": "m", "size": 1000, "size_vram": size_vram}]})
+        return httpx.Response(200, json={"message": {"content": '{"p_up": 0.6}'}, "prompt_eval_count": 10})
+
+    monkeypatch.setattr(wf, "RESULTS", tmp_path)
+    llm = wf.OllamaLLM("m")
+    llm._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    return wf, llm
+
+
+def test_llm_refuses_and_does_not_cache_cpu_fallback_answers(tmp_path, monkeypatch):
+    import asyncio
+
+    import pytest
+
+    wf, llm = _mock_ollama(tmp_path, monkeypatch, size_vram=0)
+    with pytest.raises(wf.GPUFallbackError):
+        asyncio.run(llm("s", "u"))
+    assert llm._cache == {} and not (tmp_path / "llm_cache_m.jsonl").exists()
+
+
+def test_llm_accepts_answers_computed_on_gpu(tmp_path, monkeypatch):
+    import asyncio
+
+    _, llm = _mock_ollama(tmp_path, monkeypatch, size_vram=1000)
+    assert asyncio.run(llm("s", "u")) == '{"p_up": 0.6}'
+    assert len(llm._cache) == 1

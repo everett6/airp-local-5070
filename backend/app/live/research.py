@@ -61,7 +61,8 @@ async def research_tickers(tickers: list[str], *, model: str = "qwen3:8b", horiz
     if bad:
         raise ValueError(f"invalid tickers: {bad}")
     as_of = datetime.now(UTC)
-    llm = llm or OllamaLLM(model, concurrency=4, num_ctx=8192, num_predict=600, cache=False)
+    llm = llm or OllamaLLM(model, concurrency=4, num_ctx=8192, num_predict=600, cache=False,
+                            require_gpu=False)
     base = ToolGateway.from_env("live")
     fetcher = base.fetcher  # one connection pool and cache shared by every ticker
     provenance = prov.collect(BACKEND.parent, DATA, model)

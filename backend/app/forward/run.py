@@ -148,7 +148,7 @@ async def run_once(cfg: dict[str, Any], ledger: Ledger, *, now: datetime | None 
         model = cfg["model"]
         if "live_plain" in cfg["arms"]:
             arms["live_plain"] = await decide_plain(table, c, tickers,
-                                                    llm or OllamaLLM(model, concurrency=4, cache=False),
+                                                    llm or OllamaLLM(model, concurrency=4, cache=False, require_gpu=False),
                                                     cfg.get("lookback", 120), allow_unjailed)
             log(f"  live_plain done ({len(arms['live_plain'])} stocks)")
         if "live_web" in cfg["arms"]:
