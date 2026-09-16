@@ -148,8 +148,8 @@ actually check whether the predictions are any good before trusting them.
 
 Everything below was re-run for this repo; claims inherited from upstream that weren't re-checked were removed.
 
-- **CI is green on GitHub** (it had failed on every push until 2026-09-14): `ruff`, strict `mypy` on 60 modules
-  plus `mypy` on all 85, the full pytest suite, and an 85% coverage floor (currently 92%) on the
+- **CI is green on GitHub** (it had failed on every push until 2026-09-14, and again on 2026-09-16 when a new pandas-stubs release broke one type check; fixed the same day): `ruff`, strict `mypy` on 60 modules
+  plus `mypy` on all 85, the full pytest suite, and an 85% coverage floor (currently 95%) on the
   safety-critical modules. Hosted runners have no bubblewrap, so the jailed variants skip there and the same
   checks run unjailed; locally (Ubuntu 26.04, bubblewrap installed) the jailed variants run too.
 - **Reproducibility:** `python scripts/reproduce.py` re-runs every frozen backtest from the committed LLM cache
