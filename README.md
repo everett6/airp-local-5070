@@ -138,29 +138,23 @@ actually check whether the predictions are any good before trusting them.
 
 ## Verified state (as of last commit)
 
-- **5070 edition:** 200/200 pytest passing (94 new walk-forward, jail, provenance, web-tool, and dashboard tests,
-  including live bubblewrap isolation), `ruff check` clean on app/tests/scripts,
-  `mypy` clean on `app/sandbox`, `app/data_ingestion`, `app/tools`, `app/live`, and `app/dashboard/data.py`. The bullets below
-  describe the upstream `airp-local` verification and were not re-run here.
-- Backend: **106/106 pytest passing**, `ruff check` clean, `mypy --strict`
-  clean across **38 modules** (quant/evidence/confidence/context/llm/sandbox/
-  data_ingestion/store/api) — re-verified in a fresh venv after a from-scratch
-  dependency install, not just trusted from a stale environment.
-- Backend default install has **zero compiled/platform-specific
-  dependencies** — `asyncpg`, `neo4j`, `sqlalchemy`, and several other
-  packages that were installed-but-never-imported were removed or moved to
-  an opt-in extra. Fresh install takes ~20s.
-- Frontend: `npm run build` clean under TypeScript strict mode, `eslint`
-  clean (including a genuinely new `react-hooks/set-state-in-effect` rule
-  that caught a real hydration-risk pattern, since fixed), 0 npm
-  vulnerabilities, standalone Docker output verified by actually booting
-  `node server.js` and confirming both pages plus a static asset serve.
-- The sandbox self-check (`self_check_passed`) is verified both by dedicated
-  pytest coverage and by the harness performing the same check live on every
-  single run — so a regression would surface in production, not just in CI.
-- `scripts/setup.sh` was actually executed end-to-end in CI-equivalent
-  conditions (not just syntax-checked) and confirmed to produce a working
-  venv that passes the full test suite.
+Everything below was re-run for this repo; claims inherited from upstream that weren't re-checked were removed.
+
+- **CI is green on GitHub** (it had failed on every push until 2026-09-14): `ruff`, strict `mypy` on 60 modules
+  plus `mypy` on all 85, the full pytest suite, and an 85% coverage floor (currently 92%) on the
+  safety-critical modules. Hosted runners have no bubblewrap, so the jailed variants skip there and the same
+  checks run unjailed; locally (Ubuntu 26.04, bubblewrap installed) the jailed variants run too.
+- **Reproducibility:** `python scripts/reproduce.py` re-runs every frozen backtest from the committed LLM cache
+  and compares every score and individual prediction with the published files: all identical, no GPU needed.
+- **Isolation:** every walk-forward run probes the jail live at start and end, and refuses to run if the agent
+  can read the data or reach the network. Hostile-worker tests cover memory, CPU, hangs, floods, and
+  oversized messages.
+- **Web tools:** the network guard connects only to the exact public address it checked (DNS rebinding
+  closed), with size and total-time limits; live research fits the model's context (measured, with
+  overflow detection).
+- **Forward test:** hash-chained ledger verified by the dashboard and by tests; first decision logged on time.
+- Frontend (`frontend/`) is the upstream Next.js app, built in CI; it has not been extended for the walk-forward
+  work (the Streamlit dashboard covers that).
 
 ## License
 

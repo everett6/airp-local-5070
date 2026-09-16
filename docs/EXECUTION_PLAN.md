@@ -69,7 +69,7 @@ Web research before Phase C (sources in the executive summary) changed three thi
 More data for learning: the universe grows from 20 to **100** point-in-time S&P 500
 members, 5× more predictions per week on the same dates.
 
-## Phase C — Filings and earnings, point-in-time
+## Phase C — Filings and earnings, point-in-time. ✅ Built 2026-09-14 (results below once runs finish)
 
 | # | Task | Done when |
 |---|---|---|
@@ -82,7 +82,7 @@ members, 5× more predictions per week on the same dates.
 | C6 | **New scores**: cross-sectional rank IC per week with a week-clustered CI, top-minus-bottom quintile return, 20-day horizon config | Scoring tested on synthetic data with a known IC |
 | C7 | Frozen configs **before** running: `v5_fund_top100` (5-day, weekly, 100 stocks, all arms incl. Phase R) and `v6_fund_rank20d` (20-day, non-overlapping) | Results with receipts; dashboard shows them |
 
-## Phase R — Deep reinforcement learning on top of the jailed LLM (new)
+## Phase R — Deep reinforcement learning on top of the jailed LLM (new). ✅ Built 2026-09-14
 
 | # | Task | Done when |
 |---|---|---|
@@ -106,14 +106,15 @@ For Phase R: `rl_forecast` beats `always_up` on Brier with a week-clustered CI e
 and `rl_trader` has positive after-cost Sharpe with a CI excluding 0.
 Anything else is reported as "no edge".
 
-## Phase D — Engineering hygiene (~2–3 h, runs alongside B/C)
+## Phase D — Engineering hygiene. ✅ Done 2026-09-14
 
-| # | Task | Done when |
+| # | Task | Result |
 |---|---|---|
-| D1 | GitHub Actions: pytest, ruff, and mypy on `sandbox`, `data_ingestion`, `dashboard/data.py`. Bubblewrap tests skip on CI, since hosted runners restrict user namespaces | Green check on push; badge in README |
-| D2 | mypy: 28 errors across the repo (20 in the dashboard app from untyped Streamlit/Altair calls; 8 in `memory`, 4 in `debate`, 3 in `knowledge_graph`, 2 in `agents`, all inherited from upstream). Fix them, or exclude the Streamlit script and fix the rest | `mypy app` clean, or README states exactly what's checked |
-| D3 | README "Verified state": remove upstream claims not re-verified here | Every claim was re-run on this PC |
-| D4 | Dashboard: provenance panel, Live tab (B3), and the new target types (rank IC chart) | Headless smoke test covers every tab and every run |
+| D1 | CI on every push | ✅ CI had failed on **every** push since the repo was created. Fixed (missing dashboard/type-stub dependencies, a test that assumed bubblewrap, coverage gaps). First green run: `4678ab7` |
+| D2 | mypy | ✅ 0 errors across all 85 modules (was 31); strict mode on 60 modules in CI |
+| D3 | README "Verified state" | ✅ Rewritten with re-verified claims only (final pass) |
+| D4 | Dashboard | ✅ Receipts, forward-test ledger, fundamentals/RL arms, rank IC table, RL training section |
+| D5 | Coverage | ✅ 92% on the safety-critical modules (floor 85%). The agent's in-jail tasks are now tested in-process too |
 
 ## Phase E — Decision gate (~1 h)
 
