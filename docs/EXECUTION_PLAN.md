@@ -127,6 +127,14 @@ Anything else is reported as "no edge".
 
 ---
 
+## Phase F — Research-driven optimization (proposed 2026-09-16, not started)
+
+From a review of public repos, Hugging Face models, and recent papers: [`RESEARCH_OPTIMIZATION.md`](RESEARCH_OPTIMIZATION.md).
+Main finding in our own data: 19,319 cached LLM answers use only 18 distinct `p_up` values (42% are 0.52), which
+limits rank IC. Planned fixes, each in a new config frozen before its first run: a log-prob `llm_lp` arm, a Lookahead
+Propensity leak test, Kronos (pre-training ends June 2024, clean for our window) and classical-anomaly baselines,
+a warm-started stacker, and Deflated Sharpe in reporting. v5/v6 finish first, unchanged.
+
 ## Order and timeline (revised 2026-09-14)
 
 | Step | Work | GPU |
