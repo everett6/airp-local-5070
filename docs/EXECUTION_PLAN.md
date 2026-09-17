@@ -137,7 +137,7 @@ limits rank IC.
 
 | Item | Where |
 |---|---|
-| F1 Tuned Ollama: benchmarked, runs as a user service on :11435 (no sudo); parallel slots 1.6× faster | `scripts/ollama/`, `docs/LOCAL_SETUP.md` |
+| F1 Tuned Ollama benchmarked (parallel slots 1.6× faster; user service on :11435 available but **turned off** 2026-09-16, runs use the standard :11434) | `scripts/ollama/`, `docs/LOCAL_SETUP.md` |
 | F2 Log-prob scoring: one-word UP/DOWN, P from token log-probabilities (`llm_lp`, `llm_fund_lp`) | `walkforward.OllamaLLM`, `agent_worker.system_prompt_updown`, jail `mode` |
 | F3 Lookahead Propensity probe + interaction test (arXiv 2512.23847) | `walkforward --probe-lap`, `scripts/lap_test.py` |
 | F4 Exact Newton stacker (≈10 passes instead of 300 GD steps) | `agent_worker.fit_logistic_newton`, `solver = "newton"` |
@@ -148,7 +148,7 @@ limits rank IC.
 
 **Run `v7_phase_f`** (`backend/configs/v7_phase_f.toml`, frozen before its first run): same 100 stocks, window and
 grid as v5, with every F option on. Order (one GPU job at a time): finish v5 → v6 → Kronos forecasts → LAP probe →
-v7 → LAP interaction test → evaluate. `scripts/phase_f_pipeline.sh` runs the whole chain; a one-shot user service (`scripts/airp-phase-f.service`, enabled 2026-09-16) starts it automatically after the next boot and login, and never again once `results/criteria_summary.md` exists.
+v7 → LAP interaction test → evaluate. `scripts/phase_f_pipeline.sh` runs the whole chain in the foreground on the standard Ollama (:11434). No background services: the one-shot service, the tuned Ollama and the forward-test timer were all turned off on 2026-09-16, so each run is started by hand.
 
 **Pre-registered success criteria for v7 (written before any v7 output exists):**
 - **F1:** `llm_fund_lp` rank IC after warm-up has a week-clustered 95% CI above 0.

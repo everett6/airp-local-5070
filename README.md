@@ -15,10 +15,10 @@
 ### Phase F: research-driven optimization (built 2026-09-16, GPU runs pending)
 
 Log-prob LLM scores (the verbalized answers used only 18 distinct values), a Lookahead Propensity leak test,
-Kronos and classical-anomaly baselines, an exact Newton stacker, Deflated Sharpe, and a tuned Ollama service
-(measured 1.6× faster). Success criteria for the `v7_phase_f` run were pre-registered before it ran. See
+Kronos and classical-anomaly baselines, an exact Newton stacker, Deflated Sharpe, and a measured Ollama tuning option
+(1.6× faster, off by default). Success criteria for the `v7_phase_f` run were pre-registered before it ran. See
 [`docs/RESEARCH_OPTIMIZATION.md`](docs/RESEARCH_OPTIMIZATION.md) and `docs/EXECUTION_PLAN.md` (Phase F).
-After a reboot, `scripts/phase_f_pipeline.sh` runs the remaining GPU work one job at a time.
+`scripts/phase_f_pipeline.sh` runs the remaining GPU work one job at a time, in the foreground (no background services).
 
 ### Live, web-informed research
 
@@ -161,6 +161,8 @@ Everything below was re-run for this repo; claims inherited from upstream that w
   closed), with size and total-time limits; live research fits the model's context (measured, with
   overflow detection).
 - **Forward test:** hash-chained ledger verified by the dashboard and by tests; first decision logged on time.
+  **Paused 2026-09-16:** the hourly timer was uninstalled at the owner's request, so weeks from 2026-09-21 are not
+  logged unless `python -m app.forward.run` is run by hand before the Monday open (missed weeks can't be backfilled).
 - **Failure handling (2026-09-16):** a power loss that corrupted the LLM cache and a GPU crash (Xid 79) that made
   Ollama fall back to CPU are both handled now: damaged cache lines are skipped, CPU answers are refused, and GPU
   jobs take one shared lock.

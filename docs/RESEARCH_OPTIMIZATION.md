@@ -81,8 +81,8 @@ q8_0 KV cache ([issue #13337](https://github.com/ollama/ollama/issues/13337),
 
 So: q8_0 KV brings no speed here and changes answers, so it is not used. Parallel slots are the real win, but
 only with enough total context, and answers then depend on batch composition (max |Δp| 0.04). Applied as a
-**user service on :11435** (no sudo; `scripts/ollama/`), used by v6/v7 via `ollama_url`. v5 finishes on the stock
-server it started on. Every run records the URL, and every answer is cached, so finished runs still reproduce
+**user service on :11435** (no sudo; `scripts/ollama/`). **Turned off 2026-09-16 at the owner's request**: v5, v6 and v7 all run on the stock
+server (:11434). Every run records the URL, and every answer is cached, so finished runs still reproduce
 exactly.
 
 ### 2.4 Remove the per-week CPU slowdown. Done: exact Newton solver
@@ -162,7 +162,7 @@ license before adopting.
 | # | Change | Kind | Cost | Why first |
 |---|---|---|---|---|
 | 1 | 🔁 Resume v5, then v6 (blocked by the GPU crash until reboot; `scripts/phase_f_pipeline.sh`) | finish pre-registered work | GPU ~1 h + v6 | results were promised before new work |
-| 2 | ✅ Tuned Ollama user service on :11435 (measured 1.6×; q8_0 rejected) | infra | done | faster everything after |
+| 2 | ✅ Measured: tuned Ollama on :11435 is 1.6× faster (q8_0 rejected); available but turned off | infra | done | optional speedup |
 | 3 | ✅ Exact Newton stacker (§2.4) | speed | done | removes the late-week slowdown |
 | 4 | ✅ built, run pending: `llm_lp` log-prob arm + LAP probe (§2.1–2.2) | new arm, frozen `v7` | GPU | fixes the measured 18-value problem, sharper leak test |
 | 5 | ✅ built, run pending: anomaly ranks + Kronos arms (§3.1, §3.3) | baselines in `v7` | GPU | honest bar for rank IC |

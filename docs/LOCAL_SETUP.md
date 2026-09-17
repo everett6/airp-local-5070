@@ -138,7 +138,7 @@ in parallel across two.
 
 ## Tuned Ollama for walk-forward runs (RTX 5070, measured)
 
-For the walk-forward experiments this repo runs a second, tuned Ollama as a **user** service on
+Optional (turned off by default since 2026-09-16; runs use the standard :11434). A second, tuned Ollama can run as a **user** service on
 `127.0.0.1:11435` (no sudo): flash attention and 4 parallel slots with 16k total context (4k per slot). On the 5070
 with qwen3:8b and 4 concurrent requests it served **4.3 req/s vs 2.7** for the stock server. A q8_0 KV cache gave
 no speedup and changed answers, so it is not used. Details and the full table: `docs/RESEARCH_OPTIMIZATION.md` §2.3.

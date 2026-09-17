@@ -469,7 +469,7 @@ Nothing else about training or its guard changes.
 López de Prado). The number of trials is every arm of every published walk-forward run, and the luck benchmark
 comes from the spread of Sharpes across arms. The RL trader must reach DSR > 0.95.
 
-**Serving.** v7 runs on the tuned Ollama user service (:11435, 4 parallel slots; 1.6× measured). Parallel batching
-makes regenerated answers non-bit-identical, but every answer is cached, so v7 reproduces exactly from its cache.
+**Serving.** v6 and v7 run on the standard Ollama (:11434, one slot, deterministic). The tuned 4-slot server measured 1.6× faster but is turned off (its batching also makes regenerated answers
+non-bit-identical). Every answer is cached either way, so v7 reproduces exactly from its cache.
 Its verbalized arms reuse v5's cached answers for identical prompts.
 
