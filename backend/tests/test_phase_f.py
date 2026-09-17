@@ -442,3 +442,29 @@ def test_gpu_lock_serializes_jobs(tmp_path, capsys):
         order.append("first-done")
     t.join(2)
     assert order == ["first-done", "second"] and "waiting for another GPU job (first" in capsys.readouterr().out
+
+
+def test_numpy_newton_matches_the_jailed_stdlib_solver():
+    from app.learning.linear import fit_logistic_newton_np
+
+    rng = np.random.default_rng(7)
+    rows = rng.normal(size=(300, 6)).tolist()
+    for r in rows:
+        r[0] = 0.0  # feat_logit's llm_logit column is constant 0; the penalty keeps the system solvable
+    ys = [int(rng.random() < 1 / (1 + math.exp(-(0.6 * r[1] - 0.4 * r[3])))) for r in rows]
+    assert np.allclose(fit_logistic_newton_np(rows, ys), aw.fit_logistic_newton(rows, ys), atol=1e-8)
+
+
+def test_updown_no_mass_is_counted_on_replay_too(tmp_path, monkeypatch):
+    def handler(request):
+        if request.url.path == "/api/ps":
+            return httpx.Response(200, json={"models": [{"name": "m", "size": 10, "size_vram": 10}]})
+        return httpx.Response(200, json={"message": {"content": "**"}, "logprobs": [
+            {"token": "**", "logprob": 0.0, "top_logprobs": [{"token": "**", "logprob": 0.0}]}]})
+
+    llm = _mock_llm(tmp_path, monkeypatch, handler)
+    asyncio.run(llm("s", "u", mode="updown"))
+    assert llm.updown_no_mass == 1
+    replay = _mock_llm(tmp_path, monkeypatch, handler)
+    assert json.loads(asyncio.run(replay("s", "u", mode="updown")))["p_up"] == 0.5
+    assert replay.cache_hits == 1 and replay.updown_no_mass == 1

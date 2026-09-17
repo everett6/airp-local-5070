@@ -51,7 +51,7 @@ import httpx
 import numpy as np
 
 from app.data_ingestion.edgar import FUND_KEYS, PITFundamentals, digest_text
-from app.learning.linear import Logistic
+from app.learning.linear import Logistic, fit_logistic_newton_np
 from app.learning.rl_agent import ContinualTrainer, score_trader
 from app.sandbox import agent_worker as aw
 from app.sandbox import anomalies as anom
@@ -115,6 +115,8 @@ class OllamaLLM:
         key = hashlib.sha256(f"{self.model}\0{system}\0{user}{ctx}".encode()).hexdigest()
         if self.use_cache and key in self._cache:
             self.cache_hits += 1
+            if mode == "updown" and '"mass": 0.0' in self._cache[key]:
+                self.updown_no_mass += 1  # count replayed answers too, so the report is the same on a re-run
             return self._cache[key]
         body: dict[str, Any] = {
             "model": self.model, "stream": False, "think": False, "format": "json",
@@ -136,7 +138,7 @@ class OllamaLLM:
                     text: str = data["message"]["content"]
                     if mode == "updown":
                         p_up, mass = updown_probability(data.get("logprobs") or [])
-                        self.updown_no_mass += int(mass == 0)
+                        self.updown_no_mass += int(round(mass, 6) == 0)  # same rule as a replayed answer
                         text = json.dumps({"p_up": round(p_up, 6), "mass": round(mass, 6), "token": text[:12]})
                     elif mode == "lap":
                         probs = word_probabilities(data.get("logprobs") or [], ("UP", "DOWN", "UNKNOWN"))
@@ -405,7 +407,8 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     anomrank, anomlogit, kron = ArmState("anomaly_rank"), ArmState("anomaly_logit"), ArmState("kronos")
     state_keys = RL_STATE_KEYS_V7 if rl_state == "v7" else RL_STATE_KEYS
     rl_trainer = ContinualTrainer(len(state_keys)) if use_rl else None
-    fit_lr = aw.fit_logistic_newton if solver == "newton" else aw.fit_logistic
+    # host-side feat_logit refits on every resolved row each week (thousands by the end): numpy Newton there
+    fit_lr = fit_logistic_newton_np if solver == "newton" else aw.fit_logistic
     rl_log: list[dict[str, Any]] = []
     stacker_log: list[dict[str, Any]] = []
     t_start = time.time()

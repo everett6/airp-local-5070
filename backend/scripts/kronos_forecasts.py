@@ -60,8 +60,8 @@ def main() -> None:
         wins = {}
         for t in tickers:
             w = window(bars[t], c, P["context_bars"])
-            if w[-1][0] != c:
-                raise SystemExit(f"{t}: no OHLCV bar on cutoff {c}")
+            if not w or w[-1][0] != c:
+                raise SystemExit(f"{t}: no OHLCV bar on cutoff {c} (refetch the OHLCV file or drop the ticker)")
             wins[t] = w
             groups.setdefault(len(w), []).append(t)
         samples: dict[str, list[float]] = {t: [] for t in tickers}

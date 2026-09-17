@@ -34,3 +34,26 @@ class Logistic:
         xs = np.clip((x - self.mu) / self.sd, -5, 5)
         out: Arr = 1 / (1 + np.exp(-np.clip(np.hstack([xs, np.ones((len(xs), 1))]) @ self.w, -30, 30)))
         return np.clip(out, 0.01, 0.99)
+
+
+def fit_logistic_newton_np(rows: list[list[float]], ys: list[int], l2: float = 0.05, iters: int = 25,
+                           tol: float = 1e-9) -> list[float]:
+    """numpy twin of `app.sandbox.agent_worker.fit_logistic_newton` (same objective: mean log loss +
+    l2/2 * |weights|^2 with the intercept unpenalized; same [intercept, *weights] output) for the orchestrator,
+    where numpy is available. The jailed agent keeps the stdlib version."""
+    x = np.hstack([np.ones((len(rows), 1)), np.asarray(rows, dtype=float)])
+    y = np.asarray(ys, dtype=float)
+    n, k = x.shape
+    pen = np.full(k, l2)
+    pen[0] = 0.0
+    w = np.zeros(k)
+    for _ in range(iters):
+        p = 1 / (1 + np.exp(-np.clip(x @ w, -30, 30)))
+        g = x.T @ (p - y) / n + pen * w
+        h = (x * (p * (1 - p))[:, None]).T @ x / n + np.diag(pen)
+        h[0, 0] += 1e-9
+        step = np.linalg.solve(h, g)
+        w -= step
+        if np.abs(step).max() < tol:
+            break
+    return [float(v) for v in w]
