@@ -54,8 +54,8 @@ def _load_run(tag: str, mtime: float) -> tuple[dict[str, Any], pd.DataFrame]:  #
 
 
 @st.cache_data(show_spinner=False, max_entries=256)
-def _gap(preds: pd.DataFrame, arm: str) -> dict[str, float] | None:
-    return D.brier_gap_ci(preds, arm)
+def _gap(preds: pd.DataFrame, arm: str, block: int = 1) -> dict[str, float] | None:
+    return D.brier_gap_ci(preds, arm, block=block)
 
 
 if tag:
@@ -88,7 +88,7 @@ if tag:
 
         gaps: dict[str, dict[str, float]] = {}
         for arm_name in ("llm_plain", "llm_fund", "llm_selfimprove", "rl_forecast"):
-            gap = _gap(preds, arm_name) if arm_name in saved_arms else None
+            gap = _gap(preds, arm_name, D.bootstrap_block(report)) if arm_name in saved_arms else None
             if gap:
                 gaps[arm_name] = gap
         if "always_up" in saved_arms and gaps:
@@ -163,7 +163,7 @@ if tag:
             for a in saved_arms:
                 if a == "always_up":
                     continue
-                g = _gap(preds, a)
+                g = _gap(preds, a, D.bootstrap_block(report))
                 if g:
                     verdict = "better" if g["hi"] < 0 else ("worse" if g["lo"] > 0 else "no clear difference")
                     rows.append({"Arm": D.ARM_LABELS.get(a, a), "Brier gap": g["gap"], "95% CI low": g["lo"],

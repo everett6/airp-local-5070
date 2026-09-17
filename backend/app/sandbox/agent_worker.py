@@ -207,11 +207,22 @@ def fit_logistic_newton(rows: list[list[float]], ys: list[int], l2: float = 0.05
                         tol: float = 1e-9) -> list[float]:
     """Same objective as `fit_logistic` (mean log loss + l2/2 * |weights|^2, intercept unpenalized), solved
     exactly by Newton's method: ~10 passes over the data instead of 300, and converged rather than stopped early.
-    Used only by configs that set solver = "newton", so published runs are unchanged."""
+    Used only by configs that set solver = "newton", so published runs are unchanged.
+    A full Newton step is taken whenever it lowers the objective (the usual case, so the answer is the exact
+    optimum); otherwise the step is halved until it does, which keeps nearly separable data from diverging."""
     k = len(rows[0]) + 1
     n = len(rows)
     xs = [[1.0, *x] for x in rows]
     w = [0.0] * k
+
+    def objective(v: list[float]) -> float:
+        total = 0.0
+        for x, y in zip(xs, ys, strict=True):
+            z = sum(vi * xi for vi, xi in zip(v, x, strict=True))
+            total += math.log1p(math.exp(-abs(z))) + max(z, 0.0) - y * z  # log(1 + e^z) - y z, overflow-safe
+        return total / n + l2 / 2 * sum(vi * vi for vi in v[1:])
+
+    f_w = objective(w)
     for _ in range(iters):
         g = [0.0] * k
         h = [[0.0] * k for _ in range(k)]
@@ -235,8 +246,15 @@ def fit_logistic_newton(rows: list[list[float]], ys: list[int], l2: float = 0.05
             h[i][i] += l2
         h[0][0] += 1e-9
         step = _solve(h, g)
-        w = [wi - si for wi, si in zip(w, step, strict=True)]
-        if max(abs(si) for si in step) < tol:
+        t = 1.0
+        while True:
+            cand = [wi - t * si for wi, si in zip(w, step, strict=True)]
+            f_cand = objective(cand)
+            if f_cand <= f_w + 1e-12 or t < 1e-8:
+                break
+            t /= 2
+        w, f_w = cand, f_cand
+        if max(abs(t * si) for si in step) < tol:
             break
     return w
 

@@ -277,8 +277,12 @@ class ContinualTrainer:
 
 
 def score_trader(rows: list[dict[str, Any]], cost_bps: float = 5.0, n_boot: int = 2000,
-                 seed: int = 0) -> dict[str, float]:
-    """Weekly long/short P&L of positions after costs (|position| x cost each week), Sharpe with a week-bootstrap CI."""
+                 seed: int = 0, horizon: int = 5, step: int = 5) -> dict[str, float]:
+    """Per-cutoff long/short P&L of positions after costs (|position| x cost each cutoff), Sharpe with a bootstrap CI
+    over cutoffs. Each period's return covers `horizon` trading days, so the Sharpe is annualized with
+    periods_per_year(horizon) (52 for the published 5-day runs); when horizon > step the outcome windows overlap and
+    the CI uses a moving-block bootstrap. Defaults reproduce every published number."""
+    from app.sandbox.scoring import boot_indices, overlap_block, periods_per_year
     by_cut: dict[Any, list[tuple[float, float]]] = {}
     for r in rows:
         by_cut.setdefault(r["cutoff"], []).append((r["position"], r["ret"]))
@@ -287,11 +291,12 @@ def score_trader(rows: list[dict[str, Any]], cost_bps: float = 5.0, n_boot: int 
     if len(weekly) < 2:
         return {"weeks": float(len(weekly))}
     gross = np.array([np.mean([p * ret for p, ret in v]) for _, v in sorted(by_cut.items(), key=lambda kv: kv[0])])
-    sharpe = float(weekly.mean() / (weekly.std(ddof=1) + 1e-12) * np.sqrt(52))
+    ann = np.sqrt(periods_per_year(horizon))
+    sharpe = float(weekly.mean() / (weekly.std(ddof=1) + 1e-12) * ann)
     rng = np.random.default_rng(seed)
-    idx = rng.integers(0, len(weekly), size=(n_boot, len(weekly)))
+    idx = boot_indices(rng, len(weekly), n_boot, overlap_block(horizon, step))
     boot = weekly[idx]
-    boot_sharpe = boot.mean(axis=1) / (boot.std(axis=1, ddof=1) + 1e-12) * np.sqrt(52)
+    boot_sharpe = boot.mean(axis=1) / (boot.std(axis=1, ddof=1) + 1e-12) * ann
     lo, hi = np.percentile(boot_sharpe, [2.5, 97.5])
     return {"weeks": float(len(weekly)), "mean_weekly_pct_after_costs": round(float(weekly.mean()) * 100, 4),
             "mean_weekly_pct_gross": round(float(gross.mean()) * 100, 4),

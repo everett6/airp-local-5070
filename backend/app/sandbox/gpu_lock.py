@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import fcntl
 import os
+import tempfile
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -15,8 +16,12 @@ from pathlib import Path
 
 
 def lock_path() -> Path:
-    base = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
-    return Path(base) / "airp-gpu.lock"
+    """Fixed per user, independent of environment variables: a job started from a login shell (XDG_RUNTIME_DIR
+    set) and one started from cron or a bare service (unset) must still find the same lock."""
+    uid = os.getuid()
+    run = Path(f"/run/user/{uid}")
+    base = run if run.is_dir() else Path(tempfile.gettempdir())
+    return base / f"airp-gpu-{uid}.lock"
 
 
 @contextmanager

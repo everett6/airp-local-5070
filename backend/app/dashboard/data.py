@@ -17,6 +17,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.sandbox.scoring import boot_indices, overlap_block
+
 BACKEND = Path(__file__).resolve().parents[2]
 RESULTS = BACKEND / "results"
 DATA_CSV = BACKEND / "data" / "prices.csv"
@@ -155,10 +157,16 @@ def calibration(df: pd.DataFrame, bins: int = 10) -> pd.DataFrame:
     return out.drop(columns="bin")
 
 
+def bootstrap_block(report: dict[str, Any]) -> int:
+    """Block length for this run's bootstrap: >1 only when outcome windows overlap (horizon > step)."""
+    return overlap_block(int(report.get("horizon_days", 5)), int(report.get("step_days", report.get("horizon_days", 5))))
+
+
 def brier_gap_ci(df: pd.DataFrame, arm: str, vs: str = "always_up",
-                 n_boot: int = 2000, seed: int = 0) -> dict[str, float] | None:
+                 n_boot: int = 2000, seed: int = 0, block: int = 1) -> dict[str, float] | None:
     """Paired Brier difference (arm - vs; negative = arm better) with a bootstrap CI that
-    resamples whole cutoffs, because stocks in the same week are not independent."""
+    resamples whole cutoffs, because stocks in the same week are not independent (contiguous blocks of
+    cutoffs when outcome windows overlap; see app.sandbox.scoring.boot_indices)."""
     a = df[df["arm"] == arm].set_index(["cutoff", "ticker"])
     b = df[df["arm"] == vs].set_index(["cutoff", "ticker"])
     j = a[["p", "up"]].join(b[["p"]], rsuffix="_vs", how="inner")
@@ -169,7 +177,7 @@ def brier_gap_ci(df: pd.DataFrame, arm: str, vs: str = "always_up",
     per_cut = j.groupby(level="cutoff")["diff"].agg(["sum", "size"])
     sums, sizes = per_cut["sum"].to_numpy(), per_cut["size"].to_numpy()
     rng = np.random.default_rng(seed)
-    idx = rng.integers(0, len(sums), size=(n_boot, len(sums)))
+    idx = boot_indices(rng, len(sums), n_boot, block)
     boots = sums[idx].sum(axis=1) / sizes[idx].sum(axis=1)
     lo, hi = np.percentile(boots, [2.5, 97.5])
     return {"gap": float(sums.sum() / sizes.sum()), "lo": float(lo), "hi": float(hi),

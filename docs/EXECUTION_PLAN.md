@@ -160,6 +160,15 @@ v7 → LAP interaction test → evaluate. `scripts/phase_f_pipeline.sh` runs the
   Deflated Sharpe exceeds 0.95, where the number of trials is every arm of every published walk-forward run.
 - Reported but not a criterion: `llm_fund_lp` vs `llm_fund` IC gap (does log-prob scoring help?), PSR/DSR per arm.
 
+**Analysis amendment, 2026-09-16 (before any v6 or v7 output exists):** v6 forecasts 20-day returns every 5 trading
+days, so neighbouring cutoffs share 15 days of outcome and are correlated. The pre-registered "week-clustered" CIs and
+Sharpe ratios assumed independent weeks, which would make v6's CIs too narrow (false passes) and annualize 20-day
+returns as if they were weekly (Sharpe overstated about 2×). For every run with horizon > step, every bootstrap
+(rank IC, IC gaps, Brier gaps, trader Sharpe, LAP test) now resamples contiguous blocks of ceil(horizon/step) cutoffs
+(circular moving-block bootstrap). Sharpe is annualized per horizon-day period, and PSR/DSR use the effective sample
+length T/block. The criteria themselves are unchanged. Runs with horizon = step (all published runs, v5, v7) get
+exactly the same numbers as before (tested).
+
 **Decision gates for the two large items:**
 - **LLM fine-tuning (GRPO/ReMax LoRA on Qwen3-4B):** start only if `llm_lp` or `llm_fund_lp` passes F1 and F3 in v7.
   Otherwise there is no signal for outcome-RL to amplify, and the leak risk (qwen3 knows pre-2025 outcomes) dominates.

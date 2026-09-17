@@ -469,6 +469,11 @@ Nothing else about training or its guard changes.
 López de Prado). The number of trials is every arm of every published walk-forward run, and the luck benchmark
 comes from the spread of Sharpes across arms. The RL trader must reach DSR > 0.95.
 
+**Overlapping outcomes (v6).** When the horizon is longer than the step (20-day returns every 5 days), outcome
+windows overlap and neighbouring cutoffs are correlated. All bootstraps then resample contiguous blocks of
+ceil(horizon/step) cutoffs, Sharpe ratios are annualized per horizon-length period (13 per year for 20 days, 52 for
+5), and PSR/DSR use T/block as the sample length. For horizon = step nothing changes.
+
 **Serving.** v6 and v7 run on the standard Ollama (:11434, one slot, deterministic). The tuned 4-slot server measured 1.6× faster but is turned off (its batching also makes regenerated answers
 non-bit-identical). Every answer is cached either way, so v7 reproduces exactly from its cache.
 Its verbalized arms reuse v5's cached answers for identical prompts.

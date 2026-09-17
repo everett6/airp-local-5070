@@ -4,7 +4,7 @@
 
 Linear probability model on the run's post-warm-up rows:  up = a + b*s + c*LAP + d*(s*LAP),  s = p - 0.5.
 If the forecasts lean on remembered outcomes, they are more accurate where the model remembers more: d > 0.
-The 95% CI for d resamples whole weeks. Also reports how often the model's date-only recall got the direction
+The 95% CI for d resamples whole weeks (contiguous blocks of weeks when outcome windows overlap). Also reports how often the model's date-only recall got the direction
 right in this window (chance ~50% if the window is after its training cutoff).
 Writes results/lap_test_<tag>_<arm>.json.
 """
@@ -21,32 +21,38 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 from app.dashboard import data as D
+from app.sandbox.scoring import boot_indices
 
 
-def interaction_test(rows: list[dict[str, Any]], n_boot: int = 2000, seed: int = 0) -> dict[str, Any]:
+def interaction_test(rows: list[dict[str, Any]], n_boot: int = 2000, seed: int = 0, block: int = 1) -> dict[str, Any]:
     rows = [r for r in rows if r.get("lap") is not None and np.isfinite(r["lap"])]
     weeks = sorted({r["cutoff"] for r in rows})
-    by_week = {w: [r for r in rows if r["cutoff"] == w] for w in weeks}
-
-    def fit(rs: list[dict[str, Any]]) -> np.ndarray:
-        s = np.array([r["p"] - 0.5 for r in rs])
-        lap = np.array([r["lap"] for r in rs])
-        x = np.column_stack([np.ones(len(rs)), s, lap, s * lap])
-        y = np.array([float(r["up"]) for r in rs])
-        coef: np.ndarray = np.linalg.lstsq(x, y, rcond=None)[0]
-        return coef
-
-    coef = fit(rows)
+    week_ix = {w: i for i, w in enumerate(weeks)}
+    s = np.array([r["p"] - 0.5 for r in rows])
+    lap = np.array([r["lap"] for r in rows])
+    x = np.column_stack([np.ones(len(rows)), s, lap, s * lap])
+    y = np.array([float(r["up"]) for r in rows])
+    if len(weeks) < 2:
+        return {"n": len(rows), "weeks": len(weeks), "coef": None, "d_ci": None, "leak_signature": False,
+                "bootstrap_block": block, "mean_lap": None, "recall_direction_accuracy": None, "recall_n": 0,
+                "note": "fewer than 2 weeks with LAP values: no test"}
+    wk = np.array([week_ix[r["cutoff"]] for r in rows])
+    # OLS through per-week normal equations: resampling weeks = summing their X'X and X'y, so the 2,000 bootstrap
+    # fits need no copies of the rows (same estimate as least squares on the stacked resampled rows)
+    xtx = np.zeros((len(weeks), 4, 4))
+    xty = np.zeros((len(weeks), 4))
+    np.add.at(xtx, wk, x[:, :, None] * x[:, None, :])
+    np.add.at(xty, wk, x * y[:, None])
+    coef = np.linalg.pinv(xtx.sum(axis=0)) @ xty.sum(axis=0)
     rng = np.random.default_rng(seed)
-    boots = []
-    for _ in range(n_boot):
-        pick = rng.integers(0, len(weeks), len(weeks))
-        boots.append(fit([r for i in pick for r in by_week[weeks[i]]])[3])
+    pick = boot_indices(rng, len(weeks), n_boot, block)
+    boots = (np.linalg.pinv(xtx[pick].sum(axis=1)) @ xty[pick].sum(axis=1)[:, :, None])[:, 3, 0]
     lo, hi = np.percentile(boots, [2.5, 97.5])
     recall = [float((r["p_up_recall"] > 0.5) == bool(r["up"])) for r in rows if r["p_up_recall"] != 0.5]
-    return {"n": len(rows), "weeks": len(weeks), "coef": {"a": coef[0], "b_signal": coef[1], "c_lap": coef[2],
-            "d_signal_x_lap": coef[3]}, "d_ci": [float(lo), float(hi)], "leak_signature": bool(lo > 0),
-            "mean_lap": float(np.mean([r["lap"] for r in rows])),
+    return {"n": len(rows), "weeks": len(weeks), "coef": {"a": float(coef[0]), "b_signal": float(coef[1]),
+            "c_lap": float(coef[2]), "d_signal_x_lap": float(coef[3])}, "d_ci": [float(lo), float(hi)],
+            "leak_signature": bool(lo > 0), "bootstrap_block": block,
+            "mean_lap": float(np.mean(lap)) if len(rows) else None,
             "recall_direction_accuracy": float(np.mean(recall)) if recall else None, "recall_n": len(recall)}
 
 
@@ -63,7 +69,7 @@ def main() -> None:
         if m:
             rows.append({"cutoff": cut, "p": float(r["p"]), "up": bool(r["up"]), "lap": m["lap"],
                          "p_up_recall": m["p_up_recall"]})
-    out = {"tag": tag, "arm": arm, **interaction_test(rows)}
+    out = {"tag": tag, "arm": arm, **interaction_test(rows, block=D.bootstrap_block(report))}
     (results / f"lap_test_{tag}_{arm}.json").write_text(json.dumps(out, indent=2, default=float) + "\n")
     print(json.dumps(out, indent=1, default=float))
 

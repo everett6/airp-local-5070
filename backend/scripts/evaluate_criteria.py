@@ -67,11 +67,14 @@ def evaluate(tag: str, results: Path = BACKEND / "results") -> dict[str, Any]:
     leak_path = results / f"leak_probe_{report['model'].replace(':', '_')}.json"
     leak = json.loads(leak_path.read_text()) if leak_path.exists() else {}
     leak_rate = (leak.get("rates") or {}).get("prices+digest")
+    horizon = int(report["horizon_days"])
+    block = D.bootstrap_block(report)  # >1 when outcome windows overlap (e.g. v6: 20-day returns every 5 days)
 
     def arm_eval(arm: str) -> dict[str, Any]:
         ic = cs.get(arm, {})
-        gap = paired_ic_gap(rows.get(arm, []), rows.get("sue_rule", [])) if arm != "sue_rule" else None
-        brier = D.brier_gap_ci(preds, arm) if arm != "always_up" else None
+        gap = (paired_ic_gap(rows.get(arm, []), rows.get("sue_rule", []), block=block)
+               if arm != "sue_rule" else None)
+        brier = D.brier_gap_ci(preds, arm, block=block) if arm != "always_up" else None
         return {"rank_ic": ic.get("rank_ic_mean"), "rank_ic_ci": [ic.get("rank_ic_lo"), ic.get("rank_ic_hi")],
                 "q_spread_pct": ic.get("q_spread_pct"), "ic_gap_vs_sue_rule": gap,
                 "brier_gap_vs_always_up": brier,
@@ -87,7 +90,7 @@ def evaluate(tag: str, results: Path = BACKEND / "results") -> dict[str, Any]:
     c3 = leak_rate is not None and leak_rate < 0.20
     out: dict[str, Any] = {
         "tag": tag, "window": report["window"], "horizon_days": report["horizon_days"],
-        "n_cutoffs": report["n_cutoffs"], "warmup_from": report["warmup_from"], "arms": arms,
+        "n_cutoffs": report["n_cutoffs"], "warmup_from": report["warmup_from"], "bootstrap_block": block, "arms": arms,
         "leak_probe_rate": leak_rate,
         "phase_c": {"c1": primary.get("c1_rank_ic_ci_above_0", False), "c2": primary.get("c2_beats_sue_rule", False),
                     "c3": c3},
@@ -110,25 +113,27 @@ def evaluate(tag: str, results: Path = BACKEND / "results") -> dict[str, Any]:
     ls = {a: weekly_long_short(r) for a, r in rows.items() if a != "always_up"}
     sr_trials = [float(np.mean(v) / np.std(v, ddof=1)) for v in ls.values() if len(v) > 2 and np.std(v, ddof=1) > 0]
     out["sharpe_deflation"] = {"n_trials": n_trials, "arms": {
-        a: {"psr": probabilistic_sharpe(v), **deflated_sharpe(v, n_trials, sr_trials)} for a, v in ls.items()}}
+        a: {"psr": probabilistic_sharpe(v, block=block), **deflated_sharpe(v, n_trials, sr_trials, block, horizon)}
+        for a, v in ls.items()}}
     trader_rows = [{"cutoff": r["cutoff"], "ret": r["ret"], "position": r["position"]}
                    for r in rows.get("rl_forecast", []) if r.get("position") is not None]
     trader_weekly = trader_weekly_returns(trader_rows)
     if trader_weekly:
-        out["sharpe_deflation"]["rl_trader"] = {"psr": probabilistic_sharpe(trader_weekly),
-                                                **deflated_sharpe(trader_weekly, n_trials, sr_trials)}
+        out["sharpe_deflation"]["rl_trader"] = {"psr": probabilistic_sharpe(trader_weekly, block=block),
+                                                **deflated_sharpe(trader_weekly, n_trials, sr_trials, block, horizon)}
     if phase_f:
         pa = arms.get(PRIMARY_F, {})
         lap_path = results / f"lap_test_{tag}_{PRIMARY_F}.json"
         lap = json.loads(lap_path.read_text()) if lap_path.exists() else None
-        gaps = {b: (paired_ic_gap(rows.get(PRIMARY_F, []), rows.get(b, [])) if b in rows else None) for b in BASELINES_F}
+        gaps = {b: (paired_ic_gap(rows.get(PRIMARY_F, []), rows.get(b, []), block=block) if b in rows else None)
+                for b in BASELINES_F}
         f3 = bool(c3 and lap is not None and not lap["leak_signature"])
         dsr = (out["sharpe_deflation"].get("rl_trader") or {}).get("dsr")
         out["phase_f"] = {
             "f1": pa.get("c1_rank_ic_ci_above_0", False),
             "f2": all(g is not None and g["lo"] > 0 for g in gaps.values()), "f2_gaps": gaps,
             "f3": f3, "lap_test": lap,
-            "lp_vs_verbal_ic_gap": paired_ic_gap(rows.get(PRIMARY_F, []), rows.get("llm_fund", [])),
+            "lp_vs_verbal_ic_gap": paired_ic_gap(rows.get(PRIMARY_F, []), rows.get("llm_fund", []), block=block),
         }
         out["phase_f"]["passed"] = out["phase_f"]["f1"] and out["phase_f"]["f2"] and out["phase_f"]["f3"]
         out["phase_r_v7"] = {"rl_forecast_beats_always_up": arms.get("rl_forecast", {}).get("beats_always_up_brier", False),

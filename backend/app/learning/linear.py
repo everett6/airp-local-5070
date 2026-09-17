@@ -47,13 +47,26 @@ def fit_logistic_newton_np(rows: list[list[float]], ys: list[int], l2: float = 0
     pen = np.full(k, l2)
     pen[0] = 0.0
     w = np.zeros(k)
+
+    def objective(v: Arr) -> float:
+        z = x @ v
+        return float(np.mean(np.logaddexp(0.0, z) - y * z) + 0.5 * np.sum(pen * v * v))
+
+    f_w = objective(w)
     for _ in range(iters):
         p = 1 / (1 + np.exp(-np.clip(x @ w, -30, 30)))
         g = x.T @ (p - y) / n + pen * w
         h = (x * (p * (1 - p))[:, None]).T @ x / n + np.diag(pen)
         h[0, 0] += 1e-9
         step = np.linalg.solve(h, g)
-        w -= step
-        if np.abs(step).max() < tol:
+        t = 1.0
+        while True:  # full Newton step unless it would raise the objective (same rule as the stdlib version)
+            cand = w - t * step
+            f_cand = objective(cand)
+            if f_cand <= f_w + 1e-12 or t < 1e-8:
+                break
+            t /= 2
+        w, f_w = cand, f_cand
+        if np.abs(t * step).max() < tol:
             break
     return [float(v) for v in w]

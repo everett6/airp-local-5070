@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import bisect
 import hashlib
 import json
 import math
@@ -61,7 +62,7 @@ from app.sandbox.clock import enforce_point_in_time, sandbox_scope
 from app.sandbox.gpu_lock import gpu_job
 from app.sandbox.jail import AgentJail
 from app.sandbox.pit_data import PriceTable
-from app.sandbox.scoring import cross_sectional
+from app.sandbox.scoring import cross_sectional, overlap_block, periods_per_year
 
 BACKEND = Path(__file__).resolve().parents[2]
 DATA = BACKEND / "data" / "prices.csv"
@@ -249,7 +250,7 @@ def track_record(recs: list[dict[str, Any]], key: str = "p_llm") -> dict[str, fl
     }
 
 
-def score(preds: list[dict[str, Any]], key: str) -> dict[str, Any]:
+def score(preds: list[dict[str, Any]], key: str, horizon: int = 5) -> dict[str, Any]:
     n = len(preds)
     hits = sum((p[key] >= 0.5) == p["up"] for p in preds)
     acc = hits / n
@@ -269,7 +270,8 @@ def score(preds: list[dict[str, Any]], key: str) -> dict[str, Any]:
         "brier": round(brier, 4), "log_loss": round(ll, 4),
         "z_vs_coinflip": round(z, 2),
         "ls_mean_weekly_ret_pct": round(mean * 100, 3),
-        "ls_sharpe_ann": round(mean / sd * math.sqrt(52), 2) if sd else 0.0,
+        # each period's return covers `horizon` trading days: annualize per h-day period (52 for 5-day runs)
+        "ls_sharpe_ann": round(mean / sd * math.sqrt(periods_per_year(horizon)), 2) if sd else 0.0,
     }
 
 
@@ -287,25 +289,45 @@ def point_in_time_meta_arms(
     base_rate: list[dict[str, Any]] = []
     selector: list[dict[str, Any]] = []
     choices: list[dict[str, Any]] = []
+    # Index once instead of rescanning every arm at every cutoff (that was quadratic in run length, times the
+    # number of arms). Rows are appended cutoff by cutoff and all rows of a cutoff resolve on the same date, so
+    # "resolved by c" is a prefix of each list, found by bisection; if resolve dates were ever out of order the
+    # original full scan is used. Results are identical either way.
+    resolve_dates = {name: [p["resolve_date"] for p in ps] for name, ps in arms.items()}
+    ordered = {name: all(a <= b for a, b in zip(rd, rd[1:], strict=False)) for name, rd in resolve_dates.items()}
+
+    def resolved_window(name: str, c: date, last: int | None = None) -> list[dict[str, Any]]:
+        ps = arms[name]
+        if ordered[name]:
+            m = bisect.bisect_right(resolve_dates[name], c)
+            return ps[max(0, m - last):m] if last is not None else ps[:m]
+        hist = [p for p in ps if p["resolve_date"] <= c]
+        return hist[-last:] if last is not None else hist
+
+    by_cutoff: dict[str, dict[date, dict[str, dict[str, Any]]]] = {name: {} for name in arms}
+    for name, ps in arms.items():
+        for p in ps:
+            by_cutoff[name].setdefault(p["cutoff"], {})[p["ticker"]] = p
+    ref_rows: dict[date, list[dict[str, Any]]] = {}
+    for p in ref:
+        ref_rows.setdefault(p["cutoff"], []).append(p)
     for c in cutoffs:
         with sandbox_scope(as_of=_dt(c), run_id=f"meta-{c}"):
-            resolved_ref = [p for p in ref if p["resolve_date"] <= c]
+            resolved_ref = resolved_window("llm_plain", c)
             for p in resolved_ref:
                 enforce_point_in_time(_dt(p["resolve_date"]), source="meta:base_rate")
             rate = (sum(p["up"] for p in resolved_ref) / len(resolved_ref)) if resolved_ref else 0.5
             rate = min(max(rate, 0.05), 0.95)
             briers = {}
-            for name, ps in arms.items():
-                hist = [p for p in ps if p["resolve_date"] <= c][-window:]
+            for name in arms:
+                hist = resolved_window(name, c, window)
                 if len(hist) >= 100:
                     briers[name] = sum((p["p"] - p["up"]) ** 2 for p in hist) / len(hist)
             chosen = min(briers, key=lambda k: briers[k]) if briers else "base_rate"
         choices.append({"cutoff": c.isoformat(), "chosen": chosen,
                         "rolling_brier": {k: round(v, 4) for k, v in briers.items()}})
-        idx = {name: {p["ticker"]: p for p in ps if p["cutoff"] == c} for name, ps in arms.items()}
-        for p in ref:
-            if p["cutoff"] != c:
-                continue
+        idx = {name: by_cutoff[name].get(c, {}) for name in arms}
+        for p in ref_rows.get(c, []):
             base_rate.append({**p, "p": rate})
             src_p = rate if chosen == "base_rate" else idx[chosen][p["ticker"]]["p"]
             selector.append({**p, "p": src_p, "chosen": chosen})
@@ -609,25 +631,31 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         "window": [cutoffs[0].isoformat(), cutoffs[-1].isoformat()], "n_cutoffs": len(cutoffs),
         "tickers": tickers, "jail_probe_start": probe, "jail_probe_end": probe_end,
         "llm_calls": llm.calls, "cache_hits": llm.cache_hits, "runtime_s": round(time.time() - t_start),
-        "scores_full": {k: score(v, "p") for k, v in arms.items()},
-        "scores_after_warmup": {k: score([p for p in v if p["cutoff"] >= warm], "p") for k, v in arms.items()},
+        "scores_full": {k: score(v, "p", args.horizon) for k, v in arms.items()},
+        "scores_after_warmup": {k: score([p for p in v if p["cutoff"] >= warm], "p", args.horizon)
+                                for k, v in arms.items()},
         "warmup_from": warm.isoformat(),
         "lessons": selfimp.lesson_log,
         "stacker_log": stacker_log,
         "selector_log": selector_log,
     }
+    # overlapping outcome windows (horizon > step) make neighbouring cutoffs correlated: block bootstrap
+    block = overlap_block(args.horizon, args.step)
+    if block > 1:
+        report["bootstrap_block"] = block
     if len(tickers) >= 10:
         report["cross_sectional_after_warmup"] = {
-            k: cross_sectional([p for p in v if p["cutoff"] >= warm]) for k, v in arms.items()}
+            k: cross_sectional([p for p in v if p["cutoff"] >= warm], block=block) for k, v in arms.items()}
     if use_lp:
         report["updown_no_mass"] = llm.updown_no_mass  # log-prob answers where neither UP nor DOWN was a top token
     if use_rl:
         report["rl_log"] = rl_log
         report["rl_trader"] = {
             "full": score_trader([{"cutoff": p["cutoff"], "position": p["position"], "ret": p["ret"]}
-                                  for p in rlstate.preds]),
+                                  for p in rlstate.preds], horizon=args.horizon, step=args.step),
             "after_warmup": score_trader([{"cutoff": p["cutoff"], "position": p["position"], "ret": p["ret"]}
-                                          for p in rlstate.preds if p["cutoff"] >= warm]),
+                                          for p in rlstate.preds if p["cutoff"] >= warm],
+                                         horizon=args.horizon, step=args.step),
             "state_keys": state_keys,
         }
     RESULTS.mkdir(exist_ok=True)
