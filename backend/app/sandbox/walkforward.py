@@ -37,6 +37,7 @@ import argparse
 import asyncio
 import bisect
 import hashlib
+import itertools
 import json
 import math
 import os
@@ -294,7 +295,7 @@ def point_in_time_meta_arms(
     # "resolved by c" is a prefix of each list, found by bisection; if resolve dates were ever out of order the
     # original full scan is used. Results are identical either way.
     resolve_dates = {name: [p["resolve_date"] for p in ps] for name, ps in arms.items()}
-    ordered = {name: all(a <= b for a, b in zip(rd, rd[1:], strict=False)) for name, rd in resolve_dates.items()}
+    ordered = {name: all(a <= b for a, b in itertools.pairwise(rd)) for name, rd in resolve_dates.items()}
 
     def resolved_window(name: str, c: date, last: int | None = None) -> list[dict[str, Any]]:
         ps = arms[name]
