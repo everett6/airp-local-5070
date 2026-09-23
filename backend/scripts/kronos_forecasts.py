@@ -31,6 +31,9 @@ from app.sandbox.gpu_lock import gpu_job
 from app.sandbox.ohlcv import KRONOS_PARAMS, cutoffs_for, load_ohlcv, sample_probability, window
 from app.sandbox.pit_data import PriceTable
 
+# How many (series, sample) rows go through the model at once. It does not change what the model sees, but the
+# samples are drawn from one seeded RNG per cutoff, so a different chunk size draws different paths: it is
+# recorded in the forecast file's meta.
 CHUNK = 480
 
 
@@ -85,7 +88,8 @@ def main() -> None:
     meta = {"tag": cfg["tag"], "params": P, "horizon": horizon, "cutoffs": [c.isoformat() for c in cutoffs],
             "ohlcv": cfg["ohlcv"], "ohlcv_sha256": hashlib.sha256(ohlcv_path.read_bytes()).hexdigest(),
             "forecasts_sha256": hashlib.sha256(out_path.read_bytes()).hexdigest(),
-            "torch": torch.__version__, "device": str(pred.device), "runtime_s": round(time.time() - t0)}
+            "batch_chunk": CHUNK, "torch": torch.__version__, "device": str(pred.device),
+            "runtime_s": round(time.time() - t0)}
     out_path.with_suffix(".meta.json").write_text(json.dumps(meta, indent=2) + "\n")
     print(out_path.name, len(lines), "forecasts")
 
