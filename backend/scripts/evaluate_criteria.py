@@ -128,11 +128,12 @@ def evaluate(tag: str, results: Path = BACKEND / "results") -> dict[str, Any]:
         gaps = {b: (paired_ic_gap(rows.get(PRIMARY_F, []), rows.get(b, []), block=block) if b in rows else None)
                 for b in BASELINES_F}
         f3 = bool(c3 and lap is not None and not lap["leak_signature"])
+        lap_uninformative = bool(lap and lap.get("uninformative"))
         dsr = (out["sharpe_deflation"].get("rl_trader") or {}).get("dsr")
         out["phase_f"] = {
             "f1": pa.get("c1_rank_ic_ci_above_0", False),
             "f2": all(g is not None and g["lo"] > 0 for g in gaps.values()), "f2_gaps": gaps,
-            "f3": f3, "lap_test": lap,
+            "f3": f3, "f3_lap_test_uninformative": lap_uninformative, "lap_test": lap,
             "lp_vs_verbal_ic_gap": paired_ic_gap(rows.get(PRIMARY_F, []), rows.get("llm_fund", []), block=block),
         }
         out["phase_f"]["passed"] = out["phase_f"]["f1"] and out["phase_f"]["f2"] and out["phase_f"]["f3"]
@@ -186,7 +187,10 @@ def markdown(ev: dict[str, Any]) -> str:
         lap = pf["lap_test"] or {}
         lines.append(f"Phase F (primary {PRIMARY_F}): F1 rank IC CI > 0: **{pf['f1']}**; F2 beats baselines ({g}): "
                      f"**{pf['f2']}**; F3 no leak (identification < 20% and LAP interaction d CI "
-                     f"{lap.get('d_ci')} not above 0): **{pf['f3']}** → **{'PASSED' if pf['passed'] else 'NOT PASSED'}**")
+                     f"{lap.get('d_ci')} not above 0"
+                     + ("; NOTE: LAP ~ 0 everywhere, so the interaction test is uninformative and the "
+                        "identification probe carries F3" if pf["f3_lap_test_uninformative"] else "")
+                     + f"): **{pf['f3']}** → **{'PASSED' if pf['passed'] else 'NOT PASSED'}**")
         lines.append(f"Phase R (v7): rl_forecast beats always-up on Brier: **{rv['rl_forecast_beats_always_up']}**; "
                      f"trader Deflated Sharpe {rv['trader_dsr']} > 0.95: **{rv['trader_dsr_above_0_95']}** → "
                      f"**{'PASSED' if rv['passed'] else 'NOT PASSED'}**")

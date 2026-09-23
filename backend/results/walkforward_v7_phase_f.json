@@ -1,0 +1,3924 @@
+{
+  "tag": "v7_phase_f",
+  "config": {
+    "model": "qwen3:8b",
+    "start": "2025-06-02",
+    "end": "2026-09-02",
+    "horizon": 5,
+    "step": 5,
+    "warmup": 12,
+    "reflect_every": 4,
+    "target": "abs",
+    "data": "data/prices_pit_2025-06-02_top100.csv",
+    "fund": true,
+    "rl": true,
+    "score_logprob": true,
+    "solver": "newton",
+    "anomalies": true,
+    "kronos": true,
+    "ohlcv": "data/ohlcv_pit_2025-06-02_top100.csv",
+    "rl_state": "v7"
+  },
+  "config_hash": "2fb859a2b74fff80",
+  "provenance": {
+    "git": {
+      "commit": "c8e7e889ef0ca9456a345331ece419c493c8ad83",
+      "dirty": false,
+      "dirty_files": []
+    },
+    "data": {
+      "path": "prices_pit_2025-06-02_top100.csv",
+      "sha256": "90f30b95b2d4daa3755105878ed649c633c6430f71cb653e85af80bd7c3373ba"
+    },
+    "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+    "python": "3.14.7",
+    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+    "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB",
+    "fundamentals": {
+      "path": "data/edgar/fundamentals.json",
+      "sha256": "eac84ade7738dc33b37df5b5c296315161d1c5ee70513c2471a943138b8728d1"
+    },
+    "kronos": {
+      "forecasts": "results/kronos_v7_phase_f.jsonl",
+      "forecasts_sha256": "317c7a1aa02a0dfd379a8fefd5ae5a18b4ccff55dc5f28ab227110dcc774459a",
+      "ohlcv": "data/ohlcv_pit_2025-06-02_top100.csv",
+      "ohlcv_sha256": "a7c278f3989bafdf235e93293ec772306a527c14576404f1880294180a3ddfa2",
+      "params": {
+        "model": "NeoQuasar/Kronos-small",
+        "model_revision": "901c26c1332695a2a8f243eb2f37243a37bea320",
+        "tokenizer": "NeoQuasar/Kronos-Tokenizer-base",
+        "tokenizer_revision": "0e0117387f39004a9016484a186a908917e22426",
+        "code_commit": "67b630e67f6a18c9e9be918d9b4337c960db1e9a",
+        "context_bars": 256,
+        "samples": 24,
+        "temperature": 1.0,
+        "top_p": 0.9,
+        "seed": 20260916
+      }
+    },
+    "ollama_url": "http://127.0.0.1:11434"
+  },
+  "jail_limits": {
+    "memory_mb": 2048,
+    "cpu_seconds": 14400,
+    "open_files": 64,
+    "file_size_mb": 1,
+    "response_timeout_s": 300.0,
+    "max_message_bytes": 16777216,
+    "max_llm_requests_per_message": 256,
+    "max_prompt_chars": 100000,
+    "max_tool_calls_per_message": 8
+  },
+  "model": "qwen3:8b",
+  "target": "abs",
+  "horizon_days": 5,
+  "step_days": 5,
+  "window": [
+    "2025-06-02",
+    "2026-09-02"
+  ],
+  "n_cutoffs": 64,
+  "tickers": [
+    "NVDA",
+    "TSLA",
+    "AAPL",
+    "MSFT",
+    "META",
+    "AMZN",
+    "PLTR",
+    "AVGO",
+    "AMD",
+    "GOOGL",
+    "SMCI",
+    "NFLX",
+    "UNH",
+    "LLY",
+    "COIN",
+    "MU",
+    "JPM",
+    "V",
+    "BRK-B",
+    "CRM",
+    "COST",
+    "INTC",
+    "XOM",
+    "CRWD",
+    "BAC",
+    "ADBE",
+    "BA",
+    "WMT",
+    "ORCL",
+    "QCOM",
+    "UBER",
+    "NOW",
+    "MA",
+    "HD",
+    "GS",
+    "MRK",
+    "AMAT",
+    "JNJ",
+    "PG",
+    "CVX",
+    "DELL",
+    "TXN",
+    "ABBV",
+    "WFC",
+    "CSCO",
+    "BKNG",
+    "NKE",
+    "PFE",
+    "KO",
+    "MCD",
+    "INTU",
+    "PEP",
+    "SBUX",
+    "DIS",
+    "PANW",
+    "ACN",
+    "C",
+    "GE",
+    "TMO",
+    "LRCX",
+    "GEV",
+    "IBM",
+    "TMUS",
+    "CAT",
+    "VST",
+    "CEG",
+    "LIN",
+    "T",
+    "VZ",
+    "AMGN",
+    "CMCSA",
+    "ISRG",
+    "ETN",
+    "ANET",
+    "NEE",
+    "HON",
+    "PYPL",
+    "F",
+    "DHR",
+    "KLAC",
+    "MS",
+    "AXP",
+    "ADI",
+    "COP",
+    "TGT",
+    "CMG",
+    "PM",
+    "ABT",
+    "GILD",
+    "SCHW",
+    "DASH",
+    "BMY",
+    "ELV",
+    "LULU",
+    "PGR",
+    "CVS",
+    "VRTX",
+    "BLK",
+    "ABNB",
+    "RTX"
+  ],
+  "jail_probe_start": {
+    "readable_forbidden_paths": [],
+    "network_reachable": false,
+    "jailed": true,
+    "passed": true
+  },
+  "jail_probe_end": {
+    "readable_forbidden_paths": [],
+    "network_reachable": false,
+    "jailed": true,
+    "passed": true
+  },
+  "llm_calls": 12800,
+  "cache_hits": 19215,
+  "runtime_s": 2162,
+  "scores_full": {
+    "llm_plain": {
+      "n": 6400,
+      "accuracy": 0.5212,
+      "pct_up_calls": 0.928,
+      "brier": 0.2498,
+      "log_loss": 0.6928,
+      "z_vs_coinflip": 3.4,
+      "ls_mean_weekly_ret_pct": 0.225,
+      "ls_sharpe_ann": 1.36
+    },
+    "llm_selfimprove": {
+      "n": 6400,
+      "accuracy": 0.5141,
+      "pct_up_calls": 0.852,
+      "brier": 0.252,
+      "log_loss": 0.6972,
+      "z_vs_coinflip": 2.25,
+      "ls_mean_weekly_ret_pct": 0.311,
+      "ls_sharpe_ann": 1.57
+    },
+    "feat_logit": {
+      "n": 6400,
+      "accuracy": 0.5305,
+      "pct_up_calls": 0.993,
+      "brier": 0.2519,
+      "log_loss": 0.6971,
+      "z_vs_coinflip": 4.88,
+      "ls_mean_weekly_ret_pct": 0.406,
+      "ls_sharpe_ann": 1.74
+    },
+    "always_up": {
+      "n": 6400,
+      "accuracy": 0.5337,
+      "pct_up_calls": 1.0,
+      "brier": 0.2494,
+      "log_loss": 0.692,
+      "z_vs_coinflip": 5.4,
+      "ls_mean_weekly_ret_pct": 0.485,
+      "ls_sharpe_ann": 2.05
+    },
+    "momentum_20d": {
+      "n": 6400,
+      "accuracy": 0.5052,
+      "pct_up_calls": 0.568,
+      "brier": 0.25,
+      "log_loss": 0.6931,
+      "z_vs_coinflip": 0.82,
+      "ls_mean_weekly_ret_pct": 0.088,
+      "ls_sharpe_ann": 0.54
+    },
+    "reversal_5d": {
+      "n": 6400,
+      "accuracy": 0.5023,
+      "pct_up_calls": 0.458,
+      "brier": 0.2501,
+      "log_loss": 0.6933,
+      "z_vs_coinflip": 0.38,
+      "ls_mean_weekly_ret_pct": 0.086,
+      "ls_sharpe_ann": 0.58
+    },
+    "llm_fund": {
+      "n": 6400,
+      "accuracy": 0.5184,
+      "pct_up_calls": 0.868,
+      "brier": 0.25,
+      "log_loss": 0.6932,
+      "z_vs_coinflip": 2.95,
+      "ls_mean_weekly_ret_pct": 0.184,
+      "ls_sharpe_ann": 1.19
+    },
+    "feat_fund_logit": {
+      "n": 6400,
+      "accuracy": 0.5003,
+      "pct_up_calls": 0.696,
+      "brier": 0.2636,
+      "log_loss": 0.7257,
+      "z_vs_coinflip": 0.05,
+      "ls_mean_weekly_ret_pct": 0.053,
+      "ls_sharpe_ann": 0.29
+    },
+    "sue_rule": {
+      "n": 6400,
+      "accuracy": 0.5212,
+      "pct_up_calls": 0.722,
+      "brier": 0.2497,
+      "log_loss": 0.6926,
+      "z_vs_coinflip": 3.4,
+      "ls_mean_weekly_ret_pct": 0.305,
+      "ls_sharpe_ann": 2.13
+    },
+    "llm_lp": {
+      "n": 6400,
+      "accuracy": 0.4939,
+      "pct_up_calls": 0.467,
+      "brier": 0.4364,
+      "log_loss": 1.7467,
+      "z_vs_coinflip": -0.97,
+      "ls_mean_weekly_ret_pct": -0.064,
+      "ls_sharpe_ann": -0.38
+    },
+    "llm_fund_lp": {
+      "n": 6400,
+      "accuracy": 0.4941,
+      "pct_up_calls": 0.542,
+      "brier": 0.4469,
+      "log_loss": 1.832,
+      "z_vs_coinflip": -0.95,
+      "ls_mean_weekly_ret_pct": 0.008,
+      "ls_sharpe_ann": 0.05
+    },
+    "anomaly_rank": {
+      "n": 6400,
+      "accuracy": 0.4947,
+      "pct_up_calls": 0.553,
+      "brier": 0.2502,
+      "log_loss": 0.6936,
+      "z_vs_coinflip": -0.85,
+      "ls_mean_weekly_ret_pct": -0.031,
+      "ls_sharpe_ann": -0.25
+    },
+    "anomaly_logit": {
+      "n": 6400,
+      "accuracy": 0.5016,
+      "pct_up_calls": 0.72,
+      "brier": 0.2629,
+      "log_loss": 0.7238,
+      "z_vs_coinflip": 0.25,
+      "ls_mean_weekly_ret_pct": 0.01,
+      "ls_sharpe_ann": 0.05
+    },
+    "kronos": {
+      "n": 6400,
+      "accuracy": 0.4897,
+      "pct_up_calls": 0.353,
+      "brier": 0.2872,
+      "log_loss": 0.7763,
+      "z_vs_coinflip": -1.65,
+      "ls_mean_weekly_ret_pct": -0.131,
+      "ls_sharpe_ann": -1.0
+    },
+    "rl_forecast": {
+      "n": 6400,
+      "accuracy": 0.5273,
+      "pct_up_calls": 0.907,
+      "brier": 0.2543,
+      "log_loss": 0.7025,
+      "z_vs_coinflip": 4.38,
+      "ls_mean_weekly_ret_pct": 0.392,
+      "ls_sharpe_ann": 1.86
+    },
+    "base_rate": {
+      "n": 6400,
+      "accuracy": 0.5337,
+      "pct_up_calls": 1.0,
+      "brier": 0.2516,
+      "log_loss": 0.6968,
+      "z_vs_coinflip": 5.4,
+      "ls_mean_weekly_ret_pct": 0.466,
+      "ls_sharpe_ann": 1.96
+    },
+    "selector": {
+      "n": 6400,
+      "accuracy": 0.5134,
+      "pct_up_calls": 0.78,
+      "brier": 0.2535,
+      "log_loss": 0.7015,
+      "z_vs_coinflip": 2.15,
+      "ls_mean_weekly_ret_pct": 0.146,
+      "ls_sharpe_ann": 0.91
+    }
+  },
+  "scores_after_warmup": {
+    "llm_plain": {
+      "n": 5200,
+      "accuracy": 0.5054,
+      "pct_up_calls": 0.921,
+      "brier": 0.2507,
+      "log_loss": 0.6945,
+      "z_vs_coinflip": 0.78,
+      "ls_mean_weekly_ret_pct": 0.132,
+      "ls_sharpe_ann": 0.78
+    },
+    "llm_selfimprove": {
+      "n": 5200,
+      "accuracy": 0.4998,
+      "pct_up_calls": 0.834,
+      "brier": 0.252,
+      "log_loss": 0.6971,
+      "z_vs_coinflip": -0.03,
+      "ls_mean_weekly_ret_pct": 0.253,
+      "ls_sharpe_ann": 1.21
+    },
+    "feat_logit": {
+      "n": 5200,
+      "accuracy": 0.5187,
+      "pct_up_calls": 0.993,
+      "brier": 0.2516,
+      "log_loss": 0.6963,
+      "z_vs_coinflip": 2.69,
+      "ls_mean_weekly_ret_pct": 0.392,
+      "ls_sharpe_ann": 1.61
+    },
+    "always_up": {
+      "n": 5200,
+      "accuracy": 0.5217,
+      "pct_up_calls": 1.0,
+      "brier": 0.2497,
+      "log_loss": 0.6925,
+      "z_vs_coinflip": 3.13,
+      "ls_mean_weekly_ret_pct": 0.447,
+      "ls_sharpe_ann": 1.79
+    },
+    "momentum_20d": {
+      "n": 5200,
+      "accuracy": 0.5,
+      "pct_up_calls": 0.545,
+      "brier": 0.2501,
+      "log_loss": 0.6933,
+      "z_vs_coinflip": 0.0,
+      "ls_mean_weekly_ret_pct": 0.064,
+      "ls_sharpe_ann": 0.37
+    },
+    "reversal_5d": {
+      "n": 5200,
+      "accuracy": 0.5004,
+      "pct_up_calls": 0.472,
+      "brier": 0.2501,
+      "log_loss": 0.6933,
+      "z_vs_coinflip": 0.06,
+      "ls_mean_weekly_ret_pct": 0.078,
+      "ls_sharpe_ann": 0.5
+    },
+    "llm_fund": {
+      "n": 5200,
+      "accuracy": 0.5042,
+      "pct_up_calls": 0.856,
+      "brier": 0.2508,
+      "log_loss": 0.6947,
+      "z_vs_coinflip": 0.61,
+      "ls_mean_weekly_ret_pct": 0.082,
+      "ls_sharpe_ann": 0.53
+    },
+    "feat_fund_logit": {
+      "n": 5200,
+      "accuracy": 0.4965,
+      "pct_up_calls": 0.694,
+      "brier": 0.2601,
+      "log_loss": 0.716,
+      "z_vs_coinflip": -0.5,
+      "ls_mean_weekly_ret_pct": 0.077,
+      "ls_sharpe_ann": 0.4
+    },
+    "sue_rule": {
+      "n": 5200,
+      "accuracy": 0.5188,
+      "pct_up_calls": 0.73,
+      "brier": 0.2497,
+      "log_loss": 0.6926,
+      "z_vs_coinflip": 2.72,
+      "ls_mean_weekly_ret_pct": 0.319,
+      "ls_sharpe_ann": 2.06
+    },
+    "llm_lp": {
+      "n": 5200,
+      "accuracy": 0.4963,
+      "pct_up_calls": 0.435,
+      "brier": 0.4361,
+      "log_loss": 1.7511,
+      "z_vs_coinflip": -0.53,
+      "ls_mean_weekly_ret_pct": -0.059,
+      "ls_sharpe_ann": -0.33
+    },
+    "llm_fund_lp": {
+      "n": 5200,
+      "accuracy": 0.494,
+      "pct_up_calls": 0.52,
+      "brier": 0.4483,
+      "log_loss": 1.8388,
+      "z_vs_coinflip": -0.86,
+      "ls_mean_weekly_ret_pct": 0.006,
+      "ls_sharpe_ann": 0.04
+    },
+    "anomaly_rank": {
+      "n": 5200,
+      "accuracy": 0.4958,
+      "pct_up_calls": 0.557,
+      "brier": 0.2502,
+      "log_loss": 0.6935,
+      "z_vs_coinflip": -0.61,
+      "ls_mean_weekly_ret_pct": -0.017,
+      "ls_sharpe_ann": -0.13
+    },
+    "anomaly_logit": {
+      "n": 5200,
+      "accuracy": 0.5002,
+      "pct_up_calls": 0.715,
+      "brier": 0.2591,
+      "log_loss": 0.7141,
+      "z_vs_coinflip": 0.03,
+      "ls_mean_weekly_ret_pct": 0.052,
+      "ls_sharpe_ann": 0.27
+    },
+    "kronos": {
+      "n": 5200,
+      "accuracy": 0.4931,
+      "pct_up_calls": 0.369,
+      "brier": 0.2859,
+      "log_loss": 0.7735,
+      "z_vs_coinflip": -1.0,
+      "ls_mean_weekly_ret_pct": -0.121,
+      "ls_sharpe_ann": -0.87
+    },
+    "rl_forecast": {
+      "n": 5200,
+      "accuracy": 0.5187,
+      "pct_up_calls": 0.913,
+      "brier": 0.2529,
+      "log_loss": 0.6994,
+      "z_vs_coinflip": 2.69,
+      "ls_mean_weekly_ret_pct": 0.426,
+      "ls_sharpe_ann": 1.92
+    },
+    "base_rate": {
+      "n": 5200,
+      "accuracy": 0.5217,
+      "pct_up_calls": 1.0,
+      "brier": 0.251,
+      "log_loss": 0.6952,
+      "z_vs_coinflip": 3.13,
+      "ls_mean_weekly_ret_pct": 0.447,
+      "ls_sharpe_ann": 1.79
+    },
+    "selector": {
+      "n": 5200,
+      "accuracy": 0.5008,
+      "pct_up_calls": 0.769,
+      "brier": 0.2535,
+      "log_loss": 0.7018,
+      "z_vs_coinflip": 0.11,
+      "ls_mean_weekly_ret_pct": 0.079,
+      "ls_sharpe_ann": 0.48
+    }
+  },
+  "warmup_from": "2025-08-27",
+  "lessons": [
+    {
+      "cutoff": "2025-07-01",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2025-07-30",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2025-08-27",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2025-09-25",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2025-10-23",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2025-11-20",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2025-12-19",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2026-01-21",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2026-02-19",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2026-03-19",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2026-04-17",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2026-05-15",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2026-06-15",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2026-07-15",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    },
+    {
+      "cutoff": "2026-08-12",
+      "lessons": [
+        "Higher p_up should correlate with higher 5-day gains to improve calibration.",
+        "RSI above 50 may indicate overbought conditions, affecting accuracy.",
+        "Avoid predicting UP when 20-day trends are negative or volatile.",
+        "Market movement (mkt5d) should align more with actual direction for better accuracy.",
+        "Consistent p_up values without variation may reduce predictive power."
+      ]
+    }
+  ],
+  "stacker_log": [
+    {
+      "cutoff": "2025-06-02",
+      "stacker": "not_enough_data",
+      "n": 0
+    },
+    {
+      "cutoff": "2025-06-09",
+      "stacker": "not_enough_data",
+      "n": 100
+    },
+    {
+      "cutoff": "2025-06-16",
+      "stacker_holdout_ll": 0.752,
+      "llm_holdout_ll": 0.691,
+      "n": 200,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-06-24",
+      "stacker_holdout_ll": 0.7169,
+      "llm_holdout_ll": 0.6882,
+      "n": 300,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-07-01",
+      "stacker_holdout_ll": 0.5944,
+      "llm_holdout_ll": 0.6532,
+      "n": 400,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-07-09",
+      "stacker_holdout_ll": 0.6267,
+      "llm_holdout_ll": 0.6692,
+      "n": 500,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-07-16",
+      "stacker_holdout_ll": 0.7997,
+      "llm_holdout_ll": 0.6971,
+      "n": 600,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-07-23",
+      "stacker_holdout_ll": 0.7269,
+      "llm_holdout_ll": 0.6935,
+      "n": 700,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-07-30",
+      "stacker_holdout_ll": 0.7151,
+      "llm_holdout_ll": 0.6952,
+      "n": 800,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-08-06",
+      "stacker_holdout_ll": 0.7342,
+      "llm_holdout_ll": 0.6971,
+      "n": 900,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-08-13",
+      "stacker_holdout_ll": 0.7241,
+      "llm_holdout_ll": 0.6971,
+      "n": 1000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-08-20",
+      "stacker_holdout_ll": 0.7143,
+      "llm_holdout_ll": 0.6961,
+      "n": 1100,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-08-27",
+      "stacker_holdout_ll": 0.6885,
+      "llm_holdout_ll": 0.6928,
+      "n": 1200,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-09-04",
+      "stacker_holdout_ll": 0.6916,
+      "llm_holdout_ll": 0.6926,
+      "n": 1300,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-09-11",
+      "stacker_holdout_ll": 0.6872,
+      "llm_holdout_ll": 0.6927,
+      "n": 1400,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-09-18",
+      "stacker_holdout_ll": 0.6874,
+      "llm_holdout_ll": 0.6906,
+      "n": 1500,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-09-25",
+      "stacker_holdout_ll": 0.7031,
+      "llm_holdout_ll": 0.6946,
+      "n": 1600,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-10-02",
+      "stacker_holdout_ll": 0.7038,
+      "llm_holdout_ll": 0.6939,
+      "n": 1700,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-10-09",
+      "stacker_holdout_ll": 0.7043,
+      "llm_holdout_ll": 0.6936,
+      "n": 1800,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-10-16",
+      "stacker_holdout_ll": 0.7084,
+      "llm_holdout_ll": 0.6951,
+      "n": 1900,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-10-23",
+      "stacker_holdout_ll": 0.6957,
+      "llm_holdout_ll": 0.6929,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-10-30",
+      "stacker_holdout_ll": 0.6943,
+      "llm_holdout_ll": 0.6954,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-11-06",
+      "stacker_holdout_ll": 0.694,
+      "llm_holdout_ll": 0.6954,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-11-13",
+      "stacker_holdout_ll": 0.6981,
+      "llm_holdout_ll": 0.6958,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2025-11-20",
+      "stacker_holdout_ll": 0.7,
+      "llm_holdout_ll": 0.7018,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-11-28",
+      "stacker_holdout_ll": 0.6844,
+      "llm_holdout_ll": 0.7023,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-12-05",
+      "stacker_holdout_ll": 0.6923,
+      "llm_holdout_ll": 0.7036,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-12-12",
+      "stacker_holdout_ll": 0.6878,
+      "llm_holdout_ll": 0.7003,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-12-19",
+      "stacker_holdout_ll": 0.6851,
+      "llm_holdout_ll": 0.6983,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2025-12-29",
+      "stacker_holdout_ll": 0.6811,
+      "llm_holdout_ll": 0.696,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-01-06",
+      "stacker_holdout_ll": 0.693,
+      "llm_holdout_ll": 0.6892,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-01-13",
+      "stacker_holdout_ll": 0.6944,
+      "llm_holdout_ll": 0.6883,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-01-21",
+      "stacker_holdout_ll": 0.6946,
+      "llm_holdout_ll": 0.6872,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-01-28",
+      "stacker_holdout_ll": 0.6923,
+      "llm_holdout_ll": 0.689,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-02-04",
+      "stacker_holdout_ll": 0.694,
+      "llm_holdout_ll": 0.687,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-02-11",
+      "stacker_holdout_ll": 0.6991,
+      "llm_holdout_ll": 0.6881,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-02-19",
+      "stacker_holdout_ll": 0.7013,
+      "llm_holdout_ll": 0.6922,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-02-26",
+      "stacker_holdout_ll": 0.6966,
+      "llm_holdout_ll": 0.6908,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-03-05",
+      "stacker_holdout_ll": 0.6945,
+      "llm_holdout_ll": 0.6966,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-03-12",
+      "stacker_holdout_ll": 0.7044,
+      "llm_holdout_ll": 0.696,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-03-19",
+      "stacker_holdout_ll": 0.6997,
+      "llm_holdout_ll": 0.699,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-03-26",
+      "stacker_holdout_ll": 0.71,
+      "llm_holdout_ll": 0.7002,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-04-02",
+      "stacker_holdout_ll": 0.7076,
+      "llm_holdout_ll": 0.6996,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-04-10",
+      "stacker_holdout_ll": 0.7045,
+      "llm_holdout_ll": 0.6973,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-04-17",
+      "stacker_holdout_ll": 0.6974,
+      "llm_holdout_ll": 0.6922,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-04-24",
+      "stacker_holdout_ll": 0.6916,
+      "llm_holdout_ll": 0.6924,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-05-01",
+      "stacker_holdout_ll": 0.6925,
+      "llm_holdout_ll": 0.6905,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-05-08",
+      "stacker_holdout_ll": 0.6942,
+      "llm_holdout_ll": 0.6896,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-05-15",
+      "stacker_holdout_ll": 0.6899,
+      "llm_holdout_ll": 0.6882,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-05-22",
+      "stacker_holdout_ll": 0.6934,
+      "llm_holdout_ll": 0.6925,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-06-01",
+      "stacker_holdout_ll": 0.6988,
+      "llm_holdout_ll": 0.6948,
+      "n": 2000,
+      "stacker": "rejected"
+    },
+    {
+      "cutoff": "2026-06-08",
+      "stacker_holdout_ll": 0.6971,
+      "llm_holdout_ll": 0.6977,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-06-15",
+      "stacker_holdout_ll": 0.6974,
+      "llm_holdout_ll": 0.6984,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-06-23",
+      "stacker_holdout_ll": 0.7009,
+      "llm_holdout_ll": 0.7009,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-06-30",
+      "stacker_holdout_ll": 0.6965,
+      "llm_holdout_ll": 0.7002,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-07-08",
+      "stacker_holdout_ll": 0.6926,
+      "llm_holdout_ll": 0.6984,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-07-15",
+      "stacker_holdout_ll": 0.6931,
+      "llm_holdout_ll": 0.6971,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-07-22",
+      "stacker_holdout_ll": 0.6945,
+      "llm_holdout_ll": 0.6971,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-07-29",
+      "stacker_holdout_ll": 0.6924,
+      "llm_holdout_ll": 0.6967,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-08-05",
+      "stacker_holdout_ll": 0.6841,
+      "llm_holdout_ll": 0.6986,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-08-12",
+      "stacker_holdout_ll": 0.6845,
+      "llm_holdout_ll": 0.6961,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-08-19",
+      "stacker_holdout_ll": 0.6848,
+      "llm_holdout_ll": 0.6959,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-08-26",
+      "stacker_holdout_ll": 0.6905,
+      "llm_holdout_ll": 0.6961,
+      "n": 2000,
+      "stacker": "adopted"
+    },
+    {
+      "cutoff": "2026-09-02",
+      "stacker_holdout_ll": 0.6881,
+      "llm_holdout_ll": 0.6951,
+      "n": 2000,
+      "stacker": "adopted"
+    }
+  ],
+  "selector_log": [
+    {
+      "cutoff": "2025-06-02",
+      "chosen": "base_rate",
+      "rolling_brier": {}
+    },
+    {
+      "cutoff": "2025-06-09",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2338,
+        "llm_selfimprove": 0.2378,
+        "feat_logit": 0.25,
+        "momentum_20d": 0.2483,
+        "reversal_5d": 0.2529,
+        "llm_fund": 0.2378,
+        "feat_fund_logit": 0.25,
+        "sue_rule": 0.2484,
+        "llm_lp": 0.3533,
+        "llm_fund_lp": 0.3824,
+        "anomaly_rank": 0.2533,
+        "anomaly_logit": 0.25,
+        "kronos": 0.3284,
+        "rl_forecast": 0.25
+      }
+    },
+    {
+      "cutoff": "2025-06-16",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2388,
+        "llm_selfimprove": 0.242,
+        "feat_logit": 0.25,
+        "momentum_20d": 0.248,
+        "reversal_5d": 0.2526,
+        "llm_fund": 0.2418,
+        "feat_fund_logit": 0.25,
+        "sue_rule": 0.2495,
+        "llm_lp": 0.3446,
+        "llm_fund_lp": 0.3798,
+        "anomaly_rank": 0.2547,
+        "anomaly_logit": 0.25,
+        "kronos": 0.3164,
+        "rl_forecast": 0.25
+      }
+    },
+    {
+      "cutoff": "2025-06-24",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.241,
+        "llm_selfimprove": 0.2433,
+        "feat_logit": 0.2506,
+        "momentum_20d": 0.2485,
+        "reversal_5d": 0.2522,
+        "llm_fund": 0.2432,
+        "feat_fund_logit": 0.2729,
+        "sue_rule": 0.2494,
+        "llm_lp": 0.353,
+        "llm_fund_lp": 0.3859,
+        "anomaly_rank": 0.2518,
+        "anomaly_logit": 0.2666,
+        "kronos": 0.3198,
+        "rl_forecast": 0.25
+      }
+    },
+    {
+      "cutoff": "2025-07-01",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2386,
+        "llm_selfimprove": 0.239,
+        "feat_logit": 0.2367,
+        "momentum_20d": 0.2479,
+        "reversal_5d": 0.2514,
+        "llm_fund": 0.2409,
+        "feat_fund_logit": 0.2678,
+        "sue_rule": 0.2489,
+        "llm_lp": 0.3737,
+        "llm_fund_lp": 0.3857,
+        "anomaly_rank": 0.2514,
+        "anomaly_logit": 0.264,
+        "kronos": 0.3126,
+        "rl_forecast": 0.25
+      }
+    },
+    {
+      "cutoff": "2025-07-09",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2407,
+        "llm_selfimprove": 0.2408,
+        "feat_logit": 0.2354,
+        "momentum_20d": 0.2476,
+        "reversal_5d": 0.251,
+        "llm_fund": 0.2425,
+        "feat_fund_logit": 0.2819,
+        "sue_rule": 0.2495,
+        "llm_lp": 0.361,
+        "llm_fund_lp": 0.3769,
+        "anomaly_rank": 0.2518,
+        "anomaly_logit": 0.2797,
+        "kronos": 0.3102,
+        "rl_forecast": 0.2501
+      }
+    },
+    {
+      "cutoff": "2025-07-16",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2449,
+        "llm_selfimprove": 0.2604,
+        "feat_logit": 0.2541,
+        "momentum_20d": 0.2483,
+        "reversal_5d": 0.251,
+        "llm_fund": 0.2451,
+        "feat_fund_logit": 0.2885,
+        "sue_rule": 0.2497,
+        "llm_lp": 0.3949,
+        "llm_fund_lp": 0.4012,
+        "anomaly_rank": 0.2506,
+        "anomaly_logit": 0.2991,
+        "kronos": 0.3027,
+        "rl_forecast": 0.2716
+      }
+    },
+    {
+      "cutoff": "2025-07-23",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2438,
+        "llm_selfimprove": 0.2602,
+        "feat_logit": 0.2484,
+        "momentum_20d": 0.2481,
+        "reversal_5d": 0.2499,
+        "llm_fund": 0.2442,
+        "feat_fund_logit": 0.2968,
+        "sue_rule": 0.2495,
+        "llm_lp": 0.4091,
+        "llm_fund_lp": 0.4169,
+        "anomaly_rank": 0.2512,
+        "anomaly_logit": 0.2964,
+        "kronos": 0.2989,
+        "rl_forecast": 0.2784
+      }
+    },
+    {
+      "cutoff": "2025-07-30",
+      "chosen": "llm_fund",
+      "rolling_brier": {
+        "llm_plain": 0.2496,
+        "llm_selfimprove": 0.267,
+        "feat_logit": 0.2688,
+        "momentum_20d": 0.249,
+        "reversal_5d": 0.2497,
+        "llm_fund": 0.2486,
+        "feat_fund_logit": 0.2953,
+        "sue_rule": 0.2498,
+        "llm_lp": 0.4099,
+        "llm_fund_lp": 0.4244,
+        "anomaly_rank": 0.2507,
+        "anomaly_logit": 0.3015,
+        "kronos": 0.3014,
+        "rl_forecast": 0.278
+      }
+    },
+    {
+      "cutoff": "2025-08-06",
+      "chosen": "anomaly_rank",
+      "rolling_brier": {
+        "llm_plain": 0.2534,
+        "llm_selfimprove": 0.2695,
+        "feat_logit": 0.2811,
+        "momentum_20d": 0.2497,
+        "reversal_5d": 0.2493,
+        "llm_fund": 0.2511,
+        "feat_fund_logit": 0.2851,
+        "sue_rule": 0.2503,
+        "llm_lp": 0.4424,
+        "llm_fund_lp": 0.4535,
+        "anomaly_rank": 0.2491,
+        "anomaly_logit": 0.291,
+        "kronos": 0.2848,
+        "rl_forecast": 0.287
+      }
+    },
+    {
+      "cutoff": "2025-08-13",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2492,
+        "llm_selfimprove": 0.2502,
+        "feat_logit": 0.2593,
+        "momentum_20d": 0.2503,
+        "reversal_5d": 0.2481,
+        "llm_fund": 0.2484,
+        "feat_fund_logit": 0.2952,
+        "sue_rule": 0.2494,
+        "llm_lp": 0.4601,
+        "llm_fund_lp": 0.457,
+        "anomaly_rank": 0.2493,
+        "anomaly_logit": 0.2901,
+        "kronos": 0.2804,
+        "rl_forecast": 0.2583
+      }
+    },
+    {
+      "cutoff": "2025-08-20",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2519,
+        "llm_selfimprove": 0.2523,
+        "feat_logit": 0.2669,
+        "momentum_20d": 0.2512,
+        "reversal_5d": 0.2487,
+        "llm_fund": 0.2514,
+        "feat_fund_logit": 0.2751,
+        "sue_rule": 0.25,
+        "llm_lp": 0.5006,
+        "llm_fund_lp": 0.4892,
+        "anomaly_rank": 0.2497,
+        "anomaly_logit": 0.2822,
+        "kronos": 0.2596,
+        "rl_forecast": 0.2582
+      }
+    },
+    {
+      "cutoff": "2025-08-27",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2501,
+        "llm_selfimprove": 0.2503,
+        "feat_logit": 0.2537,
+        "momentum_20d": 0.2518,
+        "reversal_5d": 0.2485,
+        "llm_fund": 0.2505,
+        "feat_fund_logit": 0.2729,
+        "sue_rule": 0.2499,
+        "llm_lp": 0.5297,
+        "llm_fund_lp": 0.5117,
+        "anomaly_rank": 0.2498,
+        "anomaly_logit": 0.2715,
+        "kronos": 0.2647,
+        "rl_forecast": 0.2535
+      }
+    },
+    {
+      "cutoff": "2025-09-04",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2489,
+        "llm_selfimprove": 0.2524,
+        "feat_logit": 0.246,
+        "momentum_20d": 0.2515,
+        "reversal_5d": 0.2484,
+        "llm_fund": 0.2498,
+        "feat_fund_logit": 0.2679,
+        "sue_rule": 0.2488,
+        "llm_lp": 0.5076,
+        "llm_fund_lp": 0.4761,
+        "anomaly_rank": 0.2492,
+        "anomaly_logit": 0.2628,
+        "kronos": 0.2682,
+        "rl_forecast": 0.2483
+      }
+    },
+    {
+      "cutoff": "2025-09-11",
+      "chosen": "anomaly_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2499,
+        "llm_selfimprove": 0.2514,
+        "feat_logit": 0.2474,
+        "momentum_20d": 0.2512,
+        "reversal_5d": 0.2489,
+        "llm_fund": 0.2509,
+        "feat_fund_logit": 0.2529,
+        "sue_rule": 0.2491,
+        "llm_lp": 0.4972,
+        "llm_fund_lp": 0.4782,
+        "anomaly_rank": 0.2489,
+        "anomaly_logit": 0.246,
+        "kronos": 0.2778,
+        "rl_forecast": 0.2543
+      }
+    },
+    {
+      "cutoff": "2025-09-18",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2487,
+        "llm_selfimprove": 0.2525,
+        "feat_logit": 0.2471,
+        "momentum_20d": 0.2505,
+        "reversal_5d": 0.2492,
+        "llm_fund": 0.2493,
+        "feat_fund_logit": 0.2523,
+        "sue_rule": 0.2488,
+        "llm_lp": 0.4448,
+        "llm_fund_lp": 0.4252,
+        "anomaly_rank": 0.2485,
+        "anomaly_logit": 0.2493,
+        "kronos": 0.2986,
+        "rl_forecast": 0.2472
+      }
+    },
+    {
+      "cutoff": "2025-09-25",
+      "chosen": "anomaly_rank",
+      "rolling_brier": {
+        "llm_plain": 0.2512,
+        "llm_selfimprove": 0.2595,
+        "feat_logit": 0.2595,
+        "momentum_20d": 0.25,
+        "reversal_5d": 0.2503,
+        "llm_fund": 0.2507,
+        "feat_fund_logit": 0.2655,
+        "sue_rule": 0.25,
+        "llm_lp": 0.4112,
+        "llm_fund_lp": 0.4154,
+        "anomaly_rank": 0.2494,
+        "anomaly_logit": 0.2613,
+        "kronos": 0.2814,
+        "rl_forecast": 0.2583
+      }
+    },
+    {
+      "cutoff": "2025-10-02",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2495,
+        "llm_selfimprove": 0.2557,
+        "feat_logit": 0.2531,
+        "momentum_20d": 0.2504,
+        "reversal_5d": 0.2505,
+        "llm_fund": 0.2503,
+        "feat_fund_logit": 0.2658,
+        "sue_rule": 0.2506,
+        "llm_lp": 0.4429,
+        "llm_fund_lp": 0.4558,
+        "anomaly_rank": 0.2517,
+        "anomaly_logit": 0.2659,
+        "kronos": 0.2879,
+        "rl_forecast": 0.2553
+      }
+    },
+    {
+      "cutoff": "2025-10-09",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2492,
+        "llm_selfimprove": 0.2566,
+        "feat_logit": 0.2554,
+        "momentum_20d": 0.2494,
+        "reversal_5d": 0.2512,
+        "llm_fund": 0.2493,
+        "feat_fund_logit": 0.262,
+        "sue_rule": 0.2506,
+        "llm_lp": 0.397,
+        "llm_fund_lp": 0.4144,
+        "anomaly_rank": 0.252,
+        "anomaly_logit": 0.2637,
+        "kronos": 0.2881,
+        "rl_forecast": 0.2563
+      }
+    },
+    {
+      "cutoff": "2025-10-16",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2515,
+        "llm_selfimprove": 0.2559,
+        "feat_logit": 0.2573,
+        "momentum_20d": 0.25,
+        "reversal_5d": 0.2506,
+        "llm_fund": 0.2511,
+        "feat_fund_logit": 0.2625,
+        "sue_rule": 0.2512,
+        "llm_lp": 0.4238,
+        "llm_fund_lp": 0.4438,
+        "anomaly_rank": 0.2522,
+        "anomaly_logit": 0.2631,
+        "kronos": 0.2779,
+        "rl_forecast": 0.2605
+      }
+    },
+    {
+      "cutoff": "2025-10-23",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2482,
+        "llm_selfimprove": 0.2485,
+        "feat_logit": 0.2452,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.2497,
+        "llm_fund": 0.2491,
+        "feat_fund_logit": 0.2492,
+        "sue_rule": 0.25,
+        "llm_lp": 0.4558,
+        "llm_fund_lp": 0.4467,
+        "anomaly_rank": 0.2522,
+        "anomaly_logit": 0.2478,
+        "kronos": 0.2905,
+        "rl_forecast": 0.2488
+      }
+    },
+    {
+      "cutoff": "2025-10-30",
+      "chosen": "anomaly_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2512,
+        "llm_selfimprove": 0.2504,
+        "feat_logit": 0.2509,
+        "momentum_20d": 0.2497,
+        "reversal_5d": 0.2494,
+        "llm_fund": 0.2509,
+        "feat_fund_logit": 0.2436,
+        "sue_rule": 0.2498,
+        "llm_lp": 0.4435,
+        "llm_fund_lp": 0.4268,
+        "anomaly_rank": 0.2503,
+        "anomaly_logit": 0.241,
+        "kronos": 0.2967,
+        "rl_forecast": 0.2519
+      }
+    },
+    {
+      "cutoff": "2025-11-06",
+      "chosen": "anomaly_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2539,
+        "llm_selfimprove": 0.2554,
+        "feat_logit": 0.2556,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.2495,
+        "llm_fund": 0.2531,
+        "feat_fund_logit": 0.2432,
+        "sue_rule": 0.2502,
+        "llm_lp": 0.4546,
+        "llm_fund_lp": 0.4476,
+        "anomaly_rank": 0.2494,
+        "anomaly_logit": 0.2399,
+        "kronos": 0.2937,
+        "rl_forecast": 0.25
+      }
+    },
+    {
+      "cutoff": "2025-11-13",
+      "chosen": "anomaly_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2517,
+        "llm_selfimprove": 0.2532,
+        "feat_logit": 0.2504,
+        "momentum_20d": 0.2499,
+        "reversal_5d": 0.2497,
+        "llm_fund": 0.2519,
+        "feat_fund_logit": 0.2383,
+        "sue_rule": 0.2498,
+        "llm_lp": 0.4718,
+        "llm_fund_lp": 0.4595,
+        "anomaly_rank": 0.2501,
+        "anomaly_logit": 0.2367,
+        "kronos": 0.2876,
+        "rl_forecast": 0.2473
+      }
+    },
+    {
+      "cutoff": "2025-11-20",
+      "chosen": "anomaly_logit",
+      "rolling_brier": {
+        "llm_plain": 0.257,
+        "llm_selfimprove": 0.2584,
+        "feat_logit": 0.266,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.2501,
+        "llm_fund": 0.2561,
+        "feat_fund_logit": 0.2467,
+        "sue_rule": 0.2511,
+        "llm_lp": 0.4308,
+        "llm_fund_lp": 0.4525,
+        "anomaly_rank": 0.2495,
+        "anomaly_logit": 0.2438,
+        "kronos": 0.2762,
+        "rl_forecast": 0.2681
+      }
+    },
+    {
+      "cutoff": "2025-11-28",
+      "chosen": "anomaly_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2547,
+        "llm_selfimprove": 0.2529,
+        "feat_logit": 0.2558,
+        "momentum_20d": 0.2514,
+        "reversal_5d": 0.249,
+        "llm_fund": 0.2554,
+        "feat_fund_logit": 0.2369,
+        "sue_rule": 0.2502,
+        "llm_lp": 0.5201,
+        "llm_fund_lp": 0.5165,
+        "anomaly_rank": 0.2503,
+        "anomaly_logit": 0.2349,
+        "kronos": 0.269,
+        "rl_forecast": 0.2489
+      }
+    },
+    {
+      "cutoff": "2025-12-05",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2523,
+        "llm_selfimprove": 0.2497,
+        "feat_logit": 0.2504,
+        "momentum_20d": 0.2518,
+        "reversal_5d": 0.2486,
+        "llm_fund": 0.2538,
+        "feat_fund_logit": 0.2756,
+        "sue_rule": 0.2495,
+        "llm_lp": 0.5362,
+        "llm_fund_lp": 0.5265,
+        "anomaly_rank": 0.2509,
+        "anomaly_logit": 0.2732,
+        "kronos": 0.2722,
+        "rl_forecast": 0.2521
+      }
+    },
+    {
+      "cutoff": "2025-12-12",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2521,
+        "llm_selfimprove": 0.2508,
+        "feat_logit": 0.2512,
+        "momentum_20d": 0.251,
+        "reversal_5d": 0.2489,
+        "llm_fund": 0.253,
+        "feat_fund_logit": 0.2757,
+        "sue_rule": 0.2496,
+        "llm_lp": 0.5007,
+        "llm_fund_lp": 0.4963,
+        "anomaly_rank": 0.2507,
+        "anomaly_logit": 0.2722,
+        "kronos": 0.2906,
+        "rl_forecast": 0.2527
+      }
+    },
+    {
+      "cutoff": "2025-12-19",
+      "chosen": "rl_forecast",
+      "rolling_brier": {
+        "llm_plain": 0.2488,
+        "llm_selfimprove": 0.2477,
+        "feat_logit": 0.243,
+        "momentum_20d": 0.2507,
+        "reversal_5d": 0.2492,
+        "llm_fund": 0.2503,
+        "feat_fund_logit": 0.2719,
+        "sue_rule": 0.2484,
+        "llm_lp": 0.5068,
+        "llm_fund_lp": 0.4869,
+        "anomaly_rank": 0.2507,
+        "anomaly_logit": 0.274,
+        "kronos": 0.2917,
+        "rl_forecast": 0.2419
+      }
+    },
+    {
+      "cutoff": "2025-12-29",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.247,
+        "llm_selfimprove": 0.2497,
+        "feat_logit": 0.2462,
+        "momentum_20d": 0.2495,
+        "reversal_5d": 0.251,
+        "llm_fund": 0.2472,
+        "feat_fund_logit": 0.2833,
+        "sue_rule": 0.2486,
+        "llm_lp": 0.4252,
+        "llm_fund_lp": 0.4141,
+        "anomaly_rank": 0.2496,
+        "anomaly_logit": 0.2858,
+        "kronos": 0.2978,
+        "rl_forecast": 0.2496
+      }
+    },
+    {
+      "cutoff": "2026-01-06",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2454,
+        "llm_selfimprove": 0.2476,
+        "feat_logit": 0.244,
+        "momentum_20d": 0.2486,
+        "reversal_5d": 0.251,
+        "llm_fund": 0.2462,
+        "feat_fund_logit": 0.2477,
+        "sue_rule": 0.2488,
+        "llm_lp": 0.395,
+        "llm_fund_lp": 0.3995,
+        "anomaly_rank": 0.2498,
+        "anomaly_logit": 0.249,
+        "kronos": 0.307,
+        "rl_forecast": 0.2518
+      }
+    },
+    {
+      "cutoff": "2026-01-13",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2473,
+        "llm_selfimprove": 0.2483,
+        "feat_logit": 0.2465,
+        "momentum_20d": 0.2493,
+        "reversal_5d": 0.2507,
+        "llm_fund": 0.248,
+        "feat_fund_logit": 0.2532,
+        "sue_rule": 0.2491,
+        "llm_lp": 0.415,
+        "llm_fund_lp": 0.4187,
+        "anomaly_rank": 0.2495,
+        "anomaly_logit": 0.2569,
+        "kronos": 0.3015,
+        "rl_forecast": 0.2562
+      }
+    },
+    {
+      "cutoff": "2026-01-21",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.246,
+        "llm_selfimprove": 0.2464,
+        "feat_logit": 0.2476,
+        "momentum_20d": 0.2483,
+        "reversal_5d": 0.251,
+        "llm_fund": 0.247,
+        "feat_fund_logit": 0.2553,
+        "sue_rule": 0.2494,
+        "llm_lp": 0.3826,
+        "llm_fund_lp": 0.3927,
+        "anomaly_rank": 0.2494,
+        "anomaly_logit": 0.2573,
+        "kronos": 0.3178,
+        "rl_forecast": 0.2557
+      }
+    },
+    {
+      "cutoff": "2026-01-28",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2486,
+        "llm_selfimprove": 0.2488,
+        "feat_logit": 0.2513,
+        "momentum_20d": 0.2487,
+        "reversal_5d": 0.2506,
+        "llm_fund": 0.2492,
+        "feat_fund_logit": 0.2643,
+        "sue_rule": 0.2498,
+        "llm_lp": 0.392,
+        "llm_fund_lp": 0.4115,
+        "anomaly_rank": 0.2498,
+        "anomaly_logit": 0.2654,
+        "kronos": 0.3103,
+        "rl_forecast": 0.2674
+      }
+    },
+    {
+      "cutoff": "2026-02-04",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2499,
+        "llm_selfimprove": 0.2486,
+        "feat_logit": 0.2551,
+        "momentum_20d": 0.2487,
+        "reversal_5d": 0.2505,
+        "llm_fund": 0.2501,
+        "feat_fund_logit": 0.273,
+        "sue_rule": 0.2499,
+        "llm_lp": 0.4039,
+        "llm_fund_lp": 0.3965,
+        "anomaly_rank": 0.2492,
+        "anomaly_logit": 0.2722,
+        "kronos": 0.3057,
+        "rl_forecast": 0.272
+      }
+    },
+    {
+      "cutoff": "2026-02-11",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2473,
+        "llm_selfimprove": 0.2467,
+        "feat_logit": 0.2516,
+        "momentum_20d": 0.2478,
+        "reversal_5d": 0.2511,
+        "llm_fund": 0.2471,
+        "feat_fund_logit": 0.2702,
+        "sue_rule": 0.2495,
+        "llm_lp": 0.3572,
+        "llm_fund_lp": 0.3668,
+        "anomaly_rank": 0.2493,
+        "anomaly_logit": 0.2688,
+        "kronos": 0.3171,
+        "rl_forecast": 0.2648
+      }
+    },
+    {
+      "cutoff": "2026-02-19",
+      "chosen": "momentum_20d",
+      "rolling_brier": {
+        "llm_plain": 0.2493,
+        "llm_selfimprove": 0.2497,
+        "feat_logit": 0.2514,
+        "momentum_20d": 0.249,
+        "reversal_5d": 0.2505,
+        "llm_fund": 0.2495,
+        "feat_fund_logit": 0.2689,
+        "sue_rule": 0.2498,
+        "llm_lp": 0.3945,
+        "llm_fund_lp": 0.4116,
+        "anomaly_rank": 0.2503,
+        "anomaly_logit": 0.2693,
+        "kronos": 0.3059,
+        "rl_forecast": 0.2628
+      }
+    },
+    {
+      "cutoff": "2026-02-26",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2481,
+        "llm_selfimprove": 0.2493,
+        "feat_logit": 0.2514,
+        "momentum_20d": 0.2491,
+        "reversal_5d": 0.2509,
+        "llm_fund": 0.2491,
+        "feat_fund_logit": 0.2658,
+        "sue_rule": 0.2502,
+        "llm_lp": 0.393,
+        "llm_fund_lp": 0.4218,
+        "anomaly_rank": 0.2508,
+        "anomaly_logit": 0.2637,
+        "kronos": 0.3113,
+        "rl_forecast": 0.2572
+      }
+    },
+    {
+      "cutoff": "2026-03-05",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2512,
+        "llm_selfimprove": 0.2535,
+        "feat_logit": 0.2532,
+        "momentum_20d": 0.2505,
+        "reversal_5d": 0.2502,
+        "llm_fund": 0.2517,
+        "feat_fund_logit": 0.2608,
+        "sue_rule": 0.2508,
+        "llm_lp": 0.4335,
+        "llm_fund_lp": 0.4823,
+        "anomaly_rank": 0.2524,
+        "anomaly_logit": 0.2581,
+        "kronos": 0.2807,
+        "rl_forecast": 0.2519
+      }
+    },
+    {
+      "cutoff": "2026-03-12",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.2555,
+        "llm_selfimprove": 0.2583,
+        "feat_logit": 0.2604,
+        "momentum_20d": 0.2508,
+        "reversal_5d": 0.2501,
+        "llm_fund": 0.2552,
+        "feat_fund_logit": 0.2731,
+        "sue_rule": 0.251,
+        "llm_lp": 0.4186,
+        "llm_fund_lp": 0.4556,
+        "anomaly_rank": 0.2517,
+        "anomaly_logit": 0.2652,
+        "kronos": 0.263,
+        "rl_forecast": 0.2587
+      }
+    },
+    {
+      "cutoff": "2026-03-19",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.255,
+        "llm_selfimprove": 0.2576,
+        "feat_logit": 0.2601,
+        "momentum_20d": 0.2507,
+        "reversal_5d": 0.2505,
+        "llm_fund": 0.2538,
+        "feat_fund_logit": 0.2762,
+        "sue_rule": 0.2509,
+        "llm_lp": 0.4176,
+        "llm_fund_lp": 0.4429,
+        "anomaly_rank": 0.2513,
+        "anomaly_logit": 0.267,
+        "kronos": 0.2654,
+        "rl_forecast": 0.2582
+      }
+    },
+    {
+      "cutoff": "2026-03-26",
+      "chosen": "reversal_5d",
+      "rolling_brier": {
+        "llm_plain": 0.257,
+        "llm_selfimprove": 0.2576,
+        "feat_logit": 0.2623,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.25,
+        "llm_fund": 0.2549,
+        "feat_fund_logit": 0.2748,
+        "sue_rule": 0.2509,
+        "llm_lp": 0.3887,
+        "llm_fund_lp": 0.4334,
+        "anomaly_rank": 0.2503,
+        "anomaly_logit": 0.2679,
+        "kronos": 0.2699,
+        "rl_forecast": 0.2615
+      }
+    },
+    {
+      "cutoff": "2026-04-02",
+      "chosen": "anomaly_rank",
+      "rolling_brier": {
+        "llm_plain": 0.2546,
+        "llm_selfimprove": 0.2559,
+        "feat_logit": 0.2576,
+        "momentum_20d": 0.2504,
+        "reversal_5d": 0.2501,
+        "llm_fund": 0.2525,
+        "feat_fund_logit": 0.2765,
+        "sue_rule": 0.2495,
+        "llm_lp": 0.4202,
+        "llm_fund_lp": 0.4417,
+        "anomaly_rank": 0.2484,
+        "anomaly_logit": 0.2739,
+        "kronos": 0.2911,
+        "rl_forecast": 0.257
+      }
+    },
+    {
+      "cutoff": "2026-04-10",
+      "chosen": "anomaly_rank",
+      "rolling_brier": {
+        "llm_plain": 0.2499,
+        "llm_selfimprove": 0.2503,
+        "feat_logit": 0.2508,
+        "momentum_20d": 0.2507,
+        "reversal_5d": 0.2505,
+        "llm_fund": 0.2488,
+        "feat_fund_logit": 0.2684,
+        "sue_rule": 0.2489,
+        "llm_lp": 0.4836,
+        "llm_fund_lp": 0.4726,
+        "anomaly_rank": 0.2482,
+        "anomaly_logit": 0.2698,
+        "kronos": 0.3009,
+        "rl_forecast": 0.2493
+      }
+    },
+    {
+      "cutoff": "2026-04-17",
+      "chosen": "rl_forecast",
+      "rolling_brier": {
+        "llm_plain": 0.2465,
+        "llm_selfimprove": 0.2484,
+        "feat_logit": 0.2457,
+        "momentum_20d": 0.2507,
+        "reversal_5d": 0.2506,
+        "llm_fund": 0.247,
+        "feat_fund_logit": 0.2742,
+        "sue_rule": 0.2482,
+        "llm_lp": 0.496,
+        "llm_fund_lp": 0.4941,
+        "anomaly_rank": 0.2483,
+        "anomaly_logit": 0.2767,
+        "kronos": 0.2955,
+        "rl_forecast": 0.2434
+      }
+    },
+    {
+      "cutoff": "2026-04-24",
+      "chosen": "rl_forecast",
+      "rolling_brier": {
+        "llm_plain": 0.2457,
+        "llm_selfimprove": 0.2485,
+        "feat_logit": 0.2446,
+        "momentum_20d": 0.251,
+        "reversal_5d": 0.2506,
+        "llm_fund": 0.2469,
+        "feat_fund_logit": 0.2694,
+        "sue_rule": 0.248,
+        "llm_lp": 0.4967,
+        "llm_fund_lp": 0.477,
+        "anomaly_rank": 0.2487,
+        "anomaly_logit": 0.2731,
+        "kronos": 0.2966,
+        "rl_forecast": 0.2426
+      }
+    },
+    {
+      "cutoff": "2026-05-01",
+      "chosen": "rl_forecast",
+      "rolling_brier": {
+        "llm_plain": 0.2452,
+        "llm_selfimprove": 0.2467,
+        "feat_logit": 0.2458,
+        "momentum_20d": 0.2502,
+        "reversal_5d": 0.2512,
+        "llm_fund": 0.247,
+        "feat_fund_logit": 0.2647,
+        "sue_rule": 0.2488,
+        "llm_lp": 0.4417,
+        "llm_fund_lp": 0.4309,
+        "anomaly_rank": 0.2489,
+        "anomaly_logit": 0.2682,
+        "kronos": 0.2946,
+        "rl_forecast": 0.2445
+      }
+    },
+    {
+      "cutoff": "2026-05-08",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2473,
+        "llm_selfimprove": 0.2477,
+        "feat_logit": 0.2473,
+        "momentum_20d": 0.2494,
+        "reversal_5d": 0.2507,
+        "llm_fund": 0.2484,
+        "feat_fund_logit": 0.257,
+        "sue_rule": 0.2492,
+        "llm_lp": 0.4027,
+        "llm_fund_lp": 0.4173,
+        "anomaly_rank": 0.2502,
+        "anomaly_logit": 0.2582,
+        "kronos": 0.2905,
+        "rl_forecast": 0.2476
+      }
+    },
+    {
+      "cutoff": "2026-05-15",
+      "chosen": "llm_selfimprove",
+      "rolling_brier": {
+        "llm_plain": 0.2515,
+        "llm_selfimprove": 0.2488,
+        "feat_logit": 0.2543,
+        "momentum_20d": 0.2496,
+        "reversal_5d": 0.2506,
+        "llm_fund": 0.2505,
+        "feat_fund_logit": 0.2513,
+        "sue_rule": 0.2498,
+        "llm_lp": 0.3854,
+        "llm_fund_lp": 0.383,
+        "anomaly_rank": 0.249,
+        "anomaly_logit": 0.2534,
+        "kronos": 0.2963,
+        "rl_forecast": 0.2543
+      }
+    },
+    {
+      "cutoff": "2026-05-22",
+      "chosen": "anomaly_rank",
+      "rolling_brier": {
+        "llm_plain": 0.251,
+        "llm_selfimprove": 0.2503,
+        "feat_logit": 0.2509,
+        "momentum_20d": 0.25,
+        "reversal_5d": 0.25,
+        "llm_fund": 0.2506,
+        "feat_fund_logit": 0.2544,
+        "sue_rule": 0.2498,
+        "llm_lp": 0.4324,
+        "llm_fund_lp": 0.4439,
+        "anomaly_rank": 0.2498,
+        "anomaly_logit": 0.2539,
+        "kronos": 0.2759,
+        "rl_forecast": 0.2503
+      }
+    },
+    {
+      "cutoff": "2026-06-01",
+      "chosen": "sue_rule",
+      "rolling_brier": {
+        "llm_plain": 0.2527,
+        "llm_selfimprove": 0.2516,
+        "feat_logit": 0.2518,
+        "momentum_20d": 0.2502,
+        "reversal_5d": 0.2497,
+        "llm_fund": 0.2512,
+        "feat_fund_logit": 0.2526,
+        "sue_rule": 0.2497,
+        "llm_lp": 0.4305,
+        "llm_fund_lp": 0.4453,
+        "anomaly_rank": 0.2509,
+        "anomaly_logit": 0.2505,
+        "kronos": 0.2765,
+        "rl_forecast": 0.2514
+      }
+    },
+    {
+      "cutoff": "2026-06-08",
+      "chosen": "anomaly_rank",
+      "rolling_brier": {
+        "llm_plain": 0.2551,
+        "llm_selfimprove": 0.2546,
+        "feat_logit": 0.254,
+        "momentum_20d": 0.251,
+        "reversal_5d": 0.249,
+        "llm_fund": 0.254,
+        "feat_fund_logit": 0.2601,
+        "sue_rule": 0.2496,
+        "llm_lp": 0.4675,
+        "llm_fund_lp": 0.4982,
+        "anomaly_rank": 0.2488,
+        "anomaly_logit": 0.2587,
+        "kronos": 0.2676,
+        "rl_forecast": 0.2518
+      }
+    },
+    {
+      "cutoff": "2026-06-15",
+      "chosen": "anomaly_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2517,
+        "llm_selfimprove": 0.2545,
+        "feat_logit": 0.2466,
+        "momentum_20d": 0.2511,
+        "reversal_5d": 0.2487,
+        "llm_fund": 0.2518,
+        "feat_fund_logit": 0.2483,
+        "sue_rule": 0.249,
+        "llm_lp": 0.4918,
+        "llm_fund_lp": 0.5187,
+        "anomaly_rank": 0.2484,
+        "anomaly_logit": 0.2463,
+        "kronos": 0.2721,
+        "rl_forecast": 0.2463
+      }
+    },
+    {
+      "cutoff": "2026-06-23",
+      "chosen": "anomaly_rank",
+      "rolling_brier": {
+        "llm_plain": 0.254,
+        "llm_selfimprove": 0.2545,
+        "feat_logit": 0.2523,
+        "momentum_20d": 0.2501,
+        "reversal_5d": 0.2493,
+        "llm_fund": 0.2523,
+        "feat_fund_logit": 0.2548,
+        "sue_rule": 0.2492,
+        "llm_lp": 0.4376,
+        "llm_fund_lp": 0.467,
+        "anomaly_rank": 0.248,
+        "anomaly_logit": 0.2528,
+        "kronos": 0.2846,
+        "rl_forecast": 0.2524
+      }
+    },
+    {
+      "cutoff": "2026-06-30",
+      "chosen": "anomaly_rank",
+      "rolling_brier": {
+        "llm_plain": 0.2521,
+        "llm_selfimprove": 0.2533,
+        "feat_logit": 0.2504,
+        "momentum_20d": 0.2494,
+        "reversal_5d": 0.2493,
+        "llm_fund": 0.2507,
+        "feat_fund_logit": 0.2547,
+        "sue_rule": 0.2491,
+        "llm_lp": 0.4357,
+        "llm_fund_lp": 0.4579,
+        "anomaly_rank": 0.2474,
+        "anomaly_logit": 0.2517,
+        "kronos": 0.2937,
+        "rl_forecast": 0.2504
+      }
+    },
+    {
+      "cutoff": "2026-07-08",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2493,
+        "llm_selfimprove": 0.25,
+        "feat_logit": 0.2458,
+        "momentum_20d": 0.25,
+        "reversal_5d": 0.2497,
+        "llm_fund": 0.2483,
+        "feat_fund_logit": 0.2478,
+        "sue_rule": 0.2485,
+        "llm_lp": 0.4497,
+        "llm_fund_lp": 0.4455,
+        "anomaly_rank": 0.2486,
+        "anomaly_logit": 0.2492,
+        "kronos": 0.2945,
+        "rl_forecast": 0.2463
+      }
+    },
+    {
+      "cutoff": "2026-07-15",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.2496,
+        "llm_selfimprove": 0.2493,
+        "feat_logit": 0.2481,
+        "momentum_20d": 0.2499,
+        "reversal_5d": 0.2498,
+        "llm_fund": 0.2487,
+        "feat_fund_logit": 0.2546,
+        "sue_rule": 0.2491,
+        "llm_lp": 0.4413,
+        "llm_fund_lp": 0.44,
+        "anomaly_rank": 0.2501,
+        "anomaly_logit": 0.2562,
+        "kronos": 0.2858,
+        "rl_forecast": 0.2481
+      }
+    },
+    {
+      "cutoff": "2026-07-22",
+      "chosen": "rl_forecast",
+      "rolling_brier": {
+        "llm_plain": 0.2497,
+        "llm_selfimprove": 0.2494,
+        "feat_logit": 0.2477,
+        "momentum_20d": 0.2506,
+        "reversal_5d": 0.2495,
+        "llm_fund": 0.2495,
+        "feat_fund_logit": 0.2533,
+        "sue_rule": 0.2495,
+        "llm_lp": 0.4665,
+        "llm_fund_lp": 0.4683,
+        "anomaly_rank": 0.2501,
+        "anomaly_logit": 0.2563,
+        "kronos": 0.2782,
+        "rl_forecast": 0.2477
+      }
+    },
+    {
+      "cutoff": "2026-07-29",
+      "chosen": "rl_forecast",
+      "rolling_brier": {
+        "llm_plain": 0.2497,
+        "llm_selfimprove": 0.2494,
+        "feat_logit": 0.248,
+        "momentum_20d": 0.2508,
+        "reversal_5d": 0.2493,
+        "llm_fund": 0.2506,
+        "feat_fund_logit": 0.2558,
+        "sue_rule": 0.2499,
+        "llm_lp": 0.4672,
+        "llm_fund_lp": 0.479,
+        "anomaly_rank": 0.2509,
+        "anomaly_logit": 0.2609,
+        "kronos": 0.262,
+        "rl_forecast": 0.2476
+      }
+    },
+    {
+      "cutoff": "2026-08-05",
+      "chosen": "feat_logit",
+      "rolling_brier": {
+        "llm_plain": 0.252,
+        "llm_selfimprove": 0.2472,
+        "feat_logit": 0.2465,
+        "momentum_20d": 0.251,
+        "reversal_5d": 0.249,
+        "llm_fund": 0.253,
+        "feat_fund_logit": 0.2503,
+        "sue_rule": 0.2497,
+        "llm_lp": 0.4783,
+        "llm_fund_lp": 0.5004,
+        "anomaly_rank": 0.2509,
+        "anomaly_logit": 0.2524,
+        "kronos": 0.2645,
+        "rl_forecast": 0.2477
+      }
+    },
+    {
+      "cutoff": "2026-08-12",
+      "chosen": "rl_forecast",
+      "rolling_brier": {
+        "llm_plain": 0.2508,
+        "llm_selfimprove": 0.248,
+        "feat_logit": 0.2472,
+        "momentum_20d": 0.2505,
+        "reversal_5d": 0.2495,
+        "llm_fund": 0.2521,
+        "feat_fund_logit": 0.2587,
+        "sue_rule": 0.2494,
+        "llm_lp": 0.4419,
+        "llm_fund_lp": 0.4757,
+        "anomaly_rank": 0.2512,
+        "anomaly_logit": 0.258,
+        "kronos": 0.2749,
+        "rl_forecast": 0.2467
+      }
+    },
+    {
+      "cutoff": "2026-08-19",
+      "chosen": "rl_forecast",
+      "rolling_brier": {
+        "llm_plain": 0.2477,
+        "llm_selfimprove": 0.2464,
+        "feat_logit": 0.2443,
+        "momentum_20d": 0.2497,
+        "reversal_5d": 0.25,
+        "llm_fund": 0.25,
+        "feat_fund_logit": 0.2576,
+        "sue_rule": 0.2493,
+        "llm_lp": 0.4206,
+        "llm_fund_lp": 0.4455,
+        "anomaly_rank": 0.2527,
+        "anomaly_logit": 0.2554,
+        "kronos": 0.2764,
+        "rl_forecast": 0.2435
+      }
+    },
+    {
+      "cutoff": "2026-08-26",
+      "chosen": "rl_forecast",
+      "rolling_brier": {
+        "llm_plain": 0.2485,
+        "llm_selfimprove": 0.2491,
+        "feat_logit": 0.2461,
+        "momentum_20d": 0.2502,
+        "reversal_5d": 0.2505,
+        "llm_fund": 0.2503,
+        "feat_fund_logit": 0.2567,
+        "sue_rule": 0.2496,
+        "llm_lp": 0.4206,
+        "llm_fund_lp": 0.4483,
+        "anomaly_rank": 0.2524,
+        "anomaly_logit": 0.2537,
+        "kronos": 0.2899,
+        "rl_forecast": 0.2452
+      }
+    },
+    {
+      "cutoff": "2026-09-02",
+      "chosen": "llm_plain",
+      "rolling_brier": {
+        "llm_plain": 0.2481,
+        "llm_selfimprove": 0.2545,
+        "feat_logit": 0.2513,
+        "momentum_20d": 0.2496,
+        "reversal_5d": 0.2509,
+        "llm_fund": 0.2496,
+        "feat_fund_logit": 0.2629,
+        "sue_rule": 0.2507,
+        "llm_lp": 0.3854,
+        "llm_fund_lp": 0.4308,
+        "anomaly_rank": 0.2534,
+        "anomaly_logit": 0.259,
+        "kronos": 0.2821,
+        "rl_forecast": 0.2493
+      }
+    }
+  ],
+  "cross_sectional_after_warmup": {
+    "llm_plain": {
+      "rank_ic_mean": -0.0194,
+      "rank_ic_lo": -0.0747,
+      "rank_ic_hi": 0.033,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": -0.4617,
+      "q_spread_lo": -1.4068,
+      "q_spread_hi": 0.4611
+    },
+    "llm_selfimprove": {
+      "rank_ic_mean": 0.0076,
+      "rank_ic_lo": -0.0493,
+      "rank_ic_hi": 0.0638,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": 0.3777,
+      "q_spread_lo": -0.5972,
+      "q_spread_hi": 1.3637
+    },
+    "feat_logit": {
+      "rank_ic_mean": 0.0004,
+      "rank_ic_lo": -0.0519,
+      "rank_ic_hi": 0.0572,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": 0.3581,
+      "q_spread_lo": -0.6439,
+      "q_spread_hi": 1.4612
+    },
+    "always_up": {
+      "rank_ic_mean": null,
+      "rank_ic_lo": null,
+      "rank_ic_hi": null,
+      "rank_ic_weeks": 0,
+      "q_spread_pct": null,
+      "q_spread_lo": null,
+      "q_spread_hi": null
+    },
+    "momentum_20d": {
+      "rank_ic_mean": 0.0062,
+      "rank_ic_lo": -0.0495,
+      "rank_ic_hi": 0.0601,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": 0.0628,
+      "q_spread_lo": -0.7715,
+      "q_spread_hi": 0.9014
+    },
+    "reversal_5d": {
+      "rank_ic_mean": 0.0079,
+      "rank_ic_lo": -0.0325,
+      "rank_ic_hi": 0.05,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": -0.1008,
+      "q_spread_lo": -0.8953,
+      "q_spread_hi": 0.6476
+    },
+    "llm_fund": {
+      "rank_ic_mean": -0.0229,
+      "rank_ic_lo": -0.0745,
+      "rank_ic_hi": 0.0286,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": -0.3591,
+      "q_spread_lo": -1.3671,
+      "q_spread_hi": 0.5569
+    },
+    "feat_fund_logit": {
+      "rank_ic_mean": -0.0145,
+      "rank_ic_lo": -0.0571,
+      "rank_ic_hi": 0.0292,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": -0.0038,
+      "q_spread_lo": -0.9074,
+      "q_spread_hi": 0.8489
+    },
+    "sue_rule": {
+      "rank_ic_mean": 0.0152,
+      "rank_ic_lo": -0.0138,
+      "rank_ic_hi": 0.0451,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": 0.1069,
+      "q_spread_lo": -0.4368,
+      "q_spread_hi": 0.6856
+    },
+    "llm_lp": {
+      "rank_ic_mean": -0.004,
+      "rank_ic_lo": -0.0587,
+      "rank_ic_hi": 0.0507,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": -0.022,
+      "q_spread_lo": -1.0994,
+      "q_spread_hi": 0.9726
+    },
+    "llm_fund_lp": {
+      "rank_ic_mean": -0.004,
+      "rank_ic_lo": -0.0577,
+      "rank_ic_hi": 0.051,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": -0.0332,
+      "q_spread_lo": -1.0177,
+      "q_spread_hi": 0.9193
+    },
+    "anomaly_rank": {
+      "rank_ic_mean": 0.0078,
+      "rank_ic_lo": -0.0474,
+      "rank_ic_hi": 0.0627,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": -0.1546,
+      "q_spread_lo": -1.0056,
+      "q_spread_hi": 0.696
+    },
+    "anomaly_logit": {
+      "rank_ic_mean": -0.0164,
+      "rank_ic_lo": -0.0656,
+      "rank_ic_hi": 0.0309,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": -0.2928,
+      "q_spread_lo": -1.3308,
+      "q_spread_hi": 0.7182
+    },
+    "kronos": {
+      "rank_ic_mean": -0.0183,
+      "rank_ic_lo": -0.0746,
+      "rank_ic_hi": 0.0397,
+      "rank_ic_weeks": 52,
+      "q_spread_pct": -0.2052,
+      "q_spread_lo": -1.3185,
+      "q_spread_hi": 0.9135
+    },
+    "rl_forecast": {
+      "rank_ic_mean": -0.0299,
+      "rank_ic_lo": -0.0839,
+      "rank_ic_hi": 0.0232,
+      "rank_ic_weeks": 16,
+      "q_spread_pct": -0.1784,
+      "q_spread_lo": -0.9438,
+      "q_spread_hi": 0.5822
+    },
+    "base_rate": {
+      "rank_ic_mean": null,
+      "rank_ic_lo": null,
+      "rank_ic_hi": null,
+      "rank_ic_weeks": 0,
+      "q_spread_pct": null,
+      "q_spread_lo": null,
+      "q_spread_hi": null
+    },
+    "selector": {
+      "rank_ic_mean": -0.0371,
+      "rank_ic_lo": -0.0912,
+      "rank_ic_hi": 0.0142,
+      "rank_ic_weeks": 44,
+      "q_spread_pct": -0.3982,
+      "q_spread_lo": -1.1968,
+      "q_spread_hi": 0.4482
+    }
+  },
+  "updown_no_mass": 0,
+  "rl_log": [
+    {
+      "cutoff": "2025-06-02",
+      "status": "not_enough_data",
+      "n_train": 0,
+      "n_holdout": 0,
+      "epochs": 0,
+      "holdout": {},
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5
+    },
+    {
+      "cutoff": "2025-06-09",
+      "status": "not_enough_data",
+      "n_train": 100,
+      "n_holdout": 0,
+      "epochs": 0,
+      "holdout": {},
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5
+    },
+    {
+      "cutoff": "2025-06-16",
+      "status": "not_enough_data",
+      "n_train": 200,
+      "n_holdout": 0,
+      "epochs": 0,
+      "holdout": {},
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5
+    },
+    {
+      "cutoff": "2025-06-24",
+      "status": "not_enough_data",
+      "n_train": 300,
+      "n_holdout": 0,
+      "epochs": 0,
+      "holdout": {},
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5
+    },
+    {
+      "cutoff": "2025-07-01",
+      "status": "rejected",
+      "n_train": 300,
+      "n_holdout": 100,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.70332,
+        "base_log_loss": 0.54719,
+        "trader_reward": -0.02481,
+        "mean_abs_position": 0.00585,
+        "val_loss": 0.77396,
+        "val_exp_reward": -0.02481,
+        "val_log_loss": 0.70332,
+        "val_entropy": 0.96853,
+        "val_critic_mse": 0.00405
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.6825
+    },
+    {
+      "cutoff": "2025-07-09",
+      "status": "rejected",
+      "n_train": 300,
+      "n_holdout": 200,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69737,
+        "base_log_loss": 0.61372,
+        "trader_reward": -0.02283,
+        "mean_abs_position": 0.00903,
+        "val_loss": 0.76371,
+        "val_exp_reward": -0.02283,
+        "val_log_loss": 0.69737,
+        "val_entropy": 0.96598,
+        "val_critic_mse": 0.00195
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.664
+    },
+    {
+      "cutoff": "2025-07-16",
+      "status": "rejected_trader",
+      "n_train": 400,
+      "n_holdout": 200,
+      "epochs": 11,
+      "holdout": {
+        "model_log_loss": 0.6803,
+        "base_log_loss": 0.79907,
+        "trader_reward": -0.01406,
+        "mean_abs_position": 0.05433,
+        "val_loss": 0.72924,
+        "val_exp_reward": -0.01406,
+        "val_log_loss": 0.6803,
+        "val_entropy": 0.96188,
+        "val_critic_mse": 0.00734
+      },
+      "forecast_adopted": true,
+      "trader_adopted": false,
+      "base_rate": 0.6067
+    },
+    {
+      "cutoff": "2025-07-23",
+      "status": "adopted",
+      "n_train": 500,
+      "n_holdout": 200,
+      "epochs": 7,
+      "holdout": {
+        "model_log_loss": 0.68281,
+        "base_log_loss": 0.73984,
+        "trader_reward": 0.0111,
+        "mean_abs_position": 0.14481,
+        "val_loss": 0.72131,
+        "val_exp_reward": 0.0111,
+        "val_log_loss": 0.68281,
+        "val_entropy": 0.92489,
+        "val_critic_mse": 0.037
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.6214
+    },
+    {
+      "cutoff": "2025-07-30",
+      "status": "adopted",
+      "n_train": 600,
+      "n_holdout": 200,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.68157,
+        "base_log_loss": 0.68394,
+        "trader_reward": 0.02357,
+        "mean_abs_position": 0.17583,
+        "val_loss": 0.72726,
+        "val_exp_reward": 0.02357,
+        "val_log_loss": 0.68157,
+        "val_entropy": 0.94115,
+        "val_critic_mse": 0.07699
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5988
+    },
+    {
+      "cutoff": "2025-08-06",
+      "status": "rejected_trader",
+      "n_train": 600,
+      "n_holdout": 300,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.70499,
+        "base_log_loss": 0.72366,
+        "trader_reward": -0.01622,
+        "mean_abs_position": 0.17834,
+        "val_loss": 0.80736,
+        "val_exp_reward": -0.01622,
+        "val_log_loss": 0.70499,
+        "val_entropy": 0.93989,
+        "val_critic_mse": 0.11125
+      },
+      "forecast_adopted": true,
+      "trader_adopted": false,
+      "base_rate": 0.5656
+    },
+    {
+      "cutoff": "2025-08-13",
+      "status": "rejected_trader",
+      "n_train": 700,
+      "n_holdout": 300,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.68842,
+        "base_log_loss": 0.72519,
+        "trader_reward": -0.00556,
+        "mean_abs_position": 0.16672,
+        "val_loss": 0.7706,
+        "val_exp_reward": -0.00556,
+        "val_log_loss": 0.68842,
+        "val_entropy": 0.95039,
+        "val_critic_mse": 0.09331
+      },
+      "forecast_adopted": true,
+      "trader_adopted": false,
+      "base_rate": 0.584
+    },
+    {
+      "cutoff": "2025-08-20",
+      "status": "rejected",
+      "n_train": 800,
+      "n_holdout": 300,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.71947,
+        "base_log_loss": 0.7037,
+        "trader_reward": -0.03414,
+        "mean_abs_position": 0.18487,
+        "val_loss": 0.83649,
+        "val_exp_reward": -0.03414,
+        "val_log_loss": 0.71947,
+        "val_entropy": 0.95316,
+        "val_critic_mse": 0.10659
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5782
+    },
+    {
+      "cutoff": "2025-08-27",
+      "status": "rejected_forecast",
+      "n_train": 900,
+      "n_holdout": 300,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.68931,
+        "base_log_loss": 0.66313,
+        "trader_reward": 0.00187,
+        "mean_abs_position": 0.17445,
+        "val_loss": 0.74176,
+        "val_exp_reward": 0.00187,
+        "val_log_loss": 0.68931,
+        "val_entropy": 0.95732,
+        "val_critic_mse": 0.05038
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5858
+    },
+    {
+      "cutoff": "2025-09-04",
+      "status": "rejected_forecast",
+      "n_train": 900,
+      "n_holdout": 400,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.67989,
+        "base_log_loss": 0.6761,
+        "trader_reward": 0.00699,
+        "mean_abs_position": 0.16719,
+        "val_loss": 0.72075,
+        "val_exp_reward": 0.00699,
+        "val_log_loss": 0.67989,
+        "val_entropy": 0.95731,
+        "val_critic_mse": 0.03807
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5754
+    },
+    {
+      "cutoff": "2025-09-11",
+      "status": "rejected",
+      "n_train": 1000,
+      "n_holdout": 400,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.691,
+        "base_log_loss": 0.68965,
+        "trader_reward": -0.00943,
+        "mean_abs_position": 0.17669,
+        "val_loss": 0.77777,
+        "val_exp_reward": -0.00943,
+        "val_log_loss": 0.691,
+        "val_entropy": 0.95947,
+        "val_critic_mse": 0.09817
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.575
+    },
+    {
+      "cutoff": "2025-09-18",
+      "status": "adopted",
+      "n_train": 1100,
+      "n_holdout": 400,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.67888,
+        "base_log_loss": 0.6866,
+        "trader_reward": 0.00239,
+        "mean_abs_position": 0.14679,
+        "val_loss": 0.73478,
+        "val_exp_reward": 0.00239,
+        "val_log_loss": 0.67888,
+        "val_entropy": 0.96174,
+        "val_critic_mse": 0.06124
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5733
+    },
+    {
+      "cutoff": "2025-09-25",
+      "status": "rejected_trader",
+      "n_train": 1200,
+      "n_holdout": 400,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.70303,
+        "base_log_loss": 0.71157,
+        "trader_reward": -0.01053,
+        "mean_abs_position": 0.14104,
+        "val_loss": 0.77149,
+        "val_exp_reward": -0.01053,
+        "val_log_loss": 0.70303,
+        "val_entropy": 0.96131,
+        "val_critic_mse": 0.0616
+      },
+      "forecast_adopted": true,
+      "trader_adopted": false,
+      "base_rate": 0.5619
+    },
+    {
+      "cutoff": "2025-10-02",
+      "status": "adopted",
+      "n_train": 1200,
+      "n_holdout": 500,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69994,
+        "base_log_loss": 0.70255,
+        "trader_reward": 0.00068,
+        "mean_abs_position": 0.14457,
+        "val_loss": 0.75231,
+        "val_exp_reward": 0.00068,
+        "val_log_loss": 0.69994,
+        "val_entropy": 0.95968,
+        "val_critic_mse": 0.05289
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5653
+    },
+    {
+      "cutoff": "2025-10-09",
+      "status": "rejected_forecast",
+      "n_train": 1300,
+      "n_holdout": 500,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69966,
+        "base_log_loss": 0.69614,
+        "trader_reward": 0.00298,
+        "mean_abs_position": 0.15672,
+        "val_loss": 0.7506,
+        "val_exp_reward": 0.00298,
+        "val_log_loss": 0.69966,
+        "val_entropy": 0.95062,
+        "val_critic_mse": 0.05506
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5622
+    },
+    {
+      "cutoff": "2025-10-16",
+      "status": "rejected",
+      "n_train": 1400,
+      "n_holdout": 500,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.70582,
+        "base_log_loss": 0.70573,
+        "trader_reward": -0.00247,
+        "mean_abs_position": 0.15644,
+        "val_loss": 0.75193,
+        "val_exp_reward": -0.00247,
+        "val_log_loss": 0.70582,
+        "val_entropy": 0.93797,
+        "val_critic_mse": 0.03486
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5542
+    },
+    {
+      "cutoff": "2025-10-23",
+      "status": "rejected",
+      "n_train": 1500,
+      "n_holdout": 500,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69937,
+        "base_log_loss": 0.69397,
+        "trader_reward": -0.00385,
+        "mean_abs_position": 0.16446,
+        "val_loss": 0.75072,
+        "val_exp_reward": -0.00385,
+        "val_log_loss": 0.69937,
+        "val_entropy": 0.93092,
+        "val_critic_mse": 0.04335
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5635
+    },
+    {
+      "cutoff": "2025-10-30",
+      "status": "rejected_trader",
+      "n_train": 1500,
+      "n_holdout": 600,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69234,
+        "base_log_loss": 0.70057,
+        "trader_reward": -0.00066,
+        "mean_abs_position": 0.16741,
+        "val_loss": 0.74219,
+        "val_exp_reward": -0.00066,
+        "val_log_loss": 0.69234,
+        "val_entropy": 0.91908,
+        "val_critic_mse": 0.04735
+      },
+      "forecast_adopted": true,
+      "trader_adopted": false,
+      "base_rate": 0.5557
+    },
+    {
+      "cutoff": "2025-11-06",
+      "status": "adopted",
+      "n_train": 1600,
+      "n_holdout": 600,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.67799,
+        "base_log_loss": 0.70086,
+        "trader_reward": 0.00649,
+        "mean_abs_position": 0.16164,
+        "val_loss": 0.71852,
+        "val_exp_reward": 0.00649,
+        "val_log_loss": 0.67799,
+        "val_entropy": 0.90272,
+        "val_critic_mse": 0.04362
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.545
+    },
+    {
+      "cutoff": "2025-11-13",
+      "status": "adopted",
+      "n_train": 1700,
+      "n_holdout": 600,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.67834,
+        "base_log_loss": 0.70262,
+        "trader_reward": 0.0032,
+        "mean_abs_position": 0.17512,
+        "val_loss": 0.72222,
+        "val_exp_reward": 0.0032,
+        "val_log_loss": 0.67834,
+        "val_entropy": 0.90127,
+        "val_critic_mse": 0.04482
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5474
+    },
+    {
+      "cutoff": "2025-11-20",
+      "status": "rejected_trader",
+      "n_train": 1800,
+      "n_holdout": 600,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69725,
+        "base_log_loss": 0.71638,
+        "trader_reward": -0.02998,
+        "mean_abs_position": 0.18812,
+        "val_loss": 0.78698,
+        "val_exp_reward": -0.02998,
+        "val_log_loss": 0.69725,
+        "val_entropy": 0.90419,
+        "val_critic_mse": 0.07119
+      },
+      "forecast_adopted": true,
+      "trader_adopted": false,
+      "base_rate": 0.5312
+    },
+    {
+      "cutoff": "2025-11-28",
+      "status": "adopted",
+      "n_train": 1800,
+      "n_holdout": 700,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.67025,
+        "base_log_loss": 0.69881,
+        "trader_reward": 0.01385,
+        "mean_abs_position": 0.19089,
+        "val_loss": 0.71057,
+        "val_exp_reward": 0.01385,
+        "val_log_loss": 0.67025,
+        "val_entropy": 0.90966,
+        "val_critic_mse": 0.06124
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5472
+    },
+    {
+      "cutoff": "2025-12-05",
+      "status": "adopted",
+      "n_train": 1900,
+      "n_holdout": 700,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.66774,
+        "base_log_loss": 0.69222,
+        "trader_reward": 0.01668,
+        "mean_abs_position": 0.19184,
+        "val_loss": 0.70493,
+        "val_exp_reward": 0.01668,
+        "val_log_loss": 0.66774,
+        "val_entropy": 0.8999,
+        "val_critic_mse": 0.06055
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5481
+    },
+    {
+      "cutoff": "2025-12-12",
+      "status": "adopted",
+      "n_train": 2000,
+      "n_holdout": 700,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.67466,
+        "base_log_loss": 0.69982,
+        "trader_reward": 0.01808,
+        "mean_abs_position": 0.20398,
+        "val_loss": 0.71028,
+        "val_exp_reward": 0.01808,
+        "val_log_loss": 0.67466,
+        "val_entropy": 0.89682,
+        "val_critic_mse": 0.061
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5485
+    },
+    {
+      "cutoff": "2025-12-19",
+      "status": "adopted",
+      "n_train": 2100,
+      "n_holdout": 700,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.68129,
+        "base_log_loss": 0.69556,
+        "trader_reward": 0.02347,
+        "mean_abs_position": 0.23389,
+        "val_loss": 0.71359,
+        "val_exp_reward": 0.02347,
+        "val_log_loss": 0.68129,
+        "val_entropy": 0.89924,
+        "val_critic_mse": 0.06611
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5461
+    },
+    {
+      "cutoff": "2025-12-29",
+      "status": "adopted",
+      "n_train": 2100,
+      "n_holdout": 800,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.67134,
+        "base_log_loss": 0.69044,
+        "trader_reward": 0.03325,
+        "mean_abs_position": 0.25227,
+        "val_loss": 0.69185,
+        "val_exp_reward": 0.03325,
+        "val_log_loss": 0.67134,
+        "val_entropy": 0.89449,
+        "val_critic_mse": 0.0628
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5514
+    },
+    {
+      "cutoff": "2026-01-06",
+      "status": "adopted",
+      "n_train": 2200,
+      "n_holdout": 800,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.68038,
+        "base_log_loss": 0.683,
+        "trader_reward": 0.03455,
+        "mean_abs_position": 0.26009,
+        "val_loss": 0.70076,
+        "val_exp_reward": 0.03455,
+        "val_log_loss": 0.68038,
+        "val_entropy": 0.89152,
+        "val_critic_mse": 0.06602
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.554
+    },
+    {
+      "cutoff": "2026-01-13",
+      "status": "adopted",
+      "n_train": 2300,
+      "n_holdout": 800,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.68287,
+        "base_log_loss": 0.68625,
+        "trader_reward": 0.02635,
+        "mean_abs_position": 0.24108,
+        "val_loss": 0.70869,
+        "val_exp_reward": 0.02635,
+        "val_log_loss": 0.68287,
+        "val_entropy": 0.88143,
+        "val_critic_mse": 0.06105
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5506
+    },
+    {
+      "cutoff": "2026-01-21",
+      "status": "adopted",
+      "n_train": 2400,
+      "n_holdout": 800,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.67791,
+        "base_log_loss": 0.68259,
+        "trader_reward": 0.03779,
+        "mean_abs_position": 0.22576,
+        "val_loss": 0.68692,
+        "val_exp_reward": 0.03779,
+        "val_log_loss": 0.67791,
+        "val_entropy": 0.87489,
+        "val_critic_mse": 0.05121
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5484
+    },
+    {
+      "cutoff": "2026-01-28",
+      "status": "adopted",
+      "n_train": 2400,
+      "n_holdout": 900,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.68121,
+        "base_log_loss": 0.68342,
+        "trader_reward": 0.03707,
+        "mean_abs_position": 0.23776,
+        "val_loss": 0.69598,
+        "val_exp_reward": 0.03707,
+        "val_log_loss": 0.68121,
+        "val_entropy": 0.86824,
+        "val_critic_mse": 0.0618
+      },
+      "forecast_adopted": true,
+      "trader_adopted": true,
+      "base_rate": 0.5482
+    },
+    {
+      "cutoff": "2026-02-04",
+      "status": "rejected",
+      "n_train": 2500,
+      "n_holdout": 900,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.71624,
+        "base_log_loss": 0.689,
+        "trader_reward": -0.01642,
+        "mean_abs_position": 0.19502,
+        "val_loss": 0.77612,
+        "val_exp_reward": -0.01642,
+        "val_log_loss": 0.71624,
+        "val_entropy": 0.85235,
+        "val_critic_mse": 0.0451
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5468
+    },
+    {
+      "cutoff": "2026-02-11",
+      "status": "rejected",
+      "n_train": 2600,
+      "n_holdout": 900,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.71474,
+        "base_log_loss": 0.689,
+        "trader_reward": -0.01338,
+        "mean_abs_position": 0.21282,
+        "val_loss": 0.77863,
+        "val_exp_reward": -0.01338,
+        "val_log_loss": 0.71474,
+        "val_entropy": 0.86262,
+        "val_critic_mse": 0.06066
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5474
+    },
+    {
+      "cutoff": "2026-02-19",
+      "status": "rejected",
+      "n_train": 2700,
+      "n_holdout": 900,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.70897,
+        "base_log_loss": 0.69139,
+        "trader_reward": -0.0122,
+        "mean_abs_position": 0.19337,
+        "val_loss": 0.76647,
+        "val_exp_reward": -0.0122,
+        "val_log_loss": 0.70897,
+        "val_entropy": 0.84254,
+        "val_critic_mse": 0.04976
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5447
+    },
+    {
+      "cutoff": "2026-02-26",
+      "status": "rejected",
+      "n_train": 2700,
+      "n_holdout": 1000,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.71038,
+        "base_log_loss": 0.69048,
+        "trader_reward": -0.00914,
+        "mean_abs_position": 0.20577,
+        "val_loss": 0.76647,
+        "val_exp_reward": -0.00914,
+        "val_log_loss": 0.71038,
+        "val_entropy": 0.83784,
+        "val_critic_mse": 0.05386
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5457
+    },
+    {
+      "cutoff": "2026-03-05",
+      "status": "rejected",
+      "n_train": 2800,
+      "n_holdout": 1000,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.70652,
+        "base_log_loss": 0.69168,
+        "trader_reward": -0.01514,
+        "mean_abs_position": 0.18782,
+        "val_loss": 0.76853,
+        "val_exp_reward": -0.01514,
+        "val_log_loss": 0.70652,
+        "val_entropy": 0.8183,
+        "val_critic_mse": 0.05348
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5421
+    },
+    {
+      "cutoff": "2026-03-12",
+      "status": "rejected",
+      "n_train": 2900,
+      "n_holdout": 1000,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.7267,
+        "base_log_loss": 0.70134,
+        "trader_reward": -0.03828,
+        "mean_abs_position": 0.18955,
+        "val_loss": 0.82056,
+        "val_exp_reward": -0.03828,
+        "val_log_loss": 0.7267,
+        "val_entropy": 0.80611,
+        "val_critic_mse": 0.07119
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5346
+    },
+    {
+      "cutoff": "2026-03-19",
+      "status": "rejected",
+      "n_train": 3000,
+      "n_holdout": 1000,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.72845,
+        "base_log_loss": 0.70595,
+        "trader_reward": -0.03812,
+        "mean_abs_position": 0.20474,
+        "val_loss": 0.82004,
+        "val_exp_reward": -0.03812,
+        "val_log_loss": 0.72845,
+        "val_entropy": 0.79932,
+        "val_critic_mse": 0.06736
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5325
+    },
+    {
+      "cutoff": "2026-03-26",
+      "status": "rejected",
+      "n_train": 3000,
+      "n_holdout": 1100,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.72819,
+        "base_log_loss": 0.70749,
+        "trader_reward": -0.03914,
+        "mean_abs_position": 0.20509,
+        "val_loss": 0.81807,
+        "val_exp_reward": -0.03914,
+        "val_log_loss": 0.72819,
+        "val_entropy": 0.79349,
+        "val_critic_mse": 0.06263
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.529
+    },
+    {
+      "cutoff": "2026-04-02",
+      "status": "rejected",
+      "n_train": 3100,
+      "n_holdout": 1100,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.71418,
+        "base_log_loss": 0.70255,
+        "trader_reward": -0.02749,
+        "mean_abs_position": 0.19131,
+        "val_loss": 0.78364,
+        "val_exp_reward": -0.02749,
+        "val_log_loss": 0.71418,
+        "val_entropy": 0.78887,
+        "val_critic_mse": 0.0455
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5319
+    },
+    {
+      "cutoff": "2026-04-10",
+      "status": "rejected",
+      "n_train": 3200,
+      "n_holdout": 1100,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.71391,
+        "base_log_loss": 0.6991,
+        "trader_reward": -0.02742,
+        "mean_abs_position": 0.17874,
+        "val_loss": 0.78125,
+        "val_exp_reward": -0.02742,
+        "val_log_loss": 0.71391,
+        "val_entropy": 0.76938,
+        "val_critic_mse": 0.0414
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5344
+    },
+    {
+      "cutoff": "2026-04-17",
+      "status": "rejected",
+      "n_train": 3300,
+      "n_holdout": 1100,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.71999,
+        "base_log_loss": 0.69465,
+        "trader_reward": -0.03227,
+        "mean_abs_position": 0.15242,
+        "val_loss": 0.78719,
+        "val_exp_reward": -0.03227,
+        "val_log_loss": 0.71999,
+        "val_entropy": 0.73223,
+        "val_critic_mse": 0.03063
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5402
+    },
+    {
+      "cutoff": "2026-04-24",
+      "status": "rejected",
+      "n_train": 3300,
+      "n_holdout": 1200,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.71096,
+        "base_log_loss": 0.69556,
+        "trader_reward": -0.02558,
+        "mean_abs_position": 0.1463,
+        "val_loss": 0.77132,
+        "val_exp_reward": -0.02558,
+        "val_log_loss": 0.71096,
+        "val_entropy": 0.72297,
+        "val_critic_mse": 0.0308
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5384
+    },
+    {
+      "cutoff": "2026-05-01",
+      "status": "rejected",
+      "n_train": 3400,
+      "n_holdout": 1200,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.70696,
+        "base_log_loss": 0.69504,
+        "trader_reward": -0.01902,
+        "mean_abs_position": 0.15135,
+        "val_loss": 0.75823,
+        "val_exp_reward": -0.01902,
+        "val_log_loss": 0.70696,
+        "val_entropy": 0.72869,
+        "val_critic_mse": 0.02659
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.538
+    },
+    {
+      "cutoff": "2026-05-08",
+      "status": "rejected",
+      "n_train": 3500,
+      "n_holdout": 1200,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.70554,
+        "base_log_loss": 0.69687,
+        "trader_reward": -0.01387,
+        "mean_abs_position": 0.14503,
+        "val_loss": 0.75228,
+        "val_exp_reward": -0.01387,
+        "val_log_loss": 0.70554,
+        "val_entropy": 0.72967,
+        "val_critic_mse": 0.02893
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5364
+    },
+    {
+      "cutoff": "2026-05-15",
+      "status": "rejected",
+      "n_train": 3600,
+      "n_holdout": 1200,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.71142,
+        "base_log_loss": 0.69701,
+        "trader_reward": -0.01739,
+        "mean_abs_position": 0.15595,
+        "val_loss": 0.76264,
+        "val_exp_reward": -0.01739,
+        "val_log_loss": 0.71142,
+        "val_entropy": 0.74436,
+        "val_critic_mse": 0.03189
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5337
+    },
+    {
+      "cutoff": "2026-05-22",
+      "status": "rejected",
+      "n_train": 3600,
+      "n_holdout": 1300,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.70493,
+        "base_log_loss": 0.69454,
+        "trader_reward": -0.01039,
+        "mean_abs_position": 0.15104,
+        "val_loss": 0.7481,
+        "val_exp_reward": -0.01039,
+        "val_log_loss": 0.70493,
+        "val_entropy": 0.74306,
+        "val_critic_mse": 0.03074
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5367
+    },
+    {
+      "cutoff": "2026-06-01",
+      "status": "rejected",
+      "n_train": 3700,
+      "n_holdout": 1300,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.70554,
+        "base_log_loss": 0.69635,
+        "trader_reward": -0.00913,
+        "mean_abs_position": 0.16202,
+        "val_loss": 0.75026,
+        "val_exp_reward": -0.00913,
+        "val_log_loss": 0.70554,
+        "val_entropy": 0.74692,
+        "val_critic_mse": 0.03728
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5352
+    },
+    {
+      "cutoff": "2026-06-08",
+      "status": "rejected",
+      "n_train": 3800,
+      "n_holdout": 1300,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.70738,
+        "base_log_loss": 0.69554,
+        "trader_reward": -0.00642,
+        "mean_abs_position": 0.16082,
+        "val_loss": 0.75031,
+        "val_exp_reward": -0.00642,
+        "val_log_loss": 0.70738,
+        "val_entropy": 0.75691,
+        "val_critic_mse": 0.04052
+      },
+      "forecast_adopted": false,
+      "trader_adopted": false,
+      "base_rate": 0.5331
+    },
+    {
+      "cutoff": "2026-06-15",
+      "status": "rejected_forecast",
+      "n_train": 3900,
+      "n_holdout": 1300,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69489,
+        "base_log_loss": 0.68947,
+        "trader_reward": 0.01126,
+        "mean_abs_position": 0.1716,
+        "val_loss": 0.72626,
+        "val_exp_reward": 0.01126,
+        "val_log_loss": 0.69489,
+        "val_entropy": 0.75398,
+        "val_critic_mse": 0.05331
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5369
+    },
+    {
+      "cutoff": "2026-06-23",
+      "status": "rejected_forecast",
+      "n_train": 3900,
+      "n_holdout": 1400,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69726,
+        "base_log_loss": 0.69149,
+        "trader_reward": 0.00911,
+        "mean_abs_position": 0.15523,
+        "val_loss": 0.72826,
+        "val_exp_reward": 0.00911,
+        "val_log_loss": 0.69726,
+        "val_entropy": 0.73332,
+        "val_critic_mse": 0.04776
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5332
+    },
+    {
+      "cutoff": "2026-06-30",
+      "status": "rejected_forecast",
+      "n_train": 4000,
+      "n_holdout": 1400,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69369,
+        "base_log_loss": 0.69034,
+        "trader_reward": 0.01076,
+        "mean_abs_position": 0.15538,
+        "val_loss": 0.72189,
+        "val_exp_reward": 0.01076,
+        "val_log_loss": 0.69369,
+        "val_entropy": 0.72522,
+        "val_critic_mse": 0.04578
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5339
+    },
+    {
+      "cutoff": "2026-07-08",
+      "status": "rejected_forecast",
+      "n_train": 4100,
+      "n_holdout": 1400,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69431,
+        "base_log_loss": 0.68811,
+        "trader_reward": 0.00996,
+        "mean_abs_position": 0.13805,
+        "val_loss": 0.72284,
+        "val_exp_reward": 0.00996,
+        "val_log_loss": 0.69431,
+        "val_entropy": 0.70362,
+        "val_critic_mse": 0.04466
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5364
+    },
+    {
+      "cutoff": "2026-07-15",
+      "status": "rejected_forecast",
+      "n_train": 4200,
+      "n_holdout": 1400,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69482,
+        "base_log_loss": 0.68816,
+        "trader_reward": 0.00746,
+        "mean_abs_position": 0.13112,
+        "val_loss": 0.72329,
+        "val_exp_reward": 0.00746,
+        "val_log_loss": 0.69482,
+        "val_entropy": 0.6846,
+        "val_critic_mse": 0.03927
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5377
+    },
+    {
+      "cutoff": "2026-07-22",
+      "status": "rejected_forecast",
+      "n_train": 4200,
+      "n_holdout": 1500,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69619,
+        "base_log_loss": 0.68973,
+        "trader_reward": 0.00684,
+        "mean_abs_position": 0.12157,
+        "val_loss": 0.72411,
+        "val_exp_reward": 0.00684,
+        "val_log_loss": 0.69619,
+        "val_entropy": 0.66572,
+        "val_critic_mse": 0.03658
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5347
+    },
+    {
+      "cutoff": "2026-07-29",
+      "status": "rejected_forecast",
+      "n_train": 4300,
+      "n_holdout": 1500,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69453,
+        "base_log_loss": 0.69028,
+        "trader_reward": 0.00592,
+        "mean_abs_position": 0.13189,
+        "val_loss": 0.72405,
+        "val_exp_reward": 0.00592,
+        "val_log_loss": 0.69453,
+        "val_entropy": 0.67987,
+        "val_critic_mse": 0.03902
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5353
+    },
+    {
+      "cutoff": "2026-08-05",
+      "status": "rejected_forecast",
+      "n_train": 4400,
+      "n_holdout": 1500,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69404,
+        "base_log_loss": 0.69166,
+        "trader_reward": 0.00702,
+        "mean_abs_position": 0.13085,
+        "val_loss": 0.72161,
+        "val_exp_reward": 0.00702,
+        "val_log_loss": 0.69404,
+        "val_entropy": 0.6897,
+        "val_critic_mse": 0.03805
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5375
+    },
+    {
+      "cutoff": "2026-08-12",
+      "status": "rejected_forecast",
+      "n_train": 4500,
+      "n_holdout": 1500,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69642,
+        "base_log_loss": 0.68954,
+        "trader_reward": 0.00897,
+        "mean_abs_position": 0.13467,
+        "val_loss": 0.72276,
+        "val_exp_reward": 0.00897,
+        "val_log_loss": 0.69642,
+        "val_entropy": 0.68459,
+        "val_critic_mse": 0.04015
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5395
+    },
+    {
+      "cutoff": "2026-08-19",
+      "status": "rejected_forecast",
+      "n_train": 4500,
+      "n_holdout": 1600,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69764,
+        "base_log_loss": 0.68956,
+        "trader_reward": 0.00661,
+        "mean_abs_position": 0.12766,
+        "val_loss": 0.72333,
+        "val_exp_reward": 0.00661,
+        "val_log_loss": 0.69764,
+        "val_entropy": 0.67471,
+        "val_critic_mse": 0.0339
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5395
+    },
+    {
+      "cutoff": "2026-08-26",
+      "status": "rejected_forecast",
+      "n_train": 4600,
+      "n_holdout": 1600,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69387,
+        "base_log_loss": 0.68995,
+        "trader_reward": 0.00918,
+        "mean_abs_position": 0.12441,
+        "val_loss": 0.71569,
+        "val_exp_reward": 0.00918,
+        "val_log_loss": 0.69387,
+        "val_entropy": 0.66291,
+        "val_critic_mse": 0.03156
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.5385
+    },
+    {
+      "cutoff": "2026-09-02",
+      "status": "rejected_forecast",
+      "n_train": 4700,
+      "n_holdout": 1600,
+      "epochs": 1,
+      "holdout": {
+        "model_log_loss": 0.69495,
+        "base_log_loss": 0.69015,
+        "trader_reward": 0.00694,
+        "mean_abs_position": 0.12395,
+        "val_loss": 0.7173,
+        "val_exp_reward": 0.00694,
+        "val_log_loss": 0.69495,
+        "val_entropy": 0.6549,
+        "val_critic_mse": 0.02788
+      },
+      "forecast_adopted": false,
+      "trader_adopted": true,
+      "base_rate": 0.537
+    }
+  ],
+  "rl_trader": {
+    "full": {
+      "weeks": 64.0,
+      "mean_weekly_pct_after_costs": -0.0085,
+      "mean_weekly_pct_gross": -0.005,
+      "sharpe_after_costs": -0.423,
+      "sharpe_ci_lo": -1.874,
+      "sharpe_ci_hi": 1.58,
+      "mean_abs_position": 0.0707
+    },
+    "after_warmup": {
+      "weeks": 52.0,
+      "mean_weekly_pct_after_costs": -0.0079,
+      "mean_weekly_pct_gross": -0.0038,
+      "sharpe_after_costs": -0.367,
+      "sharpe_ci_lo": -2.064,
+      "sharpe_ci_hi": 1.99,
+      "mean_abs_position": 0.0811
+    },
+    "state_keys": [
+      "ret_1d",
+      "ret_5d",
+      "ret_20d",
+      "ret_60d",
+      "vol_20d_ann",
+      "rsi_14",
+      "dist_ma50",
+      "mkt_ret_5d",
+      "mkt_ret_20d",
+      "sue_1",
+      "sue_2",
+      "sue_3",
+      "sue_4",
+      "eps_yoy",
+      "rev_yoy",
+      "days_since_report",
+      "days_since_earnings_8k",
+      "n_8k_30d",
+      "earnings_expected",
+      "fund_ok",
+      "llm_plain",
+      "llm_fund",
+      "llm_self",
+      "rank_ret_5d",
+      "rank_ret_20d",
+      "rank_llm_fund",
+      "llm_fund_lp",
+      "anomaly",
+      "kronos",
+      "rank_llm_fund_lp",
+      "rank_anomaly",
+      "rank_kronos"
+    ]
+  }
+}

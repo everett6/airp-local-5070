@@ -469,12 +469,87 @@ Nothing else about training or its guard changes.
 López de Prado). The number of trials is every arm of every published walk-forward run, and the luck benchmark
 comes from the spread of Sharpes across arms. The RL trader must reach DSR > 0.95.
 
-**Overlapping outcomes (v6).** When the horizon is longer than the step (20-day returns every 5 days), outcome
-windows overlap and neighbouring cutoffs are correlated. All bootstraps then resample contiguous blocks of
+**Overlapping outcomes (safeguard; no published run needs it).** If a config ever samples faster than its horizon
+(v6 does not: it steps 20 days for a 20-day horizon), outcome windows overlap and neighbouring cutoffs are correlated. All bootstraps then resample contiguous blocks of
 ceil(horizon/step) cutoffs, Sharpe ratios are annualized per horizon-length period (13 per year for 20 days, 52 for
 5), and PSR/DSR use T/block as the sample length. For horizon = step nothing changes.
 
 **Serving.** v6 and v7 run on the standard Ollama (:11434, one slot, deterministic). The tuned 4-slot server measured 1.6× faster but is turned off (its batching also makes regenerated answers
 non-bit-identical). Every answer is cached either way, so v7 reproduces exactly from its cache.
 Its verbalized arms reuse v5's cached answers for identical prompts.
+
+## Phase C, R and F results (runs finished 2026-09-22)
+
+All three runs were scored by `scripts/evaluate_criteria.py` against criteria fixed before they ran
+(`EXECUTION_PLAN.md`). Full table: `backend/results/criteria_summary.md`; per-run JSON in `criteria_*.json`.
+Every run replays identically from its committed cache (`scripts/reproduce.py`, 0 GPU calls).
+
+### `v5_fund_top100` — 100 stocks, 64 weekly cutoffs, 5-day horizon (5,200 scored predictions after warm-up)
+
+| arm | accuracy | Brier | rank IC [95% CI] | long/short %/week |
+|---|---|---|---|---|
+| always up | 52.2% | **0.2497** | — | +0.447 |
+| earnings-surprise rule | 51.9% | 0.2497 | **+0.0152 [−0.0138, +0.0451]** | +0.319 |
+| LLM + fundamentals (primary) | 50.4% | 0.2508 | −0.0229 [−0.0745, +0.0286] | +0.082 |
+| LLM, prices only | 50.5% | 0.2507 | −0.0194 [−0.0747, +0.0330] | +0.132 |
+| LLM + self-improvement | 50.0% | 0.2520 | +0.0076 [−0.0493, +0.0637] | +0.253 |
+| logistic + fundamentals | 49.7% | 0.2601 | −0.0145 [−0.0571, +0.0292] | +0.077 |
+| deep RL forecast | 50.9% | 0.2542 | −0.0212 [−0.0755, +0.0309] | +0.322 |
+
+**Phase C: NOT PASSED.** C1 (rank IC CI above 0) fails, C2 (beat the surprise baseline) fails, C3 (leak probe
+1.0% < 20%) passes. **Phase R: NOT PASSED.** The RL forecast head is worse than "always up" on Brier, and the RL
+trader's after-cost Sharpe is −0.09 [−2.06, +2.06] with mean position 0.09 — the guard kept it near flat, as
+designed, because there was nothing to trade on. Of 60 training weeks it adopted the new policy 15 times and
+rejected it 45.
+
+### `v6_fund_rank20d` — same stocks, 20-day horizon, 16 non-overlapping cutoffs (1,200 predictions)
+
+**Phase C and R: NOT PASSED** on the primary arm (rank IC −0.0248 [−0.0959, +0.0425]). One number does stand out:
+`rl_forecast` reaches rank IC **+0.0652 [+0.0185, +0.1175]** and a +3.0%/period top-minus-bottom spread — the only
+confidence interval above zero in any run. It should not be believed:
+- it is not the pre-registered primary arm;
+- it rests on 12 scored cutoffs;
+- the same arm is *worse* than "always up" on Brier (0.2555 vs 0.2491), so it is not better calibrated, only
+  better ordered, on a small sample;
+- across all published runs we have now reported 79 arm-level results. The Deflated Sharpe benchmark for that many
+  trials is an annualized Sharpe of about 2.0; the best long/short arm in this run reaches DSR 0.53, i.e. not
+  distinguishable from the best of 79 lucky draws. The trader's Sharpe is 1.53 with CI [−0.66, +3.06].
+
+### `v7_phase_f` — Phase F arms on the v5 grid (5,200 predictions)
+
+| arm | accuracy | Brier | rank IC [95% CI] | distinct probabilities |
+|---|---|---|---|---|
+| always up | 52.2% | **0.2497** | — | 1 |
+| earnings-surprise rule | 51.9% | 0.2497 | +0.0152 [−0.0138, +0.0451] | 3 |
+| LLM + fundamentals, verbalized | 50.4% | 0.2508 | −0.0229 [−0.0745, +0.0286] | 9 |
+| **LLM + fundamentals, log-prob (primary)** | 49.4% | 0.4483 | −0.0040 [−0.0577, +0.0510] | 3,200 |
+| LLM prices only, log-prob | 49.6% | 0.4361 | −0.0040 [−0.0587, +0.0507] | 3,856 |
+| anomaly composite | 49.6% | 0.2502 | +0.0078 [−0.0474, +0.0627] | 5,796 |
+| logistic + anomalies | 50.0% | 0.2591 | −0.0164 [−0.0656, +0.0309] | — |
+| Kronos-small | 49.3% | 0.2859 | −0.0183 [−0.0746, +0.0397] | 5,591 |
+| deep RL forecast (v7 state) | 51.9% | 0.2529 | −0.0299 [−0.0839, +0.0232] | — |
+
+**Phase F: NOT PASSED** (F1 fails, F2 fails, F3 passes). **Phase R on v7: NOT PASSED** (trader DSR 0.005).
+
+What the Phase F changes did and did not do:
+- **The tie problem is fixed.** Verbalized answers used 9 distinct probabilities over 6,400 forecasts; reading the
+  probability of the single token `UP` gives 3,200. Ranking is now possible in principle.
+- **Log-prob ranking is better than verbalized ranking**, by +0.0189 rank IC [+0.0001, +0.0371] per week — the one
+  pre-registered comparison that lands above zero. But both arms sit at rank IC ≈ 0 in absolute terms, so this is a
+  better way to read an opinion that still carries no information.
+- **The log-prob probabilities are wildly overconfident**: 68% of them are beyond 0.95/0.05, so the Brier score
+  (0.45) is far worse than always saying 52%. They are usable as a score, not as a probability, without calibration.
+- **Kronos**, a foundation model trained on 12B candlesticks up to June 2024, ranks no better than the LLM
+  (−0.018) and called only 37% of names up in a window that rose 52% of the time.
+- **The classical anomaly composite** — momentum, reversal, 52-week high, idiosyncratic volatility, earnings
+  surprise — also lands at rank IC +0.008 [−0.047, +0.063]. Nothing in this universe and window beat noise.
+
+### Leak checks
+
+- **Identification** (can the model name the company from what the agent sees): 1.3% from prices, 1.0% from prices
+  plus the numbers-only digest, against a 20% threshold.
+- **Lookahead Propensity** (does it remember the actual move): given a real ticker and date, qwen3:8b puts
+  essentially no probability on a direction (mean LAP 8e-7; it answers UNKNOWN), and its date-only recall is 47%
+  accurate — chance. The interaction test is therefore **uninformative by construction** (reported as such): there
+  is no memory to leak, so the identification probe is what supports C3/F3.
 

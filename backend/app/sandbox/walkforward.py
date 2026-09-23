@@ -405,7 +405,9 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
             raise SystemExit("--kronos needs --ohlcv (the bars the forecasts were made from)")
         ohlcv_path = resolve_data_path(args.ohlcv)
         config["kronos"], config["ohlcv"] = True, str(ohlcv_path.relative_to(BACKEND))
-        kronos_path = RESULTS / f"kronos_{args.tag}.jsonl"
+        # the forecasts belong to the config, not to the tag, so a re-run under another tag (reproduce.py)
+        # reads the same file
+        kronos_path = RESULTS / f"kronos_{getattr(args, 'kronos_tag', None) or args.tag}.jsonl"
         if not kronos_path.exists():
             raise SystemExit(f"missing results/{kronos_path.name}; make it first with: "
                              f".venv-kronos/bin/python scripts/kronos_forecasts.py <this config>")
@@ -924,6 +926,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--anomalies", action="store_true", help="add anomaly_rank and anomaly_logit baselines; needs --fund")
     ap.add_argument("--ohlcv", default=None, help="OHLCV CSV under backend/data (for --kronos)")
     ap.add_argument("--kronos", action="store_true", help="add the Kronos arm from results/kronos_<tag>.jsonl")
+    ap.add_argument("--kronos-tag", default=None,
+                    help="tag whose Kronos forecast file to read (default: --tag; used when re-running under "
+                         "a temporary tag)")
     ap.add_argument("--rl-state", default=None, help="'v7': RL state also sees llm_fund_lp, anomalies and Kronos")
     ap.add_argument("--ollama-url", default=None, help="Ollama base URL (default $AIRP_OLLAMA_URL or :11434)")
     ap.add_argument("--probe-memorization", action="store_true")

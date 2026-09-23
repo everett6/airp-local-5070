@@ -27,7 +27,7 @@ RESULT_FIELDS = ("model", "start", "end", "horizon", "step", "warmup", "reflect_
 OPTIONAL_RESULT_FIELDS = ("data", "fund", "rl", "score_logprob", "solver", "anomalies", "ohlcv", "kronos", "rl_state")
 # Allowed in a config file but not hashed: they don't change what is computed (the Ollama URL is recorded in the
 # report's provenance instead; the LLM cache key does not depend on it).
-OTHER_FIELDS = ("tag", "concurrency", "description", "ollama_url")
+OTHER_FIELDS = ("tag", "concurrency", "description", "ollama_url", "kronos_tag")
 
 
 class ProvenanceError(RuntimeError):

@@ -6,19 +6,27 @@
 > no data access), point-in-time data and memory, anonymized inputs, a test
 > window after the model's measured training cutoff, a self-improving agent
 > arm, and non-LLM baselines on the identical grid. It also fixes a cache
-> bypass in the original sandbox. **Headline result: across 520–1,040
-> post-warm-up predictions per run, no LLM arm (qwen3 8B or 14B, plain or
-> self-improving) beat simply predicting "up"** — see
+> bypass in the original sandbox. **Headline result: across seven frozen runs, up to
+> 5,200 post-warm-up predictions each, nothing beat simply predicting "up"** —
+> not qwen3 8B or 14B (plain, self-improving, with SEC fundamentals, or scored
+> from token log-probabilities), not a deep-RL agent trained on all of them, not
+> the Kronos candlestick foundation model, and not a classical anomaly
+> composite. Every success criterion was fixed before its run, and all of them
+> failed; see
 > [`docs/WALKFORWARD_5070.md`](docs/WALKFORWARD_5070.md) for the full results,
 > the research behind the design, and how to reproduce.
 
-### Phase F: research-driven optimization (built 2026-09-16, GPU runs pending)
+### Phase F: research-driven optimization (run 2026-09-22 — not passed)
 
-Log-prob LLM scores (the verbalized answers used only 18 distinct values), a Lookahead Propensity leak test,
-Kronos and classical-anomaly baselines, an exact Newton stacker, Deflated Sharpe, and a measured Ollama tuning option
-(1.6× faster, off by default). Success criteria for the `v7_phase_f` run were pre-registered before it ran. See
-[`docs/RESEARCH_OPTIMIZATION.md`](docs/RESEARCH_OPTIMIZATION.md) and `docs/EXECUTION_PLAN.md` (Phase F).
-`scripts/phase_f_pipeline.sh` runs the remaining GPU work one job at a time, in the foreground (no background services).
+Reading the LLM's probability from token log-probabilities fixed the measured tie problem (9 distinct
+probabilities over 6,400 forecasts became 3,200) and ranked better than the verbalized answers
+(+0.019 rank IC [+0.0001, +0.0371]) — but both sit at rank IC ≈ 0, and the raw log-prob probabilities are far too
+confident to use as probabilities (Brier 0.45 vs 0.25). Kronos and the anomaly composite did no better. The
+Lookahead Propensity probe found no memory to leak: for a real ticker and date the model answers "unknown", and
+its date-only recall is 47% — chance. Measured on the way: a tuned Ollama configuration is 1.6× faster (off by
+default). See [`docs/RESEARCH_OPTIMIZATION.md`](docs/RESEARCH_OPTIMIZATION.md), `docs/WALKFORWARD_5070.md` and
+`docs/EXECUTION_PLAN.md` (Phases E and F). `scripts/phase_f_pipeline.sh` re-runs the whole GPU chain, one job at
+a time, in the foreground.
 
 ### Live, web-informed research
 
@@ -121,7 +129,7 @@ airp-local/
 │   │   ├── agents/         specialist agents
 │   │   ├── data_ingestion/ connectors — sandbox-aware mock connectors included
 │   │   └── api/routes/     FastAPI routes, including /api/sandbox/*
-│   └── tests/              pytest — 288 tests
+│   └── tests/              pytest — 303 tests
 ├── frontend/               Next.js + TypeScript UI (Sandbox page is live)
 └── docs/                   ARCHITECTURE, API_SPEC, AGENT_INTERFACES, ROADMAP,
                             LOCAL_SETUP (two-GPU walkthrough), SANDBOX,
@@ -160,6 +168,8 @@ Everything below was re-run for this repo; claims inherited from upstream that w
 - **Web tools:** the network guard connects only to the exact public address it checked (DNS rebinding
   closed), with size and total-time limits; live research fits the model's context (measured, with
   overflow detection).
+- **Results:** v5, v6 and v7 finished 2026-09-22 and were scored against criteria fixed before they ran — all
+  NOT PASSED; each replays identically from its committed cache with no GPU (`scripts/reproduce.py`).
 - **Forward test:** hash-chained ledger verified by the dashboard and by tests; first decision logged on time.
   **Paused 2026-09-16:** the hourly timer was uninstalled at the owner's request, so weeks from 2026-09-21 are not
   logged unless `python -m app.forward.run` is run by hand before the Monday open (missed weeks can't be backfilled).

@@ -116,7 +116,24 @@ Anything else is reported as "no edge".
 | D4 | Dashboard | ✅ Receipts, forward-test ledger, fundamentals/RL arms, rank IC table, RL training section |
 | D5 | Coverage | ✅ 92% on the safety-critical modules (floor 85%). The agent's in-jail tasks are now tested in-process too |
 
-## Phase E — Decision gate (~1 h)
+## Phase E — Decision gate. ✅ Decided 2026-09-22
+
+All three runs (v5, v6, v7) are finished, scored against criteria fixed before they ran, and reproduce exactly
+from their caches. **Phase C, Phase R and Phase F all NOT PASSED.** Nothing in 11 arms x 3 runs beat "always up"
+on Brier, nothing had a rank-IC confidence interval above zero on its pre-registered primary arm, and the single
+interval that did clear zero (`rl_forecast` in v6, 12 scored cutoffs) does not survive the Deflated Sharpe
+correction for the 79 arm-level results published so far. Reading current prices, SEC filings and the model's own
+past mistakes did not produce a weekly edge on 100 large US stocks in 2025-26.
+
+Per the rule written before the runs: **the LLM fine-tuning experiment (GRPO/ReMax) does not start** — its gate
+was an lp arm passing F1 and F3, and F1 failed, so outcome RL would have no signal to amplify. The ChronoGPT
+long-history study stays blocked on survivorship-free price data.
+
+What stands: the pipeline itself (point-in-time data, process jail, pre-registration, provenance, exact replay)
+and the negative result it produced. The forward test remains the only test that can still change the verdict;
+its timer was uninstalled on 2026-09-16 at the owner's request, so it is paused.
+
+## Phase E — original plan (~1 h)
 
 - **If Phase C meets all three criteria:** don't trust it yet. Add it to the
   forward test (B3) and wait 8–12 weeks. Only a forward-test pass counts.
@@ -127,7 +144,7 @@ Anything else is reported as "no edge".
 
 ---
 
-## Phase F — Research-driven optimization. 🔧 Built 2026-09-16; runs pending (GPU needs a reboot, see below)
+## Phase F — Research-driven optimization. ✅ Built 2026-09-16, run 2026-09-22 — **NOT PASSED** (results in [`WALKFORWARD_5070.md`](WALKFORWARD_5070.md))
 
 From a review of public repos, Hugging Face models, and recent papers: [`RESEARCH_OPTIMIZATION.md`](RESEARCH_OPTIMIZATION.md).
 Main finding in our own data: 19,319 cached LLM answers use only 18 distinct `p_up` values (42% are 0.52), which
@@ -160,10 +177,12 @@ v7 → LAP interaction test → evaluate. `scripts/phase_f_pipeline.sh` runs the
   Deflated Sharpe exceeds 0.95, where the number of trials is every arm of every published walk-forward run.
 - Reported but not a criterion: `llm_fund_lp` vs `llm_fund` IC gap (does log-prob scoring help?), PSR/DSR per arm.
 
-**Analysis amendment, 2026-09-16 (before any v6 or v7 output exists):** v6 forecasts 20-day returns every 5 trading
-days, so neighbouring cutoffs share 15 days of outcome and are correlated. The pre-registered "week-clustered" CIs and
-Sharpe ratios assumed independent weeks, which would make v6's CIs too narrow (false passes) and annualize 20-day
-returns as if they were weekly (Sharpe overstated about 2×). For every run with horizon > step, every bootstrap
+**Analysis amendment, 2026-09-16 (before any v6 or v7 output exists; corrected 2026-09-22):** the pre-registered
+"week-clustered" CIs and Sharpe ratios assumed every cutoff is independent. That holds only when the horizon is no
+longer than the step. v6 turned out to use step = horizon = 20 days, so it was never affected; the fix stands as a
+general safeguard for any future config that samples faster than its horizon (overlapping outcome windows would
+otherwise give CIs that are too narrow and Sharpe ratios annualized as if each period were a week). For every run
+with horizon > step, every bootstrap
 (rank IC, IC gaps, Brier gaps, trader Sharpe, LAP test) now resamples contiguous blocks of ceil(horizon/step) cutoffs
 (circular moving-block bootstrap). Sharpe is annualized per horizon-day period, and PSR/DSR use the effective sample
 length T/block. The criteria themselves are unchanged. Runs with horizon = step (all published runs, v5, v7) get

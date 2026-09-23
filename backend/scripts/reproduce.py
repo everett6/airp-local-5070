@@ -109,7 +109,8 @@ def reproduce(config: Path) -> bool:
         print(f"{tag}: ERROR {new_path.name} already exists; it would be deleted, so refusing (rename it first)")
         return False
     try:
-        new = asyncio.run(wf.run(wf.parse_args(["--config", str(config), "--tag", tmp_tag, "--force"])))
+        new = asyncio.run(wf.run(wf.parse_args(
+            ["--config", str(config), "--tag", tmp_tag, "--kronos-tag", tag, "--force"])))
         diffs = compare(ref, new, wf.RESULTS / f"walkforward_{tag}_predictions.jsonl", new_preds)
     except (Exception, SystemExit) as e:  # noqa: BLE001 - any failure (incl. jail probe exit) is reported per config
         print(f"{tag}: ERROR re-running: {type(e).__name__}: {e}")

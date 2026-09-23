@@ -161,14 +161,14 @@ license before adopting.
 
 | # | Change | Kind | Cost | Why first |
 |---|---|---|---|---|
-| 1 | 🔁 Resume v5, then v6 (blocked by the GPU crash until reboot; `scripts/phase_f_pipeline.sh`) | finish pre-registered work | GPU ~1 h + v6 | results were promised before new work |
+| 1 | ✅ v5 and v6 finished 2026-09-22 — both NOT PASSED | finish pre-registered work | done | results were promised before new work |
 | 2 | ✅ Measured: tuned Ollama on :11435 is 1.6× faster (q8_0 rejected); available but turned off | infra | done | optional speedup |
 | 3 | ✅ Exact Newton stacker (§2.4) | speed | done | removes the late-week slowdown |
-| 4 | ✅ built, run pending: `llm_lp` log-prob arm + LAP probe (§2.1–2.2) | new arm, frozen `v7` | GPU | fixes the measured 18-value problem, sharper leak test |
-| 5 | ✅ built, run pending: anomaly ranks + Kronos arms (§3.1, §3.3) | baselines in `v7` | GPU | honest bar for rank IC |
+| 4 | ✅ run: ties fixed (9 → 3,200 distinct), ranks better than verbalized (+0.019 IC) but still ≈ 0; LAP found no memory to leak | `v7` | done | — |
+| 5 | ✅ run: anomaly composite +0.008 [−0.047, +0.063], Kronos −0.018 — neither beat noise | baselines in `v7` | done | honest bar for rank IC |
 | 6 | ✅ Deflated Sharpe in the evaluator (§2.5) | reporting | done | multiple arms, multiple configs |
 | 7 | ⏸ gated: ChronoGPT long-history walk-forward (needs survivorship-free history back to ~2000) | new study | large | statistical power |
-| 8 | ⏸ gated: GRPO/ReMax LoRA on Qwen3-4B, only if v7 passes F1 and F3 | experiment | large | only if v7 shows signal |
+| 8 | ❌ not started: the gate (v7 passes F1) failed | experiment | — | no signal for outcome RL to amplify |
 
 ## Operational notes (2026-09-16)
 - **Reboot at 15:00** stopped `airp-v5` at week 41/64 and left 755 NUL bytes at the end of the LLM cache, so

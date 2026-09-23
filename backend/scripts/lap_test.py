@@ -33,7 +33,8 @@ def interaction_test(rows: list[dict[str, Any]], n_boot: int = 2000, seed: int =
     x = np.column_stack([np.ones(len(rows)), s, lap, s * lap])
     y = np.array([float(r["up"]) for r in rows])
     if len(weeks) < 2:
-        return {"n": len(rows), "weeks": len(weeks), "coef": None, "d_ci": None, "leak_signature": False,
+        return {"n": len(rows), "weeks": len(weeks), "uninformative": True, "lap_sd": None,
+                "coef": None, "d_ci": None, "leak_signature": False,
                 "bootstrap_block": block, "mean_lap": None, "recall_direction_accuracy": None, "recall_n": 0,
                 "note": "fewer than 2 weeks with LAP values: no test"}
     wk = np.array([week_ix[r["cutoff"]] for r in rows])
@@ -49,7 +50,11 @@ def interaction_test(rows: list[dict[str, Any]], n_boot: int = 2000, seed: int =
     boots = (np.linalg.pinv(xtx[pick].sum(axis=1)) @ xty[pick].sum(axis=1)[:, :, None])[:, 3, 0]
     lo, hi = np.percentile(boots, [2.5, 97.5])
     recall = [float((r["p_up_recall"] > 0.5) == bool(r["up"])) for r in rows if r["p_up_recall"] != 0.5]
-    return {"n": len(rows), "weeks": len(weeks), "coef": {"a": float(coef[0]), "b_signal": float(coef[1]),
+    # If the model almost never claims to remember, LAP is ~0 everywhere: the interaction is unidentified and
+    # "no leak signature" would be vacuous. Say so instead of reporting a clean bill of health.
+    uninformative = bool(float(np.mean(lap)) < 0.01 or float(np.std(lap)) < 1e-3)
+    return {"n": len(rows), "weeks": len(weeks), "uninformative": uninformative,
+            "lap_sd": float(np.std(lap)), "coef": {"a": float(coef[0]), "b_signal": float(coef[1]),
             "c_lap": float(coef[2]), "d_signal_x_lap": float(coef[3])}, "d_ci": [float(lo), float(hi)],
             "leak_signature": bool(lo > 0), "bootstrap_block": block,
             "mean_lap": float(np.mean(lap)) if len(rows) else None,
