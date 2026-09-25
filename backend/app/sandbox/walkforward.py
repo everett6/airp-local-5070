@@ -122,7 +122,9 @@ class OllamaLLM:
             return self._cache[key]
         body: dict[str, Any] = {
             "model": self.model, "stream": False, "think": False, "format": "json",
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            # an empty system prompt is left out (template-driven models such as NuExtract take only a user turn)
+            "messages": ([{"role": "system", "content": system}] if system else []) + [{"role": "user",
+                                                                                    "content": user}],
             "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": self.num_predict},
         }
         if mode in ("updown", "updown_lo", "buypass_lo", "lap"):

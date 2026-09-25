@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import sys
 import time
 from datetime import datetime
@@ -97,8 +98,13 @@ async def run(args: argparse.Namespace) -> None:
                     continue
                 user = event_text(r, ex[r.accession], p, i, etf)
                 got = json.loads(await llm(DECIDE_SYSTEM, user, mode="buypass_lo"))
-                rec = {"accession": r.accession, "ticker": r.ticker, "model": args.model, "logodds": got["logodds"],
-                       "mass": got["mass"], "censored": got["censored"], "buy": got["logodds"] > 0}
+                lo = float(got["logodds"])
+                # p_buy: the model's own probability of answering BUY rather than PASS (from its token
+                # probabilities). The master agent turns it into a calibrated P(beats sector) using only events
+                # whose outcome was already known (app/portfolio/master.py).
+                rec = {"accession": r.accession, "ticker": r.ticker, "model": args.model, "logodds": lo,
+                       "p_buy": 1.0 / (1.0 + math.exp(-max(-50.0, min(50.0, lo)))),
+                       "mass": got["mass"], "censored": got["censored"], "buy": lo > 0}
                 if n <= args.explain:
                     raw = await llm(EXPLAIN_SYSTEM, user)
                     rec["explanation"] = raw[:2000]

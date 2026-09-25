@@ -4,8 +4,11 @@
 #
 #   scripts/event_pipeline.sh            # from the repo root
 #
-# Ollama: qwen3:8b from the system model store on :11434; Bonsai models from ~/.ollama on :11435. Each GPU job takes
-# the GPU lock and unloads its model when done, so the two servers never hold models on the GPU at the same time.
+# Ollama servers (each GPU job takes the GPU lock and unloads its model when done, so only one model is ever on the GPU):
+#   :11434 system store (qwen3:8b), 1 slot: deterministic research
+#   :11435 ~/.ollama (Bonsai, NuExtract3), 1 slot: deterministic decisions
+#   :11436 ~/.ollama, 4 slots and :11437 system store, 4 slots: batched extraction (every number is re-checked by
+#          code against the release, so batching's occasional token differences can't slip a wrong number through)
 set -euo pipefail
 cd "$(dirname "$0")/../backend"
 PY=.venv/bin/python
@@ -22,6 +25,11 @@ serve() {  # port models_dir
 }
 serve 11434 /usr/share/ollama/.ollama/models
 serve 11435 "$HOME/.ollama/models"
+serve4() { OLLAMA_MODELS="$2" OLLAMA_NOPRUNE=1 OLLAMA_HOST="127.0.0.1:$1" OLLAMA_NUM_PARALLEL=4 OLLAMA_MAX_LOADED_MODELS=1 \
+  nohup ollama serve >"/tmp/ollama_$1.log" 2>&1 & for _ in $(seq 30); do curl -s "127.0.0.1:$1/api/tags" >/dev/null && break; sleep 1; done; }
+curl -s 127.0.0.1:11436/api/tags >/dev/null || serve4 11436 "$HOME/.ollama/models"
+curl -s 127.0.0.1:11437/api/tags >/dev/null || serve4 11437 /usr/share/ollama/.ollama/models
+NUX=hf.co/numind/NuExtract3-GGUF:Q4_K_M
 
 LOG "waiting for the event list and prices"
 until [ -f "$EVENTS" ] && [ -f "$PRICES" ]; do sleep 20; done
@@ -62,14 +70,31 @@ for M in "${MODELS[@]}"; do
   $PY scripts/llm_web_report.py --run "decisions_${M//:/_}" >/dev/null
 done
 
-LOG "step 3: reader (qwen3:8b) on every clean-window release"
-$PY scripts/extract_events.py extract --events "$EVENTS" --from 2025-01-01 --model qwen3:8b
+LOG "step 3a: reader benchmark on the same 200 releases: qwen3:8b vs NuExtract3-4B, 4 at a time"
+T0=$(date +%s); $PY scripts/extract_events.py extract --events "$EVENTS" --from 2025-01-01 --model qwen3:8b \
+  --base-url http://127.0.0.1:11437 --parallel 4 --limit 200 --out results/events/bench_qwen3_8b.jsonl
+T1=$(date +%s); $PY scripts/extract_events.py extract --events "$EVENTS" --from 2025-01-01 --model "$NUX" \
+  --base-url http://127.0.0.1:11436 --parallel 4 --limit 200 --out results/events/bench_nuextract.jsonl
+T2=$(date +%s)
+READER=$($PY scripts/bench_readers.py results/events/bench_qwen3_8b.jsonl results/events/bench_nuextract.jsonl \
+  "$(echo "($T1-$T0)/200" | bc -l)" "$(echo "($T2-$T1)/200" | bc -l)" | tail -1)
+LOG "reader chosen: $READER"
+if [ "$READER" = "$NUX" ]; then RURL=http://127.0.0.1:11436; else RURL=http://127.0.0.1:11437; fi
+RSLUG=$(echo "${READER##*/}" | tr ':/' '__')
+
+LOG "step 3: reader ($READER) on every clean-window release, 4 at a time"
+$PY scripts/extract_events.py extract --events "$EVENTS" --from 2025-01-01 --model "$READER" --base-url "$RURL" \
+  --parallel 4
 
 LOG "step 5: decisions on every event"
 for M in "${MODELS[@]}"; do
-  $PY scripts/decide_events.py --model "$M" --base-url http://127.0.0.1:11435 --events "$EVENTS" --prices "$PRICES"
+  $PY scripts/decide_events.py --model "$M" --base-url http://127.0.0.1:11435 --events "$EVENTS" --prices "$PRICES" \
+      --extract "results/events/extract_${RSLUG}.jsonl"
   $PY scripts/event_eval.py --events "$EVENTS" --prices "$PRICES" \
-      --extract results/events/extract_qwen3_8b.jsonl --decide "results/events/decide_${M//:/_}.jsonl" \
+      --extract "results/events/extract_${RSLUG}.jsonl" --decide "results/events/decide_${M//:/_}.jsonl" \
       --tag "${M//:/_}" | tee "results/events/eval_${M//:/_}.txt"
+  LOG "master agent portfolio with $M picks + crypto sleeve + SPY core"
+  $PY scripts/master_portfolio.py full --start 2025-01-02 --events "$EVENTS" --prices "$PRICES" \
+      --decide "results/events/decide_${M//:/_}.jsonl" | tee "results/master_full_${M//:/_}.txt"
 done
 LOG "pipeline done"

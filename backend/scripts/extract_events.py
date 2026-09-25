@@ -53,6 +53,46 @@ Reply with ONLY this JSON:
  "guidance": "...", "guidance_quote": "...", "tone": "...", "highlights": ["<exact quote>", "<exact quote>"]}"""
 
 
+NUEXTRACT_TEMPLATE = {
+    "period_end": "date",
+    "revenue_unit": ["thousands", "millions", "billions"],
+    "revenue_current_quarter": "number", "revenue_same_quarter_prior_year": "number",
+    "revenue_sentence": "verbatim-string",
+    "diluted_eps_current_quarter": "number", "diluted_eps_same_quarter_prior_year": "number",
+    "diluted_eps_sentence": "verbatim-string",
+    "adjusted_eps_current_quarter": "number", "adjusted_eps_same_quarter_prior_year": "number",
+    "adjusted_eps_sentence": "verbatim-string",
+    "guidance": ["raised", "lowered", "maintained", "initiated", "withdrawn", "none"],
+    "guidance_sentence": "verbatim-string",
+    "management_tone": ["positive", "neutral", "negative"],
+    "key_sentences": ["verbatim-string"],
+}
+SCALE = {"thousands": 0.001, "millions": 1.0, "billions": 1000.0}
+
+
+def nuextract_prompt(text: str) -> str:
+    return f"# Template:\n{json.dumps(NUEXTRACT_TEMPLATE, indent=1)}\n# Context:\n{text}"
+
+
+def from_nuextract(o: dict[str, Any] | None) -> dict[str, Any] | None:
+    """NuExtract's template output -> the reader schema `check` verifies (revenue in millions)."""
+    if not o:
+        return None
+    k = SCALE.get(str(o.get("revenue_unit")), 1.0)
+
+    def num(x: Any, scale: float = 1.0) -> float | None:
+        return float(x) * scale if isinstance(x, int | float) and not isinstance(x, bool) else None
+    return {"period_end": o.get("period_end"),
+            "revenue": {"q": num(o.get("revenue_current_quarter"), k),
+                        "prior": num(o.get("revenue_same_quarter_prior_year"), k), "quote": o.get("revenue_sentence")},
+            "eps": {"q": num(o.get("diluted_eps_current_quarter")), "prior": num(o.get(
+                "diluted_eps_same_quarter_prior_year")), "quote": o.get("diluted_eps_sentence")},
+            "adj_eps": {"q": num(o.get("adjusted_eps_current_quarter")), "prior": num(o.get(
+                "adjusted_eps_same_quarter_prior_year")), "quote": o.get("adjusted_eps_sentence")},
+            "guidance": o.get("guidance") or "none", "guidance_quote": o.get("guidance_sentence"),
+            "tone": o.get("management_tone") or "neutral", "highlights": o.get("key_sentences") or []}
+
+
 def text_path(accession: str) -> Path:
     return TEXT / f"{accession}.txt.gz"
 
@@ -91,13 +131,17 @@ async def extract(args: argparse.Namespace) -> None:
     ev = pd.read_csv(BACKEND / args.events)
     ev = ev[(ev["filed"] >= args.date_from) & (ev["filed"] <= args.date_to)]
     OUT.mkdir(parents=True, exist_ok=True)
-    slug = args.model.replace(":", "_").replace("/", "_")
-    out_path = OUT / f"extract_{slug}.jsonl"
+    slug = args.model.split("/")[-1].replace(":", "_").replace("/", "_")
+    out_path = BACKEND / args.out if args.out else OUT / f"extract_{slug}.jsonl"
     done = {json.loads(x)["accession"] for x in out_path.read_text().splitlines()} if out_path.exists() else set()
     todo = [r for r in ev.itertuples() if r.accession not in done and text_path(r.accession).exists()]
+    if args.limit:
+        todo = todo[: args.limit]
     print(f"{len(ev)} events in window, {len(done)} extracted, {len(todo)} to go with {args.model}", flush=True)
-    llm = OllamaLLM(args.model, base_url=args.base_url, concurrency=1, num_ctx=8192, num_predict=450, cache=True,
-                    require_gpu=True)
+    # extraction is checked number-by-number by code, so batched decoding (--parallel, needs an Ollama server
+    # started with OLLAMA_NUM_PARALLEL >= that) is allowed here even though it can shift a token now and then
+    llm = OllamaLLM(args.model, base_url=args.base_url, concurrency=args.parallel, num_ctx=8192, num_predict=450,
+                    cache=True, require_gpu=True)
     t0 = time.monotonic()
     try:
         await _extract_loop(todo, llm, out_path, t0, args)
@@ -106,21 +150,28 @@ async def extract(args: argparse.Namespace) -> None:
 
 
 async def _extract_loop(todo: list[Any], llm: OllamaLLM, out_path: Path, t0: float, args: argparse.Namespace) -> None:
+    nu = "nuextract" in args.model.lower()
+    n = 0
     with out_path.open("a") as f:
-        for n, r in enumerate(todo, start=1):
-            text = gzip.decompress(text_path(r.accession).read_bytes()).decode()
-            raw_text = await llm(READER_SYSTEM, text[:MAX_CHARS])
+        async def one(r: Any) -> None:
+            nonlocal n
+            text = gzip.decompress(text_path(r.accession).read_bytes()).decode()[: args.max_chars]
+            raw_text = await (llm("", nuextract_prompt(text)) if nu else llm(READER_SYSTEM, text))
             try:
                 raw = json.loads(raw_text[raw_text.index("{"): raw_text.rindex("}") + 1])
             except ValueError:
                 raw = None
             rec = {"accession": r.accession, "ticker": r.ticker, "cik": int(r.cik), "accepted_utc": r.accepted_utc,
-                   "model": args.model, **check(raw, text[:MAX_CHARS])}
+                   "model": args.model, **check(from_nuextract(raw) if nu else raw, text)}
             f.write(json.dumps(rec) + "\n")
             f.flush()
+            n += 1
             if n % 50 == 0:
                 rate = (time.monotonic() - t0) / n
-                print(f"  {n}/{len(todo)} {rate:.1f}s/event eta={(len(todo) - n) * rate / 3600:.1f}h", flush=True)
+                print(f"  {n}/{len(todo)} {rate:.2f}s/event eta={(len(todo) - n) * rate / 3600:.1f}h", flush=True)
+        # a bounded pool: the Ollama client's own semaphore (concurrency=--parallel) sets how many run at once
+        for i in range(0, len(todo), 64):
+            await asyncio.gather(*(one(r) for r in todo[i:i + 64]))
 
 
 def main() -> None:
@@ -131,6 +182,10 @@ def main() -> None:
     ap.add_argument("--to", dest="date_to", default="2026-09-24")
     ap.add_argument("--model", default="qwen3:8b")
     ap.add_argument("--base-url", default=None)
+    ap.add_argument("--parallel", type=int, default=1, help="requests in flight (Ollama OLLAMA_NUM_PARALLEL)")
+    ap.add_argument("--max-chars", type=int, default=MAX_CHARS)
+    ap.add_argument("--limit", type=int, default=0, help="only the first N events (benchmarks)")
+    ap.add_argument("--out", default=None, help="output jsonl (default results/events/extract_<model>.jsonl)")
     args = ap.parse_args()
     if args.cmd == "fetch":
         asyncio.run(fetch_all(args))
