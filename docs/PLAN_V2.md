@@ -50,3 +50,28 @@ crypto-sleeve allocator only.
 ## Order and time
 
 A (1 day) -> B (1 day) -> D starts immediately after B -> C in parallel only if A step 3 justifies it.
+
+## Stage A result (2026-09-25): FAIL, with one open lead
+
+- **XBRL, 2010-2026, S&P 1500 (46,149 quarterly filings, no LLM):** EPS change 20-day monthly rank IC +0.012
+  [-0.005, +0.029]; by period +0.049 (2010-15), +0.000 (2016-20), -0.013 (2021-26). Fails the pre-registered rule
+  (needed > 0.03 with the interval above zero, positive in 2 of 3 periods). The effect was real a decade ago and is
+  gone now. S&P 500 alone: +0.024 [+0.004, +0.044] at 20 days, too small to trade after costs.
+- **Release day vs filing day (2024+, 13,476 quarters):** the same XBRL signal entered at the 8-K release scores
+  +0.020 (20 days) and +0.046 [+0.011, +0.082] (60 days), vs +0.001 / +0.030 at the 10-Q. Reading on release day
+  helps a little.
+- **Why last night's sample looked strong:** within the 1,180 LLM-read releases, EPS change scores IC +0.21 only where
+  the reader verified BOTH numbers in the release (422 events); where the SEC tool supplied the year-earlier number
+  (348 events) it is +0.06, not significant. So the +0.15 came from which releases the reader could verify
+  (companies that print the GAAP comparison), 14 months only: a selection effect or a narrow lead, not the broad
+  signal the plan hoped for.
+- **Reader vs SEC numbers:** this quarter's EPS matches XBRL 87%, the year-earlier 70% (restatements, adjusted EPS).
+- **Research table + Bonsai** (scripts/build_features.py: reader + SEC tool + prices -> CSV fact sheet ->
+  decide_events.py --features): the SEC tool completed 355 more EPS pairs (781 of 1,180). Bonsai's P(BUY) IC went
+  from +0.065 [-0.008, +0.129] to +0.077 [+0.000, +0.153] at 20 days, top-bottom fifth +1.2% -> +2.4%: slightly
+  better, still borderline, 14 months.
+
+Per the kill rule, broad EPS-change stock picking stops. The one test left before dropping stock picks entirely:
+**out of sample on 2024 releases** (reader on ~1,800 S&P 500 releases, ~1 hour GPU): does "reader verified both
+numbers" + EPS change, and Bonsai with the research table, hold up in a year they were not found in? If not, the
+project is the SPY + crypto trend allocator.

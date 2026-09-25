@@ -8,7 +8,8 @@ Input per event (all known before the entry open; nothing the model computes):
   - price context computed from closes before the release: 20- and 60-day return vs the sector, 12-1 momentum.
 The model answers one word, BUY or PASS; the decision and its strength are read from token log-probabilities
 (log P(BUY) - log P(PASS), unrounded). BUY means log-odds > 0. A sample (--explain N) also gets a written bull/bear
-case for human review. Results: results/events/decide_<model>.jsonl (replayable from the LLM cache).
+case for human review. Results: results/events/decide_<model>[_<tag>].jsonl (replayable from the LLM cache).
+With --features, the model reads the research table's fact sheet instead (reader + SEC tool + prices).
 """
 from __future__ import annotations
 
@@ -81,10 +82,15 @@ async def run(args: argparse.Namespace) -> None:
     ex = {json.loads(x)["accession"]: json.loads(x) for x in (BACKEND / args.extract).read_text().splitlines()}
     p = Prices.from_long(pd.read_parquet(BACKEND / args.prices))
     days = pd.DatetimeIndex(p.open.index)
-    slug = args.model.replace(":", "_").replace("/", "_")
+    slug = args.model.replace(":", "_").replace("/", "_") + (f"_{args.tag}" if args.tag else "")
+    sheets = (pd.read_csv(BACKEND / args.features).set_index("accession")["fact_sheet"].to_dict()
+              if args.features else {})
     out_path = BACKEND / "results" / "events" / f"decide_{slug}.jsonl"
     done = {json.loads(x)["accession"] for x in out_path.read_text().splitlines()} if out_path.exists() else set()
-    todo = [r for r in ev.itertuples() if r.accession in ex and r.accession not in done]
+    todo = [r for r in ev.itertuples() if r.accession in ex and r.accession not in done
+            and (not sheets or r.accession in sheets)]
+    if args.limit:
+        todo = todo[: args.limit]
     print(f"{len(todo)} events to decide with {args.model} ({len(done)} done)", flush=True)
     llm = OllamaLLM(args.model, base_url=args.base_url, concurrency=1, num_ctx=4096, num_predict=400, cache=True,
                     require_gpu=True)
@@ -96,7 +102,7 @@ async def run(args: argparse.Namespace) -> None:
                 i = entry_index(days, datetime.fromisoformat(str(r.accepted_utc)))
                 if etf is None or i is None or str(r.ticker).replace(".", "-") not in p.close.columns:
                     continue
-                user = event_text(r, ex[r.accession], p, i, etf)
+                user = sheets[r.accession] if sheets else event_text(r, ex[r.accession], p, i, etf)
                 got = json.loads(await llm(DECIDE_SYSTEM, user, mode="buypass_lo"))
                 lo = float(got["logodds"])
                 # p_buy: the model's own probability of answering BUY rather than PASS (from its token
@@ -127,6 +133,10 @@ def main() -> None:
     ap.add_argument("--prices", default="data/events/ohlcv_2023-01-01_2026-09-25.parquet")
     ap.add_argument("--from", dest="date_from", default="2025-01-01")
     ap.add_argument("--to", dest="date_to", default="2026-09-24")
+    ap.add_argument("--features", default=None,
+                    help="research table from build_features.py: the model reads its fact_sheet column")
+    ap.add_argument("--tag", default="", help="suffix for the output file (e.g. xbrl)")
+    ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--explain", type=int, default=100, help="write a bull/bear case for the first N events")
     args = ap.parse_args()
     with gpu_job(f"decide_events {args.model}"):
