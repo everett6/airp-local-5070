@@ -120,7 +120,11 @@ async def test_probe_leak_and_memorization_offline(env):
     assert mem["unanswered_rate"] and all(v == 1.0 for v in mem["unanswered_rate"].values())
 
 
-def test_cli_main_routes_probes_and_runs(env, monkeypatch, capsys):
+def test_cli_main_routes_probes_and_runs(env, monkeypatch, capsys, tmp_path):
+    from app.sandbox import gpu_lock
+
+    # a private lock: the real one may be held by a GPU job running on this machine
+    monkeypatch.setattr(gpu_lock, "lock_path", lambda: tmp_path / "gpu.lock")
     calls = []
 
     async def fake_run(args):

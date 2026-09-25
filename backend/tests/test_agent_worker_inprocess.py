@@ -100,3 +100,29 @@ def test_main_dispatches_tasks(monkeypatch, capsys):
     aw.main()
     lines = [json.loads(x) for x in capsys.readouterr().out.splitlines()]
     assert lines[0]["result"]["network_reachable"] is False and "unknown task" in lines[1]["error"]
+
+
+def test_run_research_as_of_prompt_and_logprob_score(pipe):
+    replies = iter([json.dumps({"thought": "t", "actions": [{"tool": "news_as_of", "args": {"ticker": "X"}}]}),
+                    json.dumps({"final": {"p_up": 0.55, "reason": "earnings beat", "sources": ["u"]}})])
+
+    def llm(r):
+        if r.get("mode") == "updown":
+            return json.dumps({"p_up": 0.5731, "mass": 0.93, "token": "UP"})
+        return next(replies)
+    p = pipe(llm, lambda r: {"ok": True, "result": "headline"})
+    out = aw.run_research({"subject": {"ticker": "X", "as_of": "2015-03-10T20:00:00+00:00", "horizon_days": 20},
+                           "tools": [{"name": "news_as_of"}], "prompt": "as_of", "score": "logprob",
+                           "max_rounds": 2, "num_ctx": 8192, "num_predict": 600})
+    first = p.sent[0]["llm_requests"][0]
+    assert "The decision time is 2015-03-10" in first["system"] and "ignore it" in first["system"]
+    last = p.sent[-1]["llm_requests"][0]
+    assert last["mode"] == "updown" and "earnings beat" in last["user"] and "headline" in last["user"]
+    assert "20 trading days" in last["system"]
+    assert out["p_up"] == 0.55 and out["p_up_logprob"] == 0.5731 and out["logprob_mass"] == 0.93
+
+
+def test_run_research_default_has_no_logprob_step(pipe):
+    p = pipe(lambda r: json.dumps({"final": {"p_up": 0.6, "reason": "r"}}))
+    out = aw.run_research({"subject": {"ticker": "X", "as_of": "now"}, "tools": [], "max_rounds": 1})
+    assert "p_up_logprob" not in out and not any(r.get("mode") for s in p.sent for r in s.get("llm_requests", []))

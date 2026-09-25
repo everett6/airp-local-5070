@@ -31,7 +31,8 @@ import httpx
 Resolver = Callable[[str], Awaitable[list[str]]]
 
 # hosts with published or sensible request-rate expectations (seconds between requests)
-HOST_MIN_INTERVAL = {"www.sec.gov": 0.12, "data.sec.gov": 0.12, "efts.sec.gov": 0.12}
+HOST_MIN_INTERVAL = {"www.sec.gov": 0.12, "data.sec.gov": 0.12, "efts.sec.gov": 0.12,
+                     "web.archive.org": 4.0}  # the Internet Archive blocks clients above ~15 requests/minute
 
 
 class FetchError(RuntimeError):
