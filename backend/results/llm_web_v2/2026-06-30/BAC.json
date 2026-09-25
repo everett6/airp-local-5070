@@ -1,0 +1,182 @@
+{
+ "ticker": "BAC",
+ "as_of": "2026-06-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.276890550683647,
+ "logprob_mass": 1.0000000817987353,
+ "logodds": -0.959938288662357,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The 20-day return for BAC is positive (11.19%), indicating some upward momentum. However, there are no strong fundamental or news catalysts in the latest SEC filings or news articles that would significantly impact the stock price over the next 20 trading days. The stock's volatility is moderate, and without clear positive or negative signals, the probability of closing higher remains around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/70858/000007085826000273/bac-20260504.htm",
+  "https://www.cnbc.com/quotes/BAC/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting BAC.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "BAC",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "BAC",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "BAC",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any material news and assess the recent price performance to estimate the probability of BAC closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/70858/000007085826000273/bac-20260504.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "BAC",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price performance shows a positive 20-day return, but no strong fundamental or news catalysts are evident. The probability is moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "BAC",
+    "days": 260
+   },
+   "started": "2026-09-25T03:49:40.402+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 400,
+   "error": null,
+   "preview": "{\"ticker\": \"BAC\", \"last_date\": \"2026-06-30\", \"last_close\": 56.69, \"ret_1d\": -0.0155, \"ret_5d\": -0.0161, \"ret_20d\": 0.1119, \"ret_60d\": 0.1599, \"vol_20d_annualized\": 0.205, \"closes_last_30\": [50.17, 50."
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "BAC",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:49:40.404+00:00",
+   "ok": true,
+   "elapsed_ms": 1713,
+   "chars": 1164,
+   "error": null,
+   "preview": "{\"ticker\": \"BAC\", \"cik\": 70858, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-05-06\", \"accepted_utc_latest\": \"2026-05-07T01:34:21+00:00\", \"items\": \"5.07\", \"url\": \"https://www.sec.gov/Archives/edgar/data/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "BAC",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:49:40.403+00:00",
+   "ok": true,
+   "elapsed_ms": 19951,
+   "chars": 3378,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/BAC/\", \"captured_utc\": \"2026-06-30T13:20:09+00:00\", \"title\": \"BAC: Bank of America Corp - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote "
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "BAC",
+    "days": 20
+   },
+   "started": "2026-09-25T03:50:07.700+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 335,
+   "error": null,
+   "preview": "{\"ticker\": \"BAC\", \"last_date\": \"2026-06-30\", \"last_close\": 56.69, \"ret_1d\": -0.0155, \"ret_5d\": -0.0161, \"ret_20d\": 0.1119, \"ret_60d\": null, \"vol_20d_annualized\": 0.205, \"closes_last_30\": [50.98, 51.94"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/70858/000007085826000273/bac-20260504.htm"
+   },
+   "started": "2026-09-25T03:50:07.700+00:00",
+   "ok": true,
+   "elapsed_ms": 1911,
+   "chars": 377,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000070858-26-000273.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/70858/000007085826000273/0000070858-26-000273.txt\"}, {\"name\": \"bac-20260504.htm\", \"url\": \"https://ww"
+  }
+ ],
+ "llm_calls": 17,
+ "attempts": 1,
+ "elapsed_s": 42.8,
+ "window": "clean",
+ "screen_score": 0.625,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

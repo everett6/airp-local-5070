@@ -1,0 +1,229 @@
+{
+ "ticker": "CSCO",
+ "as_of": "2025-07-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9667271593439107,
+ "logprob_mass": 1.0000000626584702,
+ "logodds": 3.369174835686265,
+ "logodds_censored": false,
+ "p_up": 0.5,
+ "answered": true,
+ "reason": "The price history shows a slight negative return over the last 20 days, but a positive return over 60 days. The recent news and SEC filings do not indicate any major events that would significantly impact the stock's performance over the next 20 trading days. Therefore, the probability of CSCO closing higher is close to a coin flip.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/858877/000085887725000046/csco-20250605.htm",
+  "https://www.sec.gov/Archives/edgar/data/858877/000085887725000021/csco-20250509.htm",
+  "https://www.sec.gov/Archives/edgar/data/858877/000119312525119864/d946014d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/858877/000085887725000014/csco-20250512.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to identify any factors that might influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "CSCO",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "CSCO",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "CSCO",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent SEC filings and news to identify any significant events or trends that could impact CSCO's stock price over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/858877/000085887725000046/csco-20250605.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/858877/000085887725000021/csco-20250509.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/858877/000119312525119864/d946014d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/858877/000085887725000014/csco-20250512.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price history, news, and SEC filings, there is no strong evidence to suggest that CSCO will close higher 20 trading days from now. The stock has shown mixed performance in the short term, and there are no significant events or trends that would strongly influence its direction.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "CSCO",
+    "days": 260
+   },
+   "started": "2026-09-25T03:27:47.361+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 395,
+   "error": null,
+   "preview": "{\"ticker\": \"CSCO\", \"last_date\": \"2025-07-31\", \"last_close\": 66.7, \"ret_1d\": -0.0029, \"ret_5d\": -0.0031, \"ret_20d\": -0.0015, \"ret_60d\": 0.1546, \"vol_20d_annualized\": 0.125, \"closes_last_30\": [64.12, 64"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "CSCO",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:47.361+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4284,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/csco\", \"captured_utc\": \"2025-07-11T01:52:16+00:00\", \"title\": \"CSCO Stock Price | Cisco Systems Inc. Stock Quote (U.S.: Nas"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "CSCO",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:27:47.362+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 2176,
+   "error": null,
+   "preview": "{\"ticker\": \"CSCO\", \"cik\": 858877, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-06-09\", \"accepted_utc_latest\": \"2025-06-10T01:45:23+00:00\", \"items\": \"5.02\", \"url\": \"https://www.sec.gov/Archives/edgar/dat"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/858877/000085887725000046/csco-20250605.htm"
+   },
+   "started": "2026-09-25T03:27:47.362+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 382,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000858877-25-000046.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/858877/000085887725000046/0000858877-25-000046.txt\"}, {\"name\": \"csco-20250605.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/858877/000085887725000021/csco-20250509.htm"
+   },
+   "started": "2026-09-25T03:27:47.362+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 382,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000858877-25-000021.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/858877/000085887725000021/0000858877-25-000021.txt\"}, {\"name\": \"csco-20250509.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/858877/000119312525119864/d946014d8k.htm"
+   },
+   "started": "2026-09-25T03:27:47.362+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 501,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-119864.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/858877/000119312525119864/0001193125-25-119864.txt\"}, {\"name\": \"d946014d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/858877/000085887725000014/csco-20250512.htm"
+   },
+   "started": "2026-09-25T03:27:47.362+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 382,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000858877-25-000014.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/858877/000085887725000014/0000858877-25-000014.txt\"}, {\"name\": \"csco-20250512.htm\", \"url\": \"https://"
+  }
+ ],
+ "llm_calls": 4,
+ "attempts": 1,
+ "elapsed_s": 7.6,
+ "window": "clean",
+ "screen_score": 0.7625,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

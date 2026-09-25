@@ -1,0 +1,229 @@
+{
+ "ticker": "WMT",
+ "as_of": "2025-03-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 3.533398470494368e-05,
+ "logprob_mass": 1.000000065718076,
+ "logodds": -10.250629983035699,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The 20-day return for WMT is negative (-9.79%), but there is no strong news or filings indicating a significant directional move. The stock's recent performance and market conditions suggest a probability close to a coin flip, with a slight edge toward a rise.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/104169/000010416925000027/wmt-20250317.htm",
+  "https://www.sec.gov/Archives/edgar/data/104169/000010416925000025/wmt-20250317.htm",
+  "https://www.sec.gov/Archives/edgar/data/104169/000010416925000010/wmt-20250220.htm",
+  "https://www.sec.gov/Archives/edgar/data/104169/000010416924000173/wmt-20241122.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting WMT.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "WMT",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "WMT",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "WMT",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any material news that could impact WMT's stock price over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416925000027/wmt-20250317.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416925000025/wmt-20250317.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416925000010/wmt-20250220.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416924000173/wmt-20241122.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price data shows a negative 20-day return, but no strong news or filings indicate a significant directional move. The probability is close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "WMT",
+    "days": 20
+   },
+   "started": "2026-09-25T03:26:33.526+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 332,
+   "error": null,
+   "preview": "{\"ticker\": \"WMT\", \"last_date\": \"2025-03-31\", \"last_close\": 86.64, \"ret_1d\": 0.031, \"ret_5d\": 0.0034, \"ret_20d\": -0.0979, \"ret_60d\": null, \"vol_20d_annualized\": 0.321, \"closes_last_30\": [96.05, 93.47, "
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "WMT",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:26:33.527+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4282,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/wmt\", \"captured_utc\": \"2025-03-06T10:31:43+00:00\", \"title\": \"WMT Stock Price | Walmart Inc. Stock Quote (U.S.: NYSE) | Mar"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "WMT",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:26:33.527+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1155,
+   "error": null,
+   "preview": "{\"ticker\": \"WMT\", \"cik\": 104169, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-03-17\", \"accepted_utc_latest\": \"2025-03-18T01:43:00+00:00\", \"items\": \"8.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416925000027/wmt-20250317.htm"
+   },
+   "started": "2026-09-25T03:26:33.527+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 380,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000104169-25-000027.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/104169/000010416925000027/0000104169-25-000027.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416925000025/wmt-20250317.htm"
+   },
+   "started": "2026-09-25T03:26:33.527+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 380,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000104169-25-000025.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/104169/000010416925000025/0000104169-25-000025.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416925000010/wmt-20250220.htm"
+   },
+   "started": "2026-09-25T03:26:33.527+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 668,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000104169-25-000010.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/104169/000010416925000010/0000104169-25-000010.txt\"}, {\"name\": \"earningspresentationfy25.htm\", \"url\""
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/104169/000010416924000173/wmt-20241122.htm"
+   },
+   "started": "2026-09-25T03:26:33.527+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 380,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000104169-24-000173.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/104169/000010416924000173/0000104169-24-000173.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov"
+  }
+ ],
+ "llm_calls": 3,
+ "attempts": 1,
+ "elapsed_s": 8.8,
+ "window": "clean",
+ "screen_score": 0.6925,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

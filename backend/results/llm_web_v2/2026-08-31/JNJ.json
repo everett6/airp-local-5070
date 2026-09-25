@@ -1,0 +1,220 @@
+{
+ "ticker": "JNJ",
+ "as_of": "2026-08-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9997047497213064,
+ "logprob_mass": 1.0000000426611064,
+ "logodds": 8.127391865089866,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a 5.01% return over 20 days, and the news indicates strong performance with positive earnings guidance. However, there is no specific recent news or filings that would significantly impact the stock's movement over the next 20 trading days, so the probability remains close to a coin flip.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/200406/000020040626000167/jnj-20260804.htm",
+  "https://finance.yahoo.com/quote/JNJ/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to identify any factors that might influence the stock's movement over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "JNJ",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "JNJ",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "JNJ",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for earnings news and other relevant information that could impact the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000167/jnj-20260804.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000163/jnj-20260729.htm"
+     },
+     "ok": false
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000155/jnj-20260727.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000146/jnj-20260715.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price history shows a positive return over 20 days, and the news indicates strong performance with positive earnings guidance. However, without specific recent news or filings impacting the stock, the probability remains close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "JNJ",
+    "days": 260
+   },
+   "started": "2026-09-25T03:53:31.477+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 428,
+   "error": null,
+   "preview": "{\"ticker\": \"JNJ\", \"last_date\": \"2026-08-31\", \"last_close\": 265.85, \"ret_1d\": -0.0082, \"ret_5d\": -0.0215, \"ret_20d\": 0.0501, \"ret_60d\": 0.1709, \"vol_20d_annualized\": 0.192, \"closes_last_30\": [249.38, 2"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "JNJ",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:53:31.479+00:00",
+   "ok": true,
+   "elapsed_ms": 1893,
+   "chars": 2210,
+   "error": null,
+   "preview": "{\"ticker\": \"JNJ\", \"cik\": 200406, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-08-04\", \"accepted_utc_latest\": \"2026-08-04T17:48:52+00:00\", \"items\": \"5.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "JNJ",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:53:31.478+00:00",
+   "ok": true,
+   "elapsed_ms": 2481,
+   "chars": 2653,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/JNJ/\", \"captured_utc\": \"2026-08-30T13:25:53+00:00\", \"title\": \"Johnson & Johnson (JNJ) Stock Price, News, Quote & History - Yahoo Finance\", \""
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000167/jnj-20260804.htm"
+   },
+   "started": "2026-09-25T03:53:39.565+00:00",
+   "ok": true,
+   "elapsed_ms": 2702,
+   "chars": 519,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000200406-26-000167.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/200406/000020040626000167/0000200406-26-000167.txt\"}, {\"name\": \"jnj-20260804.htm\", \"url\": \"https://w"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000155/jnj-20260727.htm"
+   },
+   "started": "2026-09-25T03:53:39.565+00:00",
+   "ok": true,
+   "elapsed_ms": 2705,
+   "chars": 499,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000200406-26-000155.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/200406/000020040626000155/0000200406-26-000155.txt\"}, {\"name\": \"exhibit991.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000146/jnj-20260715.htm"
+   },
+   "started": "2026-09-25T03:53:39.565+00:00",
+   "ok": true,
+   "elapsed_ms": 2776,
+   "chars": 646,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000200406-26-000146.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/200406/000020040626000146/0000200406-26-000146.txt\"}, {\"name\": \"a2026q2exhibit991.htm\", \"url\": \"http"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000163/jnj-20260729.htm"
+   },
+   "started": "2026-09-25T03:53:39.565+00:00",
+   "ok": false,
+   "elapsed_ms": 30001,
+   "chars": 0,
+   "error": "timed out",
+   "preview": ""
+  }
+ ],
+ "llm_calls": 29,
+ "attempts": 1,
+ "elapsed_s": 54.5,
+ "window": "clean",
+ "screen_score": 0.75,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

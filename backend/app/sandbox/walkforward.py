@@ -122,10 +122,12 @@ class OllamaLLM:
             return self._cache[key]
         body: dict[str, Any] = {
             "model": self.model, "stream": False, "think": False, "format": "json",
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            # an empty system prompt is left out (template-driven models such as NuExtract take only a user turn)
+            "messages": ([{"role": "system", "content": system}] if system else []) + [{"role": "user",
+                                                                                    "content": user}],
             "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": self.num_predict},
         }
-        if mode in ("updown", "lap"):
+        if mode in ("updown", "updown_lo", "buypass_lo", "lap"):
             del body["format"]
             body["options"]["num_predict"] = 1
             body |= {"logprobs": True, "top_logprobs": 20}
@@ -142,6 +144,14 @@ class OllamaLLM:
                         p_up, mass = updown_probability(data.get("logprobs") or [])
                         self.updown_no_mass += int(round(mass, 6) == 0)  # same rule as a replayed answer
                         text = json.dumps({"p_up": round(p_up, 6), "mass": round(mass, 6), "token": text[:12]})
+                    elif mode == "updown_lo":
+                        p_up, mass = updown_probability(data.get("logprobs") or [])
+                        lo, censored = updown_logodds(data.get("logprobs") or [])
+                        text = json.dumps({"p_up": p_up, "mass": mass, "logodds": lo, "censored": censored,
+                                           "token": text[:12]})
+                    elif mode == "buypass_lo":
+                        lo, mass, censored = pair_logodds(data.get("logprobs") or [], "BUY", "PASS")
+                        text = json.dumps({"logodds": lo, "mass": mass, "censored": censored, "token": text[:12]})
                     elif mode == "lap":
                         probs = word_probabilities(data.get("logprobs") or [], ("UP", "DOWN", "UNKNOWN"))
                         text = json.dumps({k.lower(): round(v, 6) for k, v in probs.items()} | {"token": text[:12]})
@@ -159,6 +169,14 @@ class OllamaLLM:
             self._cache[key] = text
             _append_line(self._cache_path, json.dumps({"k": key, "v": text}))
         return text
+
+    async def unload(self) -> None:
+        """Free the GPU now instead of after Ollama's 5-minute keep-alive, so the next job's model (possibly on
+        another Ollama server) never has to share the 12 GB with this one."""
+        try:
+            await self._client.post(f"{self.base_url}/api/generate", json={"model": self.model, "keep_alive": 0})
+        except httpx.HTTPError:
+            pass
 
     async def _check_on_gpu(self) -> None:
         r = await self._client.get(f"{self.base_url}/api/ps")
@@ -201,6 +219,35 @@ def updown_probability(logprobs: list[dict[str, Any]]) -> tuple[float, float]:
     if up + down <= 0:
         return 0.5, 0.0
     return up / (up + down), up + down
+
+
+def pair_logodds(logprobs: list[dict[str, Any]], yes: str, no: str) -> tuple[float, float, bool]:
+    """(log P(yes) - log P(no), P(yes)+P(no), censored) at the first token, as `updown_logodds` for any word pair."""
+    probs = word_probabilities(logprobs, (yes, no))
+    a, b = probs[yes], probs[no]
+    if a <= 0 and b <= 0:
+        return 0.0, 0.0, True
+    cands = logprobs[0].get("top_logprobs") or []
+    floor = min((float(c["logprob"]) for c in cands), default=-30.0)
+    la = math.log(a) if a > 0 else floor
+    lb = math.log(b) if b > 0 else floor
+    return la - lb, a + b, a <= 0 or b <= 0
+
+
+def updown_logodds(logprobs: list[dict[str, Any]]) -> tuple[float, bool]:
+    """log P(UP) - log P(DOWN) at the first generated token, unrounded, so near-certain answers still rank.
+    When one word is missing from the top candidates its probability is below the least likely candidate listed;
+    that bound is used and `censored` is True (the true value is further from 0)."""
+    probs = word_probabilities(logprobs, ("UP", "DOWN"))
+    up, down = probs["UP"], probs["DOWN"]
+    if up <= 0 and down <= 0:
+        return 0.0, True
+    first = logprobs[0]
+    cands = first.get("top_logprobs") or []
+    floor = min((float(c["logprob"]) for c in cands), default=-30.0)
+    lu = math.log(up) if up > 0 else floor
+    ld = math.log(down) if down > 0 else floor
+    return lu - ld, up <= 0 or down <= 0
 
 
 def _append_line(path: Path, line: str) -> None:

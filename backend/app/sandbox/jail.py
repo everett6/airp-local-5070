@@ -106,7 +106,7 @@ def build_command(allow_unjailed: bool = False, worker: Path = WORKER_PATH,
 LLMFn = Any  # async (system: str, user: str, mode: str = ...) -> str
 # request modes the agent may ask for; None = ordinary text completion. "updown" = one-word UP/DOWN answer scored
 # from token log-probabilities (the LLM function must accept mode=... to be used with it)
-LLM_MODES = (None, "updown")
+LLM_MODES = (None, "updown", "updown_lo")
 ToolExecutor = Any  # object with async execute(list[dict]) -> dict[str, dict]; see app/tools/gateway.py
 
 

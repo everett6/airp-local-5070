@@ -1,0 +1,181 @@
+{
+ "ticker": "C",
+ "as_of": "2026-06-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9992467276534094,
+ "logprob_mass": 0.9999999970034955,
+ "logodds": 7.190330157297594,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a 8.42% return over 20 days, suggesting a slight upward trend. However, there is no strong news or SEC filings indicating a clear direction for the stock. The recent news articles are general and do not specifically mention Citigroup. Therefore, the probability of the stock closing higher in the next 20 trading days is moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/831001/000110465926065155/c-20260520x8k.htm",
+  "https://www.cnbc.com/quotes/C/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to identify any factors that might influence the stock's movement over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "C",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "C",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "C",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for relevant information and check for any recent news that could impact the stock's performance.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/831001/000110465926065155/c-20260520x8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Citigroup"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The stock has shown positive returns over 20 days, but no strong news or filings indicate a clear direction. The probability is moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "C",
+    "days": 20
+   },
+   "started": "2026-09-25T03:48:56.837+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 352,
+   "error": null,
+   "preview": "{\"ticker\": \"C\", \"last_date\": \"2026-06-30\", \"last_close\": 139.25, \"ret_1d\": -0.0178, \"ret_5d\": -0.0346, \"ret_20d\": 0.0842, \"ret_60d\": null, \"vol_20d_annualized\": 0.269, \"closes_last_30\": [128.44, 130.6"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "C",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:48:56.839+00:00",
+   "ok": true,
+   "elapsed_ms": 1967,
+   "chars": 1175,
+   "error": null,
+   "preview": "{\"ticker\": \"C\", \"cik\": 831001, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-05-21\", \"accepted_utc_latest\": \"2026-05-22T01:15:55+00:00\", \"items\": \"5.02,5.07,9.01\", \"url\": \"https://www.sec.gov/Archives/ed"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "C",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:48:56.838+00:00",
+   "ok": true,
+   "elapsed_ms": 2143,
+   "chars": 3109,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/C/\", \"captured_utc\": \"2026-06-09T23:07:25+00:00\", \"title\": \"C: Citigroup Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Last NASD"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/831001/000110465926065155/c-20260520x8k.htm"
+   },
+   "started": "2026-09-25T03:49:04.245+00:00",
+   "ok": true,
+   "elapsed_ms": 169,
+   "chars": 648,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-26-065155.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/831001/000110465926065155/0001104659-26-065155.txt\"}, {\"name\": \"c-20260520x8k.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Citigroup",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:49:04.245+00:00",
+   "ok": true,
+   "elapsed_ms": 2860,
+   "chars": 4159,
+   "error": null,
+   "preview": "{\"title\": \"Citigroup\", \"revision_time\": \"2026-06-15T15:24:01Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1359486894\", \"text\": \"American multinational investment bank and financial services c"
+  }
+ ],
+ "llm_calls": 13,
+ "attempts": 1,
+ "elapsed_s": 26.0,
+ "window": "clean",
+ "screen_score": 0.65,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

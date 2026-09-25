@@ -1,0 +1,228 @@
+{
+ "ticker": "GS",
+ "as_of": "2025-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.01829172566081229,
+ "logprob_mass": 1.000000075069101,
+ "logodds": -3.982845383330702,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a slight decline over 20 days, but no strong trend. The recent 8-K filings and news do not indicate any major events that would significantly impact the stock over the next 20 days. Therefore, the probability of GS closing higher is close to a coin flip, slightly favoring an upward move.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/886982/000119312525093530/d787120d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/886982/000119312525091404/d933184d8k.htm",
+  "https://www.cnbc.com/quotes/GS"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Collect recent price data, news, and 8-K filings to assess the context for GS's stock movement.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "GS",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "GS",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "GS",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filings and news to identify any significant events that may impact GS's stock price over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525093530/d787120d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525091404/d933184d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525079625/d750054d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525036755/d847633d8k.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "GS's recent price performance shows mixed short-term trends, but no strong signals of upcoming significant events. The 8-K filings and news do not indicate any major catalysts that would strongly influence the stock over the next 20 days. Given the lack of strong evidence, the probability remains close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "GS",
+    "days": 260
+   },
+   "started": "2026-09-25T03:27:12.932+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 429,
+   "error": null,
+   "preview": "{\"ticker\": \"GS\", \"last_date\": \"2025-04-30\", \"last_close\": 531.48, \"ret_1d\": -0.0025, \"ret_5d\": 0.0345, \"ret_20d\": -0.0016, \"ret_60d\": -0.1298, \"vol_20d_annualized\": 0.678, \"closes_last_30\": [540.98, 5"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "GS",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:12.932+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 2478,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/GS\", \"captured_utc\": \"2025-04-26T12:19:11+00:00\", \"title\": \"GS: Goldman Sachs Group Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote "
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "GS",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:27:12.932+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1159,
+   "error": null,
+   "preview": "{\"ticker\": \"GS\", \"cik\": 886982, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-04-24\", \"accepted_utc_latest\": \"2025-04-25T01:15:31+00:00\", \"items\": \"5.02,5.07\", \"url\": \"https://www.sec.gov/Archives/edgar/"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525093530/d787120d8k.htm"
+   },
+   "started": "2026-09-25T03:27:12.932+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 376,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-093530.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/886982/000119312525093530/0001193125-25-093530.txt\"}, {\"name\": \"d787120d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525091404/d933184d8k.htm"
+   },
+   "started": "2026-09-25T03:27:12.932+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 499,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-091404.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/886982/000119312525091404/0001193125-25-091404.txt\"}, {\"name\": \"d933184d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525079625/d750054d8k.htm"
+   },
+   "started": "2026-09-25T03:27:12.932+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 626,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-079625.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/886982/000119312525079625/0001193125-25-079625.txt\"}, {\"name\": \"d750054d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312525036755/d847633d8k.htm"
+   },
+   "started": "2026-09-25T03:27:12.932+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 501,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-036755.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/886982/000119312525036755/0001193125-25-036755.txt\"}, {\"name\": \"d847633d8k.htm\", \"url\": \"https://www"
+  }
+ ],
+ "llm_calls": 4,
+ "attempts": 1,
+ "elapsed_s": 3.4,
+ "window": "clean",
+ "screen_score": 0.6725000000000001,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

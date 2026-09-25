@@ -1,0 +1,187 @@
+{
+ "ticker": "MA",
+ "as_of": "2025-07-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.055053493597781125,
+ "logprob_mass": 1.0000000589430893,
+ "logodds": -2.8428229954879964,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a slight positive return over 20 days (1.02%), but the volatility is moderate (annualized 13.8%). Recent news includes partnerships and stablecoin initiatives, which could have mixed impacts. However, there is no strong evidence of a clear upward or downward trend. Given the lack of strong signals, the probability is estimated between 0.40 and 0.60, leaning slightly higher at 0.55.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1141391/000114139125000170/ma-20250731.htm",
+  "https://www.marketwatch.com/investing/stock/ma"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess the stock's recent performance and any relevant events.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "MA",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "MA",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "MA",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for relevant information and check for any recent news that could impact the stock's performance.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139125000170/ma-20250731.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "Mastercard Inc.",
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Summarize the evidence and estimate the probability based on recent performance and news.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "MA",
+    "days": 20
+   },
+   "started": "2026-09-25T03:28:13.992+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 350,
+   "error": null,
+   "preview": "{\"ticker\": \"MA\", \"last_date\": \"2025-07-31\", \"last_close\": 562.96, \"ret_1d\": 0.0132, \"ret_5d\": 0.0053, \"ret_20d\": 0.0102, \"ret_60d\": null, \"vol_20d_annualized\": 0.138, \"closes_last_30\": [557.29, 564.95"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "MA",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:28:13.992+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4275,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/ma\", \"captured_utc\": \"2025-07-25T14:52:47+00:00\", \"title\": \"MA Stock Price | Mastercard Inc. Stock Quote (U.S.: NYSE) | Ma"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "MA",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:28:13.992+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1174,
+   "error": null,
+   "preview": "{\"ticker\": \"MA\", \"cik\": 1141391, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-07-31\", \"accepted_utc_latest\": \"2025-07-31T17:03:19+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1141391/000114139125000170/ma-20250731.htm"
+   },
+   "started": "2026-09-25T03:28:13.992+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 533,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001141391-25-000170.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1141391/000114139125000170/0001141391-25-000170.txt\"}, {\"name\": \"ma-20250731.htm\", \"url\": \"https://w"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_search",
+   "args": {
+    "query": "Mastercard Inc.",
+    "limit": 5
+   },
+   "started": "2026-09-25T03:28:13.992+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 172,
+   "error": null,
+   "preview": "{\"query\": \"Mastercard Inc.\", \"titles\": [\"Mastercard\", \"Debit Mastercard\", \"Mastercard Foundation\", \"Visa Inc.\", \"Maestro (debit card)\"], \"note\": \"read one with wiki_as_of\"}"
+  }
+ ],
+ "llm_calls": 3,
+ "attempts": 1,
+ "elapsed_s": 2.4,
+ "window": "clean",
+ "screen_score": 0.645,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

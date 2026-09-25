@@ -36,6 +36,20 @@ tie-breaks, and beta/alpha against SPY. Best result: +62% vs SPY's +18%, but it 
 in a rising year (alpha +25%, 95% CI −20% to +71%), and the same model came last in the 20-day run. See
 [`docs/SIMULATOR.md`](docs/SIMULATOR.md).
 
+### 16 years, and an LLM that researches the internet as of each date
+
+`scripts/build_history.py` builds a point-in-time S&P 500 top-100 universe for every year from 2010 to 2026:
+Wikipedia revisions for membership, free Yahoo prices. `scripts/longrun.py` paper-trades the no-LLM strategies
+over 2011–2026. Momentum made 19.9% a year vs SPY's 14.0%, but its alpha after beta, +4.0% a year
+(95% CI −4.3% to +12.1%), is not distinguishable from zero. The learned model did worse than the simple rules.
+
+`app/tools/asof.py` gives the jailed LLM internet tools that return only what existed at the decision time:
+Wikipedia revisions, SEC filings already accepted, and Internet Archive captures of news pages.
+`scripts/llm_web_backtest.py` has it re-rank each month's 20 screened stocks, and `scripts/llm_web_report.py`
+tests whether it beats the screen. Only 2025–2026 decisions count as evidence, because the model may remember
+earlier years. Result on 400 clean decisions (Feb 2025 – Sep 2026): the LLM's ranking skill was −0.07 (95% CI −0.19 to +0.04),
+no better than the screen it re-ranks, and its top 10 made +4.2% vs SPY's +30.8%. See [`docs/LONG_HISTORY.md`](docs/LONG_HISTORY.md).
+
 ### Live, web-informed research
 
 ```bash
@@ -137,7 +151,7 @@ airp-local/
 │   │   ├── agents/         specialist agents
 │   │   ├── data_ingestion/ connectors — sandbox-aware mock connectors included
 │   │   └── api/routes/     FastAPI routes, including /api/sandbox/*
-│   └── tests/              pytest — 314 tests
+│   └── tests/              pytest — 332 tests
 ├── frontend/               Next.js + TypeScript UI (Sandbox page is live)
 └── docs/                   ARCHITECTURE, API_SPEC, AGENT_INTERFACES, ROADMAP,
                             LOCAL_SETUP (two-GPU walkthrough), SANDBOX,

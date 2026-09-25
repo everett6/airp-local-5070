@@ -1,0 +1,226 @@
+{
+ "ticker": "V",
+ "as_of": "2025-03-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9595106125996747,
+ "logprob_mass": 1.0000000046411703,
+ "logodds": 3.1653834756626162,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The stock has shown a slight decline over the past 20 days (-3.14%) and a moderate increase over 60 days (11.08%). The recent news and filings do not indicate any major events that would significantly impact the stock's direction. Given the lack of strong evidence, the probability of the stock closing higher is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1403161/000140316125000016/v-20250128.htm",
+  "https://www.marketwatch.com/investing/stock/v"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to identify any factors that may influence the stock's movement over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "V",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "V",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "V",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filings and price history to assess any recent events or trends that may influence the stock's movement over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316125000016/v-20250128.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316125000010/v-20250128.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316124000053/v-20241029.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316124000050/v-20241011.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price history and news, there is no strong evidence to suggest a significant upward or downward movement in the next 20 trading days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "V",
+    "days": 60
+   },
+   "started": "2026-09-25T03:24:26.608+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 424,
+   "error": null,
+   "preview": "{\"ticker\": \"V\", \"last_date\": \"2025-03-31\", \"last_close\": 346.49, \"ret_1d\": 0.0222, \"ret_5d\": 0.0192, \"ret_20d\": -0.0314, \"ret_60d\": 0.1108, \"vol_20d_annualized\": 0.242, \"closes_last_30\": [352.69, 351."
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "V",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:24:26.608+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1159,
+   "error": null,
+   "preview": "{\"ticker\": \"V\", \"cik\": 1403161, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-01-30\", \"accepted_utc_latest\": \"2025-01-31T02:05:52+00:00\", \"items\": \"2.02,8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/e"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "V",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:24:26.608+00:00",
+   "ok": true,
+   "elapsed_ms": 1948,
+   "chars": 4278,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/v\", \"captured_utc\": \"2025-03-19T23:52:11+00:00\", \"title\": \"V Stock Price | Visa Inc. Cl A Stock Quote (U.S.: NYSE) | Marke"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316125000016/v-20250128.htm"
+   },
+   "started": "2026-09-25T03:24:33.332+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 521,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001403161-25-000016.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1403161/000140316125000016/0001403161-25-000016.txt\"}, {\"name\": \"q12025earningsrelease.htm\", \"url\": "
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316125000010/v-20250128.htm"
+   },
+   "started": "2026-09-25T03:24:33.332+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 379,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001403161-25-000010.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1403161/000140316125000010/0001403161-25-000010.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.go"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316124000053/v-20241029.htm"
+   },
+   "started": "2026-09-25T03:24:33.332+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 521,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001403161-24-000053.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1403161/000140316124000053/0001403161-24-000053.txt\"}, {\"name\": \"q42024earningsrelease.htm\", \"url\": "
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1403161/000140316124000050/v-20241011.htm"
+   },
+   "started": "2026-09-25T03:24:33.332+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 379,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001403161-24-000050.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1403161/000140316124000050/0001403161-24-000050.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.go"
+  }
+ ],
+ "llm_calls": 4,
+ "attempts": 1,
+ "elapsed_s": 10.3,
+ "window": "clean",
+ "screen_score": 0.745,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

@@ -1,0 +1,221 @@
+{
+ "ticker": "NEE",
+ "as_of": "2026-05-29T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.6886531939980739,
+ "logprob_mass": 0.9999999793481857,
+ "logodds": 0.7938303746892019,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "NEE has shown a negative return over the past 20 days (-11.11%) and a moderate volatility (annualized 25.6%). However, the company reported strong Q1 earnings with a 10% increase in adjusted EPS year-over-year, and there are positive signals about its focus on natural gas projects and data center demand. These factors suggest a moderate probability of the stock closing higher in the next 20 trading days.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/753308/000075330826000041/nee-20260521.htm",
+  "https://www.sec.gov/Archives/edgar/data/753308/000075330826000039/nee-20260526.htm",
+  "https://finance.yahoo.com/quote/NEE/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting NEE.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "NEE",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "NEE",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "NEE",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for insights into recent developments affecting NEE's stock performance.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/753308/000075330826000041/nee-20260521.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/753308/000075330826000039/nee-20260526.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/753308/000110465926063001/tm2614888d1_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/753308/000110465926062992/tm2614888d2_8k.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on recent price performance and news, the probability of NEE closing higher in 20 trading days is moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "NEE",
+    "days": 260
+   },
+   "started": "2026-09-25T03:44:49.056+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 401,
+   "error": null,
+   "preview": "{\"ticker\": \"NEE\", \"last_date\": \"2026-05-29\", \"last_close\": 85.73, \"ret_1d\": -0.0028, \"ret_5d\": -0.0299, \"ret_20d\": -0.1111, \"ret_60d\": -0.0604, \"vol_20d_annualized\": 0.256, \"closes_last_30\": [90.63, 9"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "NEE",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:44:49.058+00:00",
+   "ok": true,
+   "elapsed_ms": 1249,
+   "chars": 1174,
+   "error": null,
+   "preview": "{\"ticker\": \"NEE\", \"cik\": 753308, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-05-27\", \"accepted_utc_latest\": \"2026-05-28T02:08:00+00:00\", \"items\": \"5.07\", \"url\": \"https://www.sec.gov/Archives/edgar/data"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "NEE",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:44:49.057+00:00",
+   "ok": true,
+   "elapsed_ms": 1789,
+   "chars": 4243,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/NEE/\", \"captured_utc\": \"2026-05-09T16:36:27+00:00\", \"title\": \"NextEra Energy, Inc. (NEE) Stock Price, News, Quote & History - Yahoo Finance\""
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/753308/000110465926062992/tm2614888d2_8k.htm"
+   },
+   "started": "2026-09-25T03:45:01.002+00:00",
+   "ok": true,
+   "elapsed_ms": 545,
+   "chars": 384,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-26-062992.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/753308/000110465926062992/0001104659-26-062992.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/753308/000110465926063001/tm2614888d1_8k.htm"
+   },
+   "started": "2026-09-25T03:45:01.002+00:00",
+   "ok": true,
+   "elapsed_ms": 693,
+   "chars": 787,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-26-063001.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/753308/000110465926063001/0001104659-26-063001.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/753308/000075330826000039/nee-20260526.htm"
+   },
+   "started": "2026-09-25T03:45:01.001+00:00",
+   "ok": true,
+   "elapsed_ms": 774,
+   "chars": 682,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000753308-26-000039.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/753308/000075330826000039/0000753308-26-000039.txt\"}, {\"name\": \"exhibit5atonee-fpl8xkdated.htm\", \"ur"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/753308/000075330826000041/nee-20260521.htm"
+   },
+   "started": "2026-09-25T03:45:01.001+00:00",
+   "ok": true,
+   "elapsed_ms": 896,
+   "chars": 380,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000753308-26-000041.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/753308/000075330826000041/0000753308-26-000041.txt\"}, {\"name\": \"nee-20260521.htm\", \"url\": \"https://w"
+  }
+ ],
+ "llm_calls": 15,
+ "attempts": 1,
+ "elapsed_s": 34.5,
+ "window": "clean",
+ "screen_score": 0.72,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

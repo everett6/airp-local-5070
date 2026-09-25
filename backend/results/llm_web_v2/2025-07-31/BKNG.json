@@ -1,0 +1,187 @@
+{
+ "ticker": "BKNG",
+ "as_of": "2025-07-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9999871043198255,
+ "logprob_mass": 1.000000083634386,
+ "logodds": 11.258605277120383,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "BKNG's 20-day return was -3.47%, indicating a slight decline, but recent news highlights positive sentiment around travel spending and AI initiatives. Analysts have raised price targets, suggesting some optimism. However, without strong evidence of a clear trend or catalyst, the probability remains close to a coin flip, with a slight edge toward upward movement.",
+ "sources": [
+  "https://www.cnbc.com/quotes/BKNG",
+  "https://www.sec.gov/Archives/edgar/data/1075531/000107553125000035/bkng-20250729.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to identify any factors that might influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "BKNG",
+      "days": 200
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "BKNG",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "BKNG",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any significant news or events that could impact BKNG's stock price over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1075531/000107553125000035/bkng-20250729.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "Booking Holdings Inc.",
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "BKNG's recent performance shows a slight decline over 20 days, but there is positive analyst sentiment and recent news about travel spending and AI initiatives. However, without strong evidence of a clear trend or catalyst, the probability remains close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "BKNG",
+    "days": 200
+   },
+   "started": "2026-09-25T03:27:48.444+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 431,
+   "error": null,
+   "preview": "{\"ticker\": \"BKNG\", \"last_date\": \"2025-07-31\", \"last_close\": 217.79, \"ret_1d\": -0.0194, \"ret_5d\": -0.0258, \"ret_20d\": -0.0347, \"ret_60d\": 0.0621, \"vol_20d_annualized\": 0.175, \"closes_last_30\": [209.17,"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "BKNG",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:48.444+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1631,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/BKNG\", \"captured_utc\": \"2025-07-16T15:44:47+00:00\", \"title\": \"BKNG: Booking Holdings Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "BKNG",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:27:48.444+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1183,
+   "error": null,
+   "preview": "{\"ticker\": \"BKNG\", \"cik\": 1075531, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-07-29\", \"accepted_utc_latest\": \"2025-07-30T01:02:23+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edg"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1075531/000107553125000035/bkng-20250729.htm"
+   },
+   "started": "2026-09-25T03:27:48.444+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 533,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001075531-25-000035.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1075531/000107553125000035/0001075531-25-000035.txt\"}, {\"name\": \"bkng-20250729.htm\", \"url\": \"https:/"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_search",
+   "args": {
+    "query": "Booking Holdings Inc.",
+    "limit": 1
+   },
+   "started": "2026-09-25T03:27:48.444+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 102,
+   "error": null,
+   "preview": "{\"query\": \"Booking Holdings Inc.\", \"titles\": [\"Booking Holdings\"], \"note\": \"read one with wiki_as_of\"}"
+  }
+ ],
+ "llm_calls": 4,
+ "attempts": 1,
+ "elapsed_s": 7.2,
+ "window": "clean",
+ "screen_score": 0.7575,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

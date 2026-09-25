@@ -1,0 +1,186 @@
+{
+ "ticker": "IBM",
+ "as_of": "2025-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 1.1147775731838782e-05,
+ "logprob_mass": 1.0000000376878133,
+ "logodds": -11.404259418053984,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "IBM's 20-day return was -3.4%, indicating a slight decline. The recent news and SEC filings do not show any strong positive or negative catalysts that would significantly impact the stock's direction over the next 20 trading days. Given the lack of strong evidence, the probability of IBM closing higher is close to a coin flip, slightly favoring an upward move.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/51143/000005114325000035/ibm-20250429.htm",
+  "https://www.marketwatch.com/investing/stock/ibm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess IBM's recent performance and any potential catalysts.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "IBM",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "IBM",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "IBM",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for insights into IBM's performance and any potential catalysts affecting its stock.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114325000035/ibm-20250429.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "International Business Machines Corporation"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "IBM's recent price performance shows a slight decline over 20 days, and there is no strong news or filing indicating a significant catalyst. The probability of IBM closing higher in the next 20 trading days is close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "IBM",
+    "days": 20
+   },
+   "started": "2026-09-25T03:27:11.112+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"IBM\", \"last_date\": \"2025-04-30\", \"last_close\": 232.56, \"ret_1d\": 0.0102, \"ret_5d\": -0.0149, \"ret_20d\": -0.034, \"ret_60d\": null, \"vol_20d_annualized\": 0.466, \"closes_last_30\": [240.76, 240."
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "IBM",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:11.112+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4298,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/ibm\", \"captured_utc\": \"2025-04-24T16:29:01+00:00\", \"title\": \"IBM Stock Price | International Business Machines Corp. Stock"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "IBM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:27:11.112+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1160,
+   "error": null,
+   "preview": "{\"ticker\": \"IBM\", \"cik\": 51143, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-04-29\", \"accepted_utc_latest\": \"2025-04-29T20:22:17+00:00\", \"items\": \"8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114325000035/ibm-20250429.htm"
+   },
+   "started": "2026-09-25T03:27:11.112+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 493,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000051143-25-000035.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/51143/000005114325000035/0000051143-25-000035.txt\"}, {\"name\": \"ibm-20250429.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "International Business Machines Corporation",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:11.112+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4150,
+   "error": null,
+   "preview": "{\"title\": \"IBM\", \"revision_time\": \"2025-04-25T00:28:01Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1287249212\", \"text\": \"American multinational technology corporation\\nFor other uses, see IB"
+  }
+ ],
+ "llm_calls": 4,
+ "attempts": 1,
+ "elapsed_s": 3.5,
+ "window": "clean",
+ "screen_score": 0.685,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

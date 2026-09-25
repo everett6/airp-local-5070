@@ -468,3 +468,17 @@ def test_updown_no_mass_is_counted_on_replay_too(tmp_path, monkeypatch):
     replay = _mock_llm(tmp_path, monkeypatch, handler)
     assert json.loads(asyncio.run(replay("s", "u", mode="updown")))["p_up"] == 0.5
     assert replay.cache_hits == 1 and replay.updown_no_mass == 1
+
+
+def test_updown_logodds_keeps_near_certain_answers_rankable():
+    def lp(up, down, floor=-12.0):
+        top = [{"token": "UP", "logprob": up}, {"token": "x", "logprob": floor}]
+        if down is not None:
+            top.append({"token": "DOWN", "logprob": down})
+        return [{"token": "UP", "logprob": up, "top_logprobs": top}]
+    a, ca = wf.updown_logodds(lp(-1e-7, -16.0))
+    b, cb = wf.updown_logodds(lp(-1e-6, -14.0))
+    assert a > b > 13 and not ca and not cb  # both round to p=1.0, yet still ordered
+    c, cc = wf.updown_logodds(lp(-1e-6, None))  # DOWN not among the candidates: bounded by the least likely one
+    assert cc and c == pytest.approx(-1e-6 + 12.0)
+    assert wf.updown_logodds([]) == (0.0, True)

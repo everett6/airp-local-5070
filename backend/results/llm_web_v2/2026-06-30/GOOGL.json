@@ -1,0 +1,222 @@
+{
+ "ticker": "GOOGL",
+ "as_of": "2026-06-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9996980359389226,
+ "logprob_mass": 1.0000000118620176,
+ "logodds": 8.104900541064685,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The recent news about Alphabet replacing Verizon in the Dow Jones Industrial Average has generated positive sentiment, as seen in the after-hours trading. However, the stock has shown a negative return over the past 20 days, indicating some volatility. The overall market conditions are uncertain, and there are no significant negative events mentioned in the SEC filings. Therefore, the probability of the stock closing higher in the next 20 days is moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1652044/000119312526267578/d57679d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/1652044/000119312526259830/d36818d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000059/goog-20260602.htm",
+  "https://www.sec.gov/Archives/edgar/data/1652044/000119312526257724/d83560d8k.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to identify any factors that might influence the stock's movement over the next 20 days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "GOOGL",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "GOOGL",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "GOOGL",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the recent news and SEC filings to determine if there are any significant events or trends that could influence the stock's movement over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1652044/000119312526267578/d57679d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1652044/000119312526259830/d36818d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000059/goog-20260602.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1652044/000119312526257724/d83560d8k.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent news and SEC filings indicate a positive event with the Dow Jones Industrial Average reshuffle, which may have a short-term positive impact on the stock. However, the stock has shown mixed performance in the past 20 days, and the overall market conditions are uncertain. The probability of the stock closing higher in the next 20 days is moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "GOOGL",
+    "days": 260
+   },
+   "started": "2026-09-25T03:47:23.948+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 427,
+   "error": null,
+   "preview": "{\"ticker\": \"GOOGL\", \"last_date\": \"2026-06-30\", \"last_close\": 357.14, \"ret_1d\": 0.0105, \"ret_5d\": 0.0325, \"ret_20d\": -0.0499, \"ret_60d\": 0.209, \"vol_20d_annualized\": 0.367, \"closes_last_30\": [396.45, 3"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "GOOGL",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:47:23.949+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 1188,
+   "error": null,
+   "preview": "{\"ticker\": \"GOOGL\", \"cik\": 1652044, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-06-11\", \"accepted_utc_latest\": \"2026-06-12T01:17:04+00:00\", \"items\": \"5.02,5.07,9.01\", \"url\": \"https://www.sec.gov/Archiv"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "GOOGL",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:47:23.948+00:00",
+   "ok": true,
+   "elapsed_ms": 54582,
+   "chars": 4244,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/GOOGL/\", \"captured_utc\": \"2026-06-24T04:54:19+00:00\", \"title\": \"Alphabet Inc. (GOOGL) Stock Price, News, Quote & History - Yahoo Finance\", \""
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1652044/000119312526267578/d57679d8k.htm"
+   },
+   "started": "2026-09-25T03:48:27.846+00:00",
+   "ok": true,
+   "elapsed_ms": 558,
+   "chars": 503,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-26-267578.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1652044/000119312526267578/0001193125-26-267578.txt\"}, {\"name\": \"d57679d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1652044/000119312526259830/d36818d8k.htm"
+   },
+   "started": "2026-09-25T03:48:27.847+00:00",
+   "ok": true,
+   "elapsed_ms": 704,
+   "chars": 1357,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-26-259830.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1652044/000119312526259830/0001193125-26-259830.txt\"}, {\"name\": \"d36818d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000059/goog-20260602.htm"
+   },
+   "started": "2026-09-25T03:48:27.847+00:00",
+   "ok": true,
+   "elapsed_ms": 797,
+   "chars": 385,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001652044-26-000059.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1652044/000165204426000059/0001652044-26-000059.txt\"}, {\"name\": \"goog-20260602.htm\", \"url\": \"https:/"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1652044/000119312526257724/d83560d8k.htm"
+   },
+   "started": "2026-09-25T03:48:27.847+00:00",
+   "ok": true,
+   "elapsed_ms": 1000,
+   "chars": 991,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-26-257724.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1652044/000119312526257724/0001193125-26-257724.txt\"}, {\"name\": \"d83560d8k.htm\", \"url\": \"https://www"
+  }
+ ],
+ "llm_calls": 39,
+ "attempts": 1,
+ "elapsed_s": 89.8,
+ "window": "clean",
+ "screen_score": 0.7075,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

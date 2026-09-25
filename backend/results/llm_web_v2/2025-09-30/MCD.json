@@ -1,0 +1,187 @@
+{
+ "ticker": "MCD",
+ "as_of": "2025-09-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9859806271455989,
+ "logprob_mass": 1.000000036156696,
+ "logodds": 4.253196558089376,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The 20-day return for MCD is -3.76%, indicating a slight decline. However, there is positive analyst sentiment, such as Citi raising its price target to a Wall Street high. Additionally, McDonald's announced a $200M investment in regenerative farming practices, which could positively impact the stock. These factors suggest a moderate probability of the stock closing higher in the next 20 trading days.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/63908/000006390825000042/mcd-20250827.htm",
+  "https://www.cnbc.com/quotes/MCD/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess the context for MCD's potential movement.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "MCD",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "MCD",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "MCD",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for relevant news and assess the recent price performance to estimate the probability of MCD closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/63908/000006390825000042/mcd-20250827.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "MCD",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price performance shows a slight decline over 20 days, but there is positive analyst sentiment and a recent investment in regenerative farming practices, which may influence the stock's direction.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "MCD",
+    "days": 260
+   },
+   "started": "2026-09-25T03:28:58.136+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 424,
+   "error": null,
+   "preview": "{\"ticker\": \"MCD\", \"last_date\": \"2025-09-30\", \"last_close\": 296.27, \"ret_1d\": 0.003, \"ret_5d\": 0.0023, \"ret_20d\": -0.0376, \"ret_60d\": 0.0412, \"vol_20d_annualized\": 0.126, \"closes_last_30\": [301.42, 303"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "MCD",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:28:58.137+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 2432,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/MCD/\", \"captured_utc\": \"2025-09-27T13:22:31+00:00\", \"title\": \"MCD: McDonald's Corp - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Las"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "MCD",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:28:58.137+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1154,
+   "error": null,
+   "preview": "{\"ticker\": \"MCD\", \"cik\": 63908, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-08-27\", \"accepted_utc_latest\": \"2025-08-28T01:56:59+00:00\", \"items\": \"8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/63908/000006390825000042/mcd-20250827.htm"
+   },
+   "started": "2026-09-25T03:28:58.137+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 491,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000063908-25-000042.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/63908/000006390825000042/0000063908-25-000042.txt\"}, {\"name\": \"exhibit5.htm\", \"url\": \"https://www.se"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "MCD",
+    "days": 20
+   },
+   "started": "2026-09-25T03:28:58.137+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 350,
+   "error": null,
+   "preview": "{\"ticker\": \"MCD\", \"last_date\": \"2025-09-30\", \"last_close\": 296.27, \"ret_1d\": 0.003, \"ret_5d\": 0.0023, \"ret_20d\": -0.0376, \"ret_60d\": null, \"vol_20d_annualized\": 0.126, \"closes_last_30\": [307.84, 308.4"
+  }
+ ],
+ "llm_calls": 2,
+ "attempts": 1,
+ "elapsed_s": 4.2,
+ "window": "clean",
+ "screen_score": 0.6775,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

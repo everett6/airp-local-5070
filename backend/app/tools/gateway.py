@@ -9,6 +9,10 @@ Modes
             prices, SEC filings, web search (if an API key is configured).
   backtest  the web already contains the future of any past date, so every
             web tool is refused; only offline tools (python) are available.
+  as_of     a backtest with web access limited to dated sources (Wikipedia
+            revisions, SEC filings, Internet Archive captures) checked against
+            the decision time `as_of`; see app/tools/asof.py. Results are kept
+            in a disk cache so a run replays exactly.
 
 Every call is validated against the tool's parameter spec, time-limited, size-
 limited, and recorded in `gateway.log` (and streamed to `on_event`) so a
@@ -17,6 +21,7 @@ decision can always be audited back to exactly what the agent saw.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import math
 import os
@@ -31,6 +36,7 @@ from typing import Any
 from urllib.parse import quote_plus, urlsplit
 
 from app.sandbox.jail import JailLimits, build_command
+from app.tools import asof
 from app.tools.extract import html_to_text, parse_rss
 from app.tools.netguard import FetchError, SafeFetcher
 
@@ -65,6 +71,7 @@ class ToolSpec:
     handler: Handler
     live_only: bool = True
     timeout_s: float = 10.0
+    modes: tuple[str, ...] | None = None  # when set, the only modes that offer this tool
 
     def for_prompt(self) -> dict[str, Any]:
         return {"name": self.name, "description": self.description,
@@ -271,6 +278,43 @@ TOOLS: dict[str, ToolSpec] = {s.name: s for s in [
     ToolSpec("web_search", "General web search (Brave Search API; only if an API key is configured).",
              {"query": Param("str", "search words", required=True, max_len=300),
               "limit": Param("int", "max results", default=8, min=1, max=20)}, _web_search, timeout_s=8),
+    ToolSpec("wiki_as_of", "A Wikipedia article exactly as it read at the decision time (last earlier revision).",
+             {"title": Param("str", "article title, e.g. 'Apple Inc.'", required=True, max_len=200),
+              "max_chars": Param("int", "max characters of text", default=4000, min=500, max=8000)},
+             asof.wiki_as_of, modes=("as_of",), timeout_s=30),
+    ToolSpec("wiki_search", "Find Wikipedia article titles (only articles that existed at the decision time).",
+             {"query": Param("str", "search words", required=True, max_len=200),
+              "limit": Param("int", "max titles", default=5, min=1, max=10)},
+             asof.wiki_search, modes=("as_of",), timeout_s=40),
+    ToolSpec("sec_filings_as_of", "A company's SEC filings accepted before the decision time, newest first.",
+             {"ticker": Param("str", "e.g. AAPL", required=True, max_len=10),
+              "forms": Param("list[str]", "form types", default=["8-K", "10-Q", "10-K"],
+                             choices=("8-K", "10-Q", "10-K", "DEF 14A", "4", "SC 13D", "S-1")),
+              "limit": Param("int", "max filings", default=8, min=1, max=20)},
+             asof.sec_filings_as_of, modes=("as_of",), timeout_s=90),
+    ToolSpec("filing_documents", "List the documents inside one filing (e.g. EX-99.1, the earnings press release).",
+             {"url": Param("str", "a filing URL from sec_filings_as_of", required=True, max_len=500)},
+             asof.filing_documents, modes=("as_of",), timeout_s=30),
+    ToolSpec("read_filing", "Read the text of an SEC filing document accepted before the decision time.",
+             {"url": Param("str", "https://www.sec.gov/Archives/edgar/data/... URL", required=True, max_len=500),
+              "max_chars": Param("int", "max characters of text", default=4000, min=500, max=8000)},
+             asof.read_filing, modes=("as_of",), timeout_s=40),
+    ToolSpec("news_as_of", "The company's news page (Reuters, MarketWatch, CNBC, Nasdaq, Yahoo) as archived in the "
+             "weeks before the decision time: recent headlines.",
+             {"ticker": Param("str", "e.g. AAPL", required=True, max_len=10),
+              "window_days": Param("int", "how far back a copy may be", default=45, min=3, max=120),
+              "max_chars": Param("int", "max characters of text", default=4000, min=500, max=8000)},
+             asof.news_as_of, modes=("as_of",), timeout_s=150),
+    ToolSpec("archived_page", "Any web page (e.g. an article linked from news_as_of) as archived before the "
+             "decision time.",
+             {"url": Param("str", "original page URL", required=True, max_len=2000),
+              "window_days": Param("int", "how far back a copy may be", default=365, min=1, max=3650),
+              "max_chars": Param("int", "max characters of text", default=4000, min=500, max=8000)},
+             asof.archived_page, modes=("as_of",), timeout_s=90),
+    ToolSpec("price_history_as_of", "Daily closes up to the decision time with return and volatility stats.",
+             {"ticker": Param("str", "e.g. AAPL", required=True, max_len=10),
+              "days": Param("int", "trading days", default=120, min=5, max=260)},
+             asof.price_history_as_of, modes=("as_of",), timeout_s=10),
     ToolSpec("python", "Run a short Python calculation (stdlib only, no network or files, 10 s). Print results.",
              {"code": Param("str", "Python source", required=True, max_len=4000)}, _python,
              live_only=False, timeout_s=15),
@@ -279,8 +323,11 @@ TOOLS: dict[str, ToolSpec] = {s.name: s for s in [
 
 @dataclass
 class ToolGateway:
-    mode: str  # "live" | "backtest"
+    mode: str  # "live" | "backtest" | "as_of"
     fetcher: SafeFetcher
+    as_of: datetime | None = None  # decision time, required in as_of mode
+    price_lookup: asof.PriceLookup | None = None
+    tool_cache: Path | None = None  # as_of mode: tool results keyed by (tool, args, as_of), replayed exactly
     sec_user_agent: str = ""
     brave_api_key: str = ""
     max_calls_per_batch: int = 8
@@ -292,8 +339,10 @@ class ToolGateway:
     _robots: dict[str, tuple[float, urllib.robotparser.RobotFileParser | None]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.mode not in ("live", "backtest"):
-            raise ValueError("mode must be 'live' or 'backtest'")
+        if self.mode not in ("live", "backtest", "as_of"):
+            raise ValueError("mode must be 'live', 'backtest' or 'as_of'")
+        if self.mode == "as_of" and (self.as_of is None or self.as_of.tzinfo is None):
+            raise ValueError("as_of mode needs a timezone-aware decision time")
 
     @classmethod
     def from_env(cls, mode: str, **kw: Any) -> ToolGateway:
@@ -305,9 +354,18 @@ class ToolGateway:
                    **kw)
 
     def available(self) -> list[ToolSpec]:
-        out = [s for s in TOOLS.values() if self.mode == "live" or not s.live_only]
+        out = [s for s in TOOLS.values()
+               if (self.mode in s.modes if s.modes is not None else self.mode == "live" or not s.live_only)]
         return [s for s in out if (s.name != "web_search" or self.brave_api_key)
-                and (s.name != "sec_filings" or self.sec_user_agent)]
+                and (s.name not in ("sec_filings", "sec_filings_as_of", "filing_documents", "read_filing")
+                     or self.sec_user_agent)
+                and (s.name != "price_history_as_of" or self.price_lookup is not None)]
+
+    def _cache_path(self, name: str, args: dict[str, Any]) -> Path | None:
+        if self.tool_cache is None or self.mode != "as_of" or self.as_of is None:
+            return None
+        key = hashlib.sha256(json.dumps([name, args, self.as_of.isoformat()], sort_keys=True).encode()).hexdigest()
+        return self.tool_cache / key[:2] / f"{key}.json"
 
     def specs_for_prompt(self) -> list[dict[str, Any]]:
         return [s.for_prompt() for s in self.available()]
@@ -340,16 +398,26 @@ class ToolGateway:
         try:
             spec = TOOLS.get(str(name))
             if spec is None or spec not in self.available():
-                why = "not available in backtest mode (the web already contains the future)" \
-                    if spec is not None and spec.live_only and self.mode == "backtest" else "unknown tool"
+                why = f"not available in {self.mode} mode (the open web already contains the future)" \
+                    if spec is not None and self.mode != "live" else "unknown tool"
                 raise ToolInputError(f"{name}: {why}")
             args = validate_args(spec, req.get("args", {}))
             entry["args"] = args
-            result = await asyncio.wait_for(spec.handler(self, args), spec.timeout_s)
-            text = json.dumps(result, ensure_ascii=False, default=str)
-            if len(text) > self.max_result_chars:
-                text = text[: self.max_result_chars] + "…(truncated)"
-            out: dict[str, Any] = {"ok": True, "result": text}
+            cache = self._cache_path(spec.name, args)
+            if cache is not None and cache.exists():
+                out: dict[str, Any] = json.loads(cache.read_text())
+                entry["cached"] = True
+            else:
+                result = await asyncio.wait_for(spec.handler(self, args), spec.timeout_s)
+                text = json.dumps(result, ensure_ascii=False, default=str)
+                if len(text) > self.max_result_chars:
+                    text = text[: self.max_result_chars] + "…(truncated)"
+                out = {"ok": True, "result": text}
+                if cache is not None:
+                    cache.parent.mkdir(parents=True, exist_ok=True)
+                    tmp = cache.with_suffix(".tmp")
+                    tmp.write_text(json.dumps(out, ensure_ascii=False))
+                    tmp.replace(cache)
         except (ToolInputError, FetchError) as e:
             out = {"ok": False, "error": str(e)[:500]}
         except TimeoutError:

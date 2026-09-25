@@ -1,0 +1,203 @@
+{
+ "ticker": "HON",
+ "as_of": "2026-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.0014184243232742394,
+ "logprob_mass": 0.9999998729071622,
+ "logodds": -6.556789223723491,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "Honeywell's stock has shown volatility in the recent period, with a 6% decline over 20 days. There is no strong evidence of significant events impacting the stock in the near term, so the probability of a higher close is close to a coin flip.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/773840/000077384026000058/hon-20260423_d2.htm",
+  "https://www.sec.gov/Archives/edgar/data/773840/000077384026000055/hon-20260423.htm",
+  "https://www.cnbc.com/quotes/HON/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess the company's recent performance and any potential catalysts.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "HON",
+      "days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "HON",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "HON",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent SEC filings and news to identify any significant events or guidance that could impact the stock's performance over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384026000058/hon-20260423_d2.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384026000055/hon-20260423.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "Honeywell International",
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Honeywell's recent price has been volatile, with a 6% decline over 20 days. There is no strong evidence of significant events impacting the stock in the near term, so the probability of a higher close is close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "HON",
+    "days": 30
+   },
+   "started": "2026-09-25T03:42:07.339+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 423,
+   "error": null,
+   "preview": "{\"ticker\": \"HON\", \"last_date\": \"2026-04-30\", \"last_close\": 222.88, \"ret_1d\": 0.0192, \"ret_5d\": -0.0, \"ret_20d\": -0.0608, \"ret_60d\": null, \"vol_20d_annualized\": 0.261, \"closes_last_30\": [238.17, 230.34"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "HON",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:42:07.340+00:00",
+   "ok": true,
+   "elapsed_ms": 1170,
+   "chars": 1186,
+   "error": null,
+   "preview": "{\"ticker\": \"HON\", \"cik\": 773840, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-04-23\", \"accepted_utc_latest\": \"2026-04-23T18:59:08+00:00\", \"items\": \"8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "HON",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:42:07.340+00:00",
+   "ok": true,
+   "elapsed_ms": 4789,
+   "chars": 3335,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/HON/\", \"captured_utc\": \"2026-04-22T13:07:43+00:00\", \"title\": \"HON: Honeywell International Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384026000058/hon-20260423_d2.htm"
+   },
+   "started": "2026-09-25T03:42:16.438+00:00",
+   "ok": true,
+   "elapsed_ms": 2198,
+   "chars": 2261,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000773840-26-000058.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384026000058/0000773840-26-000058.txt\"}, {\"name\": \"exhibit23112312025aprconse.htm\", \"ur"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384026000055/hon-20260423.htm"
+   },
+   "started": "2026-09-25T03:42:16.438+00:00",
+   "ok": true,
+   "elapsed_ms": 2346,
+   "chars": 531,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000773840-26-000055.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384026000055/0000773840-26-000055.txt\"}, {\"name\": \"exhibit99-q12026earningsre.htm\", \"ur"
+  },
+  {
+   "id": "2.2",
+   "tool": "wiki_search",
+   "args": {
+    "query": "Honeywell International",
+    "limit": 5
+   },
+   "started": "2026-09-25T03:42:16.438+00:00",
+   "ok": true,
+   "elapsed_ms": 2881,
+   "chars": 223,
+   "error": null,
+   "preview": "{\"query\": \"Honeywell International\", \"titles\": [\"Honeywell\", \"Honeywell Aerospace\", \"Honeywell 6000 series\", \"Honeywell T87\", \"Historical components of the Dow Jones Industrial Average\"], \"note\": \"rea"
+  }
+ ],
+ "llm_calls": 12,
+ "attempts": 1,
+ "elapsed_s": 23.2,
+ "window": "clean",
+ "screen_score": 0.7024999999999999,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

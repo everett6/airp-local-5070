@@ -1,0 +1,228 @@
+{
+ "ticker": "PG",
+ "as_of": "2025-01-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9993665430747559,
+ "logprob_mass": 1.0000000886854186,
+ "logodds": 7.363684897750267,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a slight negative return over 20 days (-0.0039), and the recent news and SEC filings do not indicate any significant positive or negative events that would strongly influence the stock's direction over the next 20 trading days. The market is generally efficient, and short-horizon stock moves are close to a coin flip.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/80424/000008042425000009/pg-20250122.htm",
+  "https://www.sec.gov/Archives/edgar/data/80424/000008042425000011/ondq2fy25earningsslides.htm",
+  "https://www.sec.gov/Archives/edgar/data/80424/000008042425000003/january2025dividend.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to identify any factors that may influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "PG",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "PG",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "PG",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent SEC filings and news to identify any significant events or trends that may impact PG's stock price over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042425000009/pg-20250122.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042425000011/ondq2fy25earningsslides.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042425000003/january2025dividend.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/80424/000119312524242887/d849483d8k.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price history, news, and SEC filings, there is no strong evidence to suggest PG will close higher 20 trading days from now.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "PG",
+    "days": 60
+   },
+   "started": "2026-09-25T03:19:19.808+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 429,
+   "error": null,
+   "preview": "{\"ticker\": \"PG\", \"last_date\": \"2025-01-31\", \"last_close\": 159.16, \"ret_1d\": -0.0085, \"ret_5d\": 0.0114, \"ret_20d\": -0.0039, \"ret_60d\": 0.0115, \"vol_20d_annualized\": 0.214, \"closes_last_30\": [162.33, 16"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "PG",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:19:19.808+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4280,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/pg\", \"captured_utc\": \"2025-01-26T09:46:20+00:00\", \"title\": \"PG Stock Price | Procter & Gamble Co. Stock Quote (U.S.: NYSE)"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "PG",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:19:19.808+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1189,
+   "error": null,
+   "preview": "{\"ticker\": \"PG\", \"cik\": 80424, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-01-22\", \"accepted_utc_latest\": \"2025-01-22T20:11:24+00:00\", \"items\": \"7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/d"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042425000009/pg-20250122.htm"
+   },
+   "started": "2026-09-25T03:19:19.809+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 521,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000080424-25-000009.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/80424/000008042425000009/0000080424-25-000009.txt\"}, {\"name\": \"fy2425q2ond8-kexhibit991.htm\", \"url\":"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042425000011/ondq2fy25earningsslides.htm"
+   },
+   "started": "2026-09-25T03:19:19.809+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 535,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000080424-25-000011.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/80424/000008042425000011/0000080424-25-000011.txt\"}, {\"name\": \"ondq2earningsslides.htm\", \"url\": \"htt"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042425000003/january2025dividend.htm"
+   },
+   "started": "2026-09-25T03:19:19.809+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 535,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000080424-25-000003.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/80424/000008042425000003/0000080424-25-000003.txt\"}, {\"name\": \"jandividendpressrelease.htm\", \"url\": "
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/80424/000119312524242887/d849483d8k.htm"
+   },
+   "started": "2026-09-25T03:19:19.809+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 617,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-24-242887.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/80424/000119312524242887/0001193125-24-242887.txt\"}, {\"name\": \"d849483d8k.htm\", \"url\": \"https://www."
+  }
+ ],
+ "llm_calls": 1,
+ "attempts": 1,
+ "elapsed_s": 0.9,
+ "window": "clean",
+ "screen_score": 0.67,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

@@ -1,0 +1,221 @@
+{
+ "ticker": "PG",
+ "as_of": "2026-03-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 9.974589932407305e-06,
+ "logprob_mass": 1.000000003377853,
+ "logodds": -11.515459730926791,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history indicates a decline over the past 20 days, but the company is pushing premium products and expects moderate revenue growth. These factors suggest a moderate probability of the stock closing higher in the next 20 trading days.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/80424/000008042426000009/pg-20260122.htm",
+  "https://www.sec.gov/Archives/edgar/data/80424/000008042426000006/pg-20260122.htm",
+  "https://www.sec.gov/Archives/edgar/data/80424/000008042426000002/pg-20260113.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to identify any factors that may influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "PG",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "PG",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "PG",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filings for relevant news and use the price history to assess recent trends.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042426000009/pg-20260122.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042426000006/pg-20260122.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042426000002/pg-20260113.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042425000287/pg-20251215.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price history shows a decline over the past 20 days, and the news indicates challenges with tariff pressures and market dynamics. However, the company is pushing premium products and expects moderate revenue growth. These factors suggest a moderate probability of the stock closing higher in the next 20 trading days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "PG",
+    "days": 60
+   },
+   "started": "2026-09-25T03:39:19.270+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 426,
+   "error": null,
+   "preview": "{\"ticker\": \"PG\", \"last_date\": \"2026-03-31\", \"last_close\": 142.3, \"ret_1d\": -0.0019, \"ret_5d\": 0.0089, \"ret_20d\": -0.0957, \"ret_60d\": 0.0259, \"vol_20d_annualized\": 0.203, \"closes_last_30\": [154.53, 156"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "PG",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:39:19.271+00:00",
+   "ok": true,
+   "elapsed_ms": 2251,
+   "chars": 1151,
+   "error": null,
+   "preview": "{\"ticker\": \"PG\", \"cik\": 80424, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-01-22\", \"accepted_utc_latest\": \"2026-01-22T21:53:22+00:00\", \"items\": \"7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/d"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "PG",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:39:19.271+00:00",
+   "ok": true,
+   "elapsed_ms": 93687,
+   "chars": 4238,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/PG/\", \"captured_utc\": \"2026-03-28T21:51:00+00:00\", \"title\": \"The Procter & Gamble Company (PG) Stock Price, News, Quote & History - Yahoo Fi"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042425000287/pg-20251215.htm"
+   },
+   "started": "2026-09-25T03:41:03.573+00:00",
+   "ok": true,
+   "elapsed_ms": 2298,
+   "chars": 375,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000080424-25-000287.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/80424/000008042425000287/0000080424-25-000287.txt\"}, {\"name\": \"pg-20251215.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042426000002/pg-20260113.htm"
+   },
+   "started": "2026-09-25T03:41:03.573+00:00",
+   "ok": true,
+   "elapsed_ms": 2432,
+   "chars": 525,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000080424-26-000002.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/80424/000008042426000002/0000080424-26-000002.txt\"}, {\"name\": \"newsreleasepgjanuary2026di.htm\", \"url"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042426000006/pg-20260122.htm"
+   },
+   "started": "2026-09-25T03:41:03.573+00:00",
+   "ok": true,
+   "elapsed_ms": 2491,
+   "chars": 521,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000080424-26-000006.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/80424/000008042426000006/0000080424-26-000006.txt\"}, {\"name\": \"fy2526q2ond8-kexhibit991.htm\", \"url\":"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/80424/000008042426000009/pg-20260122.htm"
+   },
+   "started": "2026-09-25T03:41:03.573+00:00",
+   "ok": true,
+   "elapsed_ms": 2673,
+   "chars": 521,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000080424-26-000009.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/80424/000008042426000009/0000080424-26-000009.txt\"}, {\"name\": \"pg-20260122.htm\", \"url\": \"https://www"
+  }
+ ],
+ "llm_calls": 40,
+ "attempts": 1,
+ "elapsed_s": 124.2,
+ "window": "clean",
+ "screen_score": 0.6675,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

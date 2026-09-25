@@ -1,0 +1,210 @@
+{
+ "ticker": "ABBV",
+ "as_of": "2025-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9994735335065549,
+ "logprob_mass": 1.0000000086442498,
+ "logodds": 7.5487962634700265,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The latest 8-K filing indicates AbbVie's Q1 2025 results exceeded expectations, with strong growth in immunology and raised full-year EPS guidance. The stock has also shown positive momentum in recent news and price movements, suggesting a favorable outlook for the next 20 days.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1551152/000155115225000026/abbv-20250425.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting ABBV.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "ABBV",
+      "days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "ABBV",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "ABBV",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for earnings news and any significant events, then assess the stock's recent performance and news to estimate the probability of a higher close in 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1551152/000155115225000026/abbv-20250425.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "ABBV",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "ABBV",
+      "window_days": 60
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent positive earnings report and strong performance in the news suggest a higher probability of the stock closing higher in the next 20 days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "ABBV",
+    "days": 30
+   },
+   "started": "2026-09-25T03:26:58.265+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 424,
+   "error": null,
+   "preview": "{\"ticker\": \"ABBV\", \"last_date\": \"2025-04-30\", \"last_close\": 187.61, \"ret_1d\": 0.0082, \"ret_5d\": 0.1019, \"ret_20d\": -0.0454, \"ret_60d\": null, \"vol_20d_annualized\": 0.445, \"closes_last_30\": [202.23, 201"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "ABBV",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:26:58.265+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4280,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/abbv\", \"captured_utc\": \"2025-04-28T07:27:30+00:00\", \"title\": \"ABBV Stock Price | AbbVie Inc. Stock Quote (U.S.: NYSE) | Ma"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "ABBV",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:26:58.265+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1187,
+   "error": null,
+   "preview": "{\"ticker\": \"ABBV\", \"cik\": 1551152, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-04-25\", \"accepted_utc_latest\": \"2025-04-25T16:48:22+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edg"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1551152/000155115225000026/abbv-20250425.htm"
+   },
+   "started": "2026-09-25T03:26:58.266+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 533,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001551152-25-000026.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1551152/000155115225000026/0001551152-25-000026.txt\"}, {\"name\": \"abbv-20250331xexhibit991.htm\", \"url"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "ABBV",
+    "days": 60
+   },
+   "started": "2026-09-25T03:26:58.266+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 426,
+   "error": null,
+   "preview": "{\"ticker\": \"ABBV\", \"last_date\": \"2025-04-30\", \"last_close\": 187.61, \"ret_1d\": 0.0082, \"ret_5d\": 0.1019, \"ret_20d\": -0.0454, \"ret_60d\": 0.0356, \"vol_20d_annualized\": 0.445, \"closes_last_30\": [202.23, 2"
+  },
+  {
+   "id": "2.2",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "ABBV",
+    "window_days": 60,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:26:58.266+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4280,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/abbv\", \"captured_utc\": \"2025-04-28T07:27:30+00:00\", \"title\": \"ABBV Stock Price | AbbVie Inc. Stock Quote (U.S.: NYSE) | Ma"
+  }
+ ],
+ "llm_calls": 4,
+ "attempts": 1,
+ "elapsed_s": 3.7,
+ "window": "clean",
+ "screen_score": 0.755,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

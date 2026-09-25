@@ -1,0 +1,224 @@
+{
+ "ticker": "JNJ",
+ "as_of": "2026-06-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9992873120682543,
+ "logprob_mass": 1.0000000018573567,
+ "logodds": 7.245753974732997,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a positive return of 13.63% over the last 20 days, but this is not indicative of a strong trend. The recent news includes positive developments such as the CEO's mission to become the number 1 company in oncology by 2030 and positive clinical trial results, which could support the stock. However, there are also negative news items such as an FDA warning over production practices. The SEC filings do not indicate any major events that would significantly impact the stock in the near term. Given the lack of strong evidence for a directional move, the probability of JNJ closing higher in the next 20 days is estimated to be 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/200406/000020040626000089/jnj-20260423.htm",
+  "https://www.sec.gov/Archives/edgar/data/200406/000020040626000076/jnj-20260414.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting JNJ.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "JNJ",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "JNJ",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "JNJ",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the recent price performance, news, and SEC filings to determine if there are any significant factors influencing JNJ's stock movement over the next 20 days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "JNJ",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "Johnson & Johnson",
+      "limit": 3
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000089/jnj-20260423.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000076/jnj-20260414.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on recent price performance, news, and SEC filings, there is no strong evidence to suggest a significant directional move for JNJ over the next 20 days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "JNJ",
+    "days": 20
+   },
+   "started": "2026-09-25T03:48:20.820+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 354,
+   "error": null,
+   "preview": "{\"ticker\": \"JNJ\", \"last_date\": \"2026-06-30\", \"last_close\": 252.72, \"ret_1d\": -0.0176, \"ret_5d\": 0.0623, \"ret_20d\": 0.1363, \"ret_60d\": null, \"vol_20d_annualized\": 0.283, \"closes_last_30\": [222.41, 221."
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "JNJ",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:48:20.821+00:00",
+   "ok": true,
+   "elapsed_ms": 1261,
+   "chars": 1175,
+   "error": null,
+   "preview": "{\"ticker\": \"JNJ\", \"cik\": 200406, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-04-28\", \"accepted_utc_latest\": \"2026-04-28T02:33:52+00:00\", \"items\": \"5.07,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "JNJ",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:48:20.821+00:00",
+   "ok": true,
+   "elapsed_ms": 14329,
+   "chars": 3511,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/JNJ/\", \"captured_utc\": \"2026-06-02T23:24:55+00:00\", \"title\": \"JNJ: Johnson & Johnson - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | L"
+  },
+  {
+   "id": "2.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "JNJ",
+    "days": 60
+   },
+   "started": "2026-09-25T03:48:45.114+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 427,
+   "error": null,
+   "preview": "{\"ticker\": \"JNJ\", \"last_date\": \"2026-06-30\", \"last_close\": 252.72, \"ret_1d\": -0.0176, \"ret_5d\": 0.0623, \"ret_20d\": 0.1363, \"ret_60d\": 0.051, \"vol_20d_annualized\": 0.283, \"closes_last_30\": [226.49, 227"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000089/jnj-20260423.htm"
+   },
+   "started": "2026-09-25T03:48:45.115+00:00",
+   "ok": true,
+   "elapsed_ms": 495,
+   "chars": 380,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000200406-26-000089.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/200406/000020040626000089/0000200406-26-000089.txt\"}, {\"name\": \"jnj-20260423.htm\", \"url\": \"https://w"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040626000076/jnj-20260414.htm"
+   },
+   "started": "2026-09-25T03:48:45.115+00:00",
+   "ok": true,
+   "elapsed_ms": 622,
+   "chars": 779,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000200406-26-000076.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/200406/000020040626000076/0000200406-26-000076.txt\"}, {\"name\": \"a2026q1exhibit991.htm\", \"url\": \"http"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_search",
+   "args": {
+    "query": "Johnson & Johnson",
+    "limit": 3
+   },
+   "started": "2026-09-25T03:48:45.115+00:00",
+   "ok": true,
+   "elapsed_ms": 1114,
+   "chars": 153,
+   "error": null,
+   "preview": "{\"query\": \"Johnson & Johnson\", \"titles\": [\"Johnson & Johnson\", \"Woody Johnson\", \"Avery Johnson (American football)\"], \"note\": \"read one with wiki_as_of\"}"
+  }
+ ],
+ "llm_calls": 16,
+ "attempts": 1,
+ "elapsed_s": 40.6,
+ "window": "clean",
+ "screen_score": 0.675,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

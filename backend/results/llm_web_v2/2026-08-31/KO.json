@@ -1,0 +1,181 @@
+{
+ "ticker": "KO",
+ "as_of": "2026-08-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9997430147093823,
+ "logprob_mass": 1.000000034698551,
+ "logodds": 8.266234691340967,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "KO's 20-day return was slightly positive (0.0208), and recent news highlights positive developments like the World Cup performance and full-year forecast hikes. However, short-term stock movements are close to a coin flip, and without strong catalysts, the probability remains moderate.",
+ "sources": [
+  "https://www.cnbc.com/quotes/KO/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent events that might influence the stock's performance over the next 20 days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "KO",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "KO",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "KO",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent SEC filings and news to identify any significant events that could impact KO's stock price over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/21344/000162828026049922/ko-20260728.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "Coca-Cola Company",
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "KO's recent performance and news suggest a stable company with positive sentiment, but short-term stock movements are unpredictable. The probability is moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "KO",
+    "days": 260
+   },
+   "started": "2026-09-25T03:53:10.087+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 395,
+   "error": null,
+   "preview": "{\"ticker\": \"KO\", \"last_date\": \"2026-08-31\", \"last_close\": 88.14, \"ret_1d\": -0.011, \"ret_5d\": -0.0361, \"ret_20d\": 0.0208, \"ret_60d\": 0.1617, \"vol_20d_annualized\": 0.146, \"closes_last_30\": [81.48, 81.71"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "KO",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:53:10.089+00:00",
+   "ok": true,
+   "elapsed_ms": 6,
+   "chars": 2176,
+   "error": null,
+   "preview": "{\"ticker\": \"KO\", \"cik\": 21344, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-07-28\", \"accepted_utc_latest\": \"2026-07-28T15:58:13+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/d"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "KO",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:53:10.088+00:00",
+   "ok": true,
+   "elapsed_ms": 13180,
+   "chars": 3460,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/KO/\", \"captured_utc\": \"2026-08-25T20:13:50+00:00\", \"title\": \"KO: Coca-Cola Co - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Last NAS"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/21344/000162828026049922/ko-20260728.htm"
+   },
+   "started": "2026-09-25T03:53:28.397+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 525,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001628280-26-049922.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/21344/000162828026049922/0001628280-26-049922.txt\"}, {\"name\": \"a2026q2earningsreleaseex-9.htm\", \"url"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_search",
+   "args": {
+    "query": "Coca-Cola Company",
+    "limit": 5
+   },
+   "started": "2026-09-25T03:53:28.397+00:00",
+   "ok": true,
+   "elapsed_ms": 16961,
+   "chars": 179,
+   "error": null,
+   "preview": "{\"query\": \"Coca-Cola Company\", \"titles\": [\"The Coca-Cola Company\", \"Coca-Cola\", \"Coca-Cola Zero Sugar\", \"Coca-Cola formula\", \"Coca-Cola Life\"], \"note\": \"read one with wiki_as_of\"}"
+  }
+ ],
+ "llm_calls": 22,
+ "attempts": 1,
+ "elapsed_s": 45.7,
+ "window": "clean",
+ "screen_score": 0.7549999999999999,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

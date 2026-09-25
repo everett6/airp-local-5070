@@ -1,0 +1,229 @@
+{
+ "ticker": "BAC",
+ "as_of": "2025-08-29T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.15017480849290485,
+ "logprob_mass": 1.0000000123393302,
+ "logodds": -1.7332306657743668,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a positive return of 11.13% over 20 days, indicating a bullish trend. However, there is no significant news or earnings report in the recent SEC filings that would strongly influence the stock's direction. The market sentiment appears mixed, with some positive news about Bank of America's stock buyback program and volatility expectations, but no clear catalyst for a strong upward move. Given the lack of strong evidence for a significant move, the probability is moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/70858/000119312525164439/d29097d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/70858/000007085825000257/bac-20250723.htm",
+  "https://www.sec.gov/Archives/edgar/data/70858/000007085825000254/bac-20250716.htm",
+  "https://www.sec.gov/Archives/edgar/data/70858/000007085825000249/bac-20250701.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting BAC.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "BAC",
+      "days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "BAC",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "BAC",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filings for significant news and check if there are any relevant archived articles or news that could impact BAC's stock price.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/70858/000119312525164439/d29097d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/70858/000007085825000257/bac-20250723.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/70858/000007085825000254/bac-20250716.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/70858/000007085825000249/bac-20250701.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price performance and lack of significant news, the probability of BAC closing higher in 20 trading days is moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "BAC",
+    "days": 30
+   },
+   "started": "2026-09-25T03:28:26.552+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 392,
+   "error": null,
+   "preview": "{\"ticker\": \"BAC\", \"last_date\": \"2025-08-29\", \"last_close\": 49.41, \"ret_1d\": 0.005, \"ret_5d\": 0.0255, \"ret_20d\": 0.1113, \"ret_60d\": null, \"vol_20d_annualized\": 0.208, \"closes_last_30\": [46.23, 46.51, 4"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "BAC",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:28:26.552+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4282,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/Stock/BAC\", \"captured_utc\": \"2025-08-15T11:14:52+00:00\", \"title\": \"BAC Stock Price | Bank of America Corp. Stock Quote (U.S.: NY"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "BAC",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:28:26.552+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1184,
+   "error": null,
+   "preview": "{\"ticker\": \"BAC\", \"cik\": 70858, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-07-24\", \"accepted_utc_latest\": \"2025-07-25T01:30:23+00:00\", \"items\": \"3.03,5.03,8.01,9.01\", \"url\": \"https://www.sec.gov/Archi"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/70858/000119312525164439/d29097d8k.htm"
+   },
+   "started": "2026-09-25T03:28:26.553+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 851,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-164439.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/70858/000119312525164439/0001193125-25-164439.txt\"}, {\"name\": \"d29097d8k.htm\", \"url\": \"https://www.s"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/70858/000007085825000257/bac-20250723.htm"
+   },
+   "started": "2026-09-25T03:28:26.553+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 527,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000070858-25-000257.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/70858/000007085825000257/0000070858-25-000257.txt\"}, {\"name\": \"bac-20250723.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/70858/000007085825000254/bac-20250716.htm"
+   },
+   "started": "2026-09-25T03:28:26.553+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 761,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000070858-25-000254.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/70858/000007085825000254/0000070858-25-000254.txt\"}, {\"name\": \"bac-06302025ex993.htm\", \"url\": \"https"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/70858/000007085825000249/bac-20250701.htm"
+   },
+   "started": "2026-09-25T03:28:26.553+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 513,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000070858-25-000249.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/70858/000007085825000249/0000070858-25-000249.txt\"}, {\"name\": \"bac-20250701.htm\", \"url\": \"https://ww"
+  }
+ ],
+ "llm_calls": 3,
+ "attempts": 1,
+ "elapsed_s": 3.0,
+ "window": "clean",
+ "screen_score": 0.70625,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

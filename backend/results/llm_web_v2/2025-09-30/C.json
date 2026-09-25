@@ -1,0 +1,227 @@
+{
+ "ticker": "C",
+ "as_of": "2025-09-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9965165491295302,
+ "logprob_mass": 1.0000000413151369,
+ "logodds": 5.656242314877851,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a 7.09% return over the last 20 days, indicating some positive momentum. However, short-term stock movements are generally close to a coin flip, and there is no strong evidence of significant events affecting the stock in the next 20 trading days. The recent SEC filings and news do not indicate any major negative developments that would significantly impact the stock price.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/831001/000110465925092977/c-20250924x8k.htm",
+  "https://www.marketwatch.com/investing/stock/C"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to gather recent price data, news, and SEC filings to assess the likelihood of C closing higher in the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "C",
+      "days": 200
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "C",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "C",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to analyze the most recent SEC filings and news to determine if there are any significant events that could impact the stock price over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/831001/000110465925092977/c-20250924x8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/831001/000119312525201328/d15730d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/831001/000119312525163410/d904675d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/831001/000119312525163408/d34511d8k.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price data shows a positive 20-day return, and the news and filings do not indicate any significant negative events. However, short-term stock movements are close to a coin flip, so the probability is moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "C",
+    "days": 200
+   },
+   "started": "2026-09-25T03:28:50.512+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 401,
+   "error": null,
+   "preview": "{\"ticker\": \"C\", \"last_date\": \"2025-09-30\", \"last_close\": 99.4, \"ret_1d\": -0.0161, \"ret_5d\": -0.0146, \"ret_20d\": 0.0709, \"ret_60d\": 0.1663, \"vol_20d_annualized\": 0.171, \"closes_last_30\": [91.8, 91.24, "
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "C",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:28:50.512+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4277,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/C\", \"captured_utc\": \"2025-09-16T02:37:40+00:00\", \"title\": \"C Stock Price | Citigroup Inc. Stock Quote (U.S.: NYSE) | Marke"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "C",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:28:50.512+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1157,
+   "error": null,
+   "preview": "{\"ticker\": \"C\", \"cik\": 831001, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-09-24\", \"accepted_utc_latest\": \"2025-09-25T01:34:37+00:00\", \"items\": \"2.06,8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/ed"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/831001/000110465925092977/c-20250924x8k.htm"
+   },
+   "started": "2026-09-25T03:28:50.513+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 515,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-25-092977.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/831001/000110465925092977/0001104659-25-092977.txt\"}, {\"name\": \"c-20250924x8k.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/831001/000119312525201328/d15730d8k.htm"
+   },
+   "started": "2026-09-25T03:28:50.513+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 622,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-201328.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/831001/000119312525201328/0001193125-25-201328.txt\"}, {\"name\": \"d15730d8k.htm\", \"url\": \"https://www."
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/831001/000119312525163410/d904675d8k.htm"
+   },
+   "started": "2026-09-25T03:28:50.513+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 993,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-163410.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/831001/000119312525163410/0001193125-25-163410.txt\"}, {\"name\": \"d904675d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/831001/000119312525163408/d34511d8k.htm"
+   },
+   "started": "2026-09-25T03:28:50.513+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 622,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-163408.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/831001/000119312525163408/0001193125-25-163408.txt\"}, {\"name\": \"d34511d8k.htm\", \"url\": \"https://www."
+  }
+ ],
+ "llm_calls": 3,
+ "attempts": 1,
+ "elapsed_s": 4.8,
+ "window": "clean",
+ "screen_score": 0.705,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

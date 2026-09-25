@@ -1,0 +1,187 @@
+{
+ "ticker": "JNJ",
+ "as_of": "2025-12-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9995227547054318,
+ "logprob_mass": 1.0000000704642291,
+ "logodds": 7.647002595664256,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a relatively stable trend with a slight upward movement over 20 days (ret_20d: 0.0074). However, the recent news and SEC filings do not indicate any major events that would significantly impact the stock's direction. The stock's performance is influenced by broader market conditions and macroeconomic factors, which are not specific to JNJ in the provided data. Therefore, the probability of JNJ closing higher is moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/200406/000020040625000201/jnj-20251014.htm",
+  "https://www.marketwatch.com/investing/stock/jnj"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to identify any factors that might influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "JNJ",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "JNJ",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "JNJ",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for significant news and check if there are any relevant articles or press releases that could impact the stock's performance.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040625000201/jnj-20251014.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "Johnson & Johnson recent news",
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price history, news, and SEC filings, there is no strong evidence to suggest a significant upward or downward movement in JNJ's stock over the next 20 trading days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "JNJ",
+    "days": 260
+   },
+   "started": "2026-09-25T03:29:57.112+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 426,
+   "error": null,
+   "preview": "{\"ticker\": \"JNJ\", \"last_date\": \"2025-12-31\", \"last_close\": 203.67, \"ret_1d\": 0.0002, \"ret_5d\": 0.0057, \"ret_20d\": 0.0074, \"ret_60d\": 0.1068, \"vol_20d_annualized\": 0.186, \"closes_last_30\": [195.59, 198"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "JNJ",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:29:57.112+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4278,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/jnj\", \"captured_utc\": \"2025-12-04T03:07:55+00:00\", \"title\": \"JNJ Stock Price | Johnson & Johnson Stock Quote (U.S.: NYSE) "
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "JNJ",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:29:57.112+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 2206,
+   "error": null,
+   "preview": "{\"ticker\": \"JNJ\", \"cik\": 200406, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-10-14\", \"accepted_utc_latest\": \"2025-10-14T16:22:58+00:00\", \"items\": \"2.02,8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/200406/000020040625000201/jnj-20251014.htm"
+   },
+   "started": "2026-09-25T03:29:57.112+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 779,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000200406-25-000201.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/200406/000020040625000201/0000200406-25-000201.txt\"}, {\"name\": \"a2025q3exhibit991.htm\", \"url\": \"http"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_search",
+   "args": {
+    "query": "Johnson & Johnson recent news",
+    "limit": 5
+   },
+   "started": "2026-09-25T03:29:57.112+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 197,
+   "error": null,
+   "preview": "{\"query\": \"Johnson & Johnson recent news\", \"titles\": [\"Mike Johnson\", \"Jo Johnson\", \"Dakota Johnson\", \"Chris Johnson (running back)\", \"Johnson City, Tennessee\"], \"note\": \"read one with wiki_as_of\"}"
+  }
+ ],
+ "llm_calls": 2,
+ "attempts": 1,
+ "elapsed_s": 2.0,
+ "window": "clean",
+ "screen_score": 0.8150000000000001,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

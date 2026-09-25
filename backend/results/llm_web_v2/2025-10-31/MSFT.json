@@ -1,0 +1,187 @@
+{
+ "ticker": "MSFT",
+ "as_of": "2025-10-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.08035830390676749,
+ "logprob_mass": 0.9999999252953422,
+ "logodds": -2.437488699878886,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The 20-day return for MSFT is slightly positive (0.0009), but this is not statistically significant. There is no strong news or SEC filing information indicating a directional move. Given the lack of clear signals, the probability of MSFT closing higher 20 trading days from now is close to a coin flip.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/789019/000119312525256310/msft-20251028.htm",
+  "https://www.sec.gov/Archives/edgar/data/789019/000119312525256310/msft-ex99_1.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting MSFT.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "MSFT",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "MSFT",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "MSFT",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent SEC filing for any material news and assess the recent price performance to estimate the probability of MSFT closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312525256310/msft-20251028.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "MSFT",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price performance shows a slight positive return over 20 days, but no strong signals from news or filings. The probability is close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "MSFT",
+    "days": 260
+   },
+   "started": "2026-09-25T03:29:14.284+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 431,
+   "error": null,
+   "preview": "{\"ticker\": \"MSFT\", \"last_date\": \"2025-10-31\", \"last_close\": 513.58, \"ret_1d\": -0.0151, \"ret_5d\": -0.0111, \"ret_20d\": 0.0009, \"ret_60d\": -0.0042, \"vol_20d_annualized\": 0.192, \"closes_last_30\": [510.25,"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "MSFT",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:29:14.284+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 2423,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/MSFT\", \"captured_utc\": \"2025-10-28T05:15:46+00:00\", \"title\": \"MSFT: Microsoft Corp - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Las"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "MSFT",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:29:14.284+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1169,
+   "error": null,
+   "preview": "{\"ticker\": \"MSFT\", \"cik\": 789019, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-10-29\", \"accepted_utc_latest\": \"2025-10-30T01:07:42+00:00\", \"items\": \"2.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archives"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312525256310/msft-20251028.htm"
+   },
+   "started": "2026-09-25T03:29:14.284+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 745,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-256310.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/789019/000119312525256310/0001193125-25-256310.txt\"}, {\"name\": \"msft-20251028.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "MSFT",
+    "days": 20
+   },
+   "started": "2026-09-25T03:29:14.284+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 357,
+   "error": null,
+   "preview": "{\"ticker\": \"MSFT\", \"last_date\": \"2025-10-31\", \"last_close\": 513.58, \"ret_1d\": -0.0151, \"ret_5d\": -0.0111, \"ret_20d\": 0.0009, \"ret_60d\": null, \"vol_20d_annualized\": 0.192, \"closes_last_30\": [513.13, 52"
+  }
+ ],
+ "llm_calls": 3,
+ "attempts": 1,
+ "elapsed_s": 5.0,
+ "window": "clean",
+ "screen_score": 0.705,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

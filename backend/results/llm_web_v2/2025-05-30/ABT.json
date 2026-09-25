@@ -1,0 +1,229 @@
+{
+ "ticker": "ABT",
+ "as_of": "2025-05-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9511130810530477,
+ "logprob_mass": 1.0000000699271037,
+ "logodds": 2.968123108500688,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a slight positive return over 20 days (2.06%), but the 60-day return is negative (-2.55%). The recent news does not indicate any significant catalysts that would drive the stock higher. Without strong positive news or earnings surprises, the probability of ABT closing higher is close to a coin flip, slightly favoring an uptick.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1800/000110465925043508/tm2513718d1_8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/1800/000110465925040201/tm2513267d1_8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/1800/000162828025017924/abt-20250416.htm",
+  "https://www.sec.gov/Archives/edgar/data/1800/000162828025002092/abt-20250122.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess ABT's recent performance and any potential catalysts.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "ABT",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "ABT",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "ABT",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any significant news or earnings updates that could impact ABT's stock price over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1800/000110465925043508/tm2513718d1_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1800/000110465925040201/tm2513267d1_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1800/000162828025017924/abt-20250416.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1800/000162828025002092/abt-20250122.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on recent price performance and news, there is no strong evidence to suggest ABT will close higher in the next 20 days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "ABT",
+    "days": 60
+   },
+   "started": "2026-09-25T03:27:22.998+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 429,
+   "error": null,
+   "preview": "{\"ticker\": \"ABT\", \"last_date\": \"2025-05-30\", \"last_close\": 129.98, \"ret_1d\": 0.0055, \"ret_5d\": 0.0158, \"ret_20d\": 0.0206, \"ret_60d\": -0.0255, \"vol_20d_annualized\": 0.198, \"closes_last_30\": [127.45, 12"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "ABT",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:22.998+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4233,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/ABT/\", \"captured_utc\": \"2025-05-11T16:47:40+00:00\", \"title\": \"Abbott Laboratories (ABT) Stock Price, News, Quote & History - Yahoo Finance\","
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "ABT",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:27:22.998+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1149,
+   "error": null,
+   "preview": "{\"ticker\": \"ABT\", \"cik\": 1800, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-05-01\", \"accepted_utc_latest\": \"2025-05-02T01:01:21+00:00\", \"items\": \"5.02\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1800/000110465925043508/tm2513718d1_8k.htm"
+   },
+   "started": "2026-09-25T03:27:22.998+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 378,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-25-043508.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1800/000110465925043508/0001104659-25-043508.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov/A"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1800/000110465925040201/tm2513267d1_8k.htm"
+   },
+   "started": "2026-09-25T03:27:22.998+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 378,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-25-040201.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1800/000110465925040201/0001104659-25-040201.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov/A"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1800/000162828025017924/abt-20250416.htm"
+   },
+   "started": "2026-09-25T03:27:22.998+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 515,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001628280-25-017924.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1800/000162828025017924/0001628280-25-017924.txt\"}, {\"name\": \"abt-20250416.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1800/000162828025002092/abt-20250122.htm"
+   },
+   "started": "2026-09-25T03:27:22.999+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 515,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001628280-25-002092.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1800/000162828025002092/0001628280-25-002092.txt\"}, {\"name\": \"abt-2024q4xexhibitx991.htm\", \"url\": \"h"
+  }
+ ],
+ "llm_calls": 3,
+ "attempts": 1,
+ "elapsed_s": 2.8,
+ "window": "clean",
+ "screen_score": 0.7474999999999999,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

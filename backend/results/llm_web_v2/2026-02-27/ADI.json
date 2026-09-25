@@ -1,0 +1,202 @@
+{
+ "ticker": "ADI",
+ "as_of": "2026-02-27T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.8459428563119683,
+ "logprob_mass": 1.0000000806096156,
+ "logodds": 1.7031282150982636,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The recent 8-K filing from February 18, 2026, indicates that Analog Devices (ADI) reported earnings and dividend information, which may have influenced the stock price. The stock has shown a positive return of 11.64% over the last 20 trading days, and the historical volatility is moderate (annualized 28%). While there are no specific negative events mentioned in the latest filings, the stock has underperformed the broader market. Given the mixed signals and moderate volatility, the probability of ADI closing higher 20 trading days from now is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/6281/000000628126000015/adi-20260217.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent events that might influence the stock's performance.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "ADI",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "ADI",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "ADI",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for insights into recent events affecting ADI, and assess the stock's historical performance and volatility.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/6281/000000628126000015/adi-20260217.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "ADI",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Analog Devices, Inc."
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Analyze the recent 8-K filing and historical performance to estimate the probability of ADI closing higher 20 trading days from now.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "ADI",
+    "days": 20
+   },
+   "started": "2026-09-25T03:35:45.867+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 350,
+   "error": null,
+   "preview": "{\"ticker\": \"ADI\", \"last_date\": \"2026-02-27\", \"last_close\": 352.64, \"ret_1d\": 0.0041, \"ret_5d\": 0.0021, \"ret_20d\": 0.1164, \"ret_60d\": null, \"vol_20d_annualized\": 0.28, \"closes_last_30\": [315.88, 308.12"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "ADI",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:35:45.868+00:00",
+   "ok": true,
+   "elapsed_ms": 1270,
+   "chars": 1165,
+   "error": null,
+   "preview": "{\"ticker\": \"ADI\", \"cik\": 6281, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-02-18\", \"accepted_utc_latest\": \"2026-02-18T17:02:27+00:00\", \"items\": \"2.02,8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/ed"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "ADI",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:35:45.868+00:00",
+   "ok": true,
+   "elapsed_ms": 44289,
+   "chars": 4248,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/ADI/\", \"captured_utc\": \"2026-02-02T02:27:01+00:00\", \"title\": \"Analog Devices, Inc. (ADI) Stock Price, News, Quote & History - Yahoo Finance\""
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "ADI",
+    "days": 60
+   },
+   "started": "2026-09-25T03:36:32.321+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 424,
+   "error": null,
+   "preview": "{\"ticker\": \"ADI\", \"last_date\": \"2026-02-27\", \"last_close\": 352.64, \"ret_1d\": 0.0041, \"ret_5d\": 0.0021, \"ret_20d\": 0.1164, \"ret_60d\": 0.3397, \"vol_20d_annualized\": 0.28, \"closes_last_30\": [299.42, 297."
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/6281/000000628126000015/adi-20260217.htm"
+   },
+   "started": "2026-09-25T03:36:32.321+00:00",
+   "ok": true,
+   "elapsed_ms": 285,
+   "chars": 670,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000006281-26-000015.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/6281/000000628126000015/0000006281-26-000015.txt\"}, {\"name\": \"adi-20260217.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.2",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Analog Devices, Inc.",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:36:32.322+00:00",
+   "ok": true,
+   "elapsed_ms": 3361,
+   "chars": 4162,
+   "error": null,
+   "preview": "{\"title\": \"Analog Devices\", \"revision_time\": \"2026-01-16T14:31:03Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1333234271\", \"text\": \"This article is about the semiconductor company. For the g"
+  }
+ ],
+ "llm_calls": 10,
+ "attempts": 1,
+ "elapsed_s": 58.3,
+ "window": "clean",
+ "screen_score": 0.635,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

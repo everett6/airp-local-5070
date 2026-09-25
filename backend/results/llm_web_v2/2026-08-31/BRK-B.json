@@ -1,0 +1,181 @@
+{
+ "ticker": "BRK-B",
+ "as_of": "2026-08-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.8475935854163601,
+ "logprob_mass": 1.000000131150235,
+ "logodds": 1.7158505256176266,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a slight negative return over 20 days (-1.78%), but this is within the normal volatility range. Recent SEC filings and news do not indicate any major events that would significantly impact the stock's direction in the next 20 days. Given the lack of strong evidence for either upward or downward movement, the probability of BRK-B closing higher is estimated to be 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1067983/000119312526344495/d159922d8k.htm",
+  "https://finance.yahoo.com/quote/BRK-B/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to assess any recent developments affecting BRK-B.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "BRK-B",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "BRK-B",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "BRK-B",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for insights into recent developments affecting BRK-B.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1067983/000119312526344495/d159922d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Berkshire Hathaway Inc."
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Berkshire Hathaway's recent performance and filings show no significant negative or positive catalysts affecting its stock price in the short term. The stock has historically performed well, but short-term price movements are close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "BRK-B",
+    "days": 260
+   },
+   "started": "2026-09-25T03:53:08.190+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 430,
+   "error": null,
+   "preview": "{\"ticker\": \"BRK-B\", \"last_date\": \"2026-08-31\", \"last_close\": 504.03, \"ret_1d\": -0.0019, \"ret_5d\": -0.0006, \"ret_20d\": -0.0178, \"ret_60d\": 0.0531, \"vol_20d_annualized\": 0.154, \"closes_last_30\": [489.65"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "BRK-B",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:53:08.191+00:00",
+   "ok": true,
+   "elapsed_ms": 7,
+   "chars": 1181,
+   "error": null,
+   "preview": "{\"ticker\": \"BRK-B\", \"cik\": 1067983, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-08-11\", \"accepted_utc_latest\": \"2026-08-12T00:52:27+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/ed"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "BRK-B",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:53:08.191+00:00",
+   "ok": true,
+   "elapsed_ms": 8782,
+   "chars": 4244,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/BRK-B/\", \"captured_utc\": \"2026-08-31T15:54:55+00:00\", \"title\": \"Berkshire Hathaway Inc. (BRK-B) Stock Price, News, Quote & History - Yahoo F"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1067983/000119312526344495/d159922d8k.htm"
+   },
+   "started": "2026-09-25T03:53:19.454+00:00",
+   "ok": true,
+   "elapsed_ms": 749,
+   "chars": 505,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-26-344495.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1067983/000119312526344495/0001193125-26-344495.txt\"}, {\"name\": \"d159922d8k.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Berkshire Hathaway Inc.",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:53:19.454+00:00",
+   "ok": true,
+   "elapsed_ms": 3706,
+   "chars": 4163,
+   "error": null,
+   "preview": "{\"title\": \"Berkshire Hathaway\", \"revision_time\": \"2026-08-25T20:28:43Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1371307955\", \"text\": \"American multinational conglomerate holding company\\nB"
+  }
+ ],
+ "llm_calls": 12,
+ "attempts": 1,
+ "elapsed_s": 25.2,
+ "window": "clean",
+ "screen_score": 0.7575,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

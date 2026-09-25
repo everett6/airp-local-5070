@@ -1,0 +1,186 @@
+{
+ "ticker": "WFC",
+ "as_of": "2025-09-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.038500347168728515,
+ "logprob_mass": 1.0000001503265772,
+ "logodds": -3.2178269453361947,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The 20-day return for WFC is positive (2.49%), and the stock has shown resilience in recent volatility. However, the news from the latest 8-K filing does not indicate any significant positive or negative developments. Additionally, the recent news headlines do not provide strong directional signals. Given the lack of strong catalysts and the moderate historical performance, the probability of WFC closing higher 20 trading days from now is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/72971/000119312525203752/d78135d8k.htm",
+  "https://www.cnbc.com/quotes/WFC"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess the context for WFC's potential movement.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "WFC",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "WFC",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "WFC",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for relevant news and assess the recent price performance to estimate the probability of WFC closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/72971/000119312525203752/d78135d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "WFC",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Recent price performance and news suggest a moderate upward trend, but no strong catalysts are present.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "WFC",
+    "days": 260
+   },
+   "started": "2026-09-25T03:28:54.216+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 396,
+   "error": null,
+   "preview": "{\"ticker\": \"WFC\", \"last_date\": \"2025-09-30\", \"last_close\": 82.03, \"ret_1d\": -0.0098, \"ret_5d\": -0.0065, \"ret_20d\": 0.0249, \"ret_60d\": 0.024, \"vol_20d_annualized\": 0.2, \"closes_last_30\": [75.88, 76.49,"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "WFC",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:28:54.217+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 2169,
+   "error": null,
+   "preview": "{\"ticker\": \"WFC\", \"cik\": 72971, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-09-15\", \"accepted_utc_latest\": \"2025-09-16T02:03:03+00:00\", \"items\": \"9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "WFC",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:28:54.216+00:00",
+   "ok": true,
+   "elapsed_ms": 10680,
+   "chars": 2341,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/WFC\", \"captured_utc\": \"2025-09-30T03:52:19+00:00\", \"title\": \"WFC: Wells Fargo & Co - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Las"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/72971/000119312525203752/d78135d8k.htm"
+   },
+   "started": "2026-09-25T03:29:10.014+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 851,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-203752.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/72971/000119312525203752/0001193125-25-203752.txt\"}, {\"name\": \"d78135d8k.htm\", \"url\": \"https://www.s"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "WFC",
+    "days": 20
+   },
+   "started": "2026-09-25T03:29:10.014+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 332,
+   "error": null,
+   "preview": "{\"ticker\": \"WFC\", \"last_date\": \"2025-09-30\", \"last_close\": 82.03, \"ret_1d\": -0.0098, \"ret_5d\": -0.0065, \"ret_20d\": 0.0249, \"ret_60d\": null, \"vol_20d_annualized\": 0.2, \"closes_last_30\": [80.03, 78.79, "
+  }
+ ],
+ "llm_calls": 18,
+ "attempts": 1,
+ "elapsed_s": 24.3,
+ "window": "clean",
+ "screen_score": 0.7000000000000001,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

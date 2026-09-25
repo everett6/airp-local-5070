@@ -1,0 +1,137 @@
+{
+ "ticker": "T",
+ "as_of": "2025-12-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.011591551623277794,
+ "logprob_mass": 1.000000112036132,
+ "logodds": -4.445819497177136,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a -2.66% return over 20 days, but this is not indicative of future performance. The news and SEC filings do not provide strong signals about the stock's direction. Short-horizon stock moves are close to a coin flip, and stocks tend to rise slightly more often than they fall.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/732717/000119312525262515/d935272d8k.htm",
+  "https://www.marketwatch.com/investing/stock/t"
+ ],
+ "rounds": 2,
+ "parse_failures": 1,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to identify any factors that might influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "T",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "T",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "T",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price data shows a slight negative return over 20 days, but no strong signals in news or filings. The probability is close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "T",
+    "days": 260
+   },
+   "started": "2026-09-25T03:30:13.076+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 396,
+   "error": null,
+   "preview": "{\"ticker\": \"T\", \"last_date\": \"2025-12-31\", \"last_close\": 23.98, \"ret_1d\": 0.0012, \"ret_5d\": 0.0155, \"ret_20d\": -0.0266, \"ret_60d\": -0.0295, \"vol_20d_annualized\": 0.129, \"closes_last_30\": [24.71, 24.39"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "T",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:30:13.077+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4272,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/t\", \"captured_utc\": \"2025-12-31T03:08:14+00:00\", \"title\": \"T Stock Price | AT&T Inc. Stock Quote (U.S.: NYSE) | MarketWatc"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "T",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:30:13.077+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 2188,
+   "error": null,
+   "preview": "{\"ticker\": \"T\", \"cik\": 732717, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-11-03\", \"accepted_utc_latest\": \"2025-11-04T02:03:25+00:00\", \"items\": \"1.01,2.03,9.01\", \"url\": \"https://www.sec.gov/Archives/ed"
+  }
+ ],
+ "llm_calls": 2,
+ "attempts": 1,
+ "elapsed_s": 1.9,
+ "window": "clean",
+ "screen_score": 0.6775,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

@@ -1,0 +1,227 @@
+{
+ "ticker": "BRK-B",
+ "as_of": "2025-05-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 8.421824797493434e-05,
+ "logprob_mass": 0.9999998937795702,
+ "logodds": -9.38201471660967,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "BRK-B's 20-day return was -4.95%, indicating a slight decline. The latest SEC filings do not show any significant events that would drive the stock higher in the next 20 trading days. Without strong positive news or market conditions, the probability remains close to a coin flip, slightly favoring an upward move.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1067983/000119312525115695/d28310d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/1067983/000119312525113900/d910967d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/1067983/000119312525084458/d934563d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/1067983/000119312525033393/d935582d8k.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to assess any recent developments affecting BRK-B.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "BRK-B",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "BRK-B",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "BRK-B",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filings for any significant news or events that could impact BRK-B's stock price over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1067983/000119312525115695/d28310d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1067983/000119312525113900/d910967d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1067983/000119312525084458/d934563d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1067983/000119312525033393/d935582d8k.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Berkshire Hathaway's stock has shown mixed performance recently, with a slight decline over 20 days. No significant news in the latest filings suggests no immediate catalysts for movement. Given the lack of strong signals, the probability remains within the typical range.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "BRK-B",
+    "days": 260
+   },
+   "started": "2026-09-25T03:27:13.728+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 429,
+   "error": null,
+   "preview": "{\"ticker\": \"BRK-B\", \"last_date\": \"2025-05-30\", \"last_close\": 503.96, \"ret_1d\": -0.0044, \"ret_5d\": 0.0008, \"ret_20d\": -0.0495, \"ret_60d\": 0.011, \"vol_20d_annualized\": 0.229, \"closes_last_30\": [518.21, "
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "BRK-B",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:27:13.729+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1172,
+   "error": null,
+   "preview": "{\"ticker\": \"BRK-B\", \"cik\": 1067983, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-05-08\", \"accepted_utc_latest\": \"2025-05-08T20:16:20+00:00\", \"items\": \"5.02,9.01\", \"url\": \"https://www.sec.gov/Archives/ed"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "BRK-B",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:13.729+00:00",
+   "ok": true,
+   "elapsed_ms": 33000,
+   "chars": 4243,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/BRK-B/\", \"captured_utc\": \"2025-05-16T10:49:27+00:00\", \"title\": \"Berkshire Hathaway Inc. (BRK-B) Stock Price, News, Quote & History - Yahoo F"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1067983/000119312525115695/d28310d8k.htm"
+   },
+   "started": "2026-09-25T03:27:53.796+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 501,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-115695.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1067983/000119312525115695/0001193125-25-115695.txt\"}, {\"name\": \"d28310d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1067983/000119312525113900/d910967d8k.htm"
+   },
+   "started": "2026-09-25T03:27:53.796+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 505,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-113900.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1067983/000119312525113900/0001193125-25-113900.txt\"}, {\"name\": \"d910967d8k.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1067983/000119312525084458/d934563d8k.htm"
+   },
+   "started": "2026-09-25T03:27:53.796+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1371,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-084458.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1067983/000119312525084458/0001193125-25-084458.txt\"}, {\"name\": \"d934563d8k.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1067983/000119312525033393/d935582d8k.htm"
+   },
+   "started": "2026-09-25T03:27:53.796+00:00",
+   "ok": true,
+   "elapsed_ms": 180,
+   "chars": 505,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-033393.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1067983/000119312525033393/0001193125-25-033393.txt\"}, {\"name\": \"d935582d8k.htm\", \"url\": \"https://ww"
+  }
+ ],
+ "llm_calls": 51,
+ "attempts": 1,
+ "elapsed_s": 50.7,
+ "window": "clean",
+ "screen_score": 0.8600000000000001,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

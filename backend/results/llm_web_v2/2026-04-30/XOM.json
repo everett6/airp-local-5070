@@ -1,0 +1,215 @@
+{
+ "ticker": "XOM",
+ "as_of": "2026-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.00016954732981668886,
+ "logprob_mass": 0.999999895817646,
+ "logodds": -8.682208876460301,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a slight decline over the past 20 days, but no strong recent news or earnings reports have been identified. The stock has shown mixed performance, and without significant catalysts, the probability of XOM closing higher in the next 20 days is close to a coin flip.",
+ "sources": [
+  "https://www.cnbc.com/quotes/XOM"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting XOM.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "XOM",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "XOM",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "XOM",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Recent price data and news suggest volatility, but no recent 8-K filings. Need to check for any recent earnings reports or news articles that may impact XOM's stock movement.",
+   "calls": [
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "Exxon Mobil Corporation",
+      "limit": 5
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "XOM",
+      "window_days": 60,
+      "max_chars": 10000
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "XOM",
+      "forms": [
+       "10-Q",
+       "10-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Recent price data and news suggest volatility, but no recent 8-K filings. The stock has shown mixed performance over the past 20 days, with a slight decline. Given the lack of strong recent news or earnings reports, the probability of XOM closing higher in the next 20 days is close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "XOM",
+    "days": 260
+   },
+   "started": "2026-09-25T03:41:46.766+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 428,
+   "error": null,
+   "preview": "{\"ticker\": \"XOM\", \"last_date\": \"2026-04-30\", \"last_close\": 152.3, \"ret_1d\": -0.0022, \"ret_5d\": 0.0252, \"ret_20d\": -0.0401, \"ret_60d\": 0.0809, \"vol_20d_annualized\": 0.284, \"closes_last_30\": [156.08, 15"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "XOM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:41:46.767+00:00",
+   "ok": true,
+   "elapsed_ms": 728,
+   "chars": 138,
+   "error": null,
+   "preview": "{\"ticker\": \"XOM\", \"cik\": 2115436, \"filings\": [], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "XOM",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:41:46.767+00:00",
+   "ok": true,
+   "elapsed_ms": 22002,
+   "chars": 3357,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/XOM\", \"captured_utc\": \"2026-04-02T06:51:22+00:00\", \"title\": \"XOM: Exxon Mobil Corp - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Las"
+  },
+  {
+   "id": "2.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "XOM",
+    "window_days": 60,
+    "max_chars": 8000
+   },
+   "started": "2026-09-25T03:42:11.091+00:00",
+   "ok": true,
+   "elapsed_ms": 7,
+   "chars": 3357,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/XOM\", \"captured_utc\": \"2026-04-02T06:51:22+00:00\", \"title\": \"XOM: Exxon Mobil Corp - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Las"
+  },
+  {
+   "id": "2.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "XOM",
+    "forms": [
+     "10-Q",
+     "10-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:42:11.098+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 138,
+   "error": null,
+   "preview": "{\"ticker\": \"XOM\", \"cik\": 2115436, \"filings\": [], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}"
+  },
+  {
+   "id": "2.0",
+   "tool": "wiki_search",
+   "args": {
+    "query": "Exxon Mobil Corporation",
+    "limit": 5
+   },
+   "started": "2026-09-25T03:42:11.090+00:00",
+   "ok": true,
+   "elapsed_ms": 1394,
+   "chars": 167,
+   "error": null,
+   "preview": "{\"query\": \"Exxon Mobil Corporation\", \"titles\": [\"ExxonMobil\", \"History of ExxonMobil\", \"Mobil Oil Corporation\", \"Mobil 1\", \"Esso\"], \"note\": \"read one with wiki_as_of\"}"
+  }
+ ],
+ "llm_calls": 18,
+ "attempts": 1,
+ "elapsed_s": 36.3,
+ "window": "clean",
+ "screen_score": 0.7474999999999999,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

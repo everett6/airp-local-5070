@@ -1,0 +1,181 @@
+{
+ "ticker": "AMZN",
+ "as_of": "2026-05-29T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.6986483166395231,
+ "logprob_mass": 1.000000053839576,
+ "logodds": 0.8408695260983295,
+ "logodds_censored": false,
+ "p_up": 0.5,
+ "answered": true,
+ "reason": "The price history shows a slight positive return over 20 days (2.11%), but the volatility is moderate. The news articles do not contain any specific information about Amazon that would significantly impact its stock price in the next 20 days. The latest 8-K filing does not contain any material news that would affect the stock price. Therefore, the probability that Amazon closes higher 20 trading days after its latest close is around 50%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1018724/000110465926065717/tm2614288d1_8k.htm",
+  "https://www.marketwatch.com/investing/stock/amzn"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting AMZN.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "AMZN",
+      "days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "AMZN",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "AMZN",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any significant news that could impact AMZN's stock price over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1018724/000110465926065717/tm2614288d1_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Amazon.com Inc."
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price data and news do not indicate a strong upward or downward trend, and there is no significant news in the latest 8-K filing that would strongly influence the stock price over the next 20 days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "AMZN",
+    "days": 30
+   },
+   "started": "2026-09-25T03:45:26.129+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 427,
+   "error": null,
+   "preview": "{\"ticker\": \"AMZN\", \"last_date\": \"2026-05-29\", \"last_close\": 270.64, \"ret_1d\": -0.0123, \"ret_5d\": 0.0081, \"ret_20d\": 0.0211, \"ret_60d\": null, \"vol_20d_annualized\": 0.209, \"closes_last_30\": [250.56, 248"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "AMZN",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:45:26.131+00:00",
+   "ok": true,
+   "elapsed_ms": 124,
+   "chars": 1179,
+   "error": null,
+   "preview": "{\"ticker\": \"AMZN\", \"cik\": 1018724, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-05-22\", \"accepted_utc_latest\": \"2026-05-23T01:12:53+00:00\", \"items\": \"5.07\", \"url\": \"https://www.sec.gov/Archives/edgar/da"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "AMZN",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:45:26.130+00:00",
+   "ok": true,
+   "elapsed_ms": 2387,
+   "chars": 4286,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/amzn\", \"captured_utc\": \"2026-05-15T03:09:35+00:00\", \"title\": \"AMZN Stock Price | Amazon.com Inc. Stock Quote (U.S.: Nasdaq"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1018724/000110465926065717/tm2614288d1_8k.htm"
+   },
+   "started": "2026-09-25T03:45:35.383+00:00",
+   "ok": true,
+   "elapsed_ms": 204,
+   "chars": 387,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-26-065717.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1018724/000110465926065717/0001104659-26-065717.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.go"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Amazon.com Inc.",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:45:35.383+00:00",
+   "ok": true,
+   "elapsed_ms": 3602,
+   "chars": 4162,
+   "error": null,
+   "preview": "{\"title\": \"Amazon (company)\", \"revision_time\": \"2026-05-28T11:31:36Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1356540987\", \"text\": \"American multinational technology conglomerate\\nThis art"
+  }
+ ],
+ "llm_calls": 18,
+ "attempts": 1,
+ "elapsed_s": 33.7,
+ "window": "clean",
+ "screen_score": 0.715,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

@@ -1,0 +1,222 @@
+{
+ "ticker": "AAPL",
+ "as_of": "2026-06-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 1.9599467021579736e-06,
+ "logprob_mass": 1.0000000794653834,
+ "logodds": -13.1425913179195,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a slight decline over the last 20 days, but the volatility is moderate. The news and SEC filings do not indicate any major events that would significantly impact the stock price in the near term. Therefore, the probability of AAPL closing higher is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/320193/000032019326000011/aapl-20260430.htm",
+  "https://www.sec.gov/Archives/edgar/data/320193/000114036126015711/ef20071035_8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/320193/000114036126006577/ef20060722_8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/320193/000032019326000005/aapl-20260129.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent events that might influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "AAPL",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "AAPL",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "AAPL",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent SEC filings and news to identify any significant events that could impact AAPL's stock price over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000011/aapl-20260430.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036126015711/ef20071035_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036126006577/ef20060722_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000005/aapl-20260129.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price history and news, there is no strong evidence to suggest a significant upward or downward movement in AAPL's stock price over the next 20 trading days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "AAPL",
+    "days": 20
+   },
+   "started": "2026-09-25T03:47:12.915+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"AAPL\", \"last_date\": \"2026-06-30\", \"last_close\": 289.11, \"ret_1d\": 0.027, \"ret_5d\": -0.0168, \"ret_20d\": -0.0553, \"ret_60d\": null, \"vol_20d_annualized\": 0.348, \"closes_last_30\": [306.05, 314"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "AAPL",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:47:12.917+00:00",
+   "ok": true,
+   "elapsed_ms": 743,
+   "chars": 1166,
+   "error": null,
+   "preview": "{\"ticker\": \"AAPL\", \"cik\": 320193, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-04-30\", \"accepted_utc_latest\": \"2026-05-01T01:30:41+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "AAPL",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:47:12.915+00:00",
+   "ok": true,
+   "elapsed_ms": 1204,
+   "chars": 4276,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/aapl\", \"captured_utc\": \"2026-06-28T13:42:20+00:00\", \"title\": \"AAPL Stock Price | Apple Inc. Stock Quote (U.S.: Nasdaq) | M"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036126015711/ef20071035_8k.htm"
+   },
+   "started": "2026-09-25T03:47:21.087+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 382,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001140361-26-015711.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/320193/000114036126015711/0001140361-26-015711.txt\"}, {\"name\": \"ef20071035_8k.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000011/aapl-20260430.htm"
+   },
+   "started": "2026-09-25T03:47:21.087+00:00",
+   "ok": true,
+   "elapsed_ms": 1904,
+   "chars": 527,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000320193-26-000011.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/320193/000032019326000011/0000320193-26-000011.txt\"}, {\"name\": \"a8-kex991q2202603282026.htm\", \"url\":"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000005/aapl-20260129.htm"
+   },
+   "started": "2026-09-25T03:47:21.087+00:00",
+   "ok": true,
+   "elapsed_ms": 2021,
+   "chars": 527,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000320193-26-000005.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/320193/000032019326000005/0000320193-26-000005.txt\"}, {\"name\": \"a8-kex991q1202612272025.htm\", \"url\":"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/320193/000114036126006577/ef20060722_8k.htm"
+   },
+   "started": "2026-09-25T03:47:21.087+00:00",
+   "ok": true,
+   "elapsed_ms": 2142,
+   "chars": 648,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001140361-26-006577.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/320193/000114036126006577/0001140361-26-006577.txt\"}, {\"name\": \"ef20060722_8k.htm\", \"url\": \"https://"
+  }
+ ],
+ "llm_calls": 12,
+ "attempts": 1,
+ "elapsed_s": 29.8,
+ "window": "clean",
+ "screen_score": 0.7424999999999999,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# Earnings-event pipeline (docs/MASTER_PLAN.md steps 1-5), one GPU model at a time. Not a service: run it by hand;
+# every step is resumable (finished work is skipped), so re-running after a stop just continues.
+#
+#   scripts/event_pipeline.sh            # from the repo root
+#
+# Ollama servers (each GPU job takes the GPU lock and unloads its model when done, so only one model is ever on the GPU):
+#   :11434 system store (qwen3:8b), 1 slot: deterministic research
+#   :11435 ~/.ollama (Bonsai, NuExtract3), 1 slot: deterministic decisions
+#   :11436 ~/.ollama, 4 slots and :11437 system store, 4 slots: batched extraction (every number is re-checked by
+#          code against the release, so batching's occasional token differences can't slip a wrong number through)
+set -euo pipefail
+cd "$(dirname "$0")/../backend"
+PY=.venv/bin/python
+EVENTS=data/events/events_2024-01-01_2026-09-24.csv
+PRICES=data/events/ohlcv_2023-01-01_2026-09-25.parquet
+mkdir -p results/events  # tee needs the folder before the script it records creates it
+LIMIT=${LIMIT:-0}; BENCH=${BENCH:-100}; MINCAL=${MINCAL:-300}  # LIMIT>0: only the first LIMIT S&P 500 events
+LOG() { echo "[$(date '+%F %T')] $*"; }
+
+serve() {  # port models_dir
+  if ! curl -s "127.0.0.1:$1/api/tags" >/dev/null; then
+    OLLAMA_MODELS="$2" OLLAMA_NOPRUNE=1 OLLAMA_HOST="127.0.0.1:$1" OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 \
+      nohup ollama serve >"/tmp/ollama_$1.log" 2>&1 &
+    for _ in $(seq 30); do curl -s "127.0.0.1:$1/api/tags" >/dev/null && break; sleep 1; done
+  fi
+}
+serve 11434 /usr/share/ollama/.ollama/models
+serve 11435 "$HOME/.ollama/models"
+serve4() { OLLAMA_MODELS="$2" OLLAMA_NOPRUNE=1 OLLAMA_HOST="127.0.0.1:$1" OLLAMA_NUM_PARALLEL=4 OLLAMA_MAX_LOADED_MODELS=1 \
+  nohup ollama serve >"/tmp/ollama_$1.log" 2>&1 & for _ in $(seq 30); do curl -s "127.0.0.1:$1/api/tags" >/dev/null && break; sleep 1; done; }
+curl -s 127.0.0.1:11436/api/tags >/dev/null || serve4 11436 "$HOME/.ollama/models"
+curl -s 127.0.0.1:11437/api/tags >/dev/null || serve4 11437 /usr/share/ollama/.ollama/models
+NUX=hf.co/numind/NuExtract3-GGUF:Q4_K_M
+
+LOG "waiting for the event list and prices"
+until [ -f "$EVENTS" ] && [ -f "$PRICES" ]; do sleep 20; done
+
+# Time budget (the event order is shuffled with a fixed seed, so LIMIT takes a random sample of companies and dates): the LLM stages (extraction, decisions) run on S&P 500 companies only (about a third of the events);
+# the code-only baselines use every S&P 1500 event.
+EV500=data/events/events_sp500_2025.csv
+$PY -c "
+import pandas as pd
+ev = pd.read_csv('$EVENTS')
+ev[(ev['index'] == 'sp500') & (ev['filed'] >= '2025-01-01')].sample(frac=1, random_state=0).to_csv('$EV500', index=False)
+print(len(ev), 'events;', ((ev['index'] == 'sp500') & (ev['filed'] >= '2025-01-01')).sum(), 'S&P 500 events from 2025')"
+
+LOG "step 2b: download S&P 500 press releases (network only)"
+$PY scripts/extract_events.py fetch --events "$EV500" --from 2025-01-01
+
+LOG "code-only baselines"
+$PY scripts/event_eval.py --events "$EVENTS" --prices "$PRICES" --tag baseline | tee results/events/eval_baseline.txt
+
+LOG "step 3a: reader benchmark on the same $BENCH releases: qwen3:8b vs NuExtract3-4B, 4 at a time"
+T0=$(date +%s); $PY scripts/extract_events.py extract --events "$EV500" --from 2025-01-01 --model qwen3:8b \
+  --base-url http://127.0.0.1:11437 --parallel 4 --limit "$BENCH" --out results/events/bench_qwen3_8b.jsonl
+T1=$(date +%s); $PY scripts/extract_events.py extract --events "$EV500" --from 2025-01-01 --model "$NUX" \
+  --base-url http://127.0.0.1:11436 --parallel 4 --limit "$BENCH" --out results/events/bench_nuextract.jsonl
+T2=$(date +%s)
+READER=$($PY scripts/bench_readers.py results/events/bench_qwen3_8b.jsonl results/events/bench_nuextract.jsonl \
+  "$(echo "($T1-$T0)/$BENCH" | bc -l)" "$(echo "($T2-$T1)/$BENCH" | bc -l)" | tail -1)
+LOG "reader chosen: $READER"
+if [ "$READER" = "$NUX" ]; then RURL=http://127.0.0.1:11436; else RURL=http://127.0.0.1:11437; fi
+RSLUG=$(echo "${READER##*/}" | tr ':/' '__')
+
+LOG "step 3: reader ($READER) on every S&P 500 release since 2025, 4 at a time"
+$PY scripts/extract_events.py extract --events "$EV500" --from 2025-01-01 --model "$READER" --base-url "$RURL" \
+  --parallel 4 --limit "$LIMIT"
+
+step5() {  # model
+  M=$1
+  $PY scripts/decide_events.py --model "$M" --base-url http://127.0.0.1:11435 --events "$EV500" --prices "$PRICES" \
+      --extract "results/events/extract_${RSLUG}.jsonl" --explain 50
+  $PY scripts/event_eval.py --events "$EV500" --prices "$PRICES" \
+      --extract "results/events/extract_${RSLUG}.jsonl" --decide "results/events/decide_${M//:/_}.jsonl" \
+      --tag "${M//:/_}" | tee "results/events/eval_${M//:/_}.txt"
+  LOG "master agent portfolio with $M picks + crypto sleeve + SPY core"
+  $PY scripts/master_portfolio.py full --start 2025-01-02 --events "$EV500" --prices "$PRICES" \
+      --decide "results/events/decide_${M//:/_}.jsonl" --min-calibration "$MINCAL" | tee "results/master_full_${M//:/_}.txt"
+}
+LOG "step 5: Bonsai-27B decisions on every event"
+step5 bonsai-27b:latest
+LOG "bonsai-27b event stage done"
+
+LOG "import the Bonsai models into the :11435 store (no GPU)"
+B1=/home/everett/.lmstudio/models/lmstudio-community/Bonsai-27B-GGUF/Bonsai-27B-Q1_0.gguf
+B2=/home/everett/.lmstudio/models/prism-ml/Ternary-Bonsai-2-27B-gguf/Ternary-Bonsai-2-27B-PTQ1_0.gguf
+MODELS=(bonsai-27b:latest)
+if [ -f "$B2" ]; then
+  printf 'FROM %s\n' "$B2" >/tmp/Modelfile.bonsai2
+  if OLLAMA_HOST=127.0.0.1:11435 ollama create bonsai2-27b -f /tmp/Modelfile.bonsai2 >/dev/null 2>&1 && \
+     $PY -c "
+import json, urllib.request
+from app.sandbox.gpu_lock import gpu_job
+body = {'model': 'bonsai2-27b', 'stream': False, 'think': False, 'messages': [{'role': 'user', 'content': 'Say OK'}],
+        'options': {'num_predict': 3}, 'keep_alive': 0}
+with gpu_job('bonsai2 load test'):  # never alongside another GPU job
+    r = urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:11435/api/chat', json.dumps(body).encode(),
+                               {'Content-Type': 'application/json'}), timeout=300)
+    print(json.load(r)['message']['content'])" ; then
+    MODELS+=(bonsai2-27b:latest)
+    LOG "Ternary-Bonsai-2 loads in Ollama: it gets the same tests"
+  else
+    LOG "Ternary-Bonsai-2 does not load in this Ollama (quant type PTQ1_0); skipped, recorded here"
+  fi
+fi
+
+if [ "${#MODELS[@]}" -gt 1 ]; then LOG "step 5b: Ternary-Bonsai-2 decisions"; step5 bonsai2-27b:latest; fi
+
+LOG "step 1: head-to-head on the 400 research briefs"
+until [ "$(ls results/analyst/*/*.json 2>/dev/null | wc -l)" -ge 400 ]; do sleep 60; done
+for M in "${MODELS[@]}"; do
+  $PY scripts/decide.py --model "$M" --base-url http://127.0.0.1:11435 --briefs analyst
+  $PY scripts/llm_web_report.py --run "decisions_${M//:/_}" >/dev/null
+done
+LOG "pipeline done"

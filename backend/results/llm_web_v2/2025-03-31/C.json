@@ -1,0 +1,184 @@
+{
+ "ticker": "C",
+ "as_of": "2025-03-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 7.261357734263064e-05,
+ "logprob_mass": 0.9999999907323968,
+ "logodds": -9.530286021666237,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The 20-day return for C is negative (-8.01%), indicating a downward trend in the short term. However, there is no significant news in the latest 8-K filing that would strongly influence the stock's direction. Given the lack of strong evidence, the probability remains within the typical range for short-horizon stock moves.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/831001/000119312525065496/d934780d8k.htm",
+  "https://finance.yahoo.com/quote/C/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to identify any factors that might influence the stock's movement over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "C",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "C",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "C",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any significant news that could impact the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/831001/000119312525065496/d934780d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "C",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price history shows a negative return over 20 days, and there is no significant news in the latest 8-K filing that would strongly influence the stock's direction. Given the lack of strong evidence, the probability remains within the typical range.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "C",
+    "days": 260
+   },
+   "started": "2026-09-25T03:26:19.588+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 395,
+   "error": null,
+   "preview": "{\"ticker\": \"C\", \"last_date\": \"2025-03-31\", \"last_close\": 68.52, \"ret_1d\": 0.0094, \"ret_5d\": -0.0412, \"ret_20d\": -0.0801, \"ret_60d\": 0.0155, \"vol_20d_annualized\": 0.36, \"closes_last_30\": [81.68, 81.02,"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "C",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:26:19.588+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4224,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/C/\", \"captured_utc\": \"2025-03-31T17:43:35+00:00\", \"title\": \"Citigroup Inc. (C) Stock Price, News, Quote & History - Yahoo Finance\", \"text\": "
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "C",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:26:19.588+00:00",
+   "ok": true,
+   "elapsed_ms": 2013,
+   "chars": 2180,
+   "error": null,
+   "preview": "{\"ticker\": \"C\", \"cik\": 831001, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-03-27\", \"accepted_utc_latest\": \"2025-03-28T01:05:18+00:00\", \"items\": \"9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/8"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "C",
+    "days": 20
+   },
+   "started": "2026-09-25T03:26:26.691+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 331,
+   "error": null,
+   "preview": "{\"ticker\": \"C\", \"last_date\": \"2025-03-31\", \"last_close\": 68.52, \"ret_1d\": 0.0094, \"ret_5d\": -0.0412, \"ret_20d\": -0.0801, \"ret_60d\": null, \"vol_20d_annualized\": 0.36, \"closes_last_30\": [74.48, 69.83, 7"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/831001/000119312525065496/d934780d8k.htm"
+   },
+   "started": "2026-09-25T03:26:26.691+00:00",
+   "ok": true,
+   "elapsed_ms": 1209,
+   "chars": 878,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-065496.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/831001/000119312525065496/0001193125-25-065496.txt\"}, {\"name\": \"d934780d8k.htm\", \"url\": \"https://www"
+  }
+ ],
+ "llm_calls": 10,
+ "attempts": 1,
+ "elapsed_s": 26.0,
+ "window": "clean",
+ "screen_score": 0.6950000000000001,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

@@ -1,0 +1,221 @@
+{
+ "ticker": "SCHW",
+ "as_of": "2026-02-27T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.007070606048905033,
+ "logprob_mass": 1.0000000181605024,
+ "logodds": -4.9447133603042435,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a 7.68% decline over 20 days, but recent news mentions analyst optimism about future performance due to strong earnings growth. Additionally, the SEC filings include updates on various developments, though no immediate catalysts are evident. These mixed signals suggest a moderate probability of the stock closing higher.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/316709/000119312526029376/d57309d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/316709/000031670926000004/schw-20260121.htm",
+  "https://finance.yahoo.com/quote/SCHW/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to identify any factors that may influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "SCHW",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "SCHW",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "SCHW",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent SEC filings and news to identify any significant events that may impact the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/316709/000119312526029376/d57309d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/316709/000031670926000004/schw-20260121.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/316709/000119312525283263/d895473d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/316709/000119312525268187/d28688d8k.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price history shows a slight decline over 20 days, but the news and SEC filings indicate mixed factors, including a recent stock decline and analyst optimism. The probability is moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "SCHW",
+    "days": 260
+   },
+   "started": "2026-09-25T03:34:21.709+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 413,
+   "error": null,
+   "preview": "{\"ticker\": \"SCHW\", \"last_date\": \"2026-02-27\", \"last_close\": 94.58, \"ret_1d\": -0.0238, \"ret_5d\": 0.0124, \"ret_20d\": -0.0768, \"ret_60d\": 0.0305, \"vol_20d_annualized\": 0.387, \"closes_last_30\": [101.75, 1"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "SCHW",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:34:21.710+00:00",
+   "ok": true,
+   "elapsed_ms": 190,
+   "chars": 2191,
+   "error": null,
+   "preview": "{\"ticker\": \"SCHW\", \"cik\": 316709, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-01-29\", \"accepted_utc_latest\": \"2026-01-30T02:15:46+00:00\", \"items\": \"5.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archives"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "SCHW",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:34:21.710+00:00",
+   "ok": true,
+   "elapsed_ms": 14775,
+   "chars": 4249,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/SCHW/\", \"captured_utc\": \"2026-02-26T08:28:15+00:00\", \"title\": \"The Charles Schwab Corporation (SCHW) Stock Price, News, Quote & History - Ya"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/316709/000119312526029376/d57309d8k.htm"
+   },
+   "started": "2026-09-25T03:34:42.944+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 497,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-26-029376.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/316709/000119312526029376/0001193125-26-029376.txt\"}, {\"name\": \"d57309d8k.htm\", \"url\": \"https://www."
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/316709/000119312525268187/d28688d8k.htm"
+   },
+   "started": "2026-09-25T03:34:42.944+00:00",
+   "ok": true,
+   "elapsed_ms": 1859,
+   "chars": 620,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-268187.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/316709/000119312525268187/0001193125-25-268187.txt\"}, {\"name\": \"d28688d8k.htm\", \"url\": \"https://www."
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/316709/000119312525283263/d895473d8k.htm"
+   },
+   "started": "2026-09-25T03:34:42.944+00:00",
+   "ok": true,
+   "elapsed_ms": 4075,
+   "chars": 868,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-283263.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/316709/000119312525283263/0001193125-25-283263.txt\"}, {\"name\": \"d895473d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/316709/000031670926000004/schw-20260121.htm"
+   },
+   "started": "2026-09-25T03:34:42.944+00:00",
+   "ok": true,
+   "elapsed_ms": 4087,
+   "chars": 511,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000316709-26-000004.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/316709/000031670926000004/0000316709-26-000004.txt\"}, {\"name\": \"a4q25exhibit991.htm\", \"url\": \"https:"
+  }
+ ],
+ "llm_calls": 10,
+ "attempts": 1,
+ "elapsed_s": 32.8,
+ "window": "clean",
+ "screen_score": 0.69,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

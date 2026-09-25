@@ -1,0 +1,217 @@
+{
+ "ticker": "AMZN",
+ "as_of": "2026-06-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.00031894572763296495,
+ "logprob_mass": 1.000000029036413,
+ "logodds": -8.050170605864041,
+ "logodds_censored": false,
+ "p_up": 0.5,
+ "answered": true,
+ "reason": "The price history shows a negative return over the last 20 days (-8.77%), indicating a downward trend. However, the market sentiment and news are mixed, with some positive developments such as AI deals and cloud partnerships, but also negative factors like a tech sector slide and bearish sentiment. The SEC filings do not indicate any major events that would significantly impact the stock price in the near term. Given the mixed signals and the short-horizon nature of stock movements, the probability of AMZN closing higher 20 trading days from now is estimated to be around 50%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1018724/000110465926073562/tm2613616d5_8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/1018724/000110465926072140/tm2613616d4_8k.htm",
+  "https://www.marketwatch.com/investing/stock/amzn"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting AMZN.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "AMZN",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "AMZN",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "AMZN",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the recent price performance, news, and SEC filings to determine the probability of AMZN closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "AMZN",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "AMZN",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "AMZN",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price performance, news, and SEC filings, there is no strong evidence to suggest a significant upward or downward movement in AMZN's stock price over the next 20 trading days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "AMZN",
+    "days": 20
+   },
+   "started": "2026-09-25T03:48:02.686+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"AMZN\", \"last_date\": \"2026-06-30\", \"last_close\": 238.34, \"ret_1d\": -0.0075, \"ret_5d\": 0.0181, \"ret_20d\": -0.0877, \"ret_60d\": null, \"vol_20d_annualized\": 0.375, \"closes_last_30\": [261.26, 25"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "AMZN",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:48:02.687+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 1186,
+   "error": null,
+   "preview": "{\"ticker\": \"AMZN\", \"cik\": 1018724, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-06-12\", \"accepted_utc_latest\": \"2026-06-13T02:00:28+00:00\", \"items\": \"8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edg"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "AMZN",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:48:02.686+00:00",
+   "ok": true,
+   "elapsed_ms": 3915,
+   "chars": 4282,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/amzn\", \"captured_utc\": \"2026-06-10T01:07:23+00:00\", \"title\": \"AMZN Stock Price | Amazon.com Inc. Stock Quote (U.S.: Nasdaq"
+  },
+  {
+   "id": "2.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "AMZN",
+    "days": 20
+   },
+   "started": "2026-09-25T03:48:08.526+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"AMZN\", \"last_date\": \"2026-06-30\", \"last_close\": 238.34, \"ret_1d\": -0.0075, \"ret_5d\": 0.0181, \"ret_20d\": -0.0877, \"ret_60d\": null, \"vol_20d_annualized\": 0.375, \"closes_last_30\": [261.26, 25"
+  },
+  {
+   "id": "2.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "AMZN",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:48:08.526+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4282,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/amzn\", \"captured_utc\": \"2026-06-10T01:07:23+00:00\", \"title\": \"AMZN Stock Price | Amazon.com Inc. Stock Quote (U.S.: Nasdaq"
+  },
+  {
+   "id": "2.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "AMZN",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:48:08.526+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1186,
+   "error": null,
+   "preview": "{\"ticker\": \"AMZN\", \"cik\": 1018724, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-06-12\", \"accepted_utc_latest\": \"2026-06-13T02:00:28+00:00\", \"items\": \"8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edg"
+  }
+ ],
+ "llm_calls": 9,
+ "attempts": 1,
+ "elapsed_s": 18.1,
+ "window": "clean",
+ "screen_score": 0.6825,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

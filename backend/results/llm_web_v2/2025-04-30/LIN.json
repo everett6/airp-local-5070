@@ -1,0 +1,186 @@
+{
+ "ticker": "LIN",
+ "as_of": "2025-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.0009406225244574905,
+ "logprob_mass": 1.0000001536145084,
+ "logodds": -6.968027576649055,
+ "logodds_censored": false,
+ "p_up": 0.5,
+ "answered": true,
+ "reason": "The 20-day return for LIN is negative (-2.97%), indicating a downward trend in the short term. Additionally, the most recent 8-K filing does not provide any significant news that would suggest a positive outlook for the stock. While the stock has shown some recent volatility, there is no clear indication of a strong upward movement in the near future. Given the lack of strong positive signals, the probability of LIN closing higher in the next 20 trading days is moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1707925/000119312525028599/d825802d8k.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting LIN.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "LIN",
+      "days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "LIN",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "LIN",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for insights into recent developments affecting LIN.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1707925/000119312525028599/d825802d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "LIN",
+      "days": 60
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on recent price movements and filings, there is no strong evidence to suggest LIN will close higher in the next 20 trading days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "LIN",
+    "days": 30
+   },
+   "started": "2026-09-25T03:27:03.861+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 424,
+   "error": null,
+   "preview": "{\"ticker\": \"LIN\", \"last_date\": \"2025-04-30\", \"last_close\": 444.33, \"ret_1d\": 0.0059, \"ret_5d\": 0.0112, \"ret_20d\": -0.0297, \"ret_60d\": null, \"vol_20d_annualized\": 0.434, \"closes_last_30\": [450.72, 448."
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "LIN",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:03.861+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4226,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/LIN/\", \"captured_utc\": \"2025-04-01T22:23:31+00:00\", \"title\": \"Linde plc (LIN) Stock Price, News, Quote & History - Yahoo Finance\", \"text\": \""
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "LIN",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:27:03.861+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1165,
+   "error": null,
+   "preview": "{\"ticker\": \"LIN\", \"cik\": 1707925, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-02-18\", \"accepted_utc_latest\": \"2025-02-19T02:05:20+00:00\", \"items\": \"8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1707925/000119312525028599/d825802d8k.htm"
+   },
+   "started": "2026-09-25T03:27:03.862+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 751,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-028599.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1707925/000119312525028599/0001193125-25-028599.txt\"}, {\"name\": \"d825802d8k.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "LIN",
+    "days": 60
+   },
+   "started": "2026-09-25T03:27:03.862+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 426,
+   "error": null,
+   "preview": "{\"ticker\": \"LIN\", \"last_date\": \"2025-04-30\", \"last_close\": 444.33, \"ret_1d\": 0.0059, \"ret_5d\": 0.0112, \"ret_20d\": -0.0297, \"ret_60d\": 0.0012, \"vol_20d_annualized\": 0.434, \"closes_last_30\": [450.72, 44"
+  }
+ ],
+ "llm_calls": 4,
+ "attempts": 1,
+ "elapsed_s": 4.0,
+ "window": "clean",
+ "screen_score": 0.7074999999999999,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}
