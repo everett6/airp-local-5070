@@ -75,3 +75,20 @@ Per the kill rule, broad EPS-change stock picking stops. The one test left befor
 **out of sample on 2024 releases** (reader on ~1,800 S&P 500 releases, ~1 hour GPU): does "reader verified both
 numbers" + EPS change, and Bonsai with the research table, hold up in a year they were not found in? If not, the
 project is the SPY + crypto trend allocator.
+
+## Out-of-sample check on 2024 (2026-09-25): both leads FAIL -> stock picking stops
+
+Same reader, SEC tool, research table and Bonsai-27B on all 1,995 S&P 500 earnings releases of 2024
+(scripts/oos_eval.py; results/events/oos_2024.json vs oos_2025_26.json):
+
+| Lead | 2025-26 (found) | 2024 (new year) |
+|---|---|---|
+| L1 EPS change, reader verified both numbers, 20 days | +0.207 [+0.087, +0.332] | +0.043 [-0.021, +0.112] |
+| L1 same, 60 days | +0.217 [+0.140, +0.295] | +0.055 [-0.007, +0.122] |
+| L2 Bonsai P(BUY) with research table, 20 days | +0.105 [+0.036, +0.171] | +0.020 [-0.053, +0.079] |
+| L2 same, 60 days | +0.066 [-0.009, +0.138] | +0.035 [-0.055, +0.115] |
+
+Neither lead survives a year it was not found in, and 2024 is inside Bonsai's training data, which could only have
+helped it. The 2025-26 numbers were a small-sample fluke of 12-17 months. Decision: no LLM stock picking, no fine-tuning;
+the project continues as the SPY core + BTC/ETH trend-sleeve allocator (the one piece that held over 2018-2026),
+next step its forward paper test (Stage D, manual weekly command).

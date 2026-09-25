@@ -92,3 +92,12 @@ def test_reader_check_keeps_only_numbers_quoted_from_the_release():
                    "guidance_quote": "Guidance raised a lot"}, RELEASE)
     assert wrong["revenue"] == {} and "revenue.q" in wrong["rejected"] and wrong["guidance"] == "unverified"
     assert check(None, RELEASE)["parsed"] is False
+
+
+def test_plausibility_drops_a_growth_rate_read_as_revenue():
+    from app.sandbox.events import plausible
+    assert plausible("revenue", {"q": -3.5})[0] == {}
+    assert plausible("revenue", {"q": 5000.0, "prior": 50.0})[0] == {}           # 100x a year earlier: wrong number
+    assert plausible("revenue", {"q": 5000.0, "prior": 4500.0})[0] == {"q": 5000.0, "prior": 4500.0}
+    assert plausible("eps", {"q": -0.4, "prior": 1.2})[0] == {"q": -0.4, "prior": 1.2}  # losses are allowed
+    assert plausible("eps", {"q": 2023.0})[0] == {}                             # a year read as EPS

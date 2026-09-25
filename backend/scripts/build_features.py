@@ -30,7 +30,7 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 import pandas as pd
 from decide_events import SECTOR_ETF, event_text, pct
 
-from app.sandbox.events import Prices, entry_index
+from app.sandbox.events import Prices, entry_index, plausible
 
 
 def sec_tool(hist: pd.DataFrame, released: str) -> dict[str, Any]:
@@ -85,6 +85,8 @@ def main() -> None:
             continue
         tool = sec_tool(by_cik.get(int(r.cik), pd.DataFrame(columns=xb.columns)), str(r.accepted_utc))
         filled = json.loads(json.dumps(e))  # the reader's record with the SEC tool's year-earlier numbers added
+        for key in ("revenue", "eps", "adj_eps"):  # extracts made before the plausibility rule get it here
+            filled[key] = plausible(key, filled.get(key) or {})[0]
         notes = []
         for key, src in (("eps", "eps"), ("revenue", "rev")):
             d = filled.get(key) or {}
@@ -104,7 +106,7 @@ def main() -> None:
         rows.append({"accession": r.accession, "ticker": r.ticker, "cik": r.cik, "sector": r.sector,
                      "accepted_utc": r.accepted_utc, "entry": days[i].date().isoformat(),
                      "eps_q": eps.get("q"), "eps_prior": eps.get("prior"),
-                     "eps_prior_source": "reader" if "prior" in (e.get("eps") or {}) else
+                     "eps_prior_source": "reader" if "prior" in plausible("eps", e.get("eps") or {})[0] else
                      ("sec" if "prior" in eps else None),
                      "rev_q": rev.get("q"), "rev_prior": rev.get("prior"),
                      "guidance": e.get("guidance"), "tone": e.get("tone"),

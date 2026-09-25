@@ -35,7 +35,8 @@ from app.tools.gateway import _read_env_file
 
 TEXT = BACKEND / "data" / "events" / "text"
 OUT = BACKEND / "results" / "events"
-MAX_CHARS = 14000  # first part of the release: headline numbers, guidance, and the income-statement table
+MAX_CHARS = 8000  # first part of the release: 98% of EPS figures appear in the first 7,000 characters (14,000 before
+# 2026-09-25: the 8,000-char one-line-JSON profile verified as many numbers 29% faster, results/events/bench_readers.json)
 
 READER_SYSTEM = """You read one quarterly earnings press release. Extract, using ONLY the release:
 - revenue for the reported quarter and the same quarter a year earlier, in millions of dollars;
@@ -52,6 +53,8 @@ Reply with ONLY this JSON:
  "adj_eps": {"q": number|null, "prior": number|null, "quote": "..."},
  "guidance": "...", "guidance_quote": "...", "tone": "...", "highlights": ["<exact quote>", "<exact quote>"]}"""
 
+# fast profile: pretty-printed JSON spends ~a fifth of the output tokens on spaces and line breaks
+COMPACT = "\nWrite the JSON on one line without indentation."
 
 NUEXTRACT_TEMPLATE = {
     "period_end": "date",
@@ -156,7 +159,8 @@ async def _extract_loop(todo: list[Any], llm: OllamaLLM, out_path: Path, t0: flo
         async def one(r: Any) -> None:
             nonlocal n
             text = gzip.decompress(text_path(r.accession).read_bytes()).decode()[: args.max_chars]
-            raw_text = await (llm("", nuextract_prompt(text)) if nu else llm(READER_SYSTEM, text))
+            system = READER_SYSTEM + (COMPACT if args.compact else "")
+            raw_text = await (llm("", nuextract_prompt(text)) if nu else llm(system, text))
             try:
                 raw = json.loads(raw_text[raw_text.index("{"): raw_text.rindex("}") + 1])
             except ValueError:
@@ -184,6 +188,8 @@ def main() -> None:
     ap.add_argument("--base-url", default=None)
     ap.add_argument("--parallel", type=int, default=1, help="requests in flight (Ollama OLLAMA_NUM_PARALLEL)")
     ap.add_argument("--max-chars", type=int, default=MAX_CHARS)
+    ap.add_argument("--compact", action=argparse.BooleanOptionalAction, default=True,
+                    help="ask for one-line JSON (fewer output tokens); --no-compact reproduces the earlier reads")
     ap.add_argument("--limit", type=int, default=0, help="only the first N events (benchmarks)")
     ap.add_argument("--out", default=None, help="output jsonl (default results/events/extract_<model>.jsonl)")
     args = ap.parse_args()

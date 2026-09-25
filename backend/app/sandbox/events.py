@@ -132,6 +132,22 @@ def number_in_quote(value: float, quote: str, scaled: bool) -> bool:
     return any(abs(c - t) <= max(0.005, 0.0005 * abs(t)) for c in cands for t in targets)
 
 
+def plausible(key: str, kept: dict[str, float]) -> tuple[dict[str, float], list[str]]:
+    """Quote-checked numbers can still be the wrong number from the right sentence (a growth rate read as revenue):
+    revenue must be positive and within 0.3x-3x of a year earlier; EPS within +-100 per share."""
+    kept = dict(kept)
+    bad: list[str] = []
+    for part in list(kept):
+        v = kept[part]
+        if (key == "revenue" and v <= 0) or (key != "revenue" and abs(v) > 100):
+            bad.append(f"{key}.{part}")
+            del kept[part]
+    if key == "revenue" and {"q", "prior"} <= set(kept) and not 0.3 < kept["q"] / kept["prior"] < 3:
+        bad += [f"{key}.q", f"{key}.prior"]
+        kept = {}
+    return kept, bad
+
+
 def check(raw: dict[str, Any] | None, text: str) -> dict[str, Any]:
     """Keep only numbers whose quote is really in the release and really contains them."""
     raw = raw or {}
@@ -150,6 +166,8 @@ def check(raw: dict[str, Any] | None, text: str) -> dict[str, Any]:
                     kept[part] = float(v)
                 else:
                     out["rejected"].append(f"{key}.{part}")
+        kept, bad = plausible(key, kept)
+        out["rejected"] += bad
         out[key] = kept
     g = str(raw.get("guidance", "none")).lower()
     gq = str(raw.get("guidance_quote") or "")

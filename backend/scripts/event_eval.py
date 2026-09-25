@@ -32,6 +32,7 @@ from app.sandbox.events import (
     entry_index,
     fwd_excess,
     monthly_ic,
+    plausible,
     quintile_spread,
     reaction,
 )
@@ -67,6 +68,8 @@ def build(events: pd.DataFrame, p: Prices) -> pd.DataFrame:
 
 def add_extract(df: pd.DataFrame, path: Path) -> pd.DataFrame:
     ex = pd.DataFrame([json.loads(x) for x in path.read_text().splitlines()])
+    for key in ("revenue", "eps"):  # extracts made before the plausibility rule get it here
+        ex[key] = ex[key].map(lambda d, k=key: plausible(k, d if isinstance(d, dict) else {})[0])
 
     def growth(d: object) -> float | None:
         if isinstance(d, dict) and d.get("prior") not in (None, 0) and d.get("q") is not None:
