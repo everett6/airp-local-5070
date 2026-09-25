@@ -92,3 +92,44 @@ Neither lead survives a year it was not found in, and 2024 is inside Bonsai's tr
 helped it. The 2025-26 numbers were a small-sample fluke of 12-17 months. Decision: no LLM stock picking, no fine-tuning;
 the project continues as the SPY core + BTC/ETH trend-sleeve allocator (the one piece that held over 2018-2026),
 next step its forward paper test (Stage D, manual weekly command).
+
+## Next (2026-09-25): research sub-agent swap test and Stage D
+
+**Jan-v1-4B as the research sub-agent** (the model that searches the as-of internet tools and writes the checked
+brief). Jan-v1 is a Qwen3-4B fine-tune for agentic web research (janhq/Jan-v1-4B-GGUF). Test: the same research tasks
+as the qwen3:8b analyst run (every 4th month of 2025-01..2026-08, top-20 screen, 100 tasks), same tools and web cache,
+`scripts/compare_research.py analyst analyst_jan`. Rule fixed before the run: Jan replaces qwen3:8b only with at least
+as many source-verified facts per brief AND >= 1.5x faster (it is half the size, so it also frees ~2.5 GB of VRAM).
+This measures research quality, not returns: per the stock-picking verdict, briefs are no longer used to pick stocks,
+so the research agent only matters for future pre-registered hypotheses and for the allocator's review step.
+
+**Stage D: forward paper test of the allocator** (the part that held up 2018-2026).
+- `python scripts/forward_allocator.py`, by hand about once a week; `--status` prints the ledger. No service, no timer.
+- Books: master (SPY core + BTC/ETH trend sleeve, crypto <= 20%), SPY buy-and-hold, fixed 80/20 SPY/BTC.
+- Orders decided at a run fill at the first open after the run's UTC date; today's bar is never used; 5 bps costs;
+  whole SPY shares, fractional crypto (app/portfolio/forward.py, tests/test_forward_allocator.py).
+- Each run appends to results/forward/allocator/ledger.jsonl and commits it to git itself, so results can't be
+  edited afterwards.
+- Started 2026-09-25 (first targets: SPY 78%, BTC 11.6%, ETH 8.4%). Gate on 2026-12-25: the allocator's forward
+  return, volatility and drawdown vs SPY and 80/20 are within the range of 13-week windows in the 2018-2026 backtest;
+  if not, find out why before trusting the backtest.
+
+### Jan-v1-4B result (2026-09-25): FAIL, keep qwen3:8b
+
+Same 100 research tasks, same tools and web cache, 1-slot server (results/compare_analyst_vs_analyst_jan.json):
+
+| | qwen3:8b | Jan-v1-4B |
+|---|---|---|
+| source-verified facts per brief | 4.47 | 0.36 |
+| tasks with a final answer | 100% | 0% |
+| unparseable replies per task | 0.31 | 3.33 |
+| tool calls per task (ok) | 6.1 (98%) | 2.0 (97%) |
+| seconds per task | 47.4 | 27.0 (1.76x faster) |
+
+Why: Jan is trained for native tool calling (the chat template's tool-call format). Asked for our text-JSON action
+protocol it writes single `{"name", "args"}` calls or invents a tool's output (copying price data from its context)
+instead of requesting it. A fair test would need native tool calling in agent_worker; not worth it while research
+briefs feed no decision (stock-picking verdict). Speed note: research time is ~all GPU (tool calls replay from the
+cache in ~0 s), so if research becomes a bottleneck again the free wins are OLLAMA_NUM_PARALLEL=4 (the 4 workers were
+queueing on a 1-slot server), OLLAMA_FLASH_ATTENTION=1 and OLLAMA_KV_CACHE_TYPE=q8_0; vLLM (prefix caching of the
+re-sent research history) is the next step after that. Post-hoc ternary quantization of a 4B model is not worth it.
