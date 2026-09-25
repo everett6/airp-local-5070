@@ -128,36 +128,51 @@ async def run(args: argparse.Namespace) -> None:
         for line in SIGNALS.read_text().splitlines():
             r = json.loads(line)
             done_signals.add((r["arm"], r["cutoff"], r["ticker"]))
-    total = len(days) * args.candidates
-    n = 0
+    jobs = []
+    for d in days:
+        folder = OUT_DIR / d.date().isoformat()
+        folder.mkdir(parents=True, exist_ok=True)
+        label = "clean" if d.date() >= clean_from else "memory_risk"
+        jobs += [(d, t, float(sc), label, folder / f"{t}.json") for t, sc in screen(panel, feats, d, args.candidates).items()]
+    total, todo = len(jobs), sum(not j[4].exists() for j in jobs)
+    print(f"{total} decisions, {total - todo} already done, {todo} to go, {args.workers} at a time", flush=True)
+    done = 0
     t_start = time.monotonic()
+    queue: asyncio.Queue[tuple[pd.Timestamp, str, float, str, Path]] = asyncio.Queue()
+    for j in jobs:
+        queue.put_nowait(j)
+
+    def record_signals(rec: dict, d: pd.Timestamp, t: str, sc: float, label: str) -> None:
+        with SIGNALS.open("a") as f:
+            for arm, p in (("llm_web" if label == "clean" else "llm_web_memory_risk", signal_p(rec)),
+                           ("screen_top10" if label == "clean" else "screen_top10_memory_risk", 0.45 + 0.1 * sc)):
+                key = (arm, d.date().isoformat(), t)
+                if p is not None and key not in done_signals:
+                    f.write(json.dumps({"arm": arm, "cutoff": key[1], "ticker": t, "p": p}) + "\n")
+                    done_signals.add(key)
+
+    async def worker() -> None:
+        # several decisions in flight: almost all of a decision's time is waiting on the network, so they overlap.
+        # The GPU still answers one prompt at a time (OllamaLLM concurrency=1), so every answer is unchanged.
+        nonlocal done
+        while not queue.empty():
+            d, t, sc, label, path = queue.get_nowait()
+            if path.exists():
+                rec = json.loads(path.read_text())
+            else:
+                rec = await decide(t, d, llm, fetcher, base, lookup, args.rounds)
+                rec |= {"window": label, "screen_score": sc, "model": args.model, "provenance": provenance}
+                path.write_text(json.dumps(rec, indent=1, default=str) + "\n")
+                done += 1
+                rate = (time.monotonic() - t_start) / done
+                print(f"[{done}/{todo}] {d.date()} {t:6s} p={rec.get('p_up')} lp={rec.get('p_up_logprob')} "
+                      f"{rec.get('elapsed_s')}s tools={len(rec.get('tool_log', []))} "
+                      f"ok={sum(e['ok'] for e in rec.get('tool_log', []))} "
+                      f"{rate:.1f}s/decision eta={(todo - done) * rate / 3600:.1f}h", flush=True)
+            record_signals(rec, d, t, sc, label)
+
     try:
-        for d in days:
-            cands = screen(panel, feats, d, args.candidates)
-            folder = OUT_DIR / d.date().isoformat()
-            folder.mkdir(parents=True, exist_ok=True)
-            label = "clean" if d.date() >= clean_from else "memory_risk"
-            for t, sc in cands.items():
-                n += 1
-                path = folder / f"{t}.json"
-                if path.exists():
-                    rec = json.loads(path.read_text())
-                else:
-                    rec = await decide(t, d, llm, fetcher, base, lookup, args.rounds)
-                    rec |= {"window": label, "screen_score": float(sc), "model": args.model, "provenance": provenance}
-                    path.write_text(json.dumps(rec, indent=1, default=str) + "\n")
-                    rate = (time.monotonic() - t_start) / n
-                    print(f"[{n}/{total}] {d.date()} {t:6s} p={rec.get('p_up')} lp={rec.get('p_up_logprob')} {rec.get('elapsed_s')}s "
-                          f"tools={len(rec.get('tool_log', []))} ok={sum(e['ok'] for e in rec.get('tool_log', []))} "
-                          f"eta={(total - n) * rate / 3600:.1f}h", flush=True)
-                with SIGNALS.open("a") as f:
-                    for arm, p in (("llm_web" if label == "clean" else "llm_web_memory_risk", signal_p(rec)),
-                                   ("screen_top10" if label == "clean" else "screen_top10_memory_risk",
-                                    0.45 + 0.1 * float(sc))):
-                        key = (arm, d.date().isoformat(), t)
-                        if p is not None and key not in done_signals:
-                            f.write(json.dumps({"arm": arm, "cutoff": key[1], "ticker": t, "p": p}) + "\n")
-                            done_signals.add(key)
+        await asyncio.gather(*(worker() for _ in range(max(1, args.workers))))
     finally:
         await fetcher.aclose()
 
@@ -169,6 +184,7 @@ def main() -> None:
     ap.add_argument("--every", type=int, default=1, help="keep every n-th month")
     ap.add_argument("--candidates", type=int, default=20)
     ap.add_argument("--rounds", type=int, default=2)
+    ap.add_argument("--workers", type=int, default=4, help="decisions researched at the same time")
     ap.add_argument("--model", default="qwen3:8b")
     ap.add_argument("--clean-from", default="2025-01-01", help="first decision day after the model's training data")
     ap.add_argument("--newest-first", action="store_true")

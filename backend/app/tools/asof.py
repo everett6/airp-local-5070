@@ -49,7 +49,7 @@ NEWS_PAGES = (  # (source, URL template, years it was archived); tried in order,
     ("cnbc", "www.cnbc.com/quotes/{T}", 2020, 2100),
     ("yahoo", "finance.yahoo.com/quote/{T}", 2017, 2100),
     ("yahoo", "finance.yahoo.com/q?s={T}", 2009, 2017),
-    ("nasdaq", "www.nasdaq.com/market-activity/stocks/{t}/news-headlines", 2020, 2100),
+    # nasdaq.com quote pages were dropped 2026-09-24: 0 captures found in 34 tries, 4 s of rate limit each
 )
 
 PriceLookup = Callable[[str, datetime, int], list[tuple[str, float]]]
