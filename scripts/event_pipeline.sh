@@ -14,6 +14,8 @@ cd "$(dirname "$0")/../backend"
 PY=.venv/bin/python
 EVENTS=data/events/events_2024-01-01_2026-09-24.csv
 PRICES=data/events/ohlcv_2023-01-01_2026-09-25.parquet
+mkdir -p results/events  # tee needs the folder before the script it records creates it
+LIMIT=${LIMIT:-0}; BENCH=${BENCH:-100}; MINCAL=${MINCAL:-300}  # LIMIT>0: only the first LIMIT S&P 500 events
 LOG() { echo "[$(date '+%F %T')] $*"; }
 
 serve() {  # port models_dir
@@ -34,11 +36,51 @@ NUX=hf.co/numind/NuExtract3-GGUF:Q4_K_M
 LOG "waiting for the event list and prices"
 until [ -f "$EVENTS" ] && [ -f "$PRICES" ]; do sleep 20; done
 
-LOG "step 2b: download press releases (network only)"
-$PY scripts/extract_events.py fetch --events "$EVENTS" --from 2025-01-01
+# Time budget (the event order is shuffled with a fixed seed, so LIMIT takes a random sample of companies and dates): the LLM stages (extraction, decisions) run on S&P 500 companies only (about a third of the events);
+# the code-only baselines use every S&P 1500 event.
+EV500=data/events/events_sp500_2025.csv
+$PY -c "
+import pandas as pd
+ev = pd.read_csv('$EVENTS')
+ev[(ev['index'] == 'sp500') & (ev['filed'] >= '2025-01-01')].sample(frac=1, random_state=0).to_csv('$EV500', index=False)
+print(len(ev), 'events;', ((ev['index'] == 'sp500') & (ev['filed'] >= '2025-01-01')).sum(), 'S&P 500 events from 2025')"
+
+LOG "step 2b: download S&P 500 press releases (network only)"
+$PY scripts/extract_events.py fetch --events "$EV500" --from 2025-01-01
 
 LOG "code-only baselines"
 $PY scripts/event_eval.py --events "$EVENTS" --prices "$PRICES" --tag baseline | tee results/events/eval_baseline.txt
+
+LOG "step 3a: reader benchmark on the same $BENCH releases: qwen3:8b vs NuExtract3-4B, 4 at a time"
+T0=$(date +%s); $PY scripts/extract_events.py extract --events "$EV500" --from 2025-01-01 --model qwen3:8b \
+  --base-url http://127.0.0.1:11437 --parallel 4 --limit "$BENCH" --out results/events/bench_qwen3_8b.jsonl
+T1=$(date +%s); $PY scripts/extract_events.py extract --events "$EV500" --from 2025-01-01 --model "$NUX" \
+  --base-url http://127.0.0.1:11436 --parallel 4 --limit "$BENCH" --out results/events/bench_nuextract.jsonl
+T2=$(date +%s)
+READER=$($PY scripts/bench_readers.py results/events/bench_qwen3_8b.jsonl results/events/bench_nuextract.jsonl \
+  "$(echo "($T1-$T0)/$BENCH" | bc -l)" "$(echo "($T2-$T1)/$BENCH" | bc -l)" | tail -1)
+LOG "reader chosen: $READER"
+if [ "$READER" = "$NUX" ]; then RURL=http://127.0.0.1:11436; else RURL=http://127.0.0.1:11437; fi
+RSLUG=$(echo "${READER##*/}" | tr ':/' '__')
+
+LOG "step 3: reader ($READER) on every S&P 500 release since 2025, 4 at a time"
+$PY scripts/extract_events.py extract --events "$EV500" --from 2025-01-01 --model "$READER" --base-url "$RURL" \
+  --parallel 4 --limit "$LIMIT"
+
+step5() {  # model
+  M=$1
+  $PY scripts/decide_events.py --model "$M" --base-url http://127.0.0.1:11435 --events "$EV500" --prices "$PRICES" \
+      --extract "results/events/extract_${RSLUG}.jsonl" --explain 50
+  $PY scripts/event_eval.py --events "$EV500" --prices "$PRICES" \
+      --extract "results/events/extract_${RSLUG}.jsonl" --decide "results/events/decide_${M//:/_}.jsonl" \
+      --tag "${M//:/_}" | tee "results/events/eval_${M//:/_}.txt"
+  LOG "master agent portfolio with $M picks + crypto sleeve + SPY core"
+  $PY scripts/master_portfolio.py full --start 2025-01-02 --events "$EV500" --prices "$PRICES" \
+      --decide "results/events/decide_${M//:/_}.jsonl" --min-calibration "$MINCAL" | tee "results/master_full_${M//:/_}.txt"
+}
+LOG "step 5: Bonsai-27B decisions on every event"
+step5 bonsai-27b:latest
+LOG "bonsai-27b event stage done"
 
 LOG "import the Bonsai models into the :11435 store (no GPU)"
 B1=/home/everett/.lmstudio/models/lmstudio-community/Bonsai-27B-GGUF/Bonsai-27B-Q1_0.gguf
@@ -63,38 +105,12 @@ with gpu_job('bonsai2 load test'):  # never alongside another GPU job
   fi
 fi
 
+if [ "${#MODELS[@]}" -gt 1 ]; then LOG "step 5b: Ternary-Bonsai-2 decisions"; step5 bonsai2-27b:latest; fi
+
 LOG "step 1: head-to-head on the 400 research briefs"
 until [ "$(ls results/analyst/*/*.json 2>/dev/null | wc -l)" -ge 400 ]; do sleep 60; done
 for M in "${MODELS[@]}"; do
   $PY scripts/decide.py --model "$M" --base-url http://127.0.0.1:11435 --briefs analyst
   $PY scripts/llm_web_report.py --run "decisions_${M//:/_}" >/dev/null
-done
-
-LOG "step 3a: reader benchmark on the same 200 releases: qwen3:8b vs NuExtract3-4B, 4 at a time"
-T0=$(date +%s); $PY scripts/extract_events.py extract --events "$EVENTS" --from 2025-01-01 --model qwen3:8b \
-  --base-url http://127.0.0.1:11437 --parallel 4 --limit 200 --out results/events/bench_qwen3_8b.jsonl
-T1=$(date +%s); $PY scripts/extract_events.py extract --events "$EVENTS" --from 2025-01-01 --model "$NUX" \
-  --base-url http://127.0.0.1:11436 --parallel 4 --limit 200 --out results/events/bench_nuextract.jsonl
-T2=$(date +%s)
-READER=$($PY scripts/bench_readers.py results/events/bench_qwen3_8b.jsonl results/events/bench_nuextract.jsonl \
-  "$(echo "($T1-$T0)/200" | bc -l)" "$(echo "($T2-$T1)/200" | bc -l)" | tail -1)
-LOG "reader chosen: $READER"
-if [ "$READER" = "$NUX" ]; then RURL=http://127.0.0.1:11436; else RURL=http://127.0.0.1:11437; fi
-RSLUG=$(echo "${READER##*/}" | tr ':/' '__')
-
-LOG "step 3: reader ($READER) on every clean-window release, 4 at a time"
-$PY scripts/extract_events.py extract --events "$EVENTS" --from 2025-01-01 --model "$READER" --base-url "$RURL" \
-  --parallel 4
-
-LOG "step 5: decisions on every event"
-for M in "${MODELS[@]}"; do
-  $PY scripts/decide_events.py --model "$M" --base-url http://127.0.0.1:11435 --events "$EVENTS" --prices "$PRICES" \
-      --extract "results/events/extract_${RSLUG}.jsonl"
-  $PY scripts/event_eval.py --events "$EVENTS" --prices "$PRICES" \
-      --extract "results/events/extract_${RSLUG}.jsonl" --decide "results/events/decide_${M//:/_}.jsonl" \
-      --tag "${M//:/_}" | tee "results/events/eval_${M//:/_}.txt"
-  LOG "master agent portfolio with $M picks + crypto sleeve + SPY core"
-  $PY scripts/master_portfolio.py full --start 2025-01-02 --events "$EVENTS" --prices "$PRICES" \
-      --decide "results/events/decide_${M//:/_}.jsonl" | tee "results/master_full_${M//:/_}.txt"
 done
 LOG "pipeline done"
