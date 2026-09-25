@@ -28,6 +28,14 @@ default). See [`docs/RESEARCH_OPTIMIZATION.md`](docs/RESEARCH_OPTIMIZATION.md), 
 `docs/EXECUTION_PLAN.md` (Phases E and F). `scripts/phase_f_pipeline.sh` re-runs the whole GPU chain, one job at
 a time, in the foreground.
 
+### Paper-trading simulator (fake money, free data)
+
+`cd backend && .venv/bin/python scripts/simulate.py v7_phase_f` trades every strategy's weekly picks with $100k of
+paper money: fills at the next day's open with slippage, a 20% drawdown halt, rejected bad model outputs, random
+tie-breaks, and beta/alpha against SPY. Best result: +62% vs SPY's +18%, but it came from holding 1.6x-beta stocks
+in a rising year (alpha +25%, 95% CI −20% to +71%), and the same model came last in the 20-day run. See
+[`docs/SIMULATOR.md`](docs/SIMULATOR.md).
+
 ### Live, web-informed research
 
 ```bash
@@ -129,7 +137,7 @@ airp-local/
 │   │   ├── agents/         specialist agents
 │   │   ├── data_ingestion/ connectors — sandbox-aware mock connectors included
 │   │   └── api/routes/     FastAPI routes, including /api/sandbox/*
-│   └── tests/              pytest — 303 tests
+│   └── tests/              pytest — 314 tests
 ├── frontend/               Next.js + TypeScript UI (Sandbox page is live)
 └── docs/                   ARCHITECTURE, API_SPEC, AGENT_INTERFACES, ROADMAP,
                             LOCAL_SETUP (two-GPU walkthrough), SANDBOX,
