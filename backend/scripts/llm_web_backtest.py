@@ -91,7 +91,7 @@ def price_lookup(panel: Panel):
 
 
 async def decide(ticker: str, d: pd.Timestamp, llm: OllamaLLM, fetcher: SafeFetcher, base: ToolGateway,
-                 lookup, rounds: int) -> dict:
+                 lookup, rounds: int, brief: bool = False) -> dict:
     as_of = datetime(d.year, d.month, d.day, 20, 0, tzinfo=UTC)  # 16:00 New York in summer, 15:00 in winter
     gw = ToolGateway(mode="as_of", fetcher=fetcher, as_of=as_of, sec_user_agent=base.sec_user_agent,
                      price_lookup=lookup, tool_cache=WEBCACHE, max_result_chars=5000)
@@ -101,7 +101,7 @@ async def decide(ticker: str, d: pd.Timestamp, llm: OllamaLLM, fetcher: SafeFetc
         try:
             async with AgentJail(llm, tools=gw, limits=JailLimits()) as jail:
                 res = await jail.call({
-                    "task": "research", "prompt": "as_of", "score": "logodds",
+                    "task": "research", "prompt": "as_of", "score": "logodds", "brief": brief,
                     "subject": {"ticker": ticker, "horizon_days": HORIZON, "as_of": as_of.isoformat()},
                     "tools": gw.specs_for_prompt(), "max_rounds": rounds, "max_calls_per_round": 4,
                     "num_ctx": llm.num_ctx, "num_predict": llm.num_predict})
@@ -120,7 +120,9 @@ async def run(args: argparse.Namespace) -> None:
     days = monthly_days(panel, date.fromisoformat(args.date_from), date.fromisoformat(args.date_to), args.every)
     if args.newest_first:
         days = days[::-1]
-    llm = OllamaLLM(args.model, concurrency=1, num_ctx=8192, num_predict=600, cache=True, require_gpu=True)
+    global OUT_DIR, SIGNALS
+    OUT_DIR, SIGNALS = RESULTS / args.out, RESULTS / f"{args.out}_signals.jsonl"
+    llm = OllamaLLM(args.model, base_url=args.base_url, concurrency=1, num_ctx=8192, num_predict=1200 if args.brief else 600, cache=True, require_gpu=True)
     base = ToolGateway.from_env("as_of", as_of=datetime(2000, 1, 1, tzinfo=UTC))
     if not base.sec_user_agent:
         raise SystemExit("set SEC_USER_AGENT in backend/.env (SEC requires a contact)")
@@ -166,7 +168,7 @@ async def run(args: argparse.Namespace) -> None:
             if path.exists():
                 rec = json.loads(path.read_text())
             else:
-                rec = await decide(t, d, llm, fetcher, base, lookup, args.rounds)
+                rec = await decide(t, d, llm, fetcher, base, lookup, args.rounds, args.brief)
                 rec |= {"window": label, "screen_score": sc, "model": args.model, "provenance": provenance}
                 path.write_text(json.dumps(rec, indent=1, default=str) + "\n")
                 done += 1
@@ -191,6 +193,9 @@ def main() -> None:
     ap.add_argument("--candidates", type=int, default=20)
     ap.add_argument("--rounds", type=int, default=2)
     ap.add_argument("--workers", type=int, default=4, help="decisions researched at the same time")
+    ap.add_argument("--brief", action="store_true", help="also write a source-checked research brief (for scripts/decide.py)")
+    ap.add_argument("--out", default="llm_web_v2", help="results sub-folder, e.g. analyst for the brief-writing run")
+    ap.add_argument("--base-url", default=None, help="Ollama server, default http://127.0.0.1:11434")
     ap.add_argument("--model", default="qwen3:8b")
     ap.add_argument("--clean-from", default="2025-01-01", help="first decision day after the model's training data")
     ap.add_argument("--newest-first", action="store_true")

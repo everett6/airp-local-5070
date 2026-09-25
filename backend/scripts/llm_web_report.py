@@ -68,8 +68,10 @@ def main() -> None:
         if i + H < len(idx) and r["ticker"] in opens.columns:
             o0, o1 = opens[r["ticker"]].iloc[i], opens[r["ticker"]].iloc[i + H]
             fwd = float(o1 / o0 - 1) if pd.notna(o0) and pd.notna(o1) else None
-        rows.append({"day": d.date(), "ticker": r["ticker"], "p": p, "screen": r["screen_score"], "fwd": fwd,
-                     "tools": r.get("tool_log", [])})
+        # a BUY/PASS run (scripts/decide.py) ranks by log-odds but trades only BUY stocks; PASS scores 0 = not bought
+        p_trade = 0.0 if r.get("buy") is False else p
+        rows.append({"day": d.date(), "ticker": r["ticker"], "p": p, "p_trade": p_trade, "screen": r["screen_score"],
+                     "fwd": fwd, "tools": r.get("tool_log", []), "buy": r.get("buy")})
     df = pd.DataFrame(rows)
 
     def monthly_ic(col: str) -> tuple[list[float], dict]:
@@ -98,14 +100,16 @@ def main() -> None:
 
     bars = bars_from_panel(panel)
     universe = set(df["ticker"])
-    cfg = SimConfig(top_k=args.top_k, drawdown_halt=1.0)
-    llm_sig = [{"cutoff": r.day, "ticker": r.ticker, "p": r.p} for r in df.itertuples() if r.p is not None]
+    gated = df["buy"].notna().any()
+    cfg = SimConfig(top_k=args.top_k, drawdown_halt=1.0, min_prob=0.0 if gated else None)
+    llm_sig = [{"cutoff": r.day, "ticker": r.ticker, "p": r.p_trade} for r in df.itertuples() if r.p_trade is not None]
     scr_sig = [{"cutoff": r.day, "ticker": r.ticker, "p": 0.45 + 0.1 * r.screen} for r in df.itertuples()]
     last = max(df["day"])
     j = idx.searchsorted(pd.Timestamp(last), side="right") + H
     end = idx[min(j, len(idx) - 1)].date()
     llm = simulate(llm_sig, bars, cfg, name="llm_web", universe=universe, end=end)
-    scr = simulate(scr_sig, bars, cfg, name="screen_top10", universe=universe, end=end)
+    scr = simulate(scr_sig, bars, SimConfig(top_k=args.top_k, drawdown_halt=1.0), name="screen_top10",
+                   universe=universe, end=end)
     spy = buy_and_hold(bars, "SPY", llm.days[0], end)
 
     tools = Counter()
@@ -128,6 +132,10 @@ def main() -> None:
            "tools": {t: {"calls": tools[t], "ok_pct": round(100 * ok[t] / tools[t], 1)} for t in sorted(tools)},
            "decisions_with": {k: round(100 * v / len(rows), 1) for k, v in had.items()},
            "distinct_p": int(df["p"].nunique()),
+           "buy_decisions": None if not gated else {
+               "buy_pct": round(100 * float(df["buy"].fillna(False).astype(bool).mean()), 1),
+               "fwd_20d_buy_pct": round(100 * float(df.loc[df["buy"] == True, "fwd"].mean()), 2),
+               "fwd_20d_pass_pct": round(100 * float(df.loc[df["buy"] == False, "fwd"].mean()), 2)},
            "tied_at_top_pct": round(100 * float(df.groupby("day")["p"].apply(lambda g: g.duplicated(keep=False).mean()).mean()), 1)}
     (BACKEND / "results" / f"{args.run}_report_{args.window}.json").write_text(json.dumps(out, indent=1, default=str))
     print(json.dumps(out, indent=1, default=str))

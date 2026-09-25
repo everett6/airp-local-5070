@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import sys
 from typing import Any
 
@@ -470,6 +471,84 @@ def _render_history(steps: list[dict[str, Any]], budget: int = MAX_OBS_CHARS) ->
     return out if len(out) <= budget else out[-budget:]
 
 
+BRIEF_SYSTEM = """You are a research analyst. A portfolio manager must decide whether to buy {ticker} for the next
+{horizon} trading days, at {as_of} (UTC). Summarize the evidence below for them.
+
+Rules:
+- Use ONLY facts written in the evidence. Every fact must cite the URL it came from, copied exactly.
+- Never write a number that does not appear in the evidence.
+- Up to 6 facts, each under 30 words, most decision-relevant first (earnings, guidance, deals, lawsuits,
+  management, analyst moves). Do NOT list the stock's price, returns or volatility: the manager has those.
+
+Reply with ONLY one JSON object:
+{{"facts": [{{"text": "<one sentence>", "source": "<url>", "date": "<YYYY-MM-DD or empty>"}}],
+  "catalysts": ["<possible upside driver>"], "risks": ["<possible downside driver>"],
+  "missing": ["<important thing you could not find>"]}}"""
+
+_URL = re.compile(r"https?://[^\s\"'<>)\]]+")
+_NUM = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+
+def _norm_num(x: str) -> str:
+    return x.replace(",", "").rstrip("0").rstrip(".") if "." in x else x.replace(",", "")
+
+
+def salvage_facts(text: str) -> dict[str, Any] | None:
+    """A reply cut off by the output limit is not valid JSON; keep every fact object that was completed."""
+    obj = _json_object(text)
+    if obj is not None:
+        return obj
+    facts = []
+    for m in re.finditer(r"\{[^{}]*\}", text):
+        try:
+            f = json.loads(m.group(0))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(f, dict) and "text" in f:
+            facts.append(f)
+    return {"facts": facts, "truncated": True} if facts else None
+
+
+def verify_brief(raw: dict[str, Any] | None, evidence: str) -> dict[str, Any]:
+    """Code, not the model, decides which facts survive: the cited URL must be one a tool actually returned, and
+    every number in the fact must appear in the text of THAT source (so a figure from one tool can't be credited
+    to another page). Opinions (catalysts, risks) are kept but labelled as the analyst's judgement."""
+    blocks = re.split(r"\n\s+- (?=[a-z_]+\()", evidence)  # one block per tool observation
+    by_url: dict[str, set[str]] = {}
+    for blk in blocks:
+        blk_nums = {_norm_num(n) for n in _NUM.findall(blk)}
+        for u in _URL.findall(blk):
+            by_url.setdefault(u.rstrip(".,;"), set()).update(blk_nums)
+    urls = set(by_url)
+    raw = raw or {}
+    facts, dropped = [], {"no_source": 0, "unknown_source": 0, "number_not_in_evidence": 0}
+    for f in raw.get("facts", []) if isinstance(raw.get("facts"), list) else []:
+        if not isinstance(f, dict) or not str(f.get("text", "")).strip():
+            continue
+        text, src = str(f["text"]).strip()[:400], str(f.get("source", "")).strip().rstrip(".,;")
+        if not src:
+            dropped["no_source"] += 1
+        elif src not in urls:
+            dropped["unknown_source"] += 1
+        elif any(_norm_num(n) not in by_url[src] for n in _NUM.findall(text)):
+            dropped["number_not_in_evidence"] += 1
+        else:
+            facts.append({"text": text, "source": src, "date": str(f.get("date", ""))[:10]})
+    def strs(k: str) -> list[str]:
+        v = raw.get(k)
+        return [str(x)[:300] for x in v if isinstance(x, str | int | float)][:6] if isinstance(v, list) else []
+    return {"facts": facts[:8], "catalysts": strs("catalysts"), "risks": strs("risks"), "missing": strs("missing"),
+            "dropped": dropped, "parsed": bool(raw), "truncated": bool(raw.get("truncated"))}
+
+
+def write_brief(subj: dict[str, Any], steps: list[dict[str, Any]], budget: int) -> dict[str, Any]:
+    evidence = _render_history([{**st, "thought": ""} for st in steps], budget)
+    _send({"llm_requests": [{"id": "b", "user": evidence or "No evidence was found.",
+                             "system": BRIEF_SYSTEM.format(ticker=subj["ticker"], as_of=subj["as_of"],
+                                                           horizon=subj.get("horizon_days", 5))}]})
+    return verify_brief(salvage_facts(_recv()["llm_responses"].get("b", "")), evidence)
+
+
 def run_research(msg: dict[str, Any]) -> dict[str, Any]:
     subj = msg["subject"]
     max_rounds, max_calls = int(msg.get("max_rounds", 3)), int(msg.get("max_calls_per_round", 6))
@@ -539,6 +618,8 @@ def run_research(msg: dict[str, Any]) -> dict[str, Any]:
                                                                         horizon=subj.get("horizon_days", 5))}]})
         got = _json_object(_recv()["llm_responses"].get("u", "")) or {}
         scored = {"p_up_logprob": float(got.get("p_up", 0.5)), "logprob_mass": float(got.get("mass", 0.0))}
+    if msg.get("brief"):
+        scored["brief"] = write_brief(subj, steps, history_budget)
     return {
         **scored,
         "p_up": p, "answered": final is not None,

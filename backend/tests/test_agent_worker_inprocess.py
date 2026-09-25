@@ -145,3 +145,40 @@ def test_run_research_logodds_scores_the_evidence_not_the_conclusion(pipe):
     assert "MY CONCLUSION" not in last["user"] and "look" not in last["user"]  # evidence only
     assert "average S&P 500 stock" in last["system"]
     assert out["logodds"] == 17.25 and out["logodds_censored"] is False
+
+
+def test_verify_brief_keeps_only_sourced_facts_with_real_numbers():
+    evidence = ('[round 1] thought: \n  - news_as_of({}) -> {"url": "https://www.marketwatch.com/x", "text": '
+                '"Revenue rose 12.5% to $3,400 million"}\n  - read_filing({}) -> {"url": "https://www.sec.gov/a/ex99.htm",'
+                ' "text": "CEO resigns"}\n  - price_history_as_of({}) -> {"ret_20d": 0.0694}')
+    raw = {"facts": [{"text": "Revenue rose 12.5% to $3,400 million", "source": "https://www.marketwatch.com/x"},
+                     {"text": "Revenue rose 40%", "source": "https://www.marketwatch.com/x"},      # invented number
+                     {"text": "CEO resigns", "source": "https://www.sec.gov/a/ex99.htm"},
+                     {"text": "CEO resigns; 20-day return 0.0694", "source": "https://www.sec.gov/a/ex99.htm"},  # wrong page
+                     {"text": "Analysts love it", "source": "https://made-up.example/y"},         # never fetched
+                     {"text": "Buyback coming"}],                                               # no source
+           "catalysts": ["new product"], "risks": ["tariffs"], "missing": ["guidance"]}
+    b = aw.verify_brief(raw, evidence)
+    assert [f["text"] for f in b["facts"]] == ["Revenue rose 12.5% to $3,400 million", "CEO resigns"]
+    assert b["dropped"] == {"no_source": 1, "unknown_source": 1, "number_not_in_evidence": 2}
+    assert b["catalysts"] == ["new product"] and b["parsed"]
+    assert aw.verify_brief(None, evidence)["parsed"] is False
+
+
+def test_run_research_with_brief_sends_evidence_to_the_analyst(pipe):
+    replies = iter([json.dumps({"thought": "t", "actions": [{"tool": "news_as_of", "args": {"ticker": "X"}}]}),
+                    json.dumps({"final": {"p_up": 0.5, "reason": "r"}}),
+                    json.dumps({"facts": [{"text": "Sales up", "source": "https://n.example/a"}]})])
+    p = pipe(lambda r: next(replies), lambda r: {"ok": True, "result": '{"url": "https://n.example/a", "text": "Sales up"}'})
+    out = aw.run_research({"subject": {"ticker": "X", "as_of": "2025-03-31T20:00:00+00:00", "horizon_days": 20},
+                           "tools": [{"name": "news_as_of"}], "prompt": "as_of", "brief": True, "max_rounds": 2,
+                           "num_ctx": 8192, "num_predict": 600})
+    assert "https://n.example/a" in p.sent[-1]["llm_requests"][0]["user"]
+    assert out["brief"]["facts"] == [{"text": "Sales up", "source": "https://n.example/a", "date": ""}]
+
+
+def test_salvage_facts_keeps_completed_facts_from_a_cut_off_reply():
+    cut = '{"facts": [{"text": "A", "source": "u1"}, {"text": "B", "source": "u2"}, {"text": "C", "sou'
+    out = aw.salvage_facts(cut)
+    assert [f["text"] for f in out["facts"]] == ["A", "B"] and out["truncated"]
+    assert aw.salvage_facts('{"facts": []}') == {"facts": []} and aw.salvage_facts("nothing") is None
