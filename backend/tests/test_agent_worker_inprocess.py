@@ -126,3 +126,22 @@ def test_run_research_default_has_no_logprob_step(pipe):
     p = pipe(lambda r: json.dumps({"final": {"p_up": 0.6, "reason": "r"}}))
     out = aw.run_research({"subject": {"ticker": "X", "as_of": "now"}, "tools": [], "max_rounds": 1})
     assert "p_up_logprob" not in out and not any(r.get("mode") for s in p.sent for r in s.get("llm_requests", []))
+
+
+def test_run_research_logodds_scores_the_evidence_not_the_conclusion(pipe):
+    replies = iter([json.dumps({"thought": "look", "actions": [{"tool": "news_as_of", "args": {"ticker": "X"}}]}),
+                    json.dumps({"thought": "t", "final": {"p_up": 0.55, "reason": "MY CONCLUSION", "sources": []}})])
+
+    def llm(r):
+        if r.get("mode") == "updown_lo":
+            return json.dumps({"p_up": 1.0, "mass": 0.99, "logodds": 17.25, "censored": False, "token": "UP"})
+        return next(replies)
+    p = pipe(llm, lambda r: {"ok": True, "result": "headline"})
+    out = aw.run_research({"subject": {"ticker": "X", "as_of": "2025-03-31T20:00:00+00:00", "horizon_days": 20},
+                           "tools": [{"name": "news_as_of"}], "prompt": "as_of", "score": "logodds",
+                           "max_rounds": 2, "num_ctx": 8192, "num_predict": 600})
+    last = p.sent[-1]["llm_requests"][0]
+    assert last["mode"] == "updown_lo" and "headline" in last["user"]
+    assert "MY CONCLUSION" not in last["user"] and "look" not in last["user"]  # evidence only
+    assert "average S&P 500 stock" in last["system"]
+    assert out["logodds"] == 17.25 and out["logodds_censored"] is False

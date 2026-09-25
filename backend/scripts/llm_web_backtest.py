@@ -17,15 +17,16 @@ Leak guard the tools can't provide: qwen3:8b was trained on web text through ~20
 the date, so before its training cutoff it may remember what happened. Decisions are tagged `clean` (on or
 after --clean-from, default 2025-01-01) or `memory_risk`; only the clean ones count as evidence.
 
-Resumable and replayable: each decision is saved to results/llm_web/<date>/<ticker>.json, LLM answers go to the
+Resumable and replayable: each decision is saved to results/llm_web_v2/<date>/<ticker>.json, LLM answers go to the
 usual LLM cache, and every tool result to results/webcache/, so a re-run makes no new calls. Signals for the
-simulator are written to results/llm_web_signals.jsonl (feed to scripts/longrun.py --extra).
+simulator are written to results/llm_web_v2_signals.jsonl (feed to scripts/longrun.py --extra).
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
 import json
+import math
 import sys
 import time
 from datetime import UTC, date, datetime
@@ -45,8 +46,10 @@ from app.tools.gateway import ToolGateway
 from app.tools.netguard import SafeFetcher
 
 RESULTS = BACKEND / "results"
-OUT_DIR = RESULTS / "llm_web"
-SIGNALS = RESULTS / "llm_web_signals.jsonl"
+# v2 (2026-09-24): evidence-only relative question scored as unrounded log-odds. v1 (results/llm_web/) scored
+# after the model's own conclusion and 43% of its answers saturated at P >= 0.9999, so most picks were tie-breaks.
+OUT_DIR = RESULTS / "llm_web_v2"
+SIGNALS = RESULTS / "llm_web_v2_signals.jsonl"
 WEBCACHE = RESULTS / "webcache"
 HORIZON = 20
 
@@ -67,7 +70,10 @@ def screen(panel: Panel, feats: dict[str, pd.DataFrame], d: pd.Timestamp, n: int
 
 
 def signal_p(rec: dict) -> float | None:
-    """The log-prob P(UP) when the model put real probability on UP/DOWN, else its verbal answer."""
+    """A rank score in (0, 1): the logistic of log-odds / 10. Dividing by 10 keeps values like 25 vs 30 apart
+    instead of both becoming 1.0; it is monotone, so the ranking is exactly the log-odds ranking."""
+    if "logodds" in rec and rec.get("logprob_mass", 0.0) > 0.05:
+        return 1.0 / (1.0 + math.exp(-float(rec["logodds"]) / 10.0))
     if rec.get("logprob_mass", 0.0) > 0.05:
         return float(rec["p_up_logprob"])
     return rec.get("p_up")
@@ -95,7 +101,7 @@ async def decide(ticker: str, d: pd.Timestamp, llm: OllamaLLM, fetcher: SafeFetc
         try:
             async with AgentJail(llm, tools=gw, limits=JailLimits()) as jail:
                 res = await jail.call({
-                    "task": "research", "prompt": "as_of", "score": "logprob",
+                    "task": "research", "prompt": "as_of", "score": "logodds",
                     "subject": {"ticker": ticker, "horizon_days": HORIZON, "as_of": as_of.isoformat()},
                     "tools": gw.specs_for_prompt(), "max_rounds": rounds, "max_calls_per_round": 4,
                     "num_ctx": llm.num_ctx, "num_predict": llm.num_predict})
@@ -165,7 +171,7 @@ async def run(args: argparse.Namespace) -> None:
                 path.write_text(json.dumps(rec, indent=1, default=str) + "\n")
                 done += 1
                 rate = (time.monotonic() - t_start) / done
-                print(f"[{done}/{todo}] {d.date()} {t:6s} p={rec.get('p_up')} lp={rec.get('p_up_logprob')} "
+                print(f"[{done}/{todo}] {d.date()} {t:6s} p={rec.get('p_up')} logodds={rec.get('logodds')} "
                       f"{rec.get('elapsed_s')}s tools={len(rec.get('tool_log', []))} "
                       f"ok={sum(e['ok'] for e in rec.get('tool_log', []))} "
                       f"{rate:.1f}s/decision eta={(todo - done) * rate / 3600:.1f}h", flush=True)

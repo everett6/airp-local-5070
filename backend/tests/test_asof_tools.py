@@ -143,10 +143,13 @@ def archive_handler(cdx_ts="20150301120000", redirect_to=None):
         u = str(req.url)
         if "/cdx/search/cdx" in u:
             q = dict(req.url.params)
-            assert q["to"] == "20150310200000"
-            if "reuters" in q["url"]:
-                return httpx.Response(200, text="[]")  # no Reuters copy: falls through to the next source
-            return httpx.Response(200, json=[["timestamp", "original"], [cdx_ts, "http://" + q["url"]]])
+            assert "to" not in q  # the whole index is fetched once; the date filter is applied locally
+            if "marketwatch" in q["url"]:
+                return httpx.Response(200, text="[]")  # no copy at all: falls through to the next source
+            # the index also lists copies made AFTER the decision time: they must never be chosen
+            return httpx.Response(200, json=[["timestamp", "original"], ["20141201000000", "http://" + q["url"]],
+                                             [cdx_ts, "http://" + q["url"]], ["20150311000000", "http://" + q["url"]],
+                                             ["20160101000000", "http://" + q["url"]]])
         if "/web/" in u and "id_/" in u:
             if redirect_to and redirect_to not in u:
                 return httpx.Response(302, headers={"location": f"https://web.archive.org/web/{redirect_to}id_/x"})
@@ -158,7 +161,7 @@ def archive_handler(cdx_ts="20150301120000", redirect_to=None):
 
 async def test_news_as_of_uses_the_latest_capture_before_the_decision_time():
     res, ok = await call(gw(archive_handler()), "news_as_of", ticker="AAPL")
-    assert ok and res["source"] == "marketwatch" and res["captured_utc"].startswith("2015-03-01")
+    assert ok and res["source"] == "reuters" and res["captured_utc"].startswith("2015-03-01")
     assert "Apple Watch" in res["text"]
 
 
@@ -194,3 +197,19 @@ async def test_results_are_cached_and_replayed_exactly(tmp_path):
     # failures are not cached: a transient outage must not become a permanent "no data"
     _, ok = await call(gw(lambda r: httpx.Response(500), tmp_path), "wiki_as_of", title="Other")
     assert not ok and len(list(tmp_path.rglob("*.json"))) == 1
+
+
+async def test_capture_index_is_fetched_once_per_page_and_reused(tmp_path):
+    calls = []
+
+    def h(req):
+        if "/cdx/search/cdx" in str(req.url):
+            calls.append(str(req.url))
+        return archive_handler()(req)
+    g = gw(h, tmp_path)
+    await call(g, "news_as_of", ticker="AAPL")
+    n = len(calls)
+    later = G.ToolGateway(mode="as_of", fetcher=g.fetcher, as_of=datetime(2015, 3, 12, 20, tzinfo=UTC),
+                          tool_cache=tmp_path)
+    res, ok = await call(later, "news_as_of", ticker="AAPL")
+    assert ok and res["captured_utc"].startswith("2015-03-11") and len(calls) == n  # new month, no new lookup

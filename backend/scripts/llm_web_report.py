@@ -10,12 +10,13 @@ Reads results/llm_web/*/*.json (from scripts/llm_web_backtest.py) and reports:
   2. Paper trading: top 10 of the 20 candidates by the LLM vs by the screen, bought at the next open with costs,
      $100k fake money; the LLM's excess over the screen with a block-bootstrap CI, and both vs SPY.
   3. Research coverage: how often each tool worked, how many decisions had news, filings, or neither.
-Writes results/llm_web_report_<window>.json.
+Writes results/<run>_report_<window>.json.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from collections import Counter
 from pathlib import Path
@@ -33,6 +34,8 @@ H = 20
 
 
 def signal_p(rec: dict) -> float | None:
+    if "logodds" in rec and rec.get("logprob_mass", 0.0) > 0.05:
+        return 1.0 / (1.0 + math.exp(-float(rec["logodds"]) / 10.0))
     if rec.get("logprob_mass", 0.0) > 0.05:
         return float(rec["p_up_logprob"])
     return rec.get("p_up")
@@ -44,10 +47,11 @@ def main() -> None:
     ap.add_argument("--universe", default="data/hist/universe_2010_2026_top100.csv")
     ap.add_argument("--ohlcv", default="data/hist/ohlcv_2010_2026_top100.parquet")
     ap.add_argument("--top-k", type=int, default=10)
+    ap.add_argument("--run", default="llm_web_v2", help="results folder: llm_web_v2 (log-odds) or llm_web (v1)")
     ap.add_argument("--boot", type=int, default=5000)
     args = ap.parse_args()
 
-    recs = [json.loads(p.read_text()) for p in sorted((BACKEND / "results" / "llm_web").glob("*/*.json"))]
+    recs = [json.loads(p.read_text()) for p in sorted((BACKEND / "results" / args.run).glob("*/*.json"))]
     recs = [r for r in recs if r.get("window") == args.window]
     if not recs:
         raise SystemExit(f"no {args.window} decisions yet")
@@ -123,8 +127,9 @@ def main() -> None:
                              "screen_vs_market": beta_alpha(scr, spy)},
            "tools": {t: {"calls": tools[t], "ok_pct": round(100 * ok[t] / tools[t], 1)} for t in sorted(tools)},
            "decisions_with": {k: round(100 * v / len(rows), 1) for k, v in had.items()},
-           "distinct_p": int(df["p"].nunique())}
-    (BACKEND / "results" / f"llm_web_report_{args.window}.json").write_text(json.dumps(out, indent=1, default=str))
+           "distinct_p": int(df["p"].nunique()),
+           "tied_at_top_pct": round(100 * float(df.groupby("day")["p"].apply(lambda g: g.duplicated(keep=False).mean()).mean()), 1)}
+    (BACKEND / "results" / f"{args.run}_report_{args.window}.json").write_text(json.dumps(out, indent=1, default=str))
     print(json.dumps(out, indent=1, default=str))
 
 

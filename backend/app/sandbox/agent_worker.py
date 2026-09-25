@@ -415,6 +415,10 @@ Short-horizon stock moves are close to a coin flip and stocks rise slightly more
 so unless the evidence is unusually strong keep p_up between 0.40 and 0.60."""
 
 MAX_OBS_CHARS = 14000
+RANK_AFTER_RESEARCH = ("You compare stocks. Below is the evidence gathered on {ticker} up to {as_of} (UTC): prices, news "
+                       "and filings. Using only this evidence, will {ticker} do better (UP) or worse (DOWN) than the "
+                       "average S&P 500 stock over the next {horizon} trading days? Answer with exactly one word: "
+                       "UP or DOWN.")
 UPDOWN_AFTER_RESEARCH = ("You are an equity analyst. Below are your research notes on {ticker} made at {as_of} (UTC). "
                          "Using only those notes, will {ticker} close higher {horizon} trading days after its latest "
                          "close? Answer with exactly one word: UP or DOWN.")
@@ -513,7 +517,18 @@ def run_research(msg: dict[str, Any]) -> dict[str, Any]:
     p = parse_p(json.dumps(final)) if final else 0.5
     sources = final.get("sources", []) if final else []
     scored: dict[str, Any] = {}
-    if msg.get("score") == "logprob":
+    if msg.get("score") == "logodds":
+        # Evidence only: after reading its own conclusion the model just repeats it with ~100% certainty (43% of
+        # decisions scored >= 0.9999 that way), so every stock ties. Asked relative to the average stock and
+        # scored as unrounded log-odds, near-certain answers still get distinct, rankable values.
+        evidence = _render_history([{**st, "thought": ""} for st in steps], history_budget)
+        _send({"llm_requests": [{"id": "u", "mode": "updown_lo", "user": evidence or "No evidence was found.",
+                                 "system": RANK_AFTER_RESEARCH.format(ticker=subj["ticker"], as_of=subj["as_of"],
+                                                                      horizon=subj.get("horizon_days", 5))}]})
+        got = _json_object(_recv()["llm_responses"].get("u", "")) or {}
+        scored = {"p_up_logprob": float(got.get("p_up", 0.5)), "logprob_mass": float(got.get("mass", 0.0)),
+                  "logodds": float(got.get("logodds", 0.0)), "logodds_censored": bool(got.get("censored", True))}
+    elif msg.get("score") == "logprob":
         # a verbal probability clusters on a few round numbers (0.55, 0.60): useless for ranking stocks.
         # One more one-word answer, read from token log-probabilities, gives a continuous P(UP).
         notes = _render_history(steps, history_budget)

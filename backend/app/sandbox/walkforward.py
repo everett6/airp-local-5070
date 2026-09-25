@@ -125,7 +125,7 @@ class OllamaLLM:
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": self.num_predict},
         }
-        if mode in ("updown", "lap"):
+        if mode in ("updown", "updown_lo", "lap"):
             del body["format"]
             body["options"]["num_predict"] = 1
             body |= {"logprobs": True, "top_logprobs": 20}
@@ -142,6 +142,11 @@ class OllamaLLM:
                         p_up, mass = updown_probability(data.get("logprobs") or [])
                         self.updown_no_mass += int(round(mass, 6) == 0)  # same rule as a replayed answer
                         text = json.dumps({"p_up": round(p_up, 6), "mass": round(mass, 6), "token": text[:12]})
+                    elif mode == "updown_lo":
+                        p_up, mass = updown_probability(data.get("logprobs") or [])
+                        lo, censored = updown_logodds(data.get("logprobs") or [])
+                        text = json.dumps({"p_up": p_up, "mass": mass, "logodds": lo, "censored": censored,
+                                           "token": text[:12]})
                     elif mode == "lap":
                         probs = word_probabilities(data.get("logprobs") or [], ("UP", "DOWN", "UNKNOWN"))
                         text = json.dumps({k.lower(): round(v, 6) for k, v in probs.items()} | {"token": text[:12]})
@@ -201,6 +206,22 @@ def updown_probability(logprobs: list[dict[str, Any]]) -> tuple[float, float]:
     if up + down <= 0:
         return 0.5, 0.0
     return up / (up + down), up + down
+
+
+def updown_logodds(logprobs: list[dict[str, Any]]) -> tuple[float, bool]:
+    """log P(UP) - log P(DOWN) at the first generated token, unrounded, so near-certain answers still rank.
+    When one word is missing from the top candidates its probability is below the least likely candidate listed;
+    that bound is used and `censored` is True (the true value is further from 0)."""
+    probs = word_probabilities(logprobs, ("UP", "DOWN"))
+    up, down = probs["UP"], probs["DOWN"]
+    if up <= 0 and down <= 0:
+        return 0.0, True
+    first = logprobs[0]
+    cands = first.get("top_logprobs") or []
+    floor = min((float(c["logprob"]) for c in cands), default=-30.0)
+    lu = math.log(up) if up > 0 else floor
+    ld = math.log(down) if down > 0 else floor
+    return lu - ld, up <= 0 or down <= 0
 
 
 def _append_line(path: Path, line: str) -> None:

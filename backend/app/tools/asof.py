@@ -24,6 +24,8 @@ at the model's training cutoff (see docs/LONG_HISTORY.md).
 """
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
 import re
 from collections.abc import Callable
@@ -225,17 +227,41 @@ async def read_filing(gw: ToolGateway, a: dict[str, Any]) -> Any:
 
 # ---------------- Internet Archive ----------------
 
+_INDEX_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+async def capture_index(gw: ToolGateway, url: str) -> list[tuple[str, str]]:
+    """Every day's capture of `url` (timestamp, original), fetched ONCE per URL and kept on disk.
+
+    The list is fetched today, so it also names captures made after a decision time; callers only ever pick
+    from those at or before it (and the page itself is then read from that capture). Knowing that a later copy
+    exists tells the model nothing: it never sees the list. One lookup per page instead of one per page per
+    month is what keeps a backtest inside the Internet Archive's ~15 requests/minute."""
+    key = hashlib.sha256(url.encode()).hexdigest()
+    path = gw.tool_cache / "cdx" / f"{key}.json" if gw.tool_cache is not None else None
+    lock = _INDEX_LOCKS.setdefault(key, asyncio.Lock())
+    async with lock:  # several decisions may want the same page at once: ask the archive only once
+        if path is not None and path.exists():
+            return [(t, o) for t, o in json.loads(path.read_text())["captures"]]
+        r = await gw.fetcher.fetch(f"{CDX}?url={quote(url, safe='')}&filter=statuscode:200&collapse=timestamp:8"
+                                   "&fl=timestamp,original&output=json", max_bytes=16_000_000)
+        if r.status != 200:
+            raise FetchError(f"archive index HTTP {r.status}")
+        rows = _json(r.text) if r.text.strip() else []
+        caps = [(str(x[0]), str(x[1])) for x in rows[1:]] if rows else []
+        if path is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"url": url, "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                                       "captures": caps}))
+            tmp.replace(path)
+        return caps
+
+
 async def _latest_capture(gw: ToolGateway, url: str, as_of: datetime, window_days: int) -> tuple[str, str] | None:
-    r = await gw.fetcher.fetch(f"{CDX}?url={quote(url, safe='')}&from={_stamp(as_of - timedelta(days=window_days))}"
-                               f"&to={_stamp(as_of)}&filter=statuscode:200&fl=timestamp,original&output=json"
-                               "&limit=-1")
-    rows = _json(r.text) if r.text.strip() else []
-    if len(rows) < 2:
-        return None
-    ts, original = rows[-1][0], rows[-1][1]
-    if ts > _stamp(as_of):
-        return None
-    return ts, original
+    lo, hi = _stamp(as_of - timedelta(days=window_days)), _stamp(as_of)
+    before = [c for c in await capture_index(gw, url) if lo <= c[0] <= hi]
+    return max(before) if before else None
 
 
 async def _read_capture(gw: ToolGateway, ts: str, original: str, as_of: datetime, max_chars: int) -> dict[str, Any]:
