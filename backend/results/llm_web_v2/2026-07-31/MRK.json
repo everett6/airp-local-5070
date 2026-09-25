@@ -1,0 +1,181 @@
+{
+ "ticker": "MRK",
+ "as_of": "2026-07-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9999404730863148,
+ "logprob_mass": 1.0000000429916107,
+ "logodds": 9.729022488154195,
+ "logodds_censored": false,
+ "p_up": 0.52,
+ "answered": true,
+ "reason": "The price history shows a slight positive return over 20 days, but the volatility is moderate. The news includes mixed signals, such as price target raises and a terminated Phase 2 Alzheimer\u2019s study, which could influence the stock. However, there is no strong evidence to suggest a high probability of the stock closing higher. Given the lack of strong directional signals, the probability is estimated to be around 52%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/310158/000110465926067509/tm2615833d1_8k.htm",
+  "https://www.cnbc.com/quotes/MRK/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to gather recent price data, news, and SEC filings to assess the probability of MRK closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "MRK",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "MRK",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "MRK",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to analyze the most recent 8-K filing for relevant news and assess the probability of MRK closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/310158/000110465926067509/tm2615833d1_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Merck & Co."
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price data and news suggest a neutral to slightly positive outlook, but no strong evidence indicates a high probability of MRK closing higher 20 trading days from now.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "MRK",
+    "days": 20
+   },
+   "started": "2026-09-25T03:51:37.652+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 351,
+   "error": null,
+   "preview": "{\"ticker\": \"MRK\", \"last_date\": \"2026-07-31\", \"last_close\": 129.44, \"ret_1d\": 0.0032, \"ret_5d\": -0.0066, \"ret_20d\": 0.0049, \"ret_60d\": null, \"vol_20d_annualized\": 0.262, \"closes_last_30\": [128.8, 126.0"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "MRK",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:51:37.653+00:00",
+   "ok": true,
+   "elapsed_ms": 7,
+   "chars": 1170,
+   "error": null,
+   "preview": "{\"ticker\": \"MRK\", \"cik\": 310158, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-05-28\", \"accepted_utc_latest\": \"2026-05-29T01:15:25+00:00\", \"items\": \"5.07\", \"url\": \"https://www.sec.gov/Archives/edgar/data"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "MRK",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:51:37.653+00:00",
+   "ok": true,
+   "elapsed_ms": 31259,
+   "chars": 3250,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/MRK/\", \"captured_utc\": \"2026-07-16T13:05:18+00:00\", \"title\": \"MRK: Merck & Co Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Last"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/310158/000110465926067509/tm2615833d1_8k.htm"
+   },
+   "started": "2026-09-25T03:52:14.114+00:00",
+   "ok": true,
+   "elapsed_ms": 1508,
+   "chars": 384,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-26-067509.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/310158/000110465926067509/0001104659-26-067509.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Merck & Co.",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:52:14.114+00:00",
+   "ok": true,
+   "elapsed_ms": 4588,
+   "chars": 4167,
+   "error": null,
+   "preview": "{\"title\": \"Merck & Co.\", \"revision_time\": \"2026-06-16T02:58:51Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1359588475\", \"text\": \"American multinational pharmaceutical company\\nNot to be conf"
+  }
+ ],
+ "llm_calls": 29,
+ "attempts": 1,
+ "elapsed_s": 55.6,
+ "window": "clean",
+ "screen_score": 0.7025,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

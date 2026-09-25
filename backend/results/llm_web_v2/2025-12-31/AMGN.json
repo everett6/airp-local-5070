@@ -1,0 +1,186 @@
+{
+ "ticker": "AMGN",
+ "as_of": "2025-12-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.8264979749039034,
+ "logprob_mass": 1.0000000833744873,
+ "logodds": 1.5610081957086561,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a negative return over 20 days (-3.27%), but the stock has shown positive returns over 60 days (12.08%). There are no significant recent news events or SEC filings that indicate a strong upward or downward trend. Given the short-horizon nature of stock movements, the probability of AMGN closing higher is close to a coin flip, slightly favoring an upward move due to the slight positive trend over a longer period.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/318154/000031815425000070/amgn-20251104.htm",
+  "https://www.marketwatch.com/investing/stock/amgn"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting AMGN.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "AMGN",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "AMGN",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "AMGN",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent SEC filings and news to identify any significant developments affecting AMGN's stock performance.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/318154/000031815425000070/amgn-20251104.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Amgen"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price history and lack of significant news or filings, the probability of AMGN closing higher 20 trading days from now is close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "AMGN",
+    "days": 260
+   },
+   "started": "2026-09-25T03:30:11.952+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 430,
+   "error": null,
+   "preview": "{\"ticker\": \"AMGN\", \"last_date\": \"2025-12-31\", \"last_close\": 320.75, \"ret_1d\": -0.0042, \"ret_5d\": -0.0126, \"ret_20d\": -0.0327, \"ret_60d\": 0.1208, \"vol_20d_annualized\": 0.222, \"closes_last_30\": [334.71,"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "AMGN",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:30:11.952+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4277,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/amgn\", \"captured_utc\": \"2025-12-26T08:14:43+00:00\", \"title\": \"AMGN Stock Price | Amgen Inc. Stock Quote (U.S.: Nasdaq) | M"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "AMGN",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:30:11.952+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1171,
+   "error": null,
+   "preview": "{\"ticker\": \"AMGN\", \"cik\": 318154, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-11-04\", \"accepted_utc_latest\": \"2025-11-05T02:04:18+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/318154/000031815425000070/amgn-20251104.htm"
+   },
+   "started": "2026-09-25T03:30:11.952+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 533,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000318154-25-000070.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/318154/000031815425000070/0000318154-25-000070.txt\"}, {\"name\": \"amgn-20250930earningsrelea.htm\", \"ur"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Amgen",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:30:11.952+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4155,
+   "error": null,
+   "preview": "{\"title\": \"Amgen\", \"revision_time\": \"2025-09-24T12:50:44Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1313128609\", \"text\": \"American multinational biopharmaceutical company\\nAmgen Inc.\\nHeadq"
+  }
+ ],
+ "llm_calls": 2,
+ "attempts": 1,
+ "elapsed_s": 2.2,
+ "window": "clean",
+ "screen_score": 0.69,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

@@ -1,0 +1,181 @@
+{
+ "ticker": "SBUX",
+ "as_of": "2026-07-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9999856099566027,
+ "logprob_mass": 0.999999971798628,
+ "logodds": 11.148959631121667,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "Starbucks reported strong Q3 results, surpassing earnings expectations and raising guidance for the fiscal year. Same-store sales rose 7.9%, reflecting a successful turnaround strategy under CEO Brian Niccol. These positive results suggest continued momentum and could support the stock's performance over the next 20 trading days. However, short-horizon stock moves are close to a coin flip, and the probability is kept within the range of 0.40 to 0.60.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/829224/000082922426000129/sbux-20260729.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to identify any factors that may influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "SBUX",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "SBUX",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "SBUX",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent SEC filing (8-K) for insights into Starbucks' performance and future outlook, then assess the probability of the stock closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/829224/000082922426000129/sbux-20260729.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "SBUX",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Starbucks delivered strong Q3 results, surpassing earnings expectations and raising guidance for the fiscal year. This positive performance is likely to support the stock's movement over the next 20 trading days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "SBUX",
+    "days": 260
+   },
+   "started": "2026-09-25T03:51:27.110+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 426,
+   "error": null,
+   "preview": "{\"ticker\": \"SBUX\", \"last_date\": \"2026-07-31\", \"last_close\": 104.65, \"ret_1d\": -0.0057, \"ret_5d\": 0.0194, \"ret_20d\": 0.0094, \"ret_60d\": 0.0088, \"vol_20d_annualized\": 0.221, \"closes_last_30\": [100.08, 9"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "SBUX",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:51:27.112+00:00",
+   "ok": true,
+   "elapsed_ms": 1409,
+   "chars": 2196,
+   "error": null,
+   "preview": "{\"ticker\": \"SBUX\", \"cik\": 829224, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-07-29\", \"accepted_utc_latest\": \"2026-07-30T01:06:12+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "SBUX",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:51:27.111+00:00",
+   "ok": true,
+   "elapsed_ms": 3757,
+   "chars": 4250,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/SBUX/\", \"captured_utc\": \"2026-07-29T23:35:40+00:00\", \"title\": \"Starbucks Corporation (SBUX) Stock Price, News, Quote & History - Yahoo Finan"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "SBUX",
+    "days": 20
+   },
+   "started": "2026-09-25T03:51:35.992+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"SBUX\", \"last_date\": \"2026-07-31\", \"last_close\": 104.65, \"ret_1d\": -0.0057, \"ret_5d\": 0.0194, \"ret_20d\": 0.0094, \"ret_60d\": null, \"vol_20d_annualized\": 0.221, \"closes_last_30\": [103.67, 101"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/829224/000082922426000129/sbux-20260729.htm"
+   },
+   "started": "2026-09-25T03:51:35.991+00:00",
+   "ok": true,
+   "elapsed_ms": 1532,
+   "chars": 533,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000829224-26-000129.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/829224/000082922426000129/0000829224-26-000129.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov"
+  }
+ ],
+ "llm_calls": 14,
+ "attempts": 1,
+ "elapsed_s": 23.9,
+ "window": "clean",
+ "screen_score": 0.7150000000000001,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

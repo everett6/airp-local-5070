@@ -1,0 +1,225 @@
+{
+ "ticker": "GILD",
+ "as_of": "2026-06-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.002586508001024051,
+ "logprob_mass": 1.0000001452664449,
+ "logodds": -5.954856716354783,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "Gilead Sciences (GILD) has shown mixed recent price performance, with a 20-day return of -3% and a 60-day return of -8.98%. However, the company has been actively expanding its pipeline through acquisitions and collaborations, such as the recent purchase of Ouro Medicines to enhance its autoimmune disease treatments. Additionally, GILD has reported positive results from its liver disease therapies. These developments may provide some positive momentum. However, the stock has faced challenges in stock performance and earnings estimates, which could temper the upside. Given the mixed signals and the short-horizon nature of the prediction, the probability of GILD closing higher 20 trading days from now is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/882095/000110465926064518/tm2615045d1_8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/882095/000088209526000022/gild-20260507.htm",
+  "https://finance.yahoo.com/quote/GILD/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess the stock's recent performance and any potential catalysts.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "GILD",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "GILD",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "GILD",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the recent price performance, news, and SEC filings to determine the probability of GILD closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "GILD",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "Gilead Sciences",
+      "limit": 1
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/882095/000110465926064518/tm2615045d1_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/882095/000088209526000022/gild-20260507.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on recent price performance, news, and SEC filings, the probability of GILD closing higher 20 trading days from now is estimated.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "GILD",
+    "days": 60
+   },
+   "started": "2026-09-25T03:49:02.481+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 426,
+   "error": null,
+   "preview": "{\"ticker\": \"GILD\", \"last_date\": \"2026-06-30\", \"last_close\": 125.63, \"ret_1d\": 0.0001, \"ret_5d\": 0.0103, \"ret_20d\": -0.03, \"ret_60d\": -0.0898, \"vol_20d_annualized\": 0.275, \"closes_last_30\": [128.1, 128"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "GILD",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:49:02.482+00:00",
+   "ok": true,
+   "elapsed_ms": 1748,
+   "chars": 1198,
+   "error": null,
+   "preview": "{\"ticker\": \"GILD\", \"cik\": 882095, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-05-20\", \"accepted_utc_latest\": \"2026-05-21T01:15:36+00:00\", \"items\": \"1.01,2.03,8.01,9.01\", \"url\": \"https://www.sec.gov/Arc"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "GILD",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:49:02.481+00:00",
+   "ok": true,
+   "elapsed_ms": 12045,
+   "chars": 4236,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/GILD/\", \"captured_utc\": \"2026-06-07T13:49:38+00:00\", \"title\": \"Gilead Sciences, Inc. (GILD) Stock Price, News, Quote & History - Yahoo Finan"
+  },
+  {
+   "id": "2.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "GILD",
+    "days": 20
+   },
+   "started": "2026-09-25T03:49:23.487+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 353,
+   "error": null,
+   "preview": "{\"ticker\": \"GILD\", \"last_date\": \"2026-06-30\", \"last_close\": 125.63, \"ret_1d\": 0.0001, \"ret_5d\": 0.0103, \"ret_20d\": -0.03, \"ret_60d\": null, \"vol_20d_annualized\": 0.275, \"closes_last_30\": [129.51, 126.0"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/882095/000088209526000022/gild-20260507.htm"
+   },
+   "started": "2026-09-25T03:49:23.488+00:00",
+   "ok": true,
+   "elapsed_ms": 946,
+   "chars": 533,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000882095-26-000022.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/882095/000088209526000022/0000882095-26-000022.txt\"}, {\"name\": \"exhibit991earningspressrel.htm\", \"ur"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_search",
+   "args": {
+    "query": "Gilead Sciences",
+    "limit": 1
+   },
+   "started": "2026-09-25T03:49:23.488+00:00",
+   "ok": true,
+   "elapsed_ms": 1055,
+   "chars": 95,
+   "error": null,
+   "preview": "{\"query\": \"Gilead Sciences\", \"titles\": [\"Gilead Sciences\"], \"note\": \"read one with wiki_as_of\"}"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/882095/000110465926064518/tm2615045d1_8k.htm"
+   },
+   "started": "2026-09-25T03:49:23.488+00:00",
+   "ok": true,
+   "elapsed_ms": 1069,
+   "chars": 783,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-26-064518.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/882095/000110465926064518/0001104659-26-064518.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov"
+  }
+ ],
+ "llm_calls": 18,
+ "attempts": 1,
+ "elapsed_s": 36.9,
+ "window": "clean",
+ "screen_score": 0.635,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

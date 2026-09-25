@@ -1,0 +1,181 @@
+{
+ "ticker": "PEP",
+ "as_of": "2026-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9999969755265902,
+ "logprob_mass": 1.0000000449705908,
+ "logodds": 12.708770536562124,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "PepsiCo reported strong Q1 2026 results with 8.5% year-over-year revenue growth and improved snack volumes driven by recent price cuts. The company reaffirmed its full-year guidance, indicating confidence in its pricing strategy and product innovation. These positive developments suggest a favorable outlook for the stock in the short term. However, short-horizon stock moves are close to a coin flip, so the probability is estimated between 0.40 and 0.60.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/77476/000007747626000019/q120268-kxexhibit991.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to identify any factors that may influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "PEP",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "PEP",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "PEP",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for insights into PepsiCo's performance and future outlook, then estimate the probability of the stock closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/77476/000007747626000019/pep-20260416.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "PEP",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "PepsiCo's recent Q1 2026 results show strong revenue growth and improved snack volumes, which may support a higher probability of the stock closing higher in the next 20 trading days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "PEP",
+    "days": 260
+   },
+   "started": "2026-09-25T03:42:25.653+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 428,
+   "error": null,
+   "preview": "{\"ticker\": \"PEP\", \"last_date\": \"2026-04-30\", \"last_close\": 155.18, \"ret_1d\": 0.0206, \"ret_5d\": 0.0179, \"ret_20d\": 0.0248, \"ret_60d\": -0.0181, \"vol_20d_annualized\": 0.192, \"closes_last_30\": [149.55, 14"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "PEP",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:42:25.655+00:00",
+   "ok": true,
+   "elapsed_ms": 7,
+   "chars": 2204,
+   "error": null,
+   "preview": "{\"ticker\": \"PEP\", \"cik\": 77476, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-04-16\", \"accepted_utc_latest\": \"2026-04-16T03:01:12+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "PEP",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:42:25.654+00:00",
+   "ok": true,
+   "elapsed_ms": 25186,
+   "chars": 4237,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/PEP/\", \"captured_utc\": \"2026-04-22T12:24:58+00:00\", \"title\": \"PepsiCo, Inc. (PEP) Stock Price, News, Quote & History - Yahoo Finance\", \"text"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "PEP",
+    "days": 20
+   },
+   "started": "2026-09-25T03:42:53.036+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 353,
+   "error": null,
+   "preview": "{\"ticker\": \"PEP\", \"last_date\": \"2026-04-30\", \"last_close\": 155.18, \"ret_1d\": 0.0206, \"ret_5d\": 0.0179, \"ret_20d\": 0.0248, \"ret_60d\": null, \"vol_20d_annualized\": 0.192, \"closes_last_30\": [151.42, 153.7"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/77476/000007747626000019/pep-20260416.htm"
+   },
+   "started": "2026-09-25T03:42:53.035+00:00",
+   "ok": true,
+   "elapsed_ms": 1040,
+   "chars": 515,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000077476-26-000019.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/77476/000007747626000019/0000077476-26-000019.txt\"}, {\"name\": \"pep-20260416.htm\", \"url\": \"https://ww"
+  }
+ ],
+ "llm_calls": 14,
+ "attempts": 1,
+ "elapsed_s": 40.3,
+ "window": "clean",
+ "screen_score": 0.7000000000000001,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

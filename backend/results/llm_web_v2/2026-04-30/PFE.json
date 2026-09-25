@@ -1,0 +1,181 @@
+{
+ "ticker": "PFE",
+ "as_of": "2026-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 7.762694004264972e-05,
+ "logprob_mass": 0.9999999643954479,
+ "logodds": -9.463518395571866,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a -6.48% return over 20 days, but no significant news or filings indicate a strong directional move. The stock's recent performance and lack of material news suggest a probability close to a coin flip.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/78003/000007800326000044/pfe-20260423.htm",
+  "https://www.cnbc.com/quotes/PFE"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting PFE.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "PFE",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "PFE",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "PFE",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any significant news that could impact PFE's stock price over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/78003/000007800326000044/pfe-20260423.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Pfizer Inc."
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price history shows a negative return over 20 days, but no significant news or filings indicate a strong directional move. The probability is close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "PFE",
+    "days": 20
+   },
+   "started": "2026-09-25T03:41:23.180+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 328,
+   "error": null,
+   "preview": "{\"ticker\": \"PFE\", \"last_date\": \"2026-04-30\", \"last_close\": 25.81, \"ret_1d\": 0.0168, \"ret_5d\": 0.0011, \"ret_20d\": -0.0648, \"ret_60d\": null, \"vol_20d_annualized\": 0.196, \"closes_last_30\": [27.6, 27.38, "
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "PFE",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:41:23.181+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 1151,
+   "error": null,
+   "preview": "{\"ticker\": \"PFE\", \"cik\": 78003, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-04-27\", \"accepted_utc_latest\": \"2026-04-28T02:16:36+00:00\", \"items\": \"5.07\", \"url\": \"https://www.sec.gov/Archives/edgar/data/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "PFE",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:41:23.181+00:00",
+   "ok": true,
+   "elapsed_ms": 2986,
+   "chars": 3226,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/PFE\", \"captured_utc\": \"2026-04-15T17:47:50+00:00\", \"title\": \"PFE: Pfizer Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Last NYSE"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/78003/000007800326000044/pfe-20260423.htm"
+   },
+   "started": "2026-09-25T03:41:34.153+00:00",
+   "ok": true,
+   "elapsed_ms": 1252,
+   "chars": 377,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000078003-26-000044.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/78003/000007800326000044/0000078003-26-000044.txt\"}, {\"name\": \"pfe-20260423.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Pfizer Inc.",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:41:34.154+00:00",
+   "ok": true,
+   "elapsed_ms": 4362,
+   "chars": 4150,
+   "error": null,
+   "preview": "{\"title\": \"Pfizer\", \"revision_time\": \"2026-04-25T04:57:05Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1350975936\", \"text\": \"American multinational pharmaceutical and biotechnology corporatio"
+  }
+ ],
+ "llm_calls": 14,
+ "attempts": 1,
+ "elapsed_s": 30.0,
+ "window": "clean",
+ "screen_score": 0.7599999999999999,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

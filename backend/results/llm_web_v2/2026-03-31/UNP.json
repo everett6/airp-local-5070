@@ -1,0 +1,222 @@
+{
+ "ticker": "UNP",
+ "as_of": "2026-03-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 1.2020436736388458e-05,
+ "logprob_mass": 0.9999999111702207,
+ "logodds": -11.328890274866165,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a 20-day return of -8.73% and a 60-day return of 5.16%, indicating recent volatility. The recent news and SEC filings do not provide strong evidence of a clear upward or downward trend. Given the mixed sentiment and the stock's recent performance, the probability of the stock closing higher in the next 20 trading days is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/100885/000010088526000032/unp-20260127.htm",
+  "https://www.sec.gov/Archives/edgar/data/100885/000010088525000347/unp-20251219.htm",
+  "https://www.sec.gov/Archives/edgar/data/100885/000010088525000345/unp-20251212.htm",
+  "https://www.sec.gov/Archives/edgar/data/100885/000010088525000332/unp-20251114.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to identify any factors that may influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "UNP",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "UNP",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "UNP",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filings for significant news and use the price history to assess the stock's recent performance and volatility.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/100885/000010088526000032/unp-20260127.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/100885/000010088525000347/unp-20251219.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/100885/000010088525000345/unp-20251212.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/100885/000010088525000332/unp-20251114.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The stock has shown mixed performance with recent volatility, and there is no strong evidence to suggest a clear upward or downward trend. The probability is estimated based on historical trends and market behavior.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "UNP",
+    "days": 60
+   },
+   "started": "2026-09-25T03:37:54.612+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 429,
+   "error": null,
+   "preview": "{\"ticker\": \"UNP\", \"last_date\": \"2026-03-31\", \"last_close\": 240.25, \"ret_1d\": 0.0142, \"ret_5d\": 0.0123, \"ret_20d\": -0.0873, \"ret_60d\": 0.0516, \"vol_20d_annualized\": 0.208, \"closes_last_30\": [261.05, 25"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "UNP",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:37:54.613+00:00",
+   "ok": true,
+   "elapsed_ms": 219,
+   "chars": 1172,
+   "error": null,
+   "preview": "{\"ticker\": \"UNP\", \"cik\": 100885, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-01-27\", \"accepted_utc_latest\": \"2026-01-27T17:47:27+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "UNP",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:37:54.613+00:00",
+   "ok": true,
+   "elapsed_ms": 35905,
+   "chars": 4244,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/UNP/\", \"captured_utc\": \"2026-03-08T21:09:48+00:00\", \"title\": \"Union Pacific Corporation (UNP) Stock Price, News, Quote & History - Yahoo Fin"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/100885/000010088525000332/unp-20251114.htm"
+   },
+   "started": "2026-09-25T03:38:39.336+00:00",
+   "ok": true,
+   "elapsed_ms": 611,
+   "chars": 499,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000100885-25-000332.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/100885/000010088525000332/0000100885-25-000332.txt\"}, {\"name\": \"exhibit991.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/100885/000010088525000345/unp-20251212.htm"
+   },
+   "started": "2026-09-25T03:38:39.336+00:00",
+   "ok": true,
+   "elapsed_ms": 765,
+   "chars": 499,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000100885-25-000345.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/100885/000010088525000345/0000100885-25-000345.txt\"}, {\"name\": \"exhibit991.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/100885/000010088526000032/unp-20260127.htm"
+   },
+   "started": "2026-09-25T03:38:39.336+00:00",
+   "ok": true,
+   "elapsed_ms": 901,
+   "chars": 531,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000100885-26-000032.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/100885/000010088526000032/0000100885-26-000032.txt\"}, {\"name\": \"a2026-01x278xkex991earning.htm\", \"ur"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/100885/000010088525000347/unp-20251219.htm"
+   },
+   "started": "2026-09-25T03:38:39.336+00:00",
+   "ok": true,
+   "elapsed_ms": 982,
+   "chars": 618,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000100885-25-000347.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/100885/000010088525000347/0000100885-25-000347.txt\"}, {\"name\": \"exhibit991.htm\", \"url\": \"https://www"
+  }
+ ],
+ "llm_calls": 24,
+ "attempts": 1,
+ "elapsed_s": 64.8,
+ "window": "clean",
+ "screen_score": 0.75,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

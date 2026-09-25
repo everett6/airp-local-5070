@@ -1,0 +1,181 @@
+{
+ "ticker": "WMT",
+ "as_of": "2026-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9968965273516216,
+ "logprob_mass": 0.9999999834907163,
+ "logodds": 5.772125286896218,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a slight positive return over 20 days (5.76%), but no significant news or filings in the last 30 days suggest a strong directional move. The most recent 8-K filing does not contain any material information that would impact the stock price significantly in the short term. Given the lack of strong evidence, the probability is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/104169/000119312526194086/d131601d8k.htm",
+  "https://www.marketwatch.com/investing/stock/wmt"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting WMT.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "WMT",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "WMT",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "WMT",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any significant news that could impact WMT's stock price over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/104169/000119312526194086/d131601d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Walmart Inc."
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price data and news do not indicate any significant developments that would strongly influence the stock's direction over the next 20 days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "WMT",
+    "days": 260
+   },
+   "started": "2026-09-25T03:43:07.339+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 429,
+   "error": null,
+   "preview": "{\"ticker\": \"WMT\", \"last_date\": \"2026-04-30\", \"last_close\": 131.36, \"ret_1d\": 0.0306, \"ret_5d\": -0.0008, \"ret_20d\": 0.0576, \"ret_60d\": 0.0352, \"vol_20d_annualized\": 0.277, \"closes_last_30\": [120.32, 11"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "WMT",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:43:07.340+00:00",
+   "ok": true,
+   "elapsed_ms": 88,
+   "chars": 1158,
+   "error": null,
+   "preview": "{\"ticker\": \"WMT\", \"cik\": 104169, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-04-30\", \"accepted_utc_latest\": \"2026-04-30T16:54:16+00:00\", \"items\": \"8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "WMT",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:43:07.340+00:00",
+   "ok": true,
+   "elapsed_ms": 16238,
+   "chars": 4281,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/wmt\", \"captured_utc\": \"2026-04-16T19:09:33+00:00\", \"title\": \"WMT Stock Price | Walmart Inc. Stock Quote (U.S.: Nasdaq) | M"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/104169/000119312526194086/d131601d8k.htm"
+   },
+   "started": "2026-09-25T03:43:26.450+00:00",
+   "ok": true,
+   "elapsed_ms": 2417,
+   "chars": 1854,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-26-194086.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/104169/000119312526194086/0001193125-26-194086.txt\"}, {\"name\": \"d131601d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Walmart Inc.",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:43:26.450+00:00",
+   "ok": true,
+   "elapsed_ms": 9138,
+   "chars": 4160,
+   "error": null,
+   "preview": "{\"title\": \"Walmart\", \"revision_time\": \"2026-04-30T15:20:42Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1351853022\", \"text\": \"American multinational retail corporation operating department st"
+  }
+ ],
+ "llm_calls": 20,
+ "attempts": 1,
+ "elapsed_s": 47.0,
+ "window": "clean",
+ "screen_score": 0.68,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

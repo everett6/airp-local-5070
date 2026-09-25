@@ -1,0 +1,222 @@
+{
+ "ticker": "PFE",
+ "as_of": "2026-02-27T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9926582059133209,
+ "logprob_mass": 0.9999999984791302,
+ "logodds": 4.906803162544955,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a slight upward trend over the past 20 days, with a return of 5.94%. However, there are no significant news events or SEC filings that indicate a strong positive or negative impact on the stock over the next 20 trading days. The recent news and filings do not provide any clear signals about future performance. Therefore, the probability of PFE closing higher is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/78003/000007800326000005/pfe-20260203.htm",
+  "https://www.sec.gov/Archives/edgar/data/78003/000007800325000167/pfe-20251216.htm",
+  "https://www.sec.gov/Archives/edgar/data/78003/000119312525291406/d80089d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/78003/000007800325000159/pfe-20251113.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to identify any factors that may influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "PFE",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "PFE",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "PFE",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent SEC filings and news to identify any significant events that may impact PFE's stock price over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/78003/000007800326000005/pfe-20260203.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/78003/000007800325000167/pfe-20251216.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/78003/000119312525291406/d80089d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/78003/000007800325000159/pfe-20251113.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price history, news, and SEC filings, there is no strong indication of a significant event that would strongly influence the stock's performance over the next 20 trading days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "PFE",
+    "days": 260
+   },
+   "started": "2026-09-25T03:36:48.777+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 395,
+   "error": null,
+   "preview": "{\"ticker\": \"PFE\", \"last_date\": \"2026-02-27\", \"last_close\": 26.73, \"ret_1d\": 0.0203, \"ret_5d\": 0.0375, \"ret_20d\": 0.0594, \"ret_60d\": 0.1125, \"vol_20d_annualized\": 0.263, \"closes_last_30\": [24.62, 24.39"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "PFE",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:36:48.778+00:00",
+   "ok": true,
+   "elapsed_ms": 5515,
+   "chars": 2183,
+   "error": null,
+   "preview": "{\"ticker\": \"PFE\", \"cik\": 78003, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-02-03\", \"accepted_utc_latest\": \"2026-02-03T17:01:37+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "PFE",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:36:48.778+00:00",
+   "ok": true,
+   "elapsed_ms": 32721,
+   "chars": 3264,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/PFE\", \"captured_utc\": \"2026-02-03T04:09:16+00:00\", \"title\": \"PFE: Pfizer Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Last NASD"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/78003/000007800325000167/pfe-20251216.htm"
+   },
+   "started": "2026-09-25T03:37:26.627+00:00",
+   "ok": true,
+   "elapsed_ms": 1003,
+   "chars": 511,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000078003-25-000167.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/78003/000007800325000167/0000078003-25-000167.txt\"}, {\"name\": \"pfe-12162025xexh99.htm\", \"url\": \"http"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/78003/000007800325000159/pfe-20251113.htm"
+   },
+   "started": "2026-09-25T03:37:26.627+00:00",
+   "ok": true,
+   "elapsed_ms": 1146,
+   "chars": 377,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000078003-25-000159.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/78003/000007800325000159/0000078003-25-000159.txt\"}, {\"name\": \"pfe-20251113.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/78003/000007800326000005/pfe-20260203.htm"
+   },
+   "started": "2026-09-25T03:37:26.627+00:00",
+   "ok": true,
+   "elapsed_ms": 1268,
+   "chars": 509,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000078003-26-000005.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/78003/000007800326000005/0000078003-26-000005.txt\"}, {\"name\": \"pfe-12312025xex99.htm\", \"url\": \"https"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/78003/000119312525291406/d80089d8k.htm"
+   },
+   "started": "2026-09-25T03:37:26.627+00:00",
+   "ok": true,
+   "elapsed_ms": 1419,
+   "chars": 851,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-291406.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/78003/000119312525291406/0001193125-25-291406.txt\"}, {\"name\": \"d80089d8k.htm\", \"url\": \"https://www.s"
+  }
+ ],
+ "llm_calls": 24,
+ "attempts": 1,
+ "elapsed_s": 56.0,
+ "window": "clean",
+ "screen_score": 0.625,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

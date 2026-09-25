@@ -1,0 +1,222 @@
+{
+ "ticker": "CVX",
+ "as_of": "2026-06-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 9.732158398382333e-05,
+ "logprob_mass": 1.0000001638152123,
+ "logodds": -9.23739243782537,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a negative return over the last 20 days (-10.8%) and a downward trend over the last 60 days (-15.93%). However, there is no strong evidence from recent SEC filings or news articles to suggest a significant directional move. The most recent 8-K filings do not indicate any major events that would significantly impact the stock price in the next 20 days. Therefore, the probability of CVX closing higher 20 trading days after its latest close is estimated to be 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/93410/000009341026000125/cvx-20260527.htm",
+  "https://www.sec.gov/Archives/edgar/data/93410/000009341026000123/cvx-20260527.htm",
+  "https://www.sec.gov/Archives/edgar/data/93410/000009341026000110/cvx-20260501.htm",
+  "https://www.sec.gov/Archives/edgar/data/93410/000009341026000108/cvx-20260409.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting CVX.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "CVX",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "CVX",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "CVX",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filings and price history to determine if there are any significant developments affecting CVX's stock price over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/93410/000009341026000125/cvx-20260527.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/93410/000009341026000123/cvx-20260527.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/93410/000009341026000110/cvx-20260501.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/93410/000009341026000108/cvx-20260409.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price history and filings, there is no strong evidence to suggest a significant directional move in CVX's stock price over the next 20 days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "CVX",
+    "days": 260
+   },
+   "started": "2026-09-25T03:48:29.810+00:00",
+   "ok": true,
+   "elapsed_ms": 1,
+   "chars": 430,
+   "error": null,
+   "preview": "{\"ticker\": \"CVX\", \"last_date\": \"2026-06-30\", \"last_close\": 164.33, \"ret_1d\": -0.0161, \"ret_5d\": -0.0581, \"ret_20d\": -0.108, \"ret_60d\": -0.1593, \"vol_20d_annualized\": 0.243, \"closes_last_30\": [192.66, "
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "CVX",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:48:29.812+00:00",
+   "ok": true,
+   "elapsed_ms": 2252,
+   "chars": 1149,
+   "error": null,
+   "preview": "{\"ticker\": \"CVX\", \"cik\": 93410, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-05-29\", \"accepted_utc_latest\": \"2026-05-29T19:12:25+00:00\", \"items\": \"5.07\", \"url\": \"https://www.sec.gov/Archives/edgar/data/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "CVX",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:48:29.811+00:00",
+   "ok": true,
+   "elapsed_ms": 4557,
+   "chars": 4275,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/cvx\", \"captured_utc\": \"2026-06-08T19:47:58+00:00\", \"title\": \"CVX Stock Price | Chevron Corp. Stock Quote (U.S.: NYSE) | Ma"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/93410/000009341026000125/cvx-20260527.htm"
+   },
+   "started": "2026-09-25T03:48:42.135+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 377,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000093410-26-000125.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/93410/000009341026000125/0000093410-26-000125.txt\"}, {\"name\": \"cvx-20260527.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/93410/000009341026000123/cvx-20260527.htm"
+   },
+   "started": "2026-09-25T03:48:42.136+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 377,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000093410-26-000123.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/93410/000009341026000123/0000093410-26-000123.txt\"}, {\"name\": \"cvx-20260527.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/93410/000009341026000110/cvx-20260501.htm"
+   },
+   "started": "2026-09-25T03:48:42.136+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 509,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000093410-26-000110.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/93410/000009341026000110/0000093410-26-000110.txt\"}, {\"name\": \"a03312026ex9918-k.htm\", \"url\": \"https"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/93410/000009341026000108/cvx-20260409.htm"
+   },
+   "started": "2026-09-25T03:48:42.136+00:00",
+   "ok": true,
+   "elapsed_ms": 206,
+   "chars": 377,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000093410-26-000108.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/93410/000009341026000108/0000093410-26-000108.txt\"}, {\"name\": \"cvx-20260409.htm\", \"url\": \"https://ww"
+  }
+ ],
+ "llm_calls": 14,
+ "attempts": 1,
+ "elapsed_s": 38.8,
+ "window": "clean",
+ "screen_score": 0.6725,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

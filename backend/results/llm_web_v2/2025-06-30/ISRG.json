@@ -1,0 +1,229 @@
+{
+ "ticker": "ISRG",
+ "as_of": "2025-06-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.00036939574766567325,
+ "logprob_mass": 0.9999999175504856,
+ "logodds": -7.903272537737025,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a slight negative return over 20 days (-1.62%), but the stock has shown volatility with a 20-day annualized volatility of 26.2%. Recent news includes a leadership change and downgrade by Deutsche Bank, which could impact investor sentiment. However, there are also positive developments such as a rating upgrade and positive earnings reports. These mixed signals suggest a moderate probability of the stock closing higher.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000161/isrg-20250514.htm",
+  "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000156/isrg-20250501.htm",
+  "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000106/isrg-20250422.htm",
+  "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000008/isrg-20250121.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess the stock's recent performance and any potential catalysts.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "ISRG",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "ISRG",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "ISRG",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filings and news to identify any significant events that could impact the stock's future performance.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000161/isrg-20250514.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000156/isrg-20250501.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000106/isrg-20250422.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000008/isrg-20250121.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent news and filings indicate mixed signals, with some negative developments and a volatile price trend. The probability of ISRG closing higher in the next 20 trading days is moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "ISRG",
+    "days": 60
+   },
+   "started": "2026-09-25T03:27:43.300+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 427,
+   "error": null,
+   "preview": "{\"ticker\": \"ISRG\", \"last_date\": \"2025-06-30\", \"last_close\": 543.41, \"ret_1d\": 0.0182, \"ret_5d\": 0.055, \"ret_20d\": -0.0162, \"ret_60d\": 0.0717, \"vol_20d_annualized\": 0.262, \"closes_last_30\": [563.6, 561"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "ISRG",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:43.300+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4288,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/isrg\", \"captured_utc\": \"2025-06-09T20:29:07+00:00\", \"title\": \"ISRG Stock Price | Intuitive Surgical Inc. Stock Quote (U.S."
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "ISRG",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:27:43.300+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1197,
+   "error": null,
+   "preview": "{\"ticker\": \"ISRG\", \"cik\": 1035267, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-05-15\", \"accepted_utc_latest\": \"2025-05-15T18:05:20+00:00\", \"items\": \"5.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archive"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000161/isrg-20250514.htm"
+   },
+   "started": "2026-09-25T03:27:43.301+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 537,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001035267-25-000161.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1035267/000103526725000161/0001035267-25-000161.txt\"}, {\"name\": \"isrg-20250514.htm\", \"url\": \"https:/"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000156/isrg-20250501.htm"
+   },
+   "started": "2026-09-25T03:27:43.301+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 537,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001035267-25-000156.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1035267/000103526725000156/0001035267-25-000156.txt\"}, {\"name\": \"ex-101xamendedandrestated2.htm\", \"u"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000106/isrg-20250422.htm"
+   },
+   "started": "2026-09-25T03:27:43.301+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 535,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001035267-25-000106.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1035267/000103526725000106/0001035267-25-000106.txt\"}, {\"name\": \"isrg-20250422.htm\", \"url\": \"https:/"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1035267/000103526725000008/isrg-20250121.htm"
+   },
+   "started": "2026-09-25T03:27:43.301+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 687,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001035267-25-000008.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1035267/000103526725000008/0001035267-25-000008.txt\"}, {\"name\": \"isrg-20250121.htm\", \"url\": \"https:/"
+  }
+ ],
+ "llm_calls": 3,
+ "attempts": 1,
+ "elapsed_s": 2.9,
+ "window": "clean",
+ "screen_score": 0.7150000000000001,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

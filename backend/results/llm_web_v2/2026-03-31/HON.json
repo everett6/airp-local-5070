@@ -1,0 +1,183 @@
+{
+ "ticker": "HON",
+ "as_of": "2026-03-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9883465258185349,
+ "logprob_mass": 1.000000023949897,
+ "logodds": 4.440429022332641,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "HON's stock closed at $235.05 on 2026-03-31, showing a -7.31% return over 20 days. However, recent news includes analyst calls and restructuring efforts, which could influence the stock. Despite these, short-horizon stock moves are close to a coin flip, and the lack of strong catalysts keeps the probability moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/773840/000119312526118101/d118295d8k.htm",
+  "https://www.cnbc.com/quotes/HON/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess the stock's recent performance and any potential catalysts.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "HON",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "HON",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "HON",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for key events and read relevant news articles to assess potential impacts on HON's stock performance.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/773840/000119312526118101/d118295d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "archived_page",
+     "args": {
+      "url": "https://www.cnbc.com/quotes/HON/",
+      "window_days": 30
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "HON's recent price performance shows a decline over 20 days, but there are positive news and analyst calls. However, without strong catalysts, the stock is close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "HON",
+    "days": 60
+   },
+   "started": "2026-09-25T03:37:15.828+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 426,
+   "error": null,
+   "preview": "{\"ticker\": \"HON\", \"last_date\": \"2026-03-31\", \"last_close\": 235.05, \"ret_1d\": 0.0114, \"ret_5d\": 0.0201, \"ret_20d\": -0.0731, \"ret_60d\": 0.1596, \"vol_20d_annualized\": 0.228, \"closes_last_30\": [249.53, 24"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "HON",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:37:15.829+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 1183,
+   "error": null,
+   "preview": "{\"ticker\": \"HON\", \"cik\": 773840, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-03-23\", \"accepted_utc_latest\": \"2026-03-21T05:04:06+00:00\", \"items\": \"8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "HON",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:37:15.829+00:00",
+   "ok": true,
+   "elapsed_ms": 8652,
+   "chars": 3356,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/HON/\", \"captured_utc\": \"2026-03-06T21:22:19+00:00\", \"title\": \"HON: Honeywell International Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/773840/000119312526118101/d118295d8k.htm"
+   },
+   "started": "2026-09-25T03:37:28.719+00:00",
+   "ok": true,
+   "elapsed_ms": 2311,
+   "chars": 626,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-26-118101.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000119312526118101/0001193125-26-118101.txt\"}, {\"name\": \"d118295d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.1",
+   "tool": "archived_page",
+   "args": {
+    "url": "https://www.cnbc.com/quotes/HON/",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:37:28.719+00:00",
+   "ok": true,
+   "elapsed_ms": 12586,
+   "chars": 3338,
+   "error": null,
+   "preview": "{\"url\": \"https://www.cnbc.com/quotes/HON/\", \"captured_utc\": \"2026-03-06T21:22:19+00:00\", \"title\": \"HON: Honeywell International Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Last NASD"
+  }
+ ],
+ "llm_calls": 16,
+ "attempts": 1,
+ "elapsed_s": 38.5,
+ "window": "clean",
+ "screen_score": 0.7825,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

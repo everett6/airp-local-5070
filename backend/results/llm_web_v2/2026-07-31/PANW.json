@@ -1,0 +1,213 @@
+{
+ "ticker": "PANW",
+ "as_of": "2026-07-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.6790647755230422,
+ "logprob_mass": 1.0000000803593032,
+ "logodds": 0.7494772115620489,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The 20-day return for PANW is negative (-4.66%), indicating a recent decline. However, the stock has shown volatility with a 20-day annualized volatility of 51%. The news mentions mixed sentiment, including CEO comments on AI pricing and analyst price targets, which could influence future performance. Given the short horizon and the lack of strong positive or negative catalysts, the probability of the stock closing higher is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1327567/000132756726000012/panw-20260602.htm",
+  "https://www.cnbc.com/quotes/PANW/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Fetch recent price history, news, and SEC filings to assess the stock's recent performance and any relevant events.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "PANW",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "PANW",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "PANW",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the recent price performance and news to determine the probability of PANW closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "PANW",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "PANW",
+      "window_days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "PANW",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price performance and news, the probability of PANW closing higher 20 trading days from now is estimated.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "PANW",
+    "days": 20
+   },
+   "started": "2026-09-25T03:52:15.690+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 354,
+   "error": null,
+   "preview": "{\"ticker\": \"PANW\", \"last_date\": \"2026-07-31\", \"last_close\": 331.83, \"ret_1d\": 0.0189, \"ret_5d\": 0.0248, \"ret_20d\": -0.0466, \"ret_60d\": null, \"vol_20d_annualized\": 0.51, \"closes_last_30\": [348.06, 357."
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "PANW",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:52:15.691+00:00",
+   "ok": true,
+   "elapsed_ms": 178,
+   "chars": 1174,
+   "error": null,
+   "preview": "{\"ticker\": \"PANW\", \"cik\": 1327567, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-06-02\", \"accepted_utc_latest\": \"2026-06-03T01:08:29+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edg"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "PANW",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:52:15.691+00:00",
+   "ok": true,
+   "elapsed_ms": 33050,
+   "chars": 3309,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/PANW/\", \"captured_utc\": \"2026-07-14T19:52:08+00:00\", \"title\": \"PANW: Palo Alto Networks Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT Qu"
+  },
+  {
+   "id": "2.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "PANW",
+    "days": 60
+   },
+   "started": "2026-09-25T03:52:52.847+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 425,
+   "error": null,
+   "preview": "{\"ticker\": \"PANW\", \"last_date\": \"2026-07-31\", \"last_close\": 331.83, \"ret_1d\": 0.0189, \"ret_5d\": 0.0248, \"ret_20d\": -0.0466, \"ret_60d\": 0.8036, \"vol_20d_annualized\": 0.51, \"closes_last_30\": [287.78, 28"
+  },
+  {
+   "id": "2.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "PANW",
+    "window_days": 60,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:52:52.847+00:00",
+   "ok": true,
+   "elapsed_ms": 9,
+   "chars": 3309,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/PANW/\", \"captured_utc\": \"2026-07-14T19:52:08+00:00\", \"title\": \"PANW: Palo Alto Networks Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT Qu"
+  },
+  {
+   "id": "2.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "PANW",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:52:52.857+00:00",
+   "ok": true,
+   "elapsed_ms": 8,
+   "chars": 2212,
+   "error": null,
+   "preview": "{\"ticker\": \"PANW\", \"cik\": 1327567, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-06-02\", \"accepted_utc_latest\": \"2026-06-03T01:08:29+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edg"
+  }
+ ],
+ "llm_calls": 27,
+ "attempts": 1,
+ "elapsed_s": 54.0,
+ "window": "clean",
+ "screen_score": 0.6725,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

@@ -1,0 +1,220 @@
+{
+ "ticker": "HON",
+ "as_of": "2026-02-27T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9999937133201116,
+ "logprob_mass": 0.9999999980349551,
+ "logodds": 11.977071179576647,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "HON has shown positive returns over the past 20 days (7.73%) and 60 days (28.69%), with a relatively low volatility (16% annualized). The recent news highlights a significant aerospace business spinoff expected in the early second half of 2026, which could drive long-term growth. However, short-horizon stock moves are close to a coin flip, and unless the evidence is unusually strong, the probability remains between 0.40 and 0.60. Given the positive momentum and the upcoming spinoff, the probability is slightly higher than the midpoint.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/773840/000077384026000015/exhibit991-pressrelease021.htm",
+  "https://www.sec.gov/Archives/edgar/data/773840/000077384026000006/exhibit991-q42025earningsr.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess the stock's recent performance and any potential catalysts.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "HON",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "HON",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "HON",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the recent 8-K filings and news to identify any significant events that could impact HON's stock price over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384026000015/hon-20260217.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384026000006/hon-20260129.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384025000125/hon-20251222.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384025000120/hon-20251210.htm"
+     },
+     "ok": false
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "HON's recent performance and news suggest positive momentum, but short-term stock movements are close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "HON",
+    "days": 60
+   },
+   "started": "2026-09-25T03:35:37.948+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 426,
+   "error": null,
+   "preview": "{\"ticker\": \"HON\", \"last_date\": \"2026-02-27\", \"last_close\": 253.31, \"ret_1d\": 0.0163, \"ret_5d\": 0.0034, \"ret_20d\": 0.0773, \"ret_60d\": 0.2869, \"vol_20d_annualized\": 0.16, \"closes_last_30\": [222.5, 227.0"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "HON",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:35:37.949+00:00",
+   "ok": true,
+   "elapsed_ms": 3453,
+   "chars": 1185,
+   "error": null,
+   "preview": "{\"ticker\": \"HON\", \"cik\": 773840, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-02-17\", \"accepted_utc_latest\": \"2026-02-17T16:12:46+00:00\", \"items\": \"7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "HON",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:35:37.949+00:00",
+   "ok": true,
+   "elapsed_ms": 43182,
+   "chars": 4248,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/HON/\", \"captured_utc\": \"2026-02-07T04:34:39+00:00\", \"title\": \"Honeywell International Inc. (HON) Stock Price, News, Quote & History - Yahoo "
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384025000125/hon-20251222.htm"
+   },
+   "started": "2026-09-25T03:36:24.771+00:00",
+   "ok": true,
+   "elapsed_ms": 4264,
+   "chars": 531,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000773840-25-000125.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384025000125/0000773840-25-000125.txt\"}, {\"name\": \"exhibit991-decemberxsummer.htm\", \"ur"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384026000015/hon-20260217.htm"
+   },
+   "started": "2026-09-25T03:36:24.771+00:00",
+   "ok": true,
+   "elapsed_ms": 4426,
+   "chars": 531,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000773840-26-000015.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384026000015/0000773840-26-000015.txt\"}, {\"name\": \"exhibit991-pressrelease021.htm\", \"ur"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384026000006/hon-20260129.htm"
+   },
+   "started": "2026-09-25T03:36:24.771+00:00",
+   "ok": true,
+   "elapsed_ms": 4481,
+   "chars": 676,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000773840-26-000006.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384026000006/0000773840-26-000006.txt\"}, {\"name\": \"exhibit991-q42025earningsr.htm\", \"ur"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384025000120/hon-20251210.htm"
+   },
+   "started": "2026-09-25T03:36:24.771+00:00",
+   "ok": false,
+   "elapsed_ms": 30001,
+   "chars": 0,
+   "error": "timed out",
+   "preview": ""
+  }
+ ],
+ "llm_calls": 22,
+ "attempts": 1,
+ "elapsed_s": 85.4,
+ "window": "clean",
+ "screen_score": 0.6399999999999999,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

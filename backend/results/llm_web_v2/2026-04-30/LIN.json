@@ -1,0 +1,182 @@
+{
+ "ticker": "LIN",
+ "as_of": "2026-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9998810878181497,
+ "logprob_mass": 0.9999999544585056,
+ "logodds": 9.037006385677039,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "LIN's 20-day return was positive (1.48%), but the stock has been volatile with a 20-day annualized volatility of 17.4%. The news mentions positive analyst sentiment and ethical recognition, which could support a higher probability of closing higher. However, without strong catalysts or clear guidance, the probability remains moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1707925/000165495426000913/lin_8k.htm",
+  "https://finance.yahoo.com/quote/LIN/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess LIN's recent performance and any potential catalysts.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "LIN",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "LIN",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "LIN",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for insights into LIN's performance and potential catalysts for the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1707925/000165495426000913/lin_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "LIN",
+      "days": 60
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "LIN's recent price performance shows a slight positive return over 20 days, but the stock has been volatile. The news mentions positive analyst sentiment and ethical recognition, which could support a higher probability of closing higher. However, without strong catalysts or clear guidance, the probability remains moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "LIN",
+    "days": 20
+   },
+   "started": "2026-09-25T03:41:59.224+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"LIN\", \"last_date\": \"2026-04-30\", \"last_close\": 497.92, \"ret_1d\": -0.0071, \"ret_5d\": -0.0136, \"ret_20d\": 0.0148, \"ret_60d\": null, \"vol_20d_annualized\": 0.174, \"closes_last_30\": [490.66, 499"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "LIN",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:41:59.225+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 1157,
+   "error": null,
+   "preview": "{\"ticker\": \"LIN\", \"cik\": 1707925, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-02-05\", \"accepted_utc_latest\": \"2026-02-05T17:47:20+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "LIN",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:41:59.225+00:00",
+   "ok": true,
+   "elapsed_ms": 6659,
+   "chars": 4236,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/LIN/\", \"captured_utc\": \"2026-04-23T21:35:58+00:00\", \"title\": \"Linde plc (LIN) Stock Price, News, Quote & History - Yahoo Finance\", \"text\": \""
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1707925/000165495426000913/lin_8k.htm"
+   },
+   "started": "2026-09-25T03:42:09.120+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 489,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001654954-26-000913.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1707925/000165495426000913/0001654954-26-000913.txt\"}, {\"name\": \"lin_8k.htm\", \"url\": \"https://www.se"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "LIN",
+    "days": 60
+   },
+   "started": "2026-09-25T03:42:09.120+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 429,
+   "error": null,
+   "preview": "{\"ticker\": \"LIN\", \"last_date\": \"2026-04-30\", \"last_close\": 497.92, \"ret_1d\": -0.0071, \"ret_5d\": -0.0136, \"ret_20d\": 0.0148, \"ret_60d\": 0.0847, \"vol_20d_annualized\": 0.174, \"closes_last_30\": [486.65, 4"
+  }
+ ],
+ "llm_calls": 10,
+ "attempts": 1,
+ "elapsed_s": 22.2,
+ "window": "clean",
+ "screen_score": 0.7225,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

@@ -1,0 +1,181 @@
+{
+ "ticker": "IBM",
+ "as_of": "2026-01-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.0005492706099100542,
+ "logprob_mass": 1.0000000381073089,
+ "logodds": -7.506369902156819,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "IBM's 20-day return is positive (0.0354), indicating a slight upward trend. However, the news and SEC filings highlight mixed sentiment: optimism about AI and quantum computing initiatives contrasts with concerns over traditional business weaknesses. This mixed sentiment suggests a moderate probability of the stock closing higher.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/51143/000005114326000004/ibm-20260128.htm",
+  "https://finance.yahoo.com/quote/IBM/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Gather recent price data, news, and SEC filings to assess IBM's potential move.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "IBM",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "IBM",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "IBM",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for insights into IBM's recent performance and future outlook.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114326000004/ibm-20260128.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "International Business Machines Corporation"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "IBM's recent price performance shows a slight upward trend over 20 days, but the news and filings indicate mixed sentiment with both optimism about AI and quantum computing and concerns over traditional business weaknesses. This mixed sentiment suggests a moderate probability of a higher close.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "IBM",
+    "days": 20
+   },
+   "started": "2026-09-25T03:32:43.522+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 352,
+   "error": null,
+   "preview": "{\"ticker\": \"IBM\", \"last_date\": \"2026-01-30\", \"last_close\": 300.58, \"ret_1d\": -0.0082, \"ret_5d\": 0.0488, \"ret_20d\": 0.0354, \"ret_60d\": null, \"vol_20d_annualized\": 0.379, \"closes_last_30\": [290.3, 285.6"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "IBM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:32:43.523+00:00",
+   "ok": true,
+   "elapsed_ms": 1531,
+   "chars": 1164,
+   "error": null,
+   "preview": "{\"ticker\": \"IBM\", \"cik\": 51143, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-01-28\", \"accepted_utc_latest\": \"2026-01-29T02:10:27+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "IBM",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:32:43.523+00:00",
+   "ok": true,
+   "elapsed_ms": 69744,
+   "chars": 4278,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/IBM/\", \"captured_utc\": \"2026-01-08T03:31:36+00:00\", \"title\": \"International Business Machines Corporation (IBM) Stock Price, News, Quote & H"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114326000004/ibm-20260128.htm"
+   },
+   "started": "2026-09-25T03:33:54.965+00:00",
+   "ok": true,
+   "elapsed_ms": 1673,
+   "chars": 645,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000051143-26-000004.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/51143/000005114326000004/0000051143-26-000004.txt\"}, {\"name\": \"ibm-20260128.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "International Business Machines Corporation",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:33:54.965+00:00",
+   "ok": true,
+   "elapsed_ms": 5751,
+   "chars": 4147,
+   "error": null,
+   "preview": "{\"title\": \"IBM\", \"revision_time\": \"2026-01-25T18:10:20Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1334792749\", \"text\": \"American multinational technology company\\n\\\"Big Blue\\\" redirects her"
+  }
+ ],
+ "llm_calls": 33,
+ "attempts": 1,
+ "elapsed_s": 88.6,
+ "window": "clean",
+ "screen_score": 0.6464646464646464,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

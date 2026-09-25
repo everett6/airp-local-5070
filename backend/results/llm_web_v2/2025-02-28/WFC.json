@@ -1,0 +1,136 @@
+{
+ "ticker": "WFC",
+ "as_of": "2025-02-28T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9101590431233868,
+ "logprob_mass": 0.9999999726550916,
+ "logodds": 2.3155783956322313,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The 20-day return for WFC was slightly negative (-0.14%), and the stock has shown mixed performance over the past year. Recent news and SEC filings do not indicate any significant catalysts that would strongly influence the stock's direction in the short term. Given the lack of strong evidence for either a bullish or bearish trend, the probability of WFC closing higher in the next 20 trading days is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/72971/000007297125000061/wfc-20250213.htm",
+  "https://finance.yahoo.com/quote/WFC/"
+ ],
+ "rounds": 2,
+ "parse_failures": 1,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess the context for WFC's potential movement.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "WFC",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "WFC",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "WFC",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price data, news, and SEC filings, there is no strong indication of a directional move for WFC over the next 20 trading days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "WFC",
+    "days": 260
+   },
+   "started": "2026-09-25T03:20:24.700+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 397,
+   "error": null,
+   "preview": "{\"ticker\": \"WFC\", \"last_date\": \"2025-02-28\", \"last_close\": 75.79, \"ret_1d\": 0.0222, \"ret_5d\": 0.0106, \"ret_20d\": -0.0014, \"ret_60d\": 0.0333, \"vol_20d_annualized\": 0.194, \"closes_last_30\": [73.13, 74.2"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "WFC",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:20:24.700+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 2183,
+   "error": null,
+   "preview": "{\"ticker\": \"WFC\", \"cik\": 72971, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-02-13\", \"accepted_utc_latest\": \"2025-02-14T03:06:28+00:00\", \"items\": \"8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "WFC",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:20:24.700+00:00",
+   "ok": true,
+   "elapsed_ms": 84040,
+   "chars": 4238,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/WFC/\", \"captured_utc\": \"2025-02-23T23:06:29+00:00\", \"title\": \"Wells Fargo & Company (WFC) Stock Price, News, Quote & History - Yahoo Finance"
+  }
+ ],
+ "llm_calls": 21,
+ "attempts": 1,
+ "elapsed_s": 97.0,
+ "window": "clean",
+ "screen_score": 0.73,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

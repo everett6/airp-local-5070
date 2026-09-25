@@ -1,0 +1,227 @@
+{
+ "ticker": "DIS",
+ "as_of": "2025-07-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.002648912243205735,
+ "logprob_mass": 1.0000000581710178,
+ "logodds": -5.9309537706944635,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a -3.15% return over 20 days, but no significant news in the latest SEC filings. The stock has shown volatility, and without strong evidence of positive or negative developments, the probability of DIS closing higher remains close to a coin flip.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1744489/000174448925000126/dis-20250609.htm",
+  "https://www.sec.gov/Archives/edgar/data/1744489/000174448925000096/dis-20250507.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting DIS.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "DIS",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "DIS",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "DIS",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any significant news that could impact DIS's stock price over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1744489/000174448925000126/dis-20250609.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1744489/000174448925000096/dis-20250507.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1744489/000174448925000079/dis-20250320.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1744489/000119312525045574/d917979d8k.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price data shows a slight negative return over 20 days, but no significant news in the latest filings. The stock is volatile, and without strong evidence, the probability remains close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "DIS",
+    "days": 260
+   },
+   "started": "2026-09-25T03:28:11.475+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 430,
+   "error": null,
+   "preview": "{\"ticker\": \"DIS\", \"last_date\": \"2025-07-31\", \"last_close\": 117.41, \"ret_1d\": -0.0036, \"ret_5d\": -0.0233, \"ret_20d\": -0.0315, \"ret_60d\": 0.2986, \"vol_20d_annualized\": 0.143, \"closes_last_30\": [115.68, "
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "DIS",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:28:11.475+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 2959,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/DIS/\", \"captured_utc\": \"2025-07-31T00:12:26+00:00\", \"title\": \"The Walt Disney Company (DIS) Stock Price, News, Quote & History - Yahoo Finan"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "DIS",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:28:11.475+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1174,
+   "error": null,
+   "preview": "{\"ticker\": \"DIS\", \"cik\": 1744489, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-06-09\", \"accepted_utc_latest\": \"2025-06-10T01:16:48+00:00\", \"items\": \"7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1744489/000174448925000126/dis-20250609.htm"
+   },
+   "started": "2026-09-25T03:28:11.475+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 383,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001744489-25-000126.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1744489/000174448925000126/0001744489-25-000126.txt\"}, {\"name\": \"dis-20250609.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1744489/000174448925000096/dis-20250507.htm"
+   },
+   "started": "2026-09-25T03:28:11.475+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 519,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001744489-25-000096.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1744489/000174448925000096/0001744489-25-000096.txt\"}, {\"name\": \"dis-20250507.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1744489/000174448925000079/dis-20250320.htm"
+   },
+   "started": "2026-09-25T03:28:11.475+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 383,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001744489-25-000079.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1744489/000174448925000079/0001744489-25-000079.txt\"}, {\"name\": \"dis-20250320.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1744489/000119312525045574/d917979d8k.htm"
+   },
+   "started": "2026-09-25T03:28:11.475+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 505,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-045574.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1744489/000119312525045574/0001193125-25-045574.txt\"}, {\"name\": \"d917979d8k.htm\", \"url\": \"https://ww"
+  }
+ ],
+ "llm_calls": 3,
+ "attempts": 1,
+ "elapsed_s": 2.5,
+ "window": "clean",
+ "screen_score": 0.665,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

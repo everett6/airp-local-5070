@@ -1,0 +1,227 @@
+{
+ "ticker": "BMY",
+ "as_of": "2025-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 5.0599653478512115e-05,
+ "logprob_mass": 1.0000000064309866,
+ "logodds": -9.891515229011368,
+ "logodds_censored": false,
+ "p_up": 0.5,
+ "answered": true,
+ "reason": "BMY's 20-day return was -14.79%, indicating a recent decline. However, the latest 8-K filing includes positive news about FDA approvals and earnings guidance. Analysts have mixed views, with some raising price targets and others lowering them. These mixed signals suggest a moderate probability of the stock closing higher.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/14272/000001427225000089/bmy-20250424.htm",
+  "https://www.marketwatch.com/investing/stock/bmy"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting BMY.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "BMY",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "BMY",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "BMY",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for key events and read relevant filings to assess recent developments affecting BMY.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/14272/000001427225000089/bmy-20250424.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/14272/000114036125005012/ef20043809_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/14272/000001427225000037/bmy-20250206.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/14272/000114036125000885/ef20041375_8k.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "BMY's recent price performance shows a decline over 20 days, and the news and filings indicate mixed signals with some positive developments but also concerns about growth. The probability of a higher close is moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "BMY",
+    "days": 260
+   },
+   "started": "2026-09-25T03:27:07.831+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 398,
+   "error": null,
+   "preview": "{\"ticker\": \"BMY\", \"last_date\": \"2025-04-30\", \"last_close\": 47.28, \"ret_1d\": 0.0199, \"ret_5d\": 0.0344, \"ret_20d\": -0.1479, \"ret_60d\": -0.1536, \"vol_20d_annualized\": 0.363, \"closes_last_30\": [55.98, 56."
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "BMY",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:07.831+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4288,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/bmy\", \"captured_utc\": \"2025-04-25T19:29:51+00:00\", \"title\": \"BMY Stock Price | Bristol Myers Squibb Co. Stock Quote (U.S.:"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "BMY",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:27:07.831+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1176,
+   "error": null,
+   "preview": "{\"ticker\": \"BMY\", \"cik\": 14272, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-04-24\", \"accepted_utc_latest\": \"2025-04-24T16:11:41+00:00\", \"items\": \"2.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/e"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/14272/000001427225000089/bmy-20250424.htm"
+   },
+   "started": "2026-09-25T03:27:07.831+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 659,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000014272-25-000089.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/14272/000001427225000089/0000014272-25-000089.txt\"}, {\"name\": \"a2025q1ex991-filing.htm\", \"url\": \"htt"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/14272/000114036125005012/ef20043809_8k.htm"
+   },
+   "started": "2026-09-25T03:27:07.832+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 379,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001140361-25-005012.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/14272/000114036125005012/0001140361-25-005012.txt\"}, {\"name\": \"ef20043809_8k.htm\", \"url\": \"https://w"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/14272/000001427225000037/bmy-20250206.htm"
+   },
+   "started": "2026-09-25T03:27:07.832+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 655,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000014272-25-000037.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/14272/000001427225000037/0000014272-25-000037.txt\"}, {\"name\": \"a2024ex991-filing.htm\", \"url\": \"https"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/14272/000114036125000885/ef20041375_8k.htm"
+   },
+   "started": "2026-09-25T03:27:07.832+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 511,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001140361-25-000885.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/14272/000114036125000885/0001140361-25-000885.txt\"}, {\"name\": \"ef20041375_8k.htm\", \"url\": \"https://w"
+  }
+ ],
+ "llm_calls": 4,
+ "attempts": 1,
+ "elapsed_s": 3.3,
+ "window": "clean",
+ "screen_score": 0.6950000000000001,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

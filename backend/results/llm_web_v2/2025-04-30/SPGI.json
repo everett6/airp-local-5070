@@ -1,0 +1,211 @@
+{
+ "ticker": "SPGI",
+ "as_of": "2025-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9999175534346795,
+ "logprob_mass": 0.9999999561348488,
+ "logodds": 9.403277717587658,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "SPGI's 20-day return was -2.1%, but the stock has shown positive momentum in the last 5 days. The upcoming earnings report is expected to have EPS of $4.21, which is a 4.9% increase YoY. However, there is no strong evidence to suggest a significant move in either direction, so the probability remains moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/64040/000006404025000122/spgi1q2025-earningsrelease.htm",
+  "https://finance.yahoo.com/quote/SPGI/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to identify any factors that may influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "SPGI",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "SPGI",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "SPGI",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for earnings details and any significant news, then assess the stock's recent performance and market sentiment.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/64040/000006404025000122/spgi-20250429.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "SPGI",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "SPGI",
+      "window_days": 30
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The stock has shown mixed recent performance, with a slight decline over 20 days but positive short-term momentum. The upcoming earnings report may influence the stock's direction, but without strong evidence, the probability remains moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "SPGI",
+    "days": 60
+   },
+   "started": "2026-09-25T03:27:01.953+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 429,
+   "error": null,
+   "preview": "{\"ticker\": \"SPGI\", \"last_date\": \"2025-04-30\", \"last_close\": 467.23, \"ret_1d\": 0.0169, \"ret_5d\": 0.0634, \"ret_20d\": -0.021, \"ret_60d\": -0.0336, \"vol_20d_annualized\": 0.508, \"closes_last_30\": [462.72, 4"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "SPGI",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:01.954+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4246,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/SPGI/\", \"captured_utc\": \"2025-04-28T01:07:58+00:00\", \"title\": \"S&P Global Inc. (SPGI) Stock Price, News, Quote & History - Yahoo Finance\", \""
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "SPGI",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:27:01.954+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1188,
+   "error": null,
+   "preview": "{\"ticker\": \"SPGI\", \"cik\": 64040, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-04-29\", \"accepted_utc_latest\": \"2025-04-29T16:10:18+00:00\", \"items\": \"2.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/64040/000006404025000122/spgi-20250429.htm"
+   },
+   "started": "2026-09-25T03:27:01.954+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 679,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000064040-25-000122.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/64040/000006404025000122/0000064040-25-000122.txt\"}, {\"name\": \"finalprojectmetropolispres.htm\", \"url"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "SPGI",
+    "days": 60
+   },
+   "started": "2026-09-25T03:27:01.954+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 429,
+   "error": null,
+   "preview": "{\"ticker\": \"SPGI\", \"last_date\": \"2025-04-30\", \"last_close\": 467.23, \"ret_1d\": 0.0169, \"ret_5d\": 0.0634, \"ret_20d\": -0.021, \"ret_60d\": -0.0336, \"vol_20d_annualized\": 0.508, \"closes_last_30\": [462.72, 4"
+  },
+  {
+   "id": "2.2",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "SPGI",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:27:01.954+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4246,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/SPGI/\", \"captured_utc\": \"2025-04-28T01:07:58+00:00\", \"title\": \"S&P Global Inc. (SPGI) Stock Price, News, Quote & History - Yahoo Finance\", \""
+  }
+ ],
+ "llm_calls": 4,
+ "attempts": 1,
+ "elapsed_s": 4.1,
+ "window": "clean",
+ "screen_score": 0.7275,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

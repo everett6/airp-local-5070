@@ -1,0 +1,181 @@
+{
+ "ticker": "MRK",
+ "as_of": "2026-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 3.080227393946656e-08,
+ "logprob_mass": 1.0000001354300796,
+ "logodds": -17.295677289686388,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The most recent 8-K filing for MRK does not contain significant news that would strongly influence the stock's performance over the next 20 trading days. The stock has shown a negative return over the past 20 days, but there is no strong evidence to suggest a directional move in the near term. Short-horizon stock moves are close to a coin flip and stocks rise slightly more often than they fall, so unless the evidence is unusually strong, the probability is kept between 0.40 and 0.60.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/310158/000110465926052081/tm2612241d1_8k.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to identify any factors that may influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "MRK",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "MRK",
+      "window_days": 30
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "MRK",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any significant news that could impact MRK's stock price over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/310158/000110465926052081/tm2612241d1_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "MRK",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The most recent 8-K filing does not contain significant news that would strongly influence the stock's performance over the next 20 trading days. The stock has shown a negative return over the past 20 days, but there is no strong evidence to suggest a directional move in the near term.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "MRK",
+    "days": 260
+   },
+   "started": "2026-09-25T03:41:25.123+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 426,
+   "error": null,
+   "preview": "{\"ticker\": \"MRK\", \"last_date\": \"2026-04-30\", \"last_close\": 107.76, \"ret_1d\": -0.016, \"ret_5d\": -0.0475, \"ret_20d\": -0.0965, \"ret_60d\": -0.0505, \"vol_20d_annualized\": 0.282, \"closes_last_30\": [112.72, "
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "MRK",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:41:25.124+00:00",
+   "ok": true,
+   "elapsed_ms": 7,
+   "chars": 2224,
+   "error": null,
+   "preview": "{\"ticker\": \"MRK\", \"cik\": 310158, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-04-30\", \"accepted_utc_latest\": \"2026-04-30T15:53:18+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "MRK",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:41:25.124+00:00",
+   "ok": false,
+   "elapsed_ms": 59752,
+   "chars": 0,
+   "error": "no archived news page for MRK in the 30 days before the decision time (tried marketwatch, cnbc, yahoo)",
+   "preview": ""
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "MRK",
+    "days": 20
+   },
+   "started": "2026-09-25T03:42:30.739+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 352,
+   "error": null,
+   "preview": "{\"ticker\": \"MRK\", \"last_date\": \"2026-04-30\", \"last_close\": 107.76, \"ret_1d\": -0.016, \"ret_5d\": -0.0475, \"ret_20d\": -0.0965, \"ret_60d\": null, \"vol_20d_annualized\": 0.282, \"closes_last_30\": [119.27, 119"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/310158/000110465926052081/tm2612241d1_8k.htm"
+   },
+   "started": "2026-09-25T03:42:30.739+00:00",
+   "ok": true,
+   "elapsed_ms": 1989,
+   "chars": 654,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-26-052081.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/310158/000110465926052081/0001104659-26-052081.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov"
+  }
+ ],
+ "llm_calls": 36,
+ "attempts": 1,
+ "elapsed_s": 74.8,
+ "window": "clean",
+ "screen_score": 0.7575000000000001,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

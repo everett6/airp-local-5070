@@ -1,0 +1,204 @@
+{
+ "ticker": "TMO",
+ "as_of": "2026-02-27T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 3.93099043555156e-06,
+ "logprob_mass": 1.0000000013154735,
+ "logodds": -12.446615213612137,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "Thermo Fisher Scientific (TMO) has shown a 20-day return of -12% and a 60-day return of -10.88%, indicating a downward trend. However, the stock has recently faced mixed signals, with strong Q4 results and a bullish price target reported, but insider selling raises concerns. The stock's volatility over 20 days is annualized at 26.5%, which is moderate. Given the mixed signals and moderate volatility, the probability of TMO closing higher 20 trading days from now is estimated at 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/97745/000114036126005014/ef20065513_8k.htm",
+  "https://finance.yahoo.com/quote/TMO/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to assess the stock's recent performance and any relevant events.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "TMO",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "TMO",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "TMO",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for insights into recent events affecting TMO, and assess the stock's recent performance and volatility.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/97745/000114036126005014/ef20065513_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "TMO",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Thermo Fisher Scientific"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Assess the probability based on recent price performance, volatility, and mixed signals from analysts and insiders.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "TMO",
+    "days": 60
+   },
+   "started": "2026-09-25T03:34:45.943+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 427,
+   "error": null,
+   "preview": "{\"ticker\": \"TMO\", \"last_date\": \"2026-02-27\", \"last_close\": 519.68, \"ret_1d\": 0.0019, \"ret_5d\": 0.0199, \"ret_20d\": -0.12, \"ret_60d\": -0.1088, \"vol_20d_annualized\": 0.265, \"closes_last_30\": [622.93, 617"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "TMO",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:34:45.944+00:00",
+   "ok": true,
+   "elapsed_ms": 1240,
+   "chars": 1172,
+   "error": null,
+   "preview": "{\"ticker\": \"TMO\", \"cik\": 97745, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-02-12\", \"accepted_utc_latest\": \"2026-02-13T02:19:10+00:00\", \"items\": \"1.01,8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/e"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "TMO",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:34:45.943+00:00",
+   "ok": true,
+   "elapsed_ms": 110300,
+   "chars": 4242,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/TMO/\", \"captured_utc\": \"2026-02-14T23:04:20+00:00\", \"title\": \"Thermo Fisher Scientific Inc. (TMO) Stock Price, News, Quote & History - Yahoo"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "TMO",
+    "days": 60
+   },
+   "started": "2026-09-25T03:36:41.272+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 427,
+   "error": null,
+   "preview": "{\"ticker\": \"TMO\", \"last_date\": \"2026-02-27\", \"last_close\": 519.68, \"ret_1d\": 0.0019, \"ret_5d\": 0.0199, \"ret_20d\": -0.12, \"ret_60d\": -0.1088, \"vol_20d_annualized\": 0.265, \"closes_last_30\": [622.93, 617"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/97745/000114036126005014/ef20065513_8k.htm"
+   },
+   "started": "2026-09-25T03:36:41.272+00:00",
+   "ok": true,
+   "elapsed_ms": 2460,
+   "chars": 769,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001140361-26-005014.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/97745/000114036126005014/0001140361-26-005014.txt\"}, {\"name\": \"ef20065513_8k.htm\", \"url\": \"https://w"
+  },
+  {
+   "id": "2.2",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Thermo Fisher Scientific",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:36:41.272+00:00",
+   "ok": true,
+   "elapsed_ms": 5108,
+   "chars": 4170,
+   "error": null,
+   "preview": "{\"title\": \"Thermo Fisher Scientific\", \"revision_time\": \"2025-10-30T16:31:21Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1319571084\", \"text\": \"Provisioner of scientific consumables, equipment"
+  }
+ ],
+ "llm_calls": 37,
+ "attempts": 1,
+ "elapsed_s": 129.2,
+ "window": "clean",
+ "screen_score": 0.6625,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

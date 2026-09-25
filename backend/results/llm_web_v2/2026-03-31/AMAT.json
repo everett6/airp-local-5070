@@ -1,0 +1,182 @@
+{
+ "ticker": "AMAT",
+ "as_of": "2026-03-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.00045479158219395864,
+ "logprob_mass": 1.0000000032633978,
+ "logodds": -7.69521641003629,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The 20-day return for AMAT is slightly negative (-2.71%), but the stock has shown volatility with an annualized volatility of 55.1%. Recent news and filings do not indicate any major positive or negative developments that would strongly influence the stock's direction over the next 20 trading days. Given the lack of strong signals and the general tendency for short-term stock movements to be close to a coin flip, the probability of AMAT closing higher is moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/6951/000119312526106339/d114932d8k.htm",
+  "https://www.cnbc.com/quotes/AMAT/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting AMAT.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "AMAT",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "AMAT",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "AMAT",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any material news and assess the recent price trends to estimate the probability of AMAT closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/6951/000119312526106339/d114932d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "AMAT",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price data shows a slight negative return over 20 days, but the overall market conditions and lack of significant news suggest a moderate probability of the stock closing higher.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "AMAT",
+    "days": 260
+   },
+   "started": "2026-09-25T03:40:00.773+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 430,
+   "error": null,
+   "preview": "{\"ticker\": \"AMAT\", \"last_date\": \"2026-03-31\", \"last_close\": 341.0, \"ret_1d\": 0.0578, \"ret_5d\": -0.0861, \"ret_20d\": -0.0271, \"ret_60d\": 0.2728, \"vol_20d_annualized\": 0.551, \"closes_last_30\": [367.99, 3"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "AMAT",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:40:00.774+00:00",
+   "ok": true,
+   "elapsed_ms": 1130,
+   "chars": 1166,
+   "error": null,
+   "preview": "{\"ticker\": \"AMAT\", \"cik\": 6951, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-03-13\", \"accepted_utc_latest\": \"2026-03-14T01:54:42+00:00\", \"items\": \"5.07\", \"url\": \"https://www.sec.gov/Archives/edgar/data/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "AMAT",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:40:00.774+00:00",
+   "ok": true,
+   "elapsed_ms": 49213,
+   "chars": 3408,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/AMAT/\", \"captured_utc\": \"2026-03-26T13:37:14+00:00\", \"title\": \"AMAT: Applied Materials Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quo"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "AMAT",
+    "days": 20
+   },
+   "started": "2026-09-25T03:40:56.470+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 356,
+   "error": null,
+   "preview": "{\"ticker\": \"AMAT\", \"last_date\": \"2026-03-31\", \"last_close\": 341.0, \"ret_1d\": 0.0578, \"ret_5d\": -0.0861, \"ret_20d\": -0.0271, \"ret_60d\": null, \"vol_20d_annualized\": 0.551, \"closes_last_30\": [350.51, 356"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/6951/000119312526106339/d114932d8k.htm"
+   },
+   "started": "2026-09-25T03:40:56.470+00:00",
+   "ok": true,
+   "elapsed_ms": 275,
+   "chars": 370,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-26-106339.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/6951/000119312526106339/0001193125-26-106339.txt\"}, {\"name\": \"d114932d8k.htm\", \"url\": \"https://www.s"
+  }
+ ],
+ "llm_calls": 21,
+ "attempts": 1,
+ "elapsed_s": 75.9,
+ "window": "clean",
+ "screen_score": 0.6625,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

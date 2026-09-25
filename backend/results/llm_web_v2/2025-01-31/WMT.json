@@ -1,0 +1,223 @@
+{
+ "ticker": "WMT",
+ "as_of": "2025-01-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.01832216510585346,
+ "logprob_mass": 1.0000000851334263,
+ "logodds": -3.9811516492581593,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a positive return over 20 days (8.64%), but the stock has experienced volatility. The news does not indicate any major positive or negative developments, and the SEC filings do not reveal any significant events that would impact the stock's direction. Given the lack of strong evidence, the probability of WMT closing higher is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/104169/000010416924000173/wmt-20241122.htm",
+  "https://www.sec.gov/Archives/edgar/data/104169/000010416924000170/wmt-20241119.htm",
+  "https://www.sec.gov/Archives/edgar/data/104169/000010416924000166/wmt-20241018.htm",
+  "https://www.sec.gov/Archives/edgar/data/104169/000010416924000146/wmt-20240906.htm",
+  "https://www.sec.gov/Archives/edgar/data/104169/000010416924000132/wmt-20240815.htm",
+  "https://www.marketwatch.com/investing/stock/wmt"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting WMT.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "WMT",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "WMT",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "WMT",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the recent price performance, news, and SEC filings to determine the probability of WMT closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "WMT",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "WMT",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "WMT",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price performance, news, and SEC filings, there is no strong evidence to suggest a significant directional move for WMT over the next 20 trading days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "WMT",
+    "days": 260
+   },
+   "started": "2026-09-25T03:18:32.635+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 395,
+   "error": null,
+   "preview": "{\"ticker\": \"WMT\", \"last_date\": \"2025-01-31\", \"last_close\": 96.61, \"ret_1d\": -0.005, \"ret_5d\": 0.0359, \"ret_20d\": 0.0864, \"ret_60d\": 0.197, \"vol_20d_annualized\": 0.164, \"closes_last_30\": [93.92, 92.08,"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "WMT",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:18:32.635+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4276,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/wmt\", \"captured_utc\": \"2025-01-02T22:57:20+00:00\", \"title\": \"WMT Stock Price | Walmart Inc. Stock Quote (U.S.: NYSE) | Mar"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "WMT",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:18:32.636+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1160,
+   "error": null,
+   "preview": "{\"ticker\": \"WMT\", \"cik\": 104169, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-11-22\", \"accepted_utc_latest\": \"2024-11-23T03:28:28+00:00\", \"items\": \"8.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data"
+  },
+  {
+   "id": "2.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "WMT",
+    "days": 260
+   },
+   "started": "2026-09-25T03:18:32.636+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 395,
+   "error": null,
+   "preview": "{\"ticker\": \"WMT\", \"last_date\": \"2025-01-31\", \"last_close\": 96.61, \"ret_1d\": -0.005, \"ret_5d\": 0.0359, \"ret_20d\": 0.0864, \"ret_60d\": 0.197, \"vol_20d_annualized\": 0.164, \"closes_last_30\": [93.92, 92.08,"
+  },
+  {
+   "id": "2.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "WMT",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:18:32.636+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4276,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/wmt\", \"captured_utc\": \"2025-01-02T22:57:20+00:00\", \"title\": \"WMT Stock Price | Walmart Inc. Stock Quote (U.S.: NYSE) | Mar"
+  },
+  {
+   "id": "2.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "WMT",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:18:32.636+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1160,
+   "error": null,
+   "preview": "{\"ticker\": \"WMT\", \"cik\": 104169, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-11-22\", \"accepted_utc_latest\": \"2024-11-23T03:28:28+00:00\", \"items\": \"8.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data"
+  }
+ ],
+ "llm_calls": 1,
+ "attempts": 1,
+ "elapsed_s": 1.0,
+ "window": "clean",
+ "screen_score": 0.7575,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

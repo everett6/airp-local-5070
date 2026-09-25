@@ -1,0 +1,182 @@
+{
+ "ticker": "C",
+ "as_of": "2026-08-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 6.257752708460758e-05,
+ "logprob_mass": 1.0000000842277412,
+ "logodds": -9.679041757084892,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history indicates a slight downward trend over the last 20 days, with a 1.46% decline. However, there is no strong news from the latest 8-K filing that would significantly impact the stock's direction. Short-horizon stock moves are close to a coin flip and stocks rise slightly more often than they fall, so the probability remains within the typical range for short-term stock movements.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/831001/000110465926083383/c-20260714x8k.htm",
+  "https://www.marketwatch.com/investing/stock/c"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to identify any factors that might influence the stock's movement over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "C",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "C",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "C",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for significant news and assess the price history for trends.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/831001/000110465926083383/c-20260714x8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "C",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price history shows a slight downward trend over the last 20 days, and there is no strong news from the latest 8-K filing that would significantly impact the stock's direction. Given the lack of strong evidence, the probability remains within the typical range for short-term stock movements.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "C",
+    "days": 260
+   },
+   "started": "2026-09-25T03:54:03.831+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 428,
+   "error": null,
+   "preview": "{\"ticker\": \"C\", \"last_date\": \"2026-08-31\", \"last_close\": 131.62, \"ret_1d\": -0.0096, \"ret_5d\": -0.0008, \"ret_20d\": -0.0146, \"ret_60d\": -0.0212, \"vol_20d_annualized\": 0.229, \"closes_last_30\": [132.17, 1"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "C",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:54:03.833+00:00",
+   "ok": true,
+   "elapsed_ms": 1801,
+   "chars": 2203,
+   "error": null,
+   "preview": "{\"ticker\": \"C\", \"cik\": 831001, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-07-14\", \"accepted_utc_latest\": \"2026-07-14T18:39:47+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/d"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "C",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:54:03.832+00:00",
+   "ok": true,
+   "elapsed_ms": 4192,
+   "chars": 4272,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/c\", \"captured_utc\": \"2026-08-16T18:28:39+00:00\", \"title\": \"C Stock Price | Citigroup Inc. Stock Quote (U.S.: NYSE) | Marke"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/831001/000110465926083383/c-20260714x8k.htm"
+   },
+   "started": "2026-09-25T03:54:10.181+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 781,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-26-083383.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/831001/000110465926083383/0001104659-26-083383.txt\"}, {\"name\": \"c-20260714x8k.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "C",
+    "days": 20
+   },
+   "started": "2026-09-25T03:54:10.182+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 354,
+   "error": null,
+   "preview": "{\"ticker\": \"C\", \"last_date\": \"2026-08-31\", \"last_close\": 131.62, \"ret_1d\": -0.0096, \"ret_5d\": -0.0008, \"ret_20d\": -0.0146, \"ret_60d\": null, \"vol_20d_annualized\": 0.229, \"closes_last_30\": [133.57, 136."
+  }
+ ],
+ "llm_calls": 13,
+ "attempts": 1,
+ "elapsed_s": 25.1,
+ "window": "clean",
+ "screen_score": 0.7275,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

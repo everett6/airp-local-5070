@@ -1,0 +1,180 @@
+{
+ "ticker": "VZ",
+ "as_of": "2026-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.0060764670992253305,
+ "logprob_mass": 0.9999999201753473,
+ "logodds": -5.097236817140581,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a -1.29% return over 20 days, which is close to neutral. The most recent 8-K filing does not contain any material news that would suggest a strong upward or downward trend. Additionally, the news articles retrieved do not indicate any significant events affecting Verizon's stock in the near term. Therefore, the probability of Verizon closing higher 20 trading days after its latest close is close to a coin flip.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/732712/000073271226000019/vz-20260427.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting VZ.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "VZ",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "VZ",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "VZ",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any material news that could impact the stock's future performance.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000019/vz-20260427.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Verizon Communications"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price data shows a slight negative return over 20 days, but no strong news or filings indicate a significant directional move. The probability is close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "VZ",
+    "days": 260
+   },
+   "started": "2026-09-25T03:41:37.372+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 394,
+   "error": null,
+   "preview": "{\"ticker\": \"VZ\", \"last_date\": \"2026-04-30\", \"last_close\": 47.22, \"ret_1d\": 0.0305, \"ret_5d\": 0.0172, \"ret_20d\": -0.0129, \"ret_60d\": 0.0541, \"vol_20d_annualized\": 0.253, \"closes_last_30\": [47.93, 48.41"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "VZ",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:41:37.373+00:00",
+   "ok": true,
+   "elapsed_ms": 1145,
+   "chars": 1150,
+   "error": null,
+   "preview": "{\"ticker\": \"VZ\", \"cik\": 732712, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-04-27\", \"accepted_utc_latest\": \"2026-04-27T16:00:42+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "VZ",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:41:37.372+00:00",
+   "ok": true,
+   "elapsed_ms": 7174,
+   "chars": 4285,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/vz\", \"captured_utc\": \"2026-04-03T08:38:18+00:00\", \"title\": \"VZ Stock Price | Verizon Communications Inc. Stock Quote (U.S."
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/732712/000073271226000019/vz-20260427.htm"
+   },
+   "started": "2026-09-25T03:41:48.592+00:00",
+   "ok": true,
+   "elapsed_ms": 298,
+   "chars": 509,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000732712-26-000019.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/732712/000073271226000019/0000732712-26-000019.txt\"}, {\"name\": \"a2026q1exhibit99.htm\", \"url\": \"https"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Verizon Communications",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:41:48.592+00:00",
+   "ok": true,
+   "elapsed_ms": 2845,
+   "chars": 4163,
+   "error": null,
+   "preview": "{\"title\": \"Verizon\", \"revision_time\": \"2026-04-30T09:57:28Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1351820659\", \"text\": \"Not to be confused with Vierzon.\\nVerizon Communications Inc.\\nWo"
+  }
+ ],
+ "llm_calls": 11,
+ "attempts": 1,
+ "elapsed_s": 21.9,
+ "window": "clean",
+ "screen_score": 0.7525,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

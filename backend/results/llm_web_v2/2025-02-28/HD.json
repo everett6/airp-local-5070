@@ -1,0 +1,185 @@
+{
+ "ticker": "HD",
+ "as_of": "2025-02-28T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.012318182200755536,
+ "logprob_mass": 1.00000002497151,
+ "logodds": -4.384284200538746,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a 20-day return of -4.32%, indicating a recent downward trend, but the stock has shown volatility with a 20-day annualized volatility of 21.9%. The news mentions analyst calls and mixed sentiment, with some analysts lowering price targets but others maintaining confidence. The most recent SEC filing (8-K) does not indicate any major negative or positive events that would strongly influence the stock over the next 20 days. Given the mixed signals and the stock's recent volatility, the probability of HD closing higher is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/354950/000035495025000030/hd-20250225.htm",
+  "https://www.cnbc.com/quotes/HD/"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to identify any factors that may influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "HD",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "HD",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "HD",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent SEC filing and news to identify any significant events that may impact HD's stock price over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/354950/000035495025000030/hd-20250225.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Home Depot",
+      "max_chars": 10000
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Summarize the evidence to estimate the probability of HD closing higher 20 trading days from now.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "HD",
+    "days": 60
+   },
+   "started": "2026-09-25T03:23:30.657+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 427,
+   "error": null,
+   "preview": "{\"ticker\": \"HD\", \"last_date\": \"2025-02-28\", \"last_close\": 378.73, \"ret_1d\": 0.0162, \"ret_5d\": 0.0293, \"ret_20d\": -0.0432, \"ret_60d\": -0.0758, \"vol_20d_annualized\": 0.219, \"closes_last_30\": [390.89, 39"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "HD",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:23:30.657+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1159,
+   "error": null,
+   "preview": "{\"ticker\": \"HD\", \"cik\": 354950, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-02-25\", \"accepted_utc_latest\": \"2025-02-25T16:49:51+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "HD",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:23:30.657+00:00",
+   "ok": true,
+   "elapsed_ms": 38095,
+   "chars": 1930,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/HD/\", \"captured_utc\": \"2025-02-26T14:54:08+00:00\", \"title\": \"HD: Home Depot Inc - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | Last N"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/354950/000035495025000030/hd-20250225.htm"
+   },
+   "started": "2026-09-25T03:24:15.146+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 521,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000354950-25-000030.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/354950/000035495025000030/0000354950-25-000030.txt\"}, {\"name\": \"hd-20250225.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Home Depot",
+    "max_chars": 8000
+   },
+   "started": "2026-09-25T03:24:15.146+00:00",
+   "ok": true,
+   "elapsed_ms": 3249,
+   "chars": 5012,
+   "error": null,
+   "preview": "{\"title\": \"Home Depot\", \"revision_time\": \"2025-02-27T09:09:19Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1277893195\", \"text\": \"American multinational home improvement supplies retailing com"
+  }
+ ],
+ "llm_calls": 18,
+ "attempts": 1,
+ "elapsed_s": 56.0,
+ "window": "clean",
+ "screen_score": 0.655,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

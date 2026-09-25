@@ -1,0 +1,186 @@
+{
+ "ticker": "CSCO",
+ "as_of": "2025-02-28T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9998132398933701,
+ "logprob_mass": 1.0000000222161691,
+ "logodds": 8.585498839367288,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The stock has shown a positive return of 6.02% over the last 20 days, indicating a bullish trend. The latest news mentions positive developments such as partnerships and analyst ratings, which could support further gains. However, without strong fundamental or event-driven catalysts, the probability remains moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/858877/000119312525033389/d916866d8k.htm",
+  "https://www.cnbc.com/quotes/csco"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to identify any factors that might influence the stock's performance over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "CSCO",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "CSCO",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "CSCO",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for earnings news and other relevant details, then assess the stock's recent performance and market sentiment to estimate the probability of a higher close in 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/858877/000119312525033389/d916866d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "CSCO",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent price performance shows a positive trend over the last 20 days, and the latest news indicates positive sentiment. However, without strong fundamental or event-driven catalysts, the probability remains moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "CSCO",
+    "days": 260
+   },
+   "started": "2026-09-25T03:21:15.129+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 395,
+   "error": null,
+   "preview": "{\"ticker\": \"CSCO\", \"last_date\": \"2025-02-28\", \"last_close\": 62.02, \"ret_1d\": 0.0047, \"ret_5d\": 0.002, \"ret_20d\": 0.0602, \"ret_60d\": 0.0901, \"vol_20d_annualized\": 0.156, \"closes_last_30\": [57.87, 58.27"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "CSCO",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:21:15.129+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 2188,
+   "error": null,
+   "preview": "{\"ticker\": \"CSCO\", \"cik\": 858877, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-02-24\", \"accepted_utc_latest\": \"2025-02-25T02:15:21+00:00\", \"items\": \"1.01,2.03,9.01\", \"url\": \"https://www.sec.gov/Archives"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "CSCO",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:21:15.129+00:00",
+   "ok": true,
+   "elapsed_ms": 56893,
+   "chars": 1905,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/csco\", \"captured_utc\": \"2025-02-12T10:30:43+00:00\", \"title\": \"CSCO: Cisco Systems Inc - Stock Price, Quote and News - CNBC\", \"text\": \"Earnings An"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/858877/000119312525033389/d916866d8k.htm"
+   },
+   "started": "2026-09-25T03:22:14.449+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 745,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-033389.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/858877/000119312525033389/0001193125-25-033389.txt\"}, {\"name\": \"d916866d8k.htm\", \"url\": \"https://www"
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "CSCO",
+    "days": 20
+   },
+   "started": "2026-09-25T03:22:14.449+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 332,
+   "error": null,
+   "preview": "{\"ticker\": \"CSCO\", \"last_date\": \"2025-02-28\", \"last_close\": 62.02, \"ret_1d\": 0.0047, \"ret_5d\": 0.002, \"ret_20d\": 0.0602, \"ret_60d\": null, \"vol_20d_annualized\": 0.156, \"closes_last_30\": [58.5, 58.62, 5"
+  }
+ ],
+ "llm_calls": 12,
+ "attempts": 1,
+ "elapsed_s": 62.5,
+ "window": "clean",
+ "screen_score": 0.69,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

@@ -47,7 +47,8 @@ over 2011–2026. Momentum made 19.9% a year vs SPY's 14.0%, but its alpha after
 Wikipedia revisions, SEC filings already accepted, and Internet Archive captures of news pages.
 `scripts/llm_web_backtest.py` has it re-rank each month's 20 screened stocks, and `scripts/llm_web_report.py`
 tests whether it beats the screen. Only 2025–2026 decisions count as evidence, because the model may remember
-earlier years. See [`docs/LONG_HISTORY.md`](docs/LONG_HISTORY.md).
+earlier years. Result on 400 clean decisions (Feb 2025 – Sep 2026): the LLM's ranking skill was −0.07 (95% CI −0.19 to +0.04),
+no better than the screen it re-ranks, and its top 10 made +4.2% vs SPY's +30.8%. See [`docs/LONG_HISTORY.md`](docs/LONG_HISTORY.md).
 
 ### Live, web-informed research
 

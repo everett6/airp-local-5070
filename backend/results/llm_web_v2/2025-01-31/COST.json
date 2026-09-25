@@ -1,0 +1,209 @@
+{
+ "ticker": "COST",
+ "as_of": "2025-01-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.996813713916564,
+ "logprob_mass": 1.000000037655544,
+ "logodds": 5.74570790450177,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "Costco's stock has shown a positive return of 6.94% over the past 20 days, indicating a slight upward trend. However, short-term stock movements are generally close to a coin flip, and there are no significant news events or catalysts in the latest 8-K filing that would strongly influence the stock's direction over the next 20 trading days. Therefore, the probability of the stock closing higher is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/909832/000090983225000005/cost-20250123.htm",
+  "https://www.marketwatch.com/investing/stock/cost"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess the stock's recent performance and any potential catalysts.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "COST",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "COST",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "COST",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any significant news or events that could impact the stock price over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/909832/000090983225000005/cost-20250123.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Costco Wholesale Corp."
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "COST",
+      "days": 60
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Costco's recent price performance shows a positive trend, but no significant news in the latest 8-K filing. The stock has risen over the past 20 days, suggesting a slight upward bias, but short-term movements are close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "COST",
+    "days": 60
+   },
+   "started": "2026-09-25T03:18:34.598+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 426,
+   "error": null,
+   "preview": "{\"ticker\": \"COST\", \"last_date\": \"2025-01-31\", \"last_close\": 970.51, \"ret_1d\": 0.0009, \"ret_5d\": 0.0428, \"ret_20d\": 0.0694, \"ret_60d\": 0.1169, \"vol_20d_annualized\": 0.172, \"closes_last_30\": [972.69, 95"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "COST",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:18:34.598+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4293,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/cost\", \"captured_utc\": \"2025-01-17T00:52:30+00:00\", \"title\": \"COST Stock Price | Costco Wholesale Corp. Stock Quote (U.S.:"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "COST",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:18:34.598+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1176,
+   "error": null,
+   "preview": "{\"ticker\": \"COST\", \"cik\": 909832, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-01-27\", \"accepted_utc_latest\": \"2025-01-28T02:26:57+00:00\", \"items\": \"5.07,8.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/909832/000090983225000005/cost-20250123.htm"
+   },
+   "started": "2026-09-25T03:18:34.599+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 515,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000909832-25-000005.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/909832/000090983225000005/0000909832-25-000005.txt\"}, {\"name\": \"cost-20250123.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Costco Wholesale Corp.",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:18:34.599+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4147,
+   "error": null,
+   "preview": "{\"title\": \"Costco\", \"revision_time\": \"2025-01-30T13:22:54Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1272853037\", \"text\": \"American multinational warehouse club chain\\nNot to be confused wi"
+  },
+  {
+   "id": "2.2",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "COST",
+    "days": 60
+   },
+   "started": "2026-09-25T03:18:34.599+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 426,
+   "error": null,
+   "preview": "{\"ticker\": \"COST\", \"last_date\": \"2025-01-31\", \"last_close\": 970.51, \"ret_1d\": 0.0009, \"ret_5d\": 0.0428, \"ret_20d\": 0.0694, \"ret_60d\": 0.1169, \"vol_20d_annualized\": 0.172, \"closes_last_30\": [972.69, 95"
+  }
+ ],
+ "llm_calls": 2,
+ "attempts": 1,
+ "elapsed_s": 1.8,
+ "window": "clean",
+ "screen_score": 0.7175,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

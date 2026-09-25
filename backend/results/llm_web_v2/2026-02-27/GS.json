@@ -1,0 +1,182 @@
+{
+ "ticker": "GS",
+ "as_of": "2026-02-27T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 7.638163306062607e-06,
+ "logprob_mass": 1.000000082270953,
+ "logodds": -11.782345750460902,
+ "logodds_censored": false,
+ "p_up": 0.5,
+ "answered": true,
+ "reason": "The 20-day return for GS is negative (-8.57%), but the 60-day return is positive (6.53%). There are no recent news articles or SEC filings that provide clear directional signals about the stock's performance. Given the lack of strong evidence, the probability of GS closing higher 20 trading days from now is close to a coin flip.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/886982/000119312526051527/gs-20260212.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess the context for GS's potential movement.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "GS",
+      "days": 200
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "GS",
+      "window_days": 30
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "GS",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Focus on the most recent 8-K filing for potential insights into recent events affecting GS.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312526051527/gs-20260212.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "GS",
+      "days": 200
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Recent price data shows a negative 20-day return, but longer-term performance is mixed. No recent news or filings provide strong directional signals. The probability is close to a coin flip.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "GS",
+    "days": 200
+   },
+   "started": "2026-09-25T03:33:36.888+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 427,
+   "error": null,
+   "preview": "{\"ticker\": \"GS\", \"last_date\": \"2026-02-27\", \"last_close\": 847.17, \"ret_1d\": -0.0747, \"ret_5d\": -0.068, \"ret_20d\": -0.0857, \"ret_60d\": 0.0653, \"vol_20d_annualized\": 0.416, \"closes_last_30\": [961.78, 94"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "GS",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:33:36.889+00:00",
+   "ok": true,
+   "elapsed_ms": 33280,
+   "chars": 1145,
+   "error": null,
+   "preview": "{\"ticker\": \"GS\", \"cik\": 886982, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-02-13\", \"accepted_utc_latest\": \"2026-02-14T02:30:27+00:00\", \"items\": \"5.02\", \"url\": \"https://www.sec.gov/Archives/edgar/data/"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "GS",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:33:36.889+00:00",
+   "ok": false,
+   "elapsed_ms": 34378,
+   "chars": 0,
+   "error": "no archived news page for GS in the 30 days before the decision time (tried marketwatch, cnbc, yahoo)",
+   "preview": ""
+  },
+  {
+   "id": "2.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "GS",
+    "days": 200
+   },
+   "started": "2026-09-25T03:34:12.885+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 427,
+   "error": null,
+   "preview": "{\"ticker\": \"GS\", \"last_date\": \"2026-02-27\", \"last_close\": 847.17, \"ret_1d\": -0.0747, \"ret_5d\": -0.068, \"ret_20d\": -0.0857, \"ret_60d\": 0.0653, \"vol_20d_annualized\": 0.416, \"closes_last_30\": [961.78, 94"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/886982/000119312526051527/gs-20260212.htm"
+   },
+   "started": "2026-09-25T03:34:12.885+00:00",
+   "ok": true,
+   "elapsed_ms": 1090,
+   "chars": 378,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-26-051527.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/886982/000119312526051527/0001193125-26-051527.txt\"}, {\"name\": \"gs-20260212.htm\", \"url\": \"https://ww"
+  }
+ ],
+ "llm_calls": 14,
+ "attempts": 1,
+ "elapsed_s": 43.7,
+ "window": "clean",
+ "screen_score": 0.6975,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

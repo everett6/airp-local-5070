@@ -1,0 +1,229 @@
+{
+ "ticker": "IBM",
+ "as_of": "2025-12-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9999806363788188,
+ "logprob_mass": 1.0000000759198133,
+ "logodds": 10.852095085319371,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "IBM's recent price performance over 20 days shows a slight negative trend, but the news and SEC filings highlight positive developments such as the $11 billion acquisition of Confluent, which could drive future growth. The acquisition is a significant catalyst that may positively impact IBM's stock price in the coming months. However, the stock market is volatile, and short-term movements are close to a coin flip. Given the positive catalyst and the slight negative trend, the probability of IBM closing higher in 20 trading days is moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/51143/000005114325000063/ibm-20251022.htm",
+  "https://www.sec.gov/Archives/edgar/data/51143/000005114325000061/ibm-20251022.htm",
+  "https://www.sec.gov/Archives/edgar/data/51143/000005114325000051/ibm-20250723.htm",
+  "https://www.sec.gov/Archives/edgar/data/51143/000005114325000048/ibm-20250723.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess IBM's recent performance and any potential catalysts.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "IBM",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "IBM",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "IBM",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the recent price performance, news, and SEC filings to determine the probability of IBM closing higher 20 trading days from now.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114325000063/ibm-20251022.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114325000061/ibm-20251022.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114325000051/ibm-20250723.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114325000048/ibm-20250723.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "IBM's recent price performance shows a slight negative trend, but the news and SEC filings highlight positive developments such as the $11 billion acquisition of Confluent, which could drive future growth. The probability of IBM closing higher in 20 trading days is moderate.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "IBM",
+    "days": 20
+   },
+   "started": "2026-09-25T03:30:07.689+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 354,
+   "error": null,
+   "preview": "{\"ticker\": \"IBM\", \"last_date\": \"2025-12-31\", \"last_close\": 290.3, \"ret_1d\": -0.0193, \"ret_5d\": -0.0249, \"ret_20d\": -0.0185, \"ret_60d\": null, \"vol_20d_annualized\": 0.136, \"closes_last_30\": [295.76, 296"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "IBM",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:30:07.689+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 4301,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/ibm\", \"captured_utc\": \"2025-12-27T04:04:38+00:00\", \"title\": \"IBM Stock Price | International Business Machines Corp. Stock"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "IBM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:30:07.689+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 1164,
+   "error": null,
+   "preview": "{\"ticker\": \"IBM\", \"cik\": 51143, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-10-23\", \"accepted_utc_latest\": \"2025-10-24T01:16:36+00:00\", \"items\": \"7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114325000063/ibm-20251022.htm"
+   },
+   "started": "2026-09-25T03:30:07.689+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 609,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000051143-25-000063.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/51143/000005114325000063/0000051143-25-000063.txt\"}, {\"name\": \"ibm-20251022.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114325000061/ibm-20251022.htm"
+   },
+   "started": "2026-09-25T03:30:07.689+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 645,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000051143-25-000061.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/51143/000005114325000061/0000051143-25-000061.txt\"}, {\"name\": \"ibm-20251022.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114325000051/ibm-20250723.htm"
+   },
+   "started": "2026-09-25T03:30:07.689+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 613,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000051143-25-000051.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/51143/000005114325000051/0000051143-25-000051.txt\"}, {\"name\": \"ibm-20250723.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/51143/000005114325000048/ibm-20250723.htm"
+   },
+   "started": "2026-09-25T03:30:07.689+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 645,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000051143-25-000048.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/51143/000005114325000048/0000051143-25-000048.txt\"}, {\"name\": \"ibm-20250723.htm\", \"url\": \"https://ww"
+  }
+ ],
+ "llm_calls": 2,
+ "attempts": 1,
+ "elapsed_s": 1.8,
+ "window": "clean",
+ "screen_score": 0.71,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

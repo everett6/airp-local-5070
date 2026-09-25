@@ -1,0 +1,180 @@
+{
+ "ticker": "KO",
+ "as_of": "2026-04-30T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.9996222978565509,
+ "logprob_mass": 0.999999933360964,
+ "logodds": 7.8810268797668375,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The latest 8-K filing indicates Coca-Cola reported earnings, and the news highlights a positive analyst outlook with a consensus target of $83.67. Additionally, the stock has shown a slight upward trend in the past 20 days, with a return of 3.52%. However, the stock has also experienced recent declines, and short-term stock movements are close to a coin flip. Given the mixed signals and the lack of strong, recent catalysts, the probability of the stock closing higher in the next 20 days is moderate.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/21344/000162828026027723/ko-20260428.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent events that might influence the stock's performance over the next 20 days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "KO",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "KO",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "KO",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for earnings details and any significant announcements that could impact the stock's performance over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/21344/000162828026027723/ko-20260428.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "Coca-Cola Company"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "The recent earnings report and positive analyst outlook suggest a moderate probability of the stock closing higher in the next 20 days.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "KO",
+    "days": 60
+   },
+   "started": "2026-09-25T03:42:32.715+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 397,
+   "error": null,
+   "preview": "{\"ticker\": \"KO\", \"last_date\": \"2026-04-30\", \"last_close\": 77.79, \"ret_1d\": -0.0014, \"ret_5d\": 0.0325, \"ret_20d\": 0.0352, \"ret_60d\": 0.0314, \"vol_20d_annualized\": 0.216, \"closes_last_30\": [74.62, 73.83"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "KO",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:42:32.717+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 1160,
+   "error": null,
+   "preview": "{\"ticker\": \"KO\", \"cik\": 21344, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-04-28\", \"accepted_utc_latest\": \"2026-04-28T16:00:30+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/d"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "KO",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:42:32.716+00:00",
+   "ok": true,
+   "elapsed_ms": 34104,
+   "chars": 2970,
+   "error": null,
+   "preview": "{\"source\": \"yahoo\", \"url\": \"https://finance.yahoo.com/quote/KO/\", \"captured_utc\": \"2026-04-22T15:03:21+00:00\", \"title\": \"The Coca-Cola Company (KO) Stock Price, News, Quote & History - Yahoo Finance\","
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/21344/000162828026027723/ko-20260428.htm"
+   },
+   "started": "2026-09-25T03:43:09.153+00:00",
+   "ok": true,
+   "elapsed_ms": 862,
+   "chars": 525,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001628280-26-027723.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/21344/000162828026027723/0001628280-26-027723.txt\"}, {\"name\": \"a2026q1earningsreleaseex-9.htm\", \"url"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "Coca-Cola Company",
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:43:09.154+00:00",
+   "ok": true,
+   "elapsed_ms": 4123,
+   "chars": 4169,
+   "error": null,
+   "preview": "{\"title\": \"The Coca-Cola Company\", \"revision_time\": \"2026-04-19T08:44:15Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1349880250\", \"text\": \"American multinational beverage corporation\\nCoca-C"
+  }
+ ],
+ "llm_calls": 18,
+ "attempts": 1,
+ "elapsed_s": 51.2,
+ "window": "clean",
+ "screen_score": 0.6975,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

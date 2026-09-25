@@ -1,0 +1,133 @@
+{
+ "ticker": "XOM",
+ "as_of": "2026-05-29T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.0004322218991430943,
+ "logprob_mass": 1.0000000349647948,
+ "logodds": -7.746139130838172,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a slight downward trend over the last 20 days, but recent news mentions energy price spikes and geopolitical tensions, which could influence the stock. These factors may lead to either a positive or negative move, making the probability of a higher close around 55%.",
+ "sources": [
+  "https://www.cnbc.com/quotes/XOM/"
+ ],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price data, news, and SEC filings to assess any recent developments affecting XOM.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "XOM",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "XOM",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "XOM",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "No recent 8-K filings found, but the price history shows a slight downward trend over the last 20 days. News mentions energy price spikes and geopolitical tensions, which could influence the stock. Further analysis is needed.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "XOM",
+    "days": 260
+   },
+   "started": "2026-09-25T03:46:16.620+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 429,
+   "error": null,
+   "preview": "{\"ticker\": \"XOM\", \"last_date\": \"2026-05-29\", \"last_close\": 144.33, \"ret_1d\": -0.0116, \"ret_5d\": -0.0646, \"ret_20d\": -0.0524, \"ret_60d\": -0.0239, \"vol_20d_annualized\": 0.33, \"closes_last_30\": [144.52, "
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "XOM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:46:16.621+00:00",
+   "ok": true,
+   "elapsed_ms": 6,
+   "chars": 138,
+   "error": null,
+   "preview": "{\"ticker\": \"XOM\", \"cik\": 2115436, \"filings\": [], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "XOM",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:46:16.621+00:00",
+   "ok": true,
+   "elapsed_ms": 24839,
+   "chars": 3326,
+   "error": null,
+   "preview": "{\"source\": \"cnbc\", \"url\": \"https://www.cnbc.com/quotes/XOM/\", \"captured_utc\": \"2026-05-07T19:37:53+00:00\", \"title\": \"XOM: Exxon Mobil Corp - Stock Price, Quote and News - CNBC\", \"text\": \"RT Quote | La"
+  }
+ ],
+ "llm_calls": 16,
+ "attempts": 1,
+ "elapsed_s": 39.3,
+ "window": "clean",
+ "screen_score": 0.6875,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

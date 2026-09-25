@@ -117,6 +117,48 @@ The report gives:
 - paper trading vs SPY;
 - how often each tool actually found something.
 
-### Results
+### Scoring (v2)
 
-Pending: the clean-window run is in progress (400 decisions, about 1 minute each).
+The first version (v1) asked "UP or DOWN?" right after the model's own written conclusion. The model repeated
+that conclusion with near-certainty, and the answers were rounded: 43% of scores were at least 0.9999, so most
+top-10 picks were decided by random tie-breaks.
+
+v2 asks the question on the evidence alone: better or worse than the average S&P 500 stock? It keeps the
+unrounded log-odds (`updown_lo` mode). The 400 clean decisions produced 400 distinct scores, with 0% ties.
+
+### Speed
+
+The average decision went from 49 s to 5.5 s:
+
+- **Research 4 stocks at once.** 85% of a decision's time was network wait, so the waits now overlap. The GPU
+  still answers one prompt at a time, so the answers are unchanged.
+- **Fetch each news page's list of archived copies once and cache it.** Previously it was fetched once per page
+  per month, and the Internet Archive allows about 15 requests a minute.
+- **Replay from saved results.** A re-run replays research from the saved tool and LLM results in about 1 s
+  per decision.
+
+### Results: clean window, Feb 2025 – Sep 2026
+
+400 decisions: 20 months × 20 screened stocks. Full numbers: `results/llm_web_v2_report_clean.json`.
+
+| | result |
+|---|---|
+| LLM ranking skill (monthly rank IC vs realised 20-day return) | **−0.070** [95% CI −0.186, +0.041] |
+| Screen's own ranking skill on the same 20 stocks | −0.026 [−0.143, +0.090] |
+| LLM minus screen | −0.044 [−0.236, +0.152] |
+| Paper trading, LLM top 10 | +4.2% (Sharpe 0.24, beta 0.72) |
+| Paper trading, screen top 10 | +7.5% (Sharpe 0.34, beta 0.79) |
+| SPY buy & hold | +30.8% |
+| LLM vs screen, per year | −2.2% [−14.7, +10.6] |
+
+Research coverage:
+
+- 86% of decisions found archived news and 93% found SEC filings; 7% found neither.
+- Tools succeeded 93–100% of the time.
+- The model listed filing documents 622 times but never opened one with `read_filing`. With 2 research rounds,
+  listing the documents used up the last round, so exhibits such as earnings releases were never actually read.
+
+**Verdict: no evidence the internet research helps.** The LLM ranked the 20 candidates slightly *worse* than
+chance and worse than the screen, though neither difference is distinguishable from zero over 19 scored months.
+Both portfolios trailed SPY by a wide margin. The screen favours low-volatility, beaten-down stocks (beta
+about 0.75), which lagged in a strong market.

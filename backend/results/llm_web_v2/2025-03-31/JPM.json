@@ -1,0 +1,228 @@
+{
+ "ticker": "JPM",
+ "as_of": "2025-03-31T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 1.791694807622307e-05,
+ "logprob_mass": 1.0000001157825205,
+ "logodds": -10.929745556059478,
+ "logodds_censored": false,
+ "p_up": 0.55,
+ "answered": true,
+ "reason": "The price history shows a 20-day return of -5.88% and a 60-day return of 2.86%, indicating recent volatility but a slight upward trend over a longer period. There are no significant news events or filings in the recent 8-K filings that would strongly influence the stock price in the next 20 days. Given the lack of strong positive or negative signals, the probability of JPM closing higher is estimated to be around 55%.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/19617/000119312525020070/d876756d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/19617/000119312525013396/d924480d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/19617/000119312525012230/d878108d8k.htm",
+  "https://www.sec.gov/Archives/edgar/data/19617/000001961725000056/jpm-20250121.htm"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Fetch recent price history, news, and SEC filings to assess JPM's recent performance and any relevant events.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "JPM",
+      "days": 60
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "JPM",
+      "window_days": 30
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "JPM",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filings to identify any significant events that may impact JPM's stock price over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000119312525020070/d876756d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000119312525013396/d924480d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000119312525012230/d878108d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961725000056/jpm-20250121.htm"
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Summarize the evidence to estimate the probability of JPM closing higher 20 trading days from now.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "JPM",
+    "days": 60
+   },
+   "started": "2026-09-25T03:24:18.995+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 429,
+   "error": null,
+   "preview": "{\"ticker\": \"JPM\", \"last_date\": \"2025-03-31\", \"last_close\": 238.07, \"ret_1d\": 0.0101, \"ret_5d\": -0.0111, \"ret_20d\": -0.0588, \"ret_60d\": 0.0286, \"vol_20d_annualized\": 0.306, \"closes_last_30\": [271.7, 27"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "JPM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-25T03:24:18.995+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 957,
+   "error": null,
+   "preview": "{\"ticker\": \"JPM\", \"cik\": 19617, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-02-04\", \"accepted_utc_latest\": \"2025-02-05T02:30:10+00:00\", \"items\": \"3.03,5.03,8.01,9.01\", \"url\": \"https://www.sec.gov/Archi"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "JPM",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:24:18.995+00:00",
+   "ok": false,
+   "elapsed_ms": 62099,
+   "chars": 0,
+   "error": "no archived news page for JPM in the 30 days before the decision time (tried marketwatch, cnbc, yahoo)",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/19617/000119312525020070/d876756d8k.htm"
+   },
+   "started": "2026-09-25T03:25:24.820+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 861,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-020070.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/19617/000119312525020070/0001193125-25-020070.txt\"}, {\"name\": \"d876756d8k.htm\", \"url\": \"https://www."
+  },
+  {
+   "id": "2.1",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/19617/000119312525013396/d924480d8k.htm"
+   },
+   "started": "2026-09-25T03:25:24.821+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 497,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-013396.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/19617/000119312525013396/0001193125-25-013396.txt\"}, {\"name\": \"d924480d8k.htm\", \"url\": \"https://www."
+  },
+  {
+   "id": "2.2",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/19617/000119312525012230/d878108d8k.htm"
+   },
+   "started": "2026-09-25T03:25:24.821+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 495,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-25-012230.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/19617/000119312525012230/0001193125-25-012230.txt\"}, {\"name\": \"d878108d8k.htm\", \"url\": \"https://www."
+  },
+  {
+   "id": "2.3",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/19617/000001961725000056/jpm-20250121.htm"
+   },
+   "started": "2026-09-25T03:25:24.821+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 377,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000019617-25-000056.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/19617/000001961725000056/0000019617-25-000056.txt\"}, {\"name\": \"jpm-20250121.htm\", \"url\": \"https://ww"
+  }
+ ],
+ "llm_calls": 17,
+ "attempts": 1,
+ "elapsed_s": 70.7,
+ "window": "clean",
+ "screen_score": 0.7475,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}

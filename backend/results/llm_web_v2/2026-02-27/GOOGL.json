@@ -1,0 +1,182 @@
+{
+ "ticker": "GOOGL",
+ "as_of": "2026-02-27T20:00:00+00:00",
+ "horizon_days": 20,
+ "p_up_logprob": 0.20562562449619148,
+ "logprob_mass": 1.0000001584926779,
+ "logodds": -1.3514976972169985,
+ "logodds_censored": false,
+ "p_up": 0.5,
+ "answered": true,
+ "reason": "The price history shows a negative return over the last 20 days (-7.83%) and mixed performance in the short term. The recent news and SEC filings do not indicate any significant positive developments that would strongly suggest a rise in the stock price over the next 20 days. Therefore, the probability of GOOGL closing higher is estimated to be around 50%, which is close to a coin flip.",
+ "sources": [
+  "https://www.sec.gov/Archives/edgar/data/1652044/000119312526051423/d946885d8k.htm",
+  "https://www.marketwatch.com/investing/stock/googl"
+ ],
+ "rounds": 3,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "Start by gathering recent price history, news, and SEC filings to identify any factors that might influence the stock's movement over the next 20 days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "GOOGL",
+      "days": 365
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "GOOGL",
+      "window_days": 30
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "GOOGL",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Analyze the most recent 8-K filing for any significant news that could impact the stock's performance over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1652044/000119312526051423/d946885d8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "Alphabet Inc.",
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "thought": "Based on the recent price history, news, and SEC filings, there is no strong evidence to suggest that GOOGL will close higher 20 trading days from now. The stock has shown mixed performance in the short term, and the recent news and filings do not indicate a clear upward trend.",
+   "calls": []
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "GOOGL",
+    "days": 260
+   },
+   "started": "2026-09-25T03:33:01.802+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 430,
+   "error": null,
+   "preview": "{\"ticker\": \"GOOGL\", \"last_date\": \"2026-02-27\", \"last_close\": 311.15, \"ret_1d\": 0.0142, \"ret_5d\": -0.0102, \"ret_20d\": -0.0783, \"ret_60d\": -0.0093, \"vol_20d_annualized\": 0.251, \"closes_last_30\": [332.13"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "GOOGL",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-25T03:33:01.803+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 2201,
+   "error": null,
+   "preview": "{\"ticker\": \"GOOGL\", \"cik\": 1652044, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-02-13\", \"accepted_utc_latest\": \"2026-02-14T02:16:46+00:00\", \"items\": \"8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/ed"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "GOOGL",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-25T03:33:01.803+00:00",
+   "ok": true,
+   "elapsed_ms": 1501,
+   "chars": 4285,
+   "error": null,
+   "preview": "{\"source\": \"marketwatch\", \"url\": \"https://www.marketwatch.com/investing/stock/googl\", \"captured_utc\": \"2026-02-06T17:52:31+00:00\", \"title\": \"GOOGL Stock Price | Alphabet Inc. Cl A Stock Quote (U.S.: N"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1652044/000119312526051423/d946885d8k.htm"
+   },
+   "started": "2026-09-25T03:33:05.317+00:00",
+   "ok": true,
+   "elapsed_ms": 477,
+   "chars": 2123,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001193125-26-051423.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1652044/000119312526051423/0001193125-26-051423.txt\"}, {\"name\": \"d946885d8k.htm\", \"url\": \"https://ww"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_search",
+   "args": {
+    "query": "Alphabet Inc.",
+    "limit": 1
+   },
+   "started": "2026-09-25T03:33:05.317+00:00",
+   "ok": true,
+   "elapsed_ms": 674,
+   "chars": 91,
+   "error": null,
+   "preview": "{\"query\": \"Alphabet Inc.\", \"titles\": [\"Alphabet Inc.\"], \"note\": \"read one with wiki_as_of\"}"
+  }
+ ],
+ "llm_calls": 4,
+ "attempts": 1,
+ "elapsed_s": 10.3,
+ "window": "clean",
+ "screen_score": 0.79,
+ "model": "qwen3:8b",
+ "provenance": {
+  "git": {
+   "commit": "dd3743caba51accbf2d8f22b5f696e2aabb8b749",
+   "dirty": true,
+   "dirty_files": [
+    "backend/app/sandbox/agent_worker.py",
+    "backend/app/sandbox/jail.py",
+    "backend/app/sandbox/walkforward.py",
+    "backend/app/tools/asof.py",
+    "backend/scripts/llm_web_backtest.py",
+    "backend/scripts/llm_web_report.py"
+   ]
+  },
+  "data": {
+   "path": "ohlcv_2010_2026_top100.parquet",
+   "sha256": "6e817b850fcd8390835f2b4ffacc0720073945ad8af8ae9638d1e638aca22724"
+  },
+  "model_digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+  "python": "3.14.7",
+  "platform": "Linux-7.0.0-34-generic-x86_64-with-glibc2.43",
+  "gpu": "NVIDIA GeForce RTX 5070, 595.91.07, 12227 MiB"
+ }
+}
