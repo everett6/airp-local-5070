@@ -183,6 +183,7 @@ async def run(args: argparse.Namespace) -> None:
         await asyncio.gather(*(worker() for _ in range(max(1, args.workers))))
     finally:
         await fetcher.aclose()
+        await llm.unload()
 
 
 def main() -> None:

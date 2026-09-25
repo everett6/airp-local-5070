@@ -123,6 +123,7 @@ async def run(args: argparse.Namespace) -> None:
         rate = (time.monotonic() - t0) / n
         print(f"[{n}/{len(todo)}] {d.date()} {t:6s} {rec['decision']:7s} logodds={lo['logodds']:+.2f} "
               f"facts={rec['brief_facts']} {rate:.1f}s/decision eta={(len(todo) - n) * rate / 60:.0f}min", flush=True)
+    await llm.unload()
 
 
 def main() -> None:
