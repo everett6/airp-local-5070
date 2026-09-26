@@ -102,17 +102,9 @@ def crypto_mode(args: argparse.Namespace) -> dict:
             "weeks_with_some_crypto_pct": round(100 * float(on_share), 1), "allocations": log[-8:]}
 
 
-def full_mode(args: argparse.Namespace) -> dict:
-    ev = pd.read_csv(BACKEND / args.events)
-    dec = {json.loads(x)["accession"]: json.loads(x) for x in (BACKEND / args.decide).read_text().splitlines()}
-    stocks = Prices.from_long(pd.read_parquet(BACKEND / args.prices))
-    crypto = Prices.from_long(load_crypto(args.end))
-    opens = stocks.open.join(crypto.open[["BTC-USD", "ETH-USD"]], how="left")
-    closes = stocks.close.join(crypto.close[["BTC-USD", "ETH-USD"]], how="left")
-    days = pd.DatetimeIndex(stocks.open.index)
-    cfg = MasterConfig(crypto_cap=args.crypto_cap)
-    cal = Calibrator(min_rows=args.min_calibration)
-    # every scored event: entry day, 20-day outcome (known 20 trading days after entry), sector ETF
+def book_events(ev: pd.DataFrame, dec_path: str, h: int, stocks: Prices, days: pd.DatetimeIndex) -> list[dict]:
+    """Every scored release of one book: entry day, its h-day outcome vs the sector and when that became known."""
+    dec = {json.loads(x)["accession"]: json.loads(x) for x in (BACKEND / dec_path).read_text().splitlines()}
     evs = []
     for r in ev.itertuples():
         d = dec.get(r.accession)
@@ -121,41 +113,80 @@ def full_mode(args: argparse.Namespace) -> dict:
         i = entry_index(days, datetime.fromisoformat(str(r.accepted_utc))) if d else None
         if d is None or etf is None or i is None or t not in stocks.open.columns:
             continue
-        h = args.horizon
         out = fwd_excess(stocks, t, etf, i, h)
-        evs.append({"i": i, "ticker": t, "sector": r.sector, "logodds": d["logodds"], "out": out,
+        evs.append({"i": i, "ticker": t, "sector": r.sector, "logodds": d["logodds"], "out": out, "h": h,
                     "known_at": days[i + h].date() if i + h < len(days) and out is not None else None})
-    evs.sort(key=lambda e: e["i"])
+    return sorted(evs, key=lambda e: e["i"])
+
+
+def full_mode(args: argparse.Namespace) -> dict:
+    """One or more books (--book decisions.jsonl:horizon, repeatable; default --decide at --horizon). Each book has its
+    own calibrator (fed only outcomes known by the day) and holding period; all share the stock sleeve's caps. A
+    ticker picked by two books is held once, sized by the more confident book."""
+    ev = pd.read_csv(BACKEND / args.events)
+    stocks = Prices.from_long(pd.read_parquet(BACKEND / args.prices))
+    crypto = Prices.from_long(load_crypto(args.end))
+    opens = stocks.open.join(crypto.open[["BTC-USD", "ETH-USD"]], how="left")
+    closes = stocks.close.join(crypto.close[["BTC-USD", "ETH-USD"]], how="left")
+    days = pd.DatetimeIndex(stocks.open.index)
+    cfg = MasterConfig(crypto_cap=args.crypto_cap)
+    specs = [(b.rsplit(":", 1)[0], int(b.rsplit(":", 1)[1])) for b in args.book] or [(args.decide, args.horizon)]
+    books = [{"name": f"{Path(pth).stem}@{h}d", "evs": book_events(ev, pth, h, stocks, days), "h": h,
+              "cal": Calibrator(min_rows=args.min_calibration), "k": 0, "ps": []} for pth, h in specs]
     targets: dict[date, dict[str, float]] = {}
-    held: dict[str, dict] = {}
-    k = 0
+    base_t: dict[date, dict[str, float]] = {}
+    held: dict[tuple[str, str], dict] = {}
     start_i = days.searchsorted(pd.Timestamp(args.start))
     for i in range(start_i, len(days) - 1):
         d = days[i].date()
-        for e in evs:  # outcomes that became known today feed the calibrator (never earlier)
-            if e["known_at"] == d:
-                cal.add(d, e["logodds"], e["out"] > 0)
-        # a release whose first tradable open is tomorrow's joins the targets set tonight; those targets are traded at
-        # tomorrow's open, which is after the release (entry_index), and everything else here uses closes up to today
-        while k < len(evs) and evs[k]["i"] <= i + 1:
-            e = evs[k]
-            k += 1
-            if e["i"] != i + 1:
-                continue
-            p = cal.prob(e["logodds"], d)
-            c = stocks.close[e["ticker"]].iloc[max(0, i - 60):i + 1].pct_change().std() * math.sqrt(252)
-            if p is not None and not np.isnan(c):
-                held[e["ticker"]] = {"cand": Candidate(e["ticker"], p, float(c), e["sector"], "bonsai"),
-                                     "until": days[min(len(days) - 1, i + args.horizon + 1)].date()}
-        held = {t: h for t, h in held.items() if h["until"] > d}
-        a = allocate([h["cand"] for h in held.values()], crypto_state(closes, days[i], cfg.crypto_assets), cfg)
-        targets[d] = a.weights
+        for b in books:
+            for e in b["evs"]:  # outcomes that became known today feed that book's calibrator (never earlier)
+                if e["known_at"] == d:
+                    b["cal"].add(d, e["logodds"], e["out"] > 0)
+            # a release whose first tradable open is tomorrow's joins the targets set tonight; those are traded at
+            # tomorrow's open, which is after the release (entry_index); everything else uses closes up to today
+            while b["k"] < len(b["evs"]) and b["evs"][b["k"]]["i"] <= i + 1:
+                e = b["evs"][b["k"]]
+                b["k"] += 1
+                if e["i"] != i + 1:
+                    continue
+                p = b["cal"].prob(e["logodds"], d)
+                c = stocks.close[e["ticker"]].iloc[max(0, i - 60):i + 1].pct_change().std() * math.sqrt(252)
+                if p is None or np.isnan(c):
+                    continue
+                weight = None
+                if args.sizing == "top5th":
+                    # the rank rule the signal tests use: top fifth of this book's calibrated p over the previous 90
+                    # days (earlier releases only), equal weight
+                    recent = [q for dd, q in b["ps"] if (d - dd).days <= 90]
+                    b["ps"].append((d, p))
+                    if len(recent) < 30 or p < float(np.quantile(recent, 0.8)):
+                        continue
+                    weight = args.pick_weight
+                held[(e["ticker"], b["name"])] = {
+                    "cand": Candidate(e["ticker"], p, float(c), e["sector"], b["name"],
+                                      base=b["cal"].base_rate(d), weight=weight),
+                    "until": days[min(len(days) - 1, i + b["h"] + 1)].date()}
+        held = {k: v for k, v in held.items() if v["until"] > d}
+        best: dict[str, Candidate] = {}
+        for v in held.values():
+            c0 = v["cand"]
+            if c0.asset not in best or c0.p > best[c0.asset].p:
+                best[c0.asset] = c0
+        st = crypto_state(closes, days[i], cfg.crypto_assets)
+        targets[d] = allocate(list(best.values()), st, cfg).weights
+        base_t[d] = allocate([], st, cfg).weights
     s0, s1 = days[start_i].date(), days[-1].date()
-    master = simulate_weights(targets, opens, closes, s0, s1)
-    spy = simulate_weights({s0: {"SPY": 0.98}}, opens, closes, s0, s1)
-    return {"mode": "full", "window": [s0.isoformat(), s1.isoformat()], "events_scored": len(evs),
-            "results": [stats(master, "master portfolio"), stats(spy, "SPY")],
-            "yearly": {"master": yearly(master), "SPY": yearly(spy)}}
+    master = simulate_weights(targets, opens, closes, s0, s1, cost_bps=args.cost_bps)
+    base = simulate_weights(base_t, opens, closes, s0, s1, cost_bps=args.cost_bps)
+    spy = simulate_weights({s0: {"SPY": 0.98}}, opens, closes, s0, s1, cost_bps=args.cost_bps)
+    stock_days = sum(any(a not in ("SPY", "BTC-USD", "ETH-USD") for a in w) for w in targets.values())
+    return {"mode": "full", "window": [s0.isoformat(), s1.isoformat()], "books": [b["name"] for b in books],
+            "sizing": args.sizing, "days_holding_stocks_pct": round(100 * stock_days / max(1, len(targets)), 1),
+            "events_scored": sum(len(b["evs"]) for b in books), "cost_bps": args.cost_bps,
+            "results": [stats(master, "master portfolio"), stats(base, "SPY + crypto sleeve (no stocks)"),
+                        stats(spy, "SPY")],
+            "yearly": {"master": yearly(master), "SPY + crypto": yearly(base), "SPY": yearly(spy)}}
 
 
 def main() -> None:
@@ -169,11 +200,17 @@ def main() -> None:
     ap.add_argument("--decide", default="results/events/decide_bonsai-27b_latest.jsonl")
     ap.add_argument("--min-calibration", type=int, default=300)
     ap.add_argument("--horizon", type=int, default=20, help="holding period and outcome in trading days (5/20/120)")
+    ap.add_argument("--book", action="append", default=[], help="decisions.jsonl:horizon, repeatable (three books)")
+    ap.add_argument("--cost-bps", type=float, default=5.0, help="per-trade cost + slippage in basis points")
+    ap.add_argument("--sizing", choices=("kelly", "top5th"), default="kelly",
+                    help="kelly: quarter Kelly on the edge over the base rate; top5th: equal-weight top fifth")
+    ap.add_argument("--pick-weight", type=float, default=0.025, help="per-pick weight for --sizing top5th")
     ap.add_argument("--tag", default="", help="suffix for results/master_full<tag>.json")
     args = ap.parse_args()
     out = crypto_mode(args) if args.mode == "crypto" else full_mode(args)
     (BACKEND / "results" / f"master_{args.mode}{args.tag}.json").write_text(json.dumps(out, indent=1, default=str) + "\n")
-    print(f"{out['mode']}: {out['window'][0]} -> {out['window'][1]}")
+    print(f"{out['mode']}: {out['window'][0]} -> {out['window'][1]}"
+          + (f"  sizing={out['sizing']}, days holding stocks {out['days_holding_stocks_pct']}%" if "sizing" in out else ""))
     print(f"{'portfolio':42s} {'total':>8s} {'CAGR':>7s} {'vol':>6s} {'Sharpe':>6s} {'maxDD':>6s}")
     for r in out["results"]:
         print(f"{r['name']:42s} {r['total_return_pct']:>7.1f}% {r['cagr_pct']:>6.2f}% {r['vol_pct']:>5.1f}% "

@@ -38,7 +38,7 @@ def test_allocate_respects_caps_threshold_and_core():
     cands += [Candidate("W", 0.52, 0.2, sector="Energy"), Candidate("V", 0.9, 0.3, sector="Energy")]
     a = allocate(cands, {"BTC-USD": {"on": 1.0, "vol": 0.6}, "ETH-USD": {"on": 0.0, "vol": 0.8}}, cfg)
     w = a.weights
-    assert "W" not in w and "below" in a.dropped["W"]
+    assert "W" not in w and "base rate" in a.dropped["W"]
     assert all(w[f"S{i}"] <= cfg.name_cap + 1e-12 for i in range(10))
     assert sum(w[f"S{i}"] for i in range(10)) <= cfg.sector_cap + 1e-9
     assert w["BTC-USD"] == pytest.approx(cfg.crypto_cap) and "ETH-USD" not in w
@@ -67,3 +67,20 @@ def test_weights_trade_at_the_next_open_with_whole_shares_and_fractional_crypto(
     log = sim.weights_log[0]
     assert log["day"] == days[1].date().isoformat()  # decided day 0, traded day 1
     assert sim.trades == 2 and sim.equity[-1] == pytest.approx(100_000 * (1 + 0.8 * 0.001), rel=1e-3)
+
+
+def test_edge_is_measured_against_the_base_rate_and_fixed_weights_skip_kelly():
+    cfg = MasterConfig()
+    low_base = [Candidate("A", 0.53, 0.2, sector="Tech", base=0.47), Candidate("B", 0.53, 0.2, sector="Tech")]
+    w = allocate(low_base, {}, cfg).weights
+    assert "A" in w and "B" not in w  # 0.53 is 6 points above a 0.47 base rate, but only 3 above 0.5
+    fixed = allocate([Candidate("C", 0.60, 0.9, sector="Energy", weight=0.025)], {}, cfg).weights
+    assert fixed["C"] == pytest.approx(0.025)  # a volatile pick keeps its fixed size
+
+
+def test_calibrator_base_rate_uses_only_known_outcomes():
+    cal = Calibrator()
+    cal.add(date(2025, 1, 10), 0.0, True)
+    cal.add(date(2025, 3, 10), 0.0, False)
+    assert cal.base_rate(date(2025, 1, 1)) == 0.5 and cal.base_rate(date(2025, 2, 1)) == 1.0
+    assert cal.base_rate(date(2025, 4, 1)) == 0.5

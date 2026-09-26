@@ -37,7 +37,10 @@ class MasterConfig:
     satellite_cap: float = 0.60       # at most this share in individual stock picks
     name_cap: float = 0.05            # per stock
     sector_cap: float = 0.25          # per sector, stock picks only
-    p_min: float = 0.55               # calibrated P(beats benchmark) needed to buy
+    p_min: float = 0.55               # calibrated P(beats benchmark) needed to buy, when the base rate is 0.5
+    # edge rule: a candidate needs p - base >= p_min - 0.5, where base is the share of past candidates that beat their
+    # benchmark (their outcomes known by the day). Stocks trail their sector ETF slightly more often than not
+    # (base ~0.47 in 2024-26), so a fixed 0.55 kept almost every pick out (0.4% qualified).
     kelly_fraction: float = 0.25      # quarter Kelly
     edge_scale: float = 0.05          # typical excess return of a winner over the holding period
     cash_buffer: float = 0.02
@@ -68,6 +71,11 @@ class Calibrator:
             w = fit_logistic_newton_np([[(s - mu) / sd] for s, _ in past], [y for _, y in past], l2=0.01)
             self._w = (float(w[0]) - float(w[1]) * mu / sd, float(w[1]) / sd)
         self._fit_on = asof
+
+    def base_rate(self, asof: date) -> float:
+        """Share of candidates with outcomes known by `asof` that beat their benchmark (0.5 before any)."""
+        ys = [y for k, _, y in self.rows if k <= asof]
+        return sum(ys) / len(ys) if ys else 0.5
 
     def prob(self, score: float, asof: date) -> float | None:
         """None until enough outcomes are known: then the candidate is simply not bought."""
@@ -102,6 +110,8 @@ class Candidate:
     sector: str = ""
     source: str = ""
     until: date | None = None   # event positions are held until this day
+    base: float = 0.5           # the probability a candidate needs to beat (the book's known base rate)
+    weight: float | None = None  # a fixed weight instead of Kelly sizing
 
 
 @dataclass
@@ -118,10 +128,14 @@ def allocate(stock_cands: list[Candidate], crypto: dict[str, dict[str, float]], 
     # stock satellites: fractional Kelly on the calibrated edge, then caps
     raw: dict[str, float] = {}
     for c in stock_cands:
-        if c.p < cfg.p_min:
-            alloc.dropped[c.asset] = f"p={c.p:.2f} below {cfg.p_min}"
+        if c.weight is not None:  # fixed-size picks: the book's own rank rule already chose them; no Kelly
+            raw[c.asset] = min(cfg.name_cap, c.weight)
+            alloc.reasons[c.asset] = f"{c.source}: p={c.p:.2f}, fixed weight {c.weight:.3f}"
             continue
-        k = cfg.kelly_fraction * (2 * c.p - 1) * cfg.edge_scale / max(c.vol, 0.05) ** 2
+        if c.p - c.base < cfg.p_min - 0.5:
+            alloc.dropped[c.asset] = f"p={c.p:.2f} is less than {cfg.p_min - 0.5:.2f} above the base rate {c.base:.2f}"
+            continue
+        k = cfg.kelly_fraction * 2 * (c.p - c.base) * cfg.edge_scale / max(c.vol, 0.05) ** 2
         raw[c.asset] = min(cfg.name_cap, max(0.0, k))
         alloc.reasons[c.asset] = f"{c.source}: p={c.p:.2f}, vol={c.vol:.0%}, kelly={k:.3f}"
     by_sector: dict[str, float] = {}
