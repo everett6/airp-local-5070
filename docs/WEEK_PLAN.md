@@ -92,3 +92,39 @@ Bonsai decided each book twice on the same releases (results/events/horizons_eva
 **Plan changes for the rest of the week:** Block 2 drops web research and instead tests the fact-sheet Bonsai quick
 and mid books on all 1,995 2024 releases (fact sheets only, ~1 h GPU instead of ~15 h); the long book is tested as a
 contrarian signal (pre-registered: BUY log-odds IC < 0 in 2024). Blocks 3-6 unchanged.
+
+## Block 2 result (2026-09-26): 2024, fact-sheet books only (1,983 releases)
+
+| Book | 2025-26 (found) | 2024 | Pre-registered rule | Verdict |
+|---|---|---|---|---|
+| Quick money (5 d) | +0.107 [+0.040, +0.179] | +0.024 [-0.028, +0.074] | IC > 0 | passes (weakly; ~1/4 the size, not significant) |
+| Mid term (20 d) | +0.091 [+0.016, +0.168] | +0.020 [-0.053, +0.079] | IC > 0 | passes (weakly; not significant) |
+| Long term (120 d) | -0.082 | +0.050 [-0.022, +0.114] | IC < 0 (contrarian) | **fails**: the sign flipped |
+
+## Block 3 result (2026-09-26): three-book portfolio fails; the quick-money book alone is the lead
+
+Combined score per book (walk-forward logistic of EPS change, Bonsai, momentum, guidance), 2024-03 to 2026-08:
+quick +0.073 [+0.035, +0.119] (2,684 releases), mid +0.033 [-0.032, +0.097], long -0.006 [-0.076, +0.062].
+
+Master portfolio, 2024-03-01 to 2026-09-24, 10 bps per trade (`scripts/block3_run.sh`, results/master_full_*):
+
+| Portfolio | CAGR | Sharpe | Max DD |
+|---|---|---|---|
+| SPY + crypto sleeve, no stocks | 20.40% | 1.18 | 21.1% |
+| Three books, quarter Kelly | 20.06% | 1.17 | 20.9% |
+| Three books, equal-weight top fifth | 17.10% | 1.04 | 23.9% |
+| **Quick-money book alone, equal-weight top fifth** | **22.46%** | **1.29** | 21.7% |
+| Same, Bonsai scores shuffled at random (50 seeds) | mean 18.85% | mean 1.12 | |
+| SPY | 18.14% | 1.16 | 18.4% |
+
+- Pre-registered rule (three books: Sharpe above SPY + crypto sleeve, positive in 2025 and 2026): **fails**.
+- The quick-money book alone beat all 50 random shuffles of its own scores (p = 0.02, `scripts/shuffle_control.py`,
+  results/shuffle_control_decide_combined_h5.json). Random picks lose ~1.5 points a year against no stocks; Bonsai's
+  picks gain ~2.
+- Caveats: this test was chosen after the three-book test failed (with three books looked at, p ~ 0.06 after that
+  correction); one 2.5-year path; the 2024 part of Bonsai's scores is inside its training data. It is a lead for a
+  forward test, not a result.
+
+**Next (Block 4, Monday):** forward paper test of the quick-money book alone (weekly, by hand: new releases -> reader
+-> fact sheet -> Bonsai 5-day -> combined score -> top fifth -> fills at the next open), next to the allocator.
+Pre-registered gate after 12 weeks: the book's return beats the same-period shuffle median and the no-stock allocator.
