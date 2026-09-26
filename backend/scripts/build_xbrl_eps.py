@@ -149,7 +149,8 @@ async def build_facts() -> None:
             if eps:
                 break
         rev: dict[str, dict[str, Any]] = {}
-        for tag in REV_TAGS:  # a company may switch tags (ASC 606 in 2018): merge, first-reported wins
+        for tag in REV_TAGS:  # a company may switch tags (ASC 606 in 2018): merge; for a quarter
+                # reported under two tags, the first tag in REV_TAGS wins
             for k, v in facts_for(await concept(sec, cik, tag, "USD"))[0].items():
                 rev.setdefault(k, v)
         rows = []

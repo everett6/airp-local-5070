@@ -36,3 +36,13 @@ def test_second_run_fills_at_the_first_open_after_the_decision_date():
     assert fill["asset"] == "SPY" and fill["price"] == opens.loc["2026-09-28", "SPY"]
     assert books["SPY"].pending is None                    # bought once, then held
     assert books["master"].pending is not None             # re-decided each run
+
+
+def test_a_missing_close_does_not_drop_a_position_from_equity():
+    opens, closes = frames(end="2026-10-02")
+    books = new_books()
+    step(books, opens[opens.index <= "2026-09-25"], closes[closes.index <= "2026-09-25"],
+         datetime(2026, 9, 25, 15, 0, tzinfo=UTC), MasterConfig())
+    closes.loc["2026-10-01", "SPY"] = np.nan  # the latest bar is missing for SPY
+    rec = step(books, opens, closes, datetime(2026, 10, 2, 15, 0, tzinfo=UTC), MasterConfig())
+    assert rec["books"]["SPY"]["equity"] > 90_000  # still counted, at the previous close

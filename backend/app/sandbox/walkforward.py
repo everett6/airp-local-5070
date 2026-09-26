@@ -75,16 +75,37 @@ LOOKBACK = 120
 
 
 def _as_actions(text: str) -> str:
-    """Tool calls written as {"name", "arguments"} (one, or a list) become the agent's {"actions": [...]}."""
-    try:
-        obj = json.loads(text)
-    except ValueError:
-        return text
-    calls = obj if isinstance(obj, list) else [obj] if isinstance(obj, dict) and "name" in obj else []
-    if calls and all(isinstance(c, dict) and "name" in c for c in calls):
+    """Tool calls written as {"name", "arguments"} objects (one, a list, or several in a row, possibly inside prose)
+    become the agent's {"actions": [...]}; a reply that already has "actions" or "final" is passed through."""
+    dec = json.JSONDecoder()
+    found: list[Any] = []
+    i = text.find("{") if "{" in text else text.find("[")
+    while 0 <= i < len(text):
+        try:
+            obj, end = dec.raw_decode(text, i)
+        except ValueError:
+            nxt = [j for j in (text.find("{", i + 1), text.find("[", i + 1)) if j >= 0]
+            i = min(nxt) if nxt else -1
+            continue
+        found += obj if isinstance(obj, list) else [obj]
+        nxt = [j for j in (text.find("{", end), text.find("[", end)) if j >= 0]
+        i = min(nxt) if nxt else -1
+    for o in found:
+        if isinstance(o, dict) and ("actions" in o or "final" in o):
+            return json.dumps(o)
+    calls = [o for o in found if isinstance(o, dict) and "name" in o]
+    if calls:
         return json.dumps({"thought": "", "actions": [
             {"tool": str(c["name"]), "args": c.get("arguments") or c.get("args") or {}} for c in calls]})
     return text
+
+
+def _is_agent_reply(text: str) -> bool:
+    try:
+        obj = json.loads(text)
+    except ValueError:
+        return False
+    return isinstance(obj, dict) and ("actions" in obj or "final" in obj)
 
 
 class OllamaLLM:
@@ -135,7 +156,7 @@ class OllamaLLM:
         """One research round in the model's own tool-call format. Jan-v1 sometimes plans a call in its thinking and
         then emits nothing: retry warmer, then fall back to plain JSON (accepting its {"name", "arguments"} style)."""
         data: dict[str, Any] = {}
-        for temp in (0.0, 0.4, 0.8):
+        for temp in (0.0, 0.7):
             body["options"]["temperature"] = temp
             r = await self._client.post(f"{self.base_url}/api/chat", json=body)
             r.raise_for_status()
@@ -145,8 +166,8 @@ class OllamaLLM:
                 return data, json.dumps({"thought": (m.get("content") or "").strip()[:300], "actions": [
                     {"tool": c["function"]["name"], "args": c["function"].get("arguments") or {}}
                     for c in m["tool_calls"]]})
-            if (m.get("content") or "").strip():
-                return data, _as_actions(m["content"])
+            if _is_agent_reply(t := _as_actions(m.get("content") or "")):
+                return data, t  # prose without a call falls through to a retry, then to plain JSON
         fb = {k: v for k, v in body.items() if k != "tools"} | {"think": False, "format": "json"}
         fb["options"] = {**body["options"], "temperature": 0, "num_predict": self.num_predict}
         r = await self._client.post(f"{self.base_url}/api/chat", json=fb)
@@ -158,7 +179,7 @@ class OllamaLLM:
         ctx = "" if self.num_ctx == 4096 else f"\0ctx={self.num_ctx}"  # keeps existing cache keys valid
         ctx += f"\0mode={mode}" if mode else ""
         native = self._use_native_tools(system, user, mode)
-        ctx += "\0native_tools_v3" if native else ""  # v3: thinking, retries, JSON fallback
+        ctx += "\0native_tools_v5" if native else ""  # v5: calls pulled from prose; retry when none
         key = hashlib.sha256(f"{self.model}\0{system}\0{user}{ctx}".encode()).hexdigest()
         if self.use_cache and key in self._cache:
             self.cache_hits += 1
@@ -179,7 +200,7 @@ class OllamaLLM:
             del body["format"]
             body["tools"] = self.native_tools
             body["think"] = True
-            body["options"]["num_predict"] = max(self.num_predict, 2048)
+            body["options"]["num_predict"] = 1024  # its thinking is 200-800 tokens before a call
             body["messages"][0]["content"] += ("\n\nCall the tools directly with your tool-call format (several at "
                                                "once is fine). When you have enough evidence, reply with the final "
                                                "JSON object only.")

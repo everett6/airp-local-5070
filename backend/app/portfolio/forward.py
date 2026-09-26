@@ -46,6 +46,8 @@ def execute(book: Book, opens: pd.Series, cost_bps: float = 5.0) -> dict[str, An
     assert book.pending is not None
     s = cost_bps / 1e4
     px = {a: float(v) for a, v in opens.items() if pd.notna(v)}
+    if any(a not in px for a in book.positions):  # can't value the book at this open: wait for the next run
+        return {"fills": [], "skipped": "no open price for a held asset; orders stay pending"}
     equity = book.cash + sum(q * px[a] for a, q in book.positions.items())
     want = {a: (equity * w / (px[a] * (1 + s))) for a, w in book.pending.items() if a in px}
     want = {a: (q if a in FRACTIONAL else math.floor(q)) for a, q in want.items()}
@@ -90,8 +92,8 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
     """One forward run. `opens`/`closes` are on the SPY trading calendar; bars dated on or after today's UTC date
     are dropped (possibly incomplete)."""
     today = now_utc.date()
-    opens = opens[opens.index.date < today]
-    closes = closes[closes.index.date < today]
+    opens = opens[pd.DatetimeIndex(opens.index).date < today]
+    closes = closes[pd.DatetimeIndex(closes.index).date < today]
     days = pd.DatetimeIndex(closes.index)
     last = days[-1]
     rec: dict[str, Any] = {"run_at_utc": now_utc.isoformat(timespec="seconds"),
@@ -102,11 +104,12 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
             fd = fill_day(days, b.decided_at)
             if fd is not None:
                 r["filled_on"] = fd.date().isoformat()
-                r.update(execute(b, opens.loc[fd]))
+                r.update(execute(b, pd.Series(opens.loc[fd])))
             else:
                 r["waiting_for_open_after"] = datetime.fromisoformat(b.decided_at).date().isoformat()
-        px = closes.loc[last]
-        r["equity"] = round(b.cash + sum(q * float(px[a]) for a, q in b.positions.items() if pd.notna(px[a])), 2)
+        # each position at its last known close (a missing bar must not drop the position from equity)
+        px = {a: float(closes[a].loc[:last].dropna().iloc[-1]) for a in b.positions}
+        r["equity"] = round(b.cash + sum(q * px[a] for a, q in b.positions.items()), 2)
         r["positions"] = {a: round(q, 6) for a, q in b.positions.items()}
         if b.pending is None:
             t, info = targets(name, closes, last, cfg, b.positions)

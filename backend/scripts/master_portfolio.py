@@ -6,8 +6,8 @@
 
 crypto  weekly: the crypto sub-agent's trend state for BTC and ETH -> master allocation (crypto <= 20%, rest SPY).
         Benchmarks: SPY, a fixed 80/20 SPY/BTC mix rebalanced weekly, BTC buy-and-hold.
-full    daily: new earnings-event BUYs (Bonsai log-odds, calibrated on events whose 20-day outcome was already known)
-        become 20-day positions sized by the master agent, plus the crypto sleeve, plus the SPY core.
+full    daily: new earnings-event BUYs (Bonsai log-odds, calibrated on events whose --horizon outcome was already known)
+        become --horizon-day positions (5 quick money, 20 mid term, 120 long term) sized by the master agent, plus the crypto sleeve, plus the SPY core.
 Crypto trades only on US trading days here (weekend moves show up at Monday's price). Writes
 results/master_<mode>.json.
 """
@@ -121,9 +121,10 @@ def full_mode(args: argparse.Namespace) -> dict:
         i = entry_index(days, datetime.fromisoformat(str(r.accepted_utc))) if d else None
         if d is None or etf is None or i is None or t not in stocks.open.columns:
             continue
-        out = fwd_excess(stocks, t, etf, i, 20)
+        h = args.horizon
+        out = fwd_excess(stocks, t, etf, i, h)
         evs.append({"i": i, "ticker": t, "sector": r.sector, "logodds": d["logodds"], "out": out,
-                    "known_at": days[i + 20].date() if i + 20 < len(days) and out is not None else None})
+                    "known_at": days[i + h].date() if i + h < len(days) and out is not None else None})
     evs.sort(key=lambda e: e["i"])
     targets: dict[date, dict[str, float]] = {}
     held: dict[str, dict] = {}
@@ -145,7 +146,7 @@ def full_mode(args: argparse.Namespace) -> dict:
             c = stocks.close[e["ticker"]].iloc[max(0, i - 60):i + 1].pct_change().std() * math.sqrt(252)
             if p is not None and not np.isnan(c):
                 held[e["ticker"]] = {"cand": Candidate(e["ticker"], p, float(c), e["sector"], "bonsai"),
-                                     "until": days[min(len(days) - 1, i + 21)].date()}
+                                     "until": days[min(len(days) - 1, i + args.horizon + 1)].date()}
         held = {t: h for t, h in held.items() if h["until"] > d}
         a = allocate([h["cand"] for h in held.values()], crypto_state(closes, days[i], cfg.crypto_assets), cfg)
         targets[d] = a.weights
@@ -167,9 +168,11 @@ def main() -> None:
     ap.add_argument("--prices", default="data/events/ohlcv_2023-01-01_2026-09-25.parquet")
     ap.add_argument("--decide", default="results/events/decide_bonsai-27b_latest.jsonl")
     ap.add_argument("--min-calibration", type=int, default=300)
+    ap.add_argument("--horizon", type=int, default=20, help="holding period and outcome in trading days (5/20/120)")
+    ap.add_argument("--tag", default="", help="suffix for results/master_full<tag>.json")
     args = ap.parse_args()
     out = crypto_mode(args) if args.mode == "crypto" else full_mode(args)
-    (BACKEND / "results" / f"master_{args.mode}.json").write_text(json.dumps(out, indent=1, default=str) + "\n")
+    (BACKEND / "results" / f"master_{args.mode}{args.tag}.json").write_text(json.dumps(out, indent=1, default=str) + "\n")
     print(f"{out['mode']}: {out['window'][0]} -> {out['window'][1]}")
     print(f"{'portfolio':42s} {'total':>8s} {'CAGR':>7s} {'vol':>6s} {'Sharpe':>6s} {'maxDD':>6s}")
     for r in out["results"]:

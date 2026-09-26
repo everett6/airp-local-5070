@@ -561,8 +561,22 @@ def run_research(msg: dict[str, Any]) -> dict[str, Any]:
     steps: list[dict[str, Any]] = []
     parse_failures = 0
     final: dict[str, Any] | None = None
+    if msg.get("prefetch"):
+        # the standard first look (prices, filings, the release itself, background, news), fetched in parallel by
+        # code: the model's rounds then go to follow-ups instead of one routine lookup per round
+        reqs0: list[dict[str, Any]] = [{"id": f"0.{i}", "tool": str(p.get("tool", ""))[:40],
+                                        "args": p.get("args") if isinstance(p.get("args"), dict) else {}}
+                                       for i, p in enumerate(msg["prefetch"]) if isinstance(p, dict)][:max_calls + 2]
+        _send({"tool_requests": reqs0})
+        got0 = _recv()["tool_responses"]
+        steps.append({"round": 0, "thought": "standard evidence gathered before the first round", "observations": [
+            {"tool": r["tool"], "args": r["args"], "ok": bool(got0.get(r["id"], {}).get("ok")),
+             "result": str(got0.get(r["id"], {}).get("result", "")),
+             "error": str(got0.get(r["id"], {}).get("error", "no response"))} for r in reqs0]})
     for rnd in range(1, max_rounds + 2):
         last = rnd > max_rounds
+        if last and msg.get("skip_final"):
+            break  # the caller only needs the evidence (and the brief), not a verbal probability
         user = (f"Research so far:\n{_render_history(steps, history_budget)}" if steps else "No research yet.")
         if last:
             user += "\n\nYou have used all tool rounds. Reply now with the final JSON object."

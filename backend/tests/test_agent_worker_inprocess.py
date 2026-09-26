@@ -182,3 +182,17 @@ def test_salvage_facts_keeps_completed_facts_from_a_cut_off_reply():
     out = aw.salvage_facts(cut)
     assert [f["text"] for f in out["facts"]] == ["A", "B"] and out["truncated"]
     assert aw.salvage_facts('{"facts": []}') == {"facts": []} and aw.salvage_facts("nothing") is None
+
+
+def test_prefetch_runs_before_any_llm_round_and_skip_final_stops_after_the_rounds(pipe):
+    replies = iter([json.dumps({"thought": "t", "actions": [{"tool": "read_filing", "args": {"url": "u"}}]}),
+                    json.dumps({"actions": [{"tool": "wiki_as_of", "args": {"title": "X"}}]})])
+    p = pipe(lambda r: next(replies), lambda r: {"ok": True, "result": f"result of {r['tool']}"})
+    out = aw.run_research({"subject": {"ticker": "X", "as_of": "now"}, "tools": [], "max_rounds": 2,
+                           "skip_final": True, "prefetch": [{"tool": "price_history_as_of", "args": {"ticker": "X"}},
+                                                            {"tool": "news_as_of", "args": {"ticker": "X"}}]})
+    assert "tool_requests" in p.sent[0]  # code's first look happens before the model is asked anything
+    assert [r["tool"] for r in p.sent[0]["tool_requests"]] == ["price_history_as_of", "news_as_of"]
+    assert out["steps"][0]["round"] == 0 and len(out["steps"]) == 3
+    assert sum("llm_requests" in s for s in p.sent) == 2  # two research rounds, no forced final round
+    assert not out["answered"]
