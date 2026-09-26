@@ -332,6 +332,7 @@ class ToolGateway:
     brave_api_key: str = ""
     max_calls_per_batch: int = 8
     max_result_chars: int = 6000
+    timeout_cap_s: float | None = None  # caps every tool's own timeout (bulk runs: a slow archive is skipped)
     allow_unjailed_python: bool = False
     python_timeout_s: float = 10.0
     on_event: Callable[[dict[str, Any]], None] | None = None
@@ -369,6 +370,18 @@ class ToolGateway:
 
     def specs_for_prompt(self) -> list[dict[str, Any]]:
         return [s.for_prompt() for s in self.available()]
+
+    def specs_native(self) -> list[dict[str, Any]]:
+        """The same tools as JSON-schema function definitions, for models with native tool calling."""
+        kind: dict[str, dict[str, Any]] = {"str": {"type": "string"}, "int": {"type": "integer"},
+                "list[str]": {"type": "array", "items": {"type": "string"}}}
+        return [{"type": "function", "function": {
+            "name": s.name, "description": s.description,
+            "parameters": {"type": "object",
+                           "properties": {k: {**kind[p.type], "description": p.description}
+                                          for k, p in s.params.items()},
+                           "required": [k for k, p in s.params.items() if p.required]}}}
+            for s in self.available()]
 
     async def robots_allowed(self, url: str) -> bool:
         parts = urlsplit(url)
@@ -408,7 +421,8 @@ class ToolGateway:
                 out: dict[str, Any] = json.loads(cache.read_text())
                 entry["cached"] = True
             else:
-                result = await asyncio.wait_for(spec.handler(self, args), spec.timeout_s)
+                limit = spec.timeout_s if self.timeout_cap_s is None else min(spec.timeout_s, self.timeout_cap_s)
+                result = await asyncio.wait_for(spec.handler(self, args), limit)
                 text = json.dumps(result, ensure_ascii=False, default=str)
                 if len(text) > self.max_result_chars:
                     text = text[: self.max_result_chars] + "…(truncated)"

@@ -4,7 +4,7 @@ research table, then Bonsai decides with it.
     python scripts/research_events.py --features results/events/features_sp500_2025.csv --limit 400
     python scripts/decide_events.py --features results/events/features_sp500_2025_research.csv --tag research ...
 
-Per release: the jailed qwen3:8b agent gets the as-of internet tools (app/tools/asof.py: SEC filings and the
+Per release: the jailed research agent (default Jan-v1-4B with native tool calls; Bonsai-27B writes the brief) gets the as-of internet tools (app/tools/asof.py: SEC filings and the
 release itself, Wikipedia revisions, archived news pages, price history), all limited to what existed at the SEC
 acceptance time of the release (entry is the next open, so nothing it reads postdates the decision). It writes a
 brief whose facts are checked against the fetched sources (agent_worker.verify_brief); only verified facts are added
@@ -25,6 +25,7 @@ sys.path.insert(0, str(BACKEND))
 
 import pandas as pd
 
+from app.sandbox.agent_worker import BRIEF_SYSTEM
 from app.sandbox.events import Prices
 from app.sandbox.gpu_lock import gpu_job
 from app.sandbox.jail import AgentJail, JailError, JailLimits
@@ -32,7 +33,20 @@ from app.sandbox.walkforward import OllamaLLM
 from app.tools.gateway import ToolGateway
 from app.tools.netguard import SafeFetcher
 
-OUT = BACKEND / "results" / "events_research"
+OUT = BACKEND / "results" / "events_research"  # + "_<model>"
+
+
+class Router:
+    """Research rounds go to the tool-using model (Jan); the brief (summarize + cite, then code-checked) goes to the
+    writer model (Bonsai). Both stay loaded on their own Ollama servers (~10 GB together)."""
+
+    def __init__(self, research: OllamaLLM, writer: OllamaLLM | None) -> None:
+        self.research, self.writer = research, writer
+        self.num_ctx, self.num_predict = research.num_ctx, research.num_predict
+
+    async def __call__(self, system: str, user: str, mode: str | None = None) -> str:
+        llm = self.writer if self.writer is not None and system.startswith(BRIEF_SYSTEM[:60]) else self.research
+        return await (llm(system, user, mode=mode) if mode else llm(system, user))
 WEBCACHE = BACKEND / "results" / "webcache"
 
 
@@ -47,10 +61,10 @@ def lookup_from(p: Prices):
     return fn
 
 
-async def research(r, llm: OllamaLLM, fetcher: SafeFetcher, ua: str, lookup, rounds: int) -> dict:
+async def research(r, llm: Router, fetcher: SafeFetcher, ua: str, lookup, rounds: int) -> dict:
     as_of = datetime.fromisoformat(str(r.accepted_utc)).replace(tzinfo=UTC)
     gw = ToolGateway(mode="as_of", fetcher=fetcher, as_of=as_of, sec_user_agent=ua, price_lookup=lookup,
-                     tool_cache=WEBCACHE, max_result_chars=5000)
+                     tool_cache=WEBCACHE, max_result_chars=5000, timeout_cap_s=25.0)
     t0 = time.monotonic()
     err = ""
     for _ in range(2):
@@ -88,6 +102,8 @@ async def run(args: argparse.Namespace) -> None:
     if args.limit:
         feats = feats.head(args.limit)  # the event files are shuffled with a fixed seed: a random sample
     p = Prices.from_long(pd.read_parquet(BACKEND / args.prices))
+    global OUT
+    OUT = OUT.with_name(OUT.name + "_" + args.model.split("/")[-1].replace(":", "_"))
     OUT.mkdir(parents=True, exist_ok=True)
     llm = OllamaLLM(args.model, base_url=args.base_url, concurrency=args.workers, num_ctx=8192, num_predict=1200,
                     cache=True, require_gpu=True)
@@ -96,6 +112,11 @@ async def run(args: argparse.Namespace) -> None:
         raise SystemExit("set SEC_USER_AGENT in backend/.env")
     fetcher = SafeFetcher(base.fetcher.user_agent, timeout_s=40.0, total_timeout_s=80.0)
     ua = base.sec_user_agent
+    if args.native_tools:
+        llm.native_tools = base.specs_native()
+    writer = (OllamaLLM(args.brief_model, base_url=args.brief_base_url, concurrency=1, num_ctx=8192,
+                        num_predict=1200, cache=True, require_gpu=True) if args.brief_model else None)
+    router = Router(llm, writer)
     await base.aclose()
     lookup = lookup_from(p)
     todo = [r for r in feats.itertuples() if not (OUT / f"{r.accession}.json").exists()]
@@ -109,7 +130,8 @@ async def run(args: argparse.Namespace) -> None:
         nonlocal done
         while not queue.empty():
             r = queue.get_nowait()
-            rec = await research(r, llm, fetcher, ua, lookup, args.rounds)
+            rec = await research(r, router, fetcher, ua, lookup, args.rounds)
+            rec["models"] = {"research": args.model, "brief": args.brief_model or args.model}
             (OUT / f"{r.accession}.json").write_text(json.dumps(rec, indent=1, default=str) + "\n")
             done += 1
             rate = (time.monotonic() - t0) / done
@@ -122,13 +144,15 @@ async def run(args: argparse.Namespace) -> None:
     finally:
         await fetcher.aclose()
         await llm.unload()
+        if writer is not None:
+            await writer.unload()
     rows = []
     for r in feats.itertuples():
         path = OUT / f"{r.accession}.json"
         extra = brief_lines(json.loads(path.read_text())) if path.exists() else []
         rows.append({**r._asdict(), "research_facts": max(0, len(extra) - 1),
                      "fact_sheet": r.fact_sheet + ("\n" + "\n".join(extra) if extra else "")})
-    out = BACKEND / args.features.replace(".csv", "_research.csv")
+    out = BACKEND / args.features.replace(".csv", f"_research_{OUT.name.split('_', 2)[-1]}.csv")
     df = pd.DataFrame(rows).drop(columns=["Index"])
     df.to_csv(out, index=False)
     print(f"{out.name}: {len(df)} releases, {int((df['research_facts'] > 0).sum())} with verified research facts")
@@ -138,8 +162,12 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--features", default="results/events/features_sp500_2025.csv")
     ap.add_argument("--prices", default="data/events/ohlcv_2023-01-01_2026-09-25.parquet")
-    ap.add_argument("--model", default="qwen3:8b")
-    ap.add_argument("--base-url", default="http://127.0.0.1:11437")
+    ap.add_argument("--model", default="hf.co/janhq/Jan-v1-4B-GGUF:Q4_K_M")
+    ap.add_argument("--base-url", default="http://127.0.0.1:11436")
+    ap.add_argument("--native-tools", action=argparse.BooleanOptionalAction, default=True,
+                    help="use the model's own tool-call format (Jan-v1 is trained on it)")
+    ap.add_argument("--brief-model", default="bonsai-27b:latest", help="writes the brief; '' = the research model")
+    ap.add_argument("--brief-base-url", default="http://127.0.0.1:11435")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--rounds", type=int, default=3)
     ap.add_argument("--limit", type=int, default=0)

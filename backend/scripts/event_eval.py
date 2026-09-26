@@ -56,7 +56,8 @@ def build(events: pd.DataFrame, p: Prices) -> pd.DataFrame:
             continue
         row = {"accession": r.accession, "ticker": t, "sector": r.sector, "index": r.index, "scorable": True,
                "entry": days[i].date().isoformat(), "month": days[i].strftime("%Y-%m"),
-               "fwd20": fwd_excess(p, t, etf, i, 20), "fwd60": fwd_excess(p, t, etf, i, 60),
+               "fwd5": fwd_excess(p, t, etf, i, 5), "fwd20": fwd_excess(p, t, etf, i, 20),
+               "fwd60": fwd_excess(p, t, etf, i, 60), "fwd120": fwd_excess(p, t, etf, i, 120),
                "ear": reaction(p, t, etf, i),
                "fwd20_ear": fwd_excess(p, t, etf, i + 1, 20), "fwd60_ear": fwd_excess(p, t, etf, i + 1, 60)}
         c, e = p.close[t], p.close[etf]

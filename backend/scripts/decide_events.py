@@ -39,6 +39,8 @@ SECTOR_ETF = {"Information Technology": "XLK", "Financials": "XLF", "Health Care
 DECIDE_SYSTEM = ("You are a portfolio manager reacting to an earnings release. Buy only stocks you expect to beat "
                  "their sector over the next 20 trading days after this release. Use only the facts given. "
                  "Answer with exactly one word: BUY or PASS.")
+# the three books: quick money (a week), mid term (a month), long term (about six months)
+HORIZONS = {5: "quick", 20: "mid", 120: "long"}
 EXPLAIN_SYSTEM = ("You are a portfolio manager reacting to an earnings release. Using only the facts given, reply "
                   "with ONLY JSON: {\"bull\": [\"...\"], \"bear\": [\"...\"], \"decision\": \"BUY\" or \"PASS\", "
                   "\"reason\": \"1-2 sentences\"}")
@@ -82,7 +84,8 @@ async def run(args: argparse.Namespace) -> None:
     ex = {json.loads(x)["accession"]: json.loads(x) for x in (BACKEND / args.extract).read_text().splitlines()}
     p = Prices.from_long(pd.read_parquet(BACKEND / args.prices))
     days = pd.DatetimeIndex(p.open.index)
-    slug = args.model.replace(":", "_").replace("/", "_") + (f"_{args.tag}" if args.tag else "")
+    slug = (args.model.replace(":", "_").replace("/", "_") + (f"_{args.tag}" if args.tag else "")
+            + ("" if args.horizon == 20 else f"_h{args.horizon}"))
     sheets = (pd.read_csv(BACKEND / args.features).set_index("accession")["fact_sheet"].to_dict()
               if args.features else {})
     out_path = BACKEND / "results" / "events" / f"decide_{slug}.jsonl"
@@ -103,7 +106,8 @@ async def run(args: argparse.Namespace) -> None:
                 if etf is None or i is None or str(r.ticker).replace(".", "-") not in p.close.columns:
                     continue
                 user = sheets[r.accession] if sheets else event_text(r, ex[r.accession], p, i, etf)
-                got = json.loads(await llm(DECIDE_SYSTEM, user, mode="buypass_lo"))
+                system = DECIDE_SYSTEM.replace("next 20 trading days", f"next {args.horizon} trading days")
+                got = json.loads(await llm(system, user, mode="buypass_lo"))
                 lo = float(got["logodds"])
                 # p_buy: the model's own probability of answering BUY rather than PASS (from its token
                 # probabilities). The master agent turns it into a calibrated P(beats sector) using only events
@@ -136,6 +140,8 @@ def main() -> None:
     ap.add_argument("--features", default=None,
                     help="research table from build_features.py: the model reads its fact_sheet column")
     ap.add_argument("--tag", default="", help="suffix for the output file (e.g. xbrl)")
+    ap.add_argument("--horizon", type=int, default=20, choices=sorted(HORIZONS),
+                    help="5 quick money, 20 mid term, 120 long term (trading days to beat the sector)")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--explain", type=int, default=100, help="write a bull/bear case for the first N events")
     args = ap.parse_args()

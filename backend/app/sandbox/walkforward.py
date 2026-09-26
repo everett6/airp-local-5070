@@ -74,6 +74,19 @@ DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 LOOKBACK = 120
 
 
+def _as_actions(text: str) -> str:
+    """Tool calls written as {"name", "arguments"} (one, or a list) become the agent's {"actions": [...]}."""
+    try:
+        obj = json.loads(text)
+    except ValueError:
+        return text
+    calls = obj if isinstance(obj, list) else [obj] if isinstance(obj, dict) and "name" in obj else []
+    if calls and all(isinstance(c, dict) and "name" in c for c in calls):
+        return json.dumps({"thought": "", "actions": [
+            {"tool": str(c["name"]), "args": c.get("arguments") or c.get("args") or {}} for c in calls]})
+    return text
+
+
 class OllamaLLM:
     """Native /api/chat so we can disable qwen3's thinking tokens (5-10x
     faster, and thinking did not change 5-day direction calls in pilots).
@@ -111,9 +124,41 @@ class OllamaLLM:
         self.context_overflows = 0
         self.updown_no_mass = 0
 
+    native_tools: list[dict[str, Any]] | None = None  # set for models trained on native tool calls (Jan-v1)
+
+    def _use_native_tools(self, system: str, user: str, mode: str | None) -> bool:
+        """Research rounds only (their prompt asks for "actions"); not the forced final round or the brief."""
+        return (self.native_tools is not None and mode is None and '"actions"' in system
+                and "You have used all tool rounds" not in user)
+
+    async def _native_round(self, body: dict[str, Any]) -> tuple[dict[str, Any], str]:
+        """One research round in the model's own tool-call format. Jan-v1 sometimes plans a call in its thinking and
+        then emits nothing: retry warmer, then fall back to plain JSON (accepting its {"name", "arguments"} style)."""
+        data: dict[str, Any] = {}
+        for temp in (0.0, 0.4, 0.8):
+            body["options"]["temperature"] = temp
+            r = await self._client.post(f"{self.base_url}/api/chat", json=body)
+            r.raise_for_status()
+            data = r.json()
+            m = data["message"]
+            if m.get("tool_calls"):
+                return data, json.dumps({"thought": (m.get("content") or "").strip()[:300], "actions": [
+                    {"tool": c["function"]["name"], "args": c["function"].get("arguments") or {}}
+                    for c in m["tool_calls"]]})
+            if (m.get("content") or "").strip():
+                return data, _as_actions(m["content"])
+        fb = {k: v for k, v in body.items() if k != "tools"} | {"think": False, "format": "json"}
+        fb["options"] = {**body["options"], "temperature": 0, "num_predict": self.num_predict}
+        r = await self._client.post(f"{self.base_url}/api/chat", json=fb)
+        r.raise_for_status()
+        data = r.json()
+        return data, _as_actions(data["message"]["content"])
+
     async def __call__(self, system: str, user: str, mode: str | None = None) -> str:
         ctx = "" if self.num_ctx == 4096 else f"\0ctx={self.num_ctx}"  # keeps existing cache keys valid
         ctx += f"\0mode={mode}" if mode else ""
+        native = self._use_native_tools(system, user, mode)
+        ctx += "\0native_tools_v3" if native else ""  # v3: thinking, retries, JSON fallback
         key = hashlib.sha256(f"{self.model}\0{system}\0{user}{ctx}".encode()).hexdigest()
         if self.use_cache and key in self._cache:
             self.cache_hits += 1
@@ -127,6 +172,17 @@ class OllamaLLM:
                                                                                     "content": user}],
             "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": self.num_predict},
         }
+        if native:
+            # the model's own tool-call format (its chat template renders the tools); calls come back as
+            # message.tool_calls and are rewritten into the agent's {"actions": [...]} protocol below
+            # Jan-v1 plans in its thinking and then calls tools; with thinking off it only writes prose
+            del body["format"]
+            body["tools"] = self.native_tools
+            body["think"] = True
+            body["options"]["num_predict"] = max(self.num_predict, 2048)
+            body["messages"][0]["content"] += ("\n\nCall the tools directly with your tool-call format (several at "
+                                               "once is fine). When you have enough evidence, reply with the final "
+                                               "JSON object only.")
         if mode in ("updown", "updown_lo", "buypass_lo", "lap"):
             del body["format"]
             body["options"]["num_predict"] = 1
@@ -136,10 +192,13 @@ class OllamaLLM:
         async with self._sem:
             for attempt in range(3):
                 try:
-                    r = await self._client.post(f"{self.base_url}/api/chat", json=body)
-                    r.raise_for_status()
-                    data = r.json()
-                    text: str = data["message"]["content"]
+                    if native:
+                        data, text = await self._native_round(body)
+                    else:
+                        r = await self._client.post(f"{self.base_url}/api/chat", json=body)
+                        r.raise_for_status()
+                        data = r.json()
+                        text = data["message"]["content"]
                     if mode == "updown":
                         p_up, mass = updown_probability(data.get("logprobs") or [])
                         self.updown_no_mass += int(round(mass, 6) == 0)  # same rule as a replayed answer
@@ -165,7 +224,7 @@ class OllamaLLM:
                         raise
                     await asyncio.sleep(2)
         self.calls += 1
-        if self.use_cache:
+        if self.use_cache and text.strip():  # an empty reply is a glitch, not an answer: don't replay it
             self._cache[key] = text
             _append_line(self._cache_path, json.dumps({"k": key, "v": text}))
         return text
