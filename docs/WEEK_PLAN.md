@@ -128,3 +128,19 @@ Master portfolio, 2024-03-01 to 2026-09-24, 10 bps per trade (`scripts/block3_ru
 **Next (Block 4, Monday):** forward paper test of the quick-money book alone (weekly, by hand: new releases -> reader
 -> fact sheet -> Bonsai 5-day -> combined score -> top fifth -> fills at the next open), next to the allocator.
 Pre-registered gate after 12 weeks: the book's return beats the same-period shuffle median and the no-stock allocator.
+
+## Research fix (2026-09-26): targeted analyst-expectations research, rule set before results
+
+Block 1 research added noise: 36% of its facts came from Wikipedia, 31% repeated the fact sheet, only 3% were
+estimates or guidance. What moves a stock after earnings is the surprise against expectations, so research now goes
+straight for them: new tool `analyst_targets_as_of` reads the last archived Yahoo quote page in the 60 days before
+the SEC acceptance time and code-parses the analyst targets (low/average/high), the target raises/cuts listed there
+and the company's upgrade/downgrade headlines (no LLM; point-in-time checked like every as-of tool).
+`scripts/fetch_analyst_targets.py` collects it for the 1,180-release 2025-26 sample, then 2024;
+`scripts/analyst_eval.py` scores it.
+
+Features: target upside (vs the last close before entry), dispersion, net target actions, net headlines.
+**Pass rule (a feature helps a book):** own-horizon monthly rank IC in the pre-registered direction (positive;
+dispersion negative) with its 95% interval above zero in 2025-26, AND a positive point estimate in 2024. A feature
+that passes goes into the fact sheet, the research prefetch (replacing Wikipedia) and the combined score; one that
+fails is dropped. Four features x three books = 12 tests, so a single pass at the edge of its interval is a lead only.

@@ -299,12 +299,19 @@ TOOLS: dict[str, ToolSpec] = {s.name: s for s in [
              {"url": Param("str", "https://www.sec.gov/Archives/edgar/data/... URL", required=True, max_len=500),
               "max_chars": Param("int", "max characters of text", default=4000, min=500, max=8000)},
              asof.read_filing, modes=("as_of",), timeout_s=40),
-    ToolSpec("news_as_of", "The company's news page (Reuters, MarketWatch, CNBC, Nasdaq, Yahoo) as archived in the "
+    ToolSpec("news_as_of", "The company's news page (Yahoo, MarketWatch, Reuters, CNBC) as archived in the "
              "weeks before the decision time: recent headlines.",
              {"ticker": Param("str", "e.g. AAPL", required=True, max_len=10),
               "window_days": Param("int", "how far back a copy may be", default=45, min=3, max=120),
               "max_chars": Param("int", "max characters of text", default=4000, min=500, max=8000)},
              asof.news_as_of, modes=("as_of",), timeout_s=150),
+    ToolSpec("analyst_targets_as_of", "Analysts' average 1-year price target (with low/high) and their latest rating "
+             "actions (target raised/lowered, upgrades/downgrades), from the last archived quote page before the "
+             "decision time. Parsed numbers, not prose.",
+             {"ticker": Param("str", "e.g. AAPL", required=True, max_len=10),
+              "window_days": Param("int", "how far back a copy may be", default=60, min=3, max=120),
+              "name": Param("str", "company name (to pick its own headlines)", default="", max_len=100)},
+             asof.analyst_targets_as_of, modes=("as_of",), timeout_s=150),  # quote pages are ~2 MB
     ToolSpec("archived_page", "Any web page (e.g. an article linked from news_as_of) as archived before the "
              "decision time.",
              {"url": Param("str", "original page URL", required=True, max_len=2000),

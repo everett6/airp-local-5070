@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import html
 import json
 import re
 from collections.abc import Callable
@@ -44,12 +45,14 @@ CDX = "https://web.archive.org/cdx/search/cdx"
 SEC_TZ_MARGIN = timedelta(hours=5)  # EDGAR acceptance times are US Eastern; +5 h is never early
 ARCHIVE_TS = re.compile(r"^https?://web\.archive\.org/web/(\d{14})")
 SEC_ARCHIVE = re.compile(r"^https://www\.sec\.gov/Archives/edgar/data/(\d+)/(\d{18})/[^?#]+$")
-NEWS_PAGES = (  # (source, URL template, years it was archived); tried in order, first capture in the window wins
+NEWS_PAGES = (  # (source, URL template, years it was archived); tried in order, first capture with content wins
+    # Yahoo first: its archived quote page carries headlines, analyst targets and rating actions as plain text;
+    # CNBC's and MarketWatch's recent captures are often JavaScript shells with no text (skipped, see MIN_PAGE_CHARS)
+    ("yahoo", "finance.yahoo.com/quote/{T}", 2017, 2100),
     ("marketwatch", "www.marketwatch.com/investing/stock/{t}", 2009, 2100),
     ("reuters", "www.reuters.com/finance/stocks/companyNews?symbol={T}.O", 2009, 2020),
     ("reuters", "www.reuters.com/finance/stocks/companyNews?symbol={T}.N", 2009, 2020),
     ("cnbc", "www.cnbc.com/quotes/{T}", 2020, 2100),
-    ("yahoo", "finance.yahoo.com/quote/{T}", 2017, 2100),
     ("yahoo", "finance.yahoo.com/q?s={T}", 2009, 2017),
     # nasdaq.com quote pages were dropped 2026-09-24: 0 captures found in 34 tries, 4 s of rate limit each
 )
@@ -264,7 +267,8 @@ async def _latest_capture(gw: ToolGateway, url: str, as_of: datetime, window_day
     return max(before) if before else None
 
 
-async def _read_capture(gw: ToolGateway, ts: str, original: str, as_of: datetime, max_chars: int) -> dict[str, Any]:
+async def _fetch_capture(gw: ToolGateway, ts: str, original: str, as_of: datetime) -> tuple[str, str]:
+    """(raw html, capture timestamp) of one capture; refuses a copy from after the decision time."""
     r = await gw.fetcher.fetch(f"https://web.archive.org/web/{ts}id_/{original}", max_bytes=4_000_000)
     m = ARCHIVE_TS.match(r.final_url)
     got = m.group(1) if m else ts
@@ -272,7 +276,12 @@ async def _read_capture(gw: ToolGateway, ts: str, original: str, as_of: datetime
         raise FetchError("the archive only has a copy from after the decision time")
     if r.status != 200:
         raise FetchError(f"archive HTTP {r.status}")
-    page = html_to_text(r.text, max_chars)
+    return r.text, got
+
+
+async def _read_capture(gw: ToolGateway, ts: str, original: str, as_of: datetime, max_chars: int) -> dict[str, Any]:
+    raw, got = await _fetch_capture(gw, ts, original, as_of)
+    page = html_to_text(raw, max_chars)
     return {"url": original, "captured_utc": datetime.strptime(got, "%Y%m%d%H%M%S").replace(tzinfo=UTC).isoformat(),
             "title": page.get("title", ""), "text": page["text"]}
 
@@ -302,11 +311,83 @@ async def news_as_of(gw: ToolGateway, a: dict[str, Any]) -> Any:
         try:
             cap = await _latest_capture(gw, tpl.format(T=t, t=t.lower()), as_of, a["window_days"])
             if cap is not None:
-                return {"source": source, **await _read_capture(gw, *cap, as_of, a["max_chars"])}
+                page = await _read_capture(gw, *cap, as_of, a["max_chars"])
+                if len(page["text"]) >= MIN_PAGE_CHARS:  # an empty JavaScript shell is not news: try the next source
+                    return {"source": source, **page}
         except FetchError:
             continue
     raise FetchError(f"no archived news page for {t} in the {a['window_days']} days before the decision time "
                      f"(tried {', '.join(dict.fromkeys(tried))})")
+
+
+MIN_PAGE_CHARS = 400
+TARGETS_URL = "finance.yahoo.com/quote/{T}/"
+_NUM = r"([0-9][0-9,]*\.?[0-9]*)"
+
+
+def parse_analyst_page(text: str) -> dict[str, Any]:
+    """Analyst expectations from the text of an archived Yahoo Finance quote page: the average 1-year price target
+    with its low/high, and the latest rating actions (raise/lower target, upgrade/downgrade). Every number is read
+    from the page text by these patterns - nothing is estimated."""
+    def num(pat: str) -> float | None:
+        m = re.search(pat, text)
+        return float(m.group(1).replace(",", "")) if m else None
+    out: dict[str, Any] = {"target_avg": num(r"1y Target Est\s+" + _NUM)}
+    # two page layouts: "24.00 Low 29.00 Average 26.70 Current 36.00 High" and "15.00 19.63 Average 14.37 Current ..."
+    m = re.search(r"Analyst Price Targets\s+" + _NUM + r"(?:\s+Low)?\s+" + _NUM + r"\s+Average\s+" + _NUM
+                  + r"\s+Current\s+" + _NUM + r"\s+High", text)
+    if m:
+        lo, avg, cur, hi = (float(x.replace(",", "")) for x in m.groups())
+        out |= {"target_low": lo, "target_avg": out["target_avg"] or avg, "price_on_page": cur, "target_high": hi}
+    actions = []
+    for m in re.finditer(r"(Raises|Lowers|Maintains|Reiterates) Price Target\s+" + _NUM + r"\s*->\s*" + _NUM, text):
+        actions.append({"action": m.group(1).lower() + " target", "from": float(m.group(2).replace(",", "")),
+                        "to": float(m.group(3).replace(",", ""))})
+    for m in re.finditer(r"(Upgrades|Downgrades|Initiates|Maintains) (?:Rating )?([A-Z][A-Za-z ]{2,20}?)(?= Price Action|\s{2}|$)",
+                         text):
+        actions.append({"action": m.group(1).lower(), "rating": m.group(2).strip()})
+    out["actions"] = actions[:10]
+    out["raises"] = sum(a["action"] == "raises target" for a in actions)
+    out["lowers"] = sum(a["action"] == "lowers target" for a in actions)
+    return out
+
+
+_UP = re.compile(r"\b(raises?|lifts?|boosts?|hikes?|increases?|ups)\b.*\b(PT|price target)|\bupgrad", re.IGNORECASE)
+_DOWN = re.compile(r"\b(lowers?|cuts?|trims?|reduces?|slashes)\b.*\b(PT|price target)|\bdowngrad", re.IGNORECASE)
+
+
+def headline_actions(lines: list[str], ticker: str, name: str = "") -> dict[str, int]:
+    """Analyst actions in the page's headlines, counting only lines that name this company (its ticker in
+    parentheses, or its name's first word): other companies' upgrades on the same page are ignored."""
+    word = name.split()[0] if name else ""
+    own = [x for x in lines if f"({ticker})" in x or (len(word) > 3 and word.lower() in x.lower())]
+    return {"headline_up": sum(bool(_UP.search(x)) and not _DOWN.search(x) for x in own),
+            "headline_down": sum(bool(_DOWN.search(x)) and not _UP.search(x) for x in own),
+            "headlines_about_company": len(own)}
+
+
+def plain_text(raw: str) -> str:
+    """All visible text of a page on one line (the quote statistics sit in markup html_to_text leaves out)."""
+    body = re.sub(r"(?s)<(script|style)[^>]*>.*?</\1>", " ", raw)
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", body)))
+
+
+async def analyst_targets_as_of(gw: ToolGateway, a: dict[str, Any]) -> Any:
+    """Analyst price targets and recent rating actions from the last archived Yahoo quote page before the decision
+    time (within window_days). Parsed by code from the page text."""
+    as_of = _as_of(gw)
+    t = a["ticker"].strip().upper()
+    cap = await _latest_capture(gw, TARGETS_URL.format(T=t), as_of, a["window_days"])
+    if cap is None:
+        raise FetchError(f"no archived quote page for {t} in the {a['window_days']} days before the decision time")
+    raw, got = await _fetch_capture(gw, *cap, as_of)
+    parsed = parse_analyst_page(plain_text(raw))
+    lines = [x.strip() for x in html_to_text(raw, 20_000)["text"].splitlines() if x.strip()]
+    parsed |= headline_actions(lines, t, a.get("name", ""))
+    if parsed["target_avg"] is None and not parsed["actions"] and not parsed["headlines_about_company"]:
+        raise FetchError("the archived quote page has no analyst targets or company headlines")
+    return {"url": cap[1], "captured_utc": datetime.strptime(got, "%Y%m%d%H%M%S").replace(tzinfo=UTC).isoformat(),
+            **parsed}
 
 
 # ---------------- local prices ----------------
