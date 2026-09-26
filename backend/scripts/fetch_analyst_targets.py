@@ -33,7 +33,8 @@ WEBCACHE = BACKEND / "results" / "webcache"
 async def run(args: argparse.Namespace) -> None:
     feats = pd.read_csv(BACKEND / args.features)
     ev = pd.read_csv(BACKEND / args.events).set_index("accession")
-    done = {json.loads(x)["accession"] for x in OUT.read_text().splitlines()} if OUT.exists() else set()
+    rows = [json.loads(x) for x in OUT.read_text().splitlines()] if OUT.exists() else []
+    done = {r["accession"] for r in rows if r["ok"] or str(r.get("error", "")).startswith("no archived")}  # retry 429/504/timeouts
     todo = [a for a in feats["accession"] if a not in done and a in ev.index]
     base = ToolGateway.from_env("as_of", as_of=datetime(2000, 1, 1, tzinfo=UTC))
     fetcher = SafeFetcher(base.fetcher.user_agent, timeout_s=90.0, total_timeout_s=140.0)  # quote pages are ~2 MB
@@ -68,17 +69,18 @@ async def run(args: argparse.Namespace) -> None:
 
     try:
         with OUT.open("a") as f:
-            await asyncio.gather(*(worker(f) for _ in range(4)))
+            await asyncio.gather(*(worker(f) for _ in range(args.workers)))
     finally:
         await fetcher.aclose()
-    rows = [json.loads(x) for x in OUT.read_text().splitlines()]
-    print(f"{sum(r['ok'] for r in rows)} of {len(rows)} releases have analyst targets", flush=True)
+    last = {r["accession"]: r for r in map(json.loads, OUT.read_text().splitlines())}  # a retry's row replaces the old one
+    print(f"{sum(r['ok'] for r in last.values())} of {len(last)} releases have analyst targets", flush=True)
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--features", default="results/events/features_sp500_2025.csv")
     ap.add_argument("--events", default="data/events/events_sp500_2025.csv")
+    ap.add_argument("--workers", type=int, default=4, help="use 1-2 when retrying archive 429s")
     asyncio.run(run(ap.parse_args()))
 
 

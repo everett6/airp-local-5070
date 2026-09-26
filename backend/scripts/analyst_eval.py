@@ -55,7 +55,8 @@ def main() -> None:
     ap.add_argument("--prices", default="data/events/ohlcv_2023-01-01_2026-09-25.parquet")
     ap.add_argument("--out", default="results/events/analyst_eval.json")
     args = ap.parse_args()
-    targets = pd.DataFrame([json.loads(x) for x in (BACKEND / args.targets).read_text().splitlines()])
+    rows = [json.loads(x) for x in (BACKEND / args.targets).read_text().splitlines()]
+    targets = pd.DataFrame(list({r["accession"]: r for r in rows}.values()))  # a retry's row replaces the old one
     ev = pd.read_csv(BACKEND / args.events)
     df = build(ev[ev["accession"].isin(targets["accession"])], Prices.from_long(pd.read_parquet(BACKEND / args.prices)))
     x = features(targets, df, Prices.from_long(pd.read_parquet(BACKEND / args.prices)))
@@ -75,7 +76,7 @@ def main() -> None:
     for k, v in res.items():
         if v["mean_ic"] is not None:
             print(f"{k:48s} n={v['events']:4d} months={v['months']:3d} IC {v['mean_ic']:+.3f} "
-                  f"[{v['ci_lo']:+.3f}, {v['ci_hi']:+.3f}]  top-bottom {v['q_spread_pct']:+.2f}%")
+                  f"[{v['ci_lo']:+.3f}, {v['ci_hi']:+.3f}]  top-bottom {v.get('q_spread_pct') or float('nan'):+.2f}%")
 
 
 if __name__ == "__main__":
