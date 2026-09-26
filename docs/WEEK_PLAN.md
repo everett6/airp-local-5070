@@ -61,7 +61,34 @@ that passes gets research in every later block; a book that fails uses the fact 
 
 ## Operating rules
 
-- One GPU job at a time (GPU lock); vLLM at 45% of the card next to Bonsai (both fit: 9.9 of 12 GB).
+- One GPU job at a time (GPU lock); vLLM at 40% of the card next to Bonsai with 3 slots x 8k context (9.4 of 12 GB;
+  45% and 50% pushed part of Bonsai onto the CPU).
 - vLLM kernel compiles are capped at 2 jobs (`MAX_JOBS`): unlimited parallel nvcc ran the 29 GB of RAM out on
   2026-09-25. A RAM watchdog stops vLLM below 3 GB available.
 - Long runs hold `systemd-inhibit` against idle sleep; they never schedule themselves.
+
+## Block 1 result (2026-09-26 06:24): research does not help any book
+
+1,007 of the 1,180 sampled 2025-26 releases researched (998 with verified facts; the deadline stopped the rest).
+Bonsai decided each book twice on the same releases (results/events/horizons_eval.txt):
+
+| Book | With Jan research: IC [95% CI], top-bottom | Fact sheet only: IC [95% CI], top-bottom |
+|---|---|---|
+| Quick money (5 d), 1,004 releases | +0.087 [-0.001, +0.183], +0.98% | **+0.107 [+0.040, +0.179], +1.85%** |
+| Mid term (20 d), 993 | +0.057 [-0.036, +0.159], -0.19% | **+0.091 [+0.016, +0.168], +1.86%** |
+| Long term (120 d), 706 | -0.109 [-0.178, -0.039], -6.15% | -0.082 [-0.194, +0.025], -1.41% |
+
+- Pass rule (research IC higher AND its interval above zero): **fails for all three books.** Research made every book
+  a little worse; the extra web facts seem to add noise to Bonsai's call.
+- The **fact-sheet-only** Bonsai signal is significant for quick money and mid term on this larger sample (1,000
+  releases, 16 months) - the best evidence for Bonsai so far, but 2024 already failed for the 20-day version (+0.020),
+  so it still needs its out-of-sample year.
+- Long term: Bonsai's BUYs did *worse* than its PASSes over 120 days (with research significantly so, 11 months).
+- Master portfolio per book (SPY core + crypto sleeve + that book's picks, 2025-01 to 2026-09, SPY 17.58% / Sharpe
+  1.06): quick 16.93% (0.97) with research, 17.73% (1.01) without; mid 15.60% (0.91) / 14.82% (0.88); long 17.75%
+  (1.01) both (almost no trades: few 120-day outcomes were known in time to calibrate). None beats SPY over this
+  window (the sleeve's own 2025-26 share of that is not measured yet: Block 3).
+
+**Plan changes for the rest of the week:** Block 2 drops web research and instead tests the fact-sheet Bonsai quick
+and mid books on all 1,995 2024 releases (fact sheets only, ~1 h GPU instead of ~15 h); the long book is tested as a
+contrarian signal (pre-registered: BUY log-odds IC < 0 in 2024). Blocks 3-6 unchanged.
