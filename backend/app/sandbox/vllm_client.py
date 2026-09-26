@@ -22,7 +22,9 @@ RESULTS = Path(__file__).resolve().parents[2] / "results"
 
 class VLLMChat:
     def __init__(self, model: str, base_url: str = "http://127.0.0.1:8000", concurrency: int = 8,
-                 num_ctx: int = 8192, num_predict: int = 1200, cache: bool = True, tag: str = "") -> None:
+                 num_ctx: int = 6144, num_predict: int = 1200, cache: bool = True, tag: str = "") -> None:
+        # num_ctx is the budget the agent sizes its research history for: the server allows 8,192 tokens, but in
+        # native tool mode the chat template adds the tool schemas (~2,000 tokens) on top of the prompt
         self.model, self.base_url = model, base_url.rstrip("/")
         self.num_ctx, self.num_predict = num_ctx, num_predict
         self.native_tools: list[dict[str, Any]] | None = None
@@ -41,6 +43,14 @@ class VLLMChat:
         for attempt in range(3):
             try:
                 r = await self._client.post(f"{self.base_url}/v1/chat/completions", json=body)
+                if r.status_code == 400 and attempt == 0:
+                    # prompt longer than the server's context: keep the newest research (the end of the user turn)
+                    user = body["messages"][-1]["content"]
+                    body = {**body, "messages": [*body["messages"][:-1], {"role": "user", "content": (
+                        "(earlier research cut to fit the context)\n" + user[-int(len(user) * 0.5):])}]}
+                    continue
+                if r.status_code == 400:
+                    return {"content": ""}  # still too long: this round counts as a failed reply, the run goes on
                 r.raise_for_status()
                 msg: dict[str, Any] = r.json()["choices"][0]["message"]
                 return msg

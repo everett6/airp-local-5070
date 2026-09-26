@@ -34,3 +34,22 @@ def test_prefetch_reads_the_release_itself_and_the_company_article():
     assert tools["read_filing"]["url"] == "https://www.sec.gov/x.htm" and tools["wiki_as_of"]["title"] == "Kenvue"
     assert {"price_history_as_of", "sec_filings_as_of", "news_as_of"} <= set(tools)
     assert {c["tool"] for c in prefetch_for(r, {}, {})} == {"price_history_as_of", "sec_filings_as_of", "news_as_of"}
+
+
+def test_vllm_too_long_prompt_is_trimmed_once_then_skipped(tmp_path, monkeypatch):
+    import asyncio
+
+    import httpx
+
+    from app.sandbox import vllm_client
+    seen = []
+
+    def handler(req):
+        body = json.loads(req.content)
+        seen.append(len(body["messages"][-1]["content"]))
+        return httpx.Response(400, json={"error": "too long"})
+    monkeypatch.setattr(vllm_client, "RESULTS", tmp_path)
+    c = vllm_client.VLLMChat("m", cache=False)
+    c._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    msg = asyncio.run(c._post({"messages": [{"role": "user", "content": "x" * 1000}]}))
+    assert msg == {"content": ""} and len(seen) == 2 and seen[1] < seen[0]  # one trimmed retry, then give up
