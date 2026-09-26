@@ -133,3 +133,28 @@ briefs feed no decision (stock-picking verdict). Speed note: research time is ~a
 cache in ~0 s), so if research becomes a bottleneck again the free wins are OLLAMA_NUM_PARALLEL=4 (the 4 workers were
 queueing on a 1-slot server), OLLAMA_FLASH_ATTENTION=1 and OLLAMA_KV_CACHE_TYPE=q8_0; vLLM (prefix caching of the
 re-sent research history) is the next step after that. Post-hoc ternary quantization of a 4B model is not worth it.
+
+## Stage B (2026-09-25): all stock signals combined, walk-forward, in the master portfolio
+
+Stock picking continues (the user's call; failed tests are findings, not a stop). scripts/combine_scores.py: EPS
+change, Bonsai P(BUY) with the research table, momentum, guidance -> logistic regression refit monthly on releases
+whose 20-day outcome was already known; 2,672 S&P 500 releases scored Mar 2024 - Aug 2026 (results/events/
+combined_eval.json). Combined score 20-day IC +0.033 [-0.032, +0.097], 60-day +0.071 [+0.007, +0.134]; Bonsai alone
++0.075 [+0.020, +0.129] at 20 days on the same releases (the regression's weights: Bonsai +0.08, EPS +0.04, momentum
++0.03, guidance ~0).
+
+Master agent (calibrated quarter-Kelly, caps, crypto sleeve, SPY core), 2024-03-01 -> 2026-09-24:
+
+| Portfolio | CAGR | Sharpe | Max DD |
+|---|---|---|---|
+| SPY + crypto sleeve + stock picks (combined score) | 20.93% | 1.20 | 21.0% |
+| SPY + crypto sleeve only | 18.76% | 1.10 | 20.8% |
+| SPY | 18.15% | 1.16 | 18.4% |
+
+Stock picks added ~2 points a year over the crypto sleeve alone. Caveats: 2024 Bonsai answers are inside its training
+data; 2.5 years; the 2025-26 part is a 1,180-release sample. Next: web research per release (below), then all
+2025-26 releases, then a stock book in the forward test.
+
+**Web research per release** (scripts/research_events.py): the qwen3:8b agent with the as-of internet tools researches
+each release as of its SEC acceptance time, writes a source-checked brief, and the verified facts join Bonsai's fact
+sheet. Test: 400 random 2025-26 releases, Bonsai with vs without the research (oos_research400_with/_without.json).
