@@ -653,3 +653,22 @@ judgement calls". Arm A (release only, running now) stays as specified. Arm B ad
   - full B's own IC CI is above 0 (5-day return vs sector).
   - So research must add something beyond what Bonsai reads in the release alone.
 - **Registry:** one more trial. Also reported: the 20-day horizon, and the `vs_prior_guidance` field alone.
+
+### skfolio test (spec fixed 2026-09-27, before any run)
+
+Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capital cap?
+
+- **Arm S, one trial (`skfolio_cvar_risk_parity`):** same rebalance days as B0 (every 5th trading day, 2018-01-02 to
+  2026-09-25), same trend rule deciding which crypto assets are on, same simulator and costs. The assets are SPY plus
+  each crypto asset whose trend is on. Weights come from skfolio `RiskBudgeting` on CVaR (β = 0.95), equal risk
+  budgets, long only. They are fitted on the trailing 252 daily returns up to the rebalance day (at least 120; with
+  fewer, B0's weights that day), then scaled to sum to 0.98. No crypto capital cap: the test is whether risk sizing
+  beats the cap.
+- **Pass (the adding rule):** vol-matched CAGR above B0's AND the 90% block-bootstrap CI of the Sharpe difference above
+  0. Results with the drawdown brakes are reported but do not decide.
+- **Even on a pass, nothing trades** until the user changes `config/mandate.json` (the crypto cap is 20%).
+- **Stress test (descriptive, not a trial):**
+  1. Fit skfolio's `VineCopula` to weekly returns of SPY, BTC and ETH, 2018–2026.
+  2. Sample 20,000 weeks conditioned on (a) SPY −10% in the week and (b) BTC −25% in the week.
+  3. Report the frozen book's weekly loss at today's targets (SPY 78%, BTC 11.6%, ETH 8.4%): median and 5th percentile,
+     next to the worst historical weeks. This informs the maximum-drawdown decision; it changes nothing.
