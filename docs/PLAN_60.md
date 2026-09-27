@@ -1,5 +1,7 @@
 # Plan: the path to ~60% a year (paper money)
 
+> **Superseded by docs/PLAN_60_V2.md (2026-09-27)** for what comes next; the results below stay as the record.
+
 Written 2026-09-26, 23:55, at the user's request. Paper trading only; free data; no real money is involved at any
 step. Background and sources: docs/STRATEGY_RESEARCH.md.
 
