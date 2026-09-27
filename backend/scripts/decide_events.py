@@ -39,8 +39,8 @@ SECTOR_ETF = {"Information Technology": "XLK", "Financials": "XLF", "Health Care
 DECIDE_SYSTEM = ("You are a portfolio manager reacting to an earnings release. Buy only stocks you expect to beat "
                  "their sector over the next 20 trading days after this release. Use only the facts given. "
                  "Answer with exactly one word: BUY or PASS.")
-# the three books: quick money (a week), mid term (a month), long term (about six months)
-HORIZONS = {5: "quick", 20: "mid", 120: "long"}
+# the books, by holding period in trading days: a week, a month, three months, about six months, a year, two years
+HORIZONS = {5: "1 week", 20: "1 month", 63: "3 months", 120: "6 months", 252: "1 year", 504: "2 years"}
 EXPLAIN_SYSTEM = ("You are a portfolio manager reacting to an earnings release. Using only the facts given, reply "
                   "with ONLY JSON: {\"bull\": [\"...\"], \"bear\": [\"...\"], \"decision\": \"BUY\" or \"PASS\", "
                   "\"reason\": \"1-2 sentences\"}")

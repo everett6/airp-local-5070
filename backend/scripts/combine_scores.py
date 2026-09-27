@@ -100,7 +100,7 @@ def walk_forward(d: pd.DataFrame, days: pd.DatetimeIndex) -> pd.Series:
 def main() -> None:
     global HORIZON
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--horizon", type=int, default=20, choices=(5, 20, 120), help="the book: outcome and holding days")
+    ap.add_argument("--horizon", type=int, default=20, choices=(5, 20, 63, 120, 252, 504), help="the book: outcome and holding days")
     HORIZON = ap.parse_args().horizon
     sfx = "" if HORIZON == 20 else f"_h{HORIZON}"
     p = Prices.from_long(pd.read_parquet(BACKEND / "data/events/ohlcv_2023-01-01_2026-09-25.parquet"))

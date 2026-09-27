@@ -169,3 +169,18 @@ scores (p = 0.06, was 0.02; shuffle mean 18.85%): still a lead for the forward t
 Not adopted: rescaling EPS stated in cents by a P/E-below-1 rule. It fixed ~7 releases a year (WEC "76" cents) but
 also shrank real one-off losses (Centene's -$13.50 impairment quarter) and real high-EPS stocks, and the reader keeps
 no quote to tell them apart.
+
+## More horizons (2026-09-26): six books, rule set before results
+
+Books by holding period (trading days): 1 week (5), 1 month (20), 3 months (63, new), 6 months (120, the old long
+book), 1 year (252, new), 2 years (504, new). Bonsai decides each on the SEC-cross-checked fact sheets (prompt: "beat
+their sector over the next N trading days"), 2025-26 sample and all of 2024 (`scripts/horizons6_run.sh`, scored by
+`scripts/horizons6_eval.py`). Prices end 2026-09-25, so a 1-year outcome exists only for entries up to ~2025-09 and a
+2-year outcome only for 2024 entries up to ~2024-09 (none in 2025-26).
+
+**Pass rule (a new book is worth trading):** own-horizon monthly rank IC with its 95% interval above zero in 2025-26
+AND a positive point estimate in 2024 (3 months, 1 year). The 2-year book has only 2024 (inside Bonsai's training
+data): it can at most be a lead, and only if its 2024 interval is above zero. Caveat for 1 and 2 years: neighbouring
+months' outcome windows overlap almost entirely, so the month bootstrap interval is too narrow; a pass there needs a
+forward test before any money-like sizing. A walk-forward combined score and portfolio are not possible for 1 and 2
+years inside this price window (too few outcomes known before the decisions).
