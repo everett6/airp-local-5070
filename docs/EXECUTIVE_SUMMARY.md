@@ -52,6 +52,7 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 | Spike check (analyze before responding) | fail: kept as information only | halving unexplained spikes: −0.19% per trigger [−0.60, +0.24] |
 | Breadth: S&P 400/600, 1-week, extremes only | fail | IC −0.002 [−0.044, +0.035] on 6,597 releases |
 | Daily crypto trend check | fail (lead) | +1.1 pt a year, Sharpe +0.04 [−0.05, +0.16] |
+| skfolio CVaR risk parity instead of the 20% crypto cap | fail (lead) | Sharpe +0.12, 90% CI [−0.01, +0.23] |
 
 ## What was built this week
 

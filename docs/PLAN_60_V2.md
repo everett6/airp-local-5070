@@ -675,3 +675,21 @@ Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capit
 - *Implementation note (2026-09-27, before any result was seen):* the first run stopped when the CVaR solver
   (CLARABEL) failed on 2 of 194 fits (2018-03-01 and 2024-04-08, both with only BTC on). Those days use B0's weights,
   the same fallback the spec gives for too little data. Nothing was registered by the stopped run.
+
+### skfolio result (2026-09-27): **FAIL, narrowly (a lead, like the 35% crypto cap)**
+
+| 2018–26 | CAGR | Vol | Sharpe | Max DD | Worst year |
+|---|---|---|---|---|---|
+| B0 (20% crypto cap) | 21.6% | 20.6% | 1.05 | 33.8% | −23.0% |
+| S (CVaR risk parity) | 27.0% | 22.7% | 1.17 | 33.9% | −26.1% |
+| S, vol-matched to B0 | 24.5% | 20.6% | 1.17 | 31.2% | −23.9% |
+
+- Sharpe difference +0.12, 90% CI [−0.01, +0.23]. The lower end is just below 0, so it fails the adding rule. With the
+  brakes: +0.10 [−0.04, +0.22].
+- When crypto is on, risk parity holds 28% crypto on average (up to 44%) instead of 20%. That is much of the gain, and
+  2018–26 was a good period for crypto, so part of the gain is hindsight.
+- 2 of 439 rebalances fell back to B0's weights (solver failures).
+- **Stress test (descriptive), frozen book at today's weights, weekly loss:**
+  - a week when SPY falls 10%: median −9.4%, 5th percentile −14.5%, 1st percentile −17.7%;
+  - a week when BTC falls 25%: median −6.3%, 5th percentile −12.0%;
+  - for comparison, the worst real week was −15.7% (13 Mar 2020) and the 1st-percentile real week −8.1%.
