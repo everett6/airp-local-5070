@@ -36,7 +36,7 @@ in [PLAN_60_V2.md](PLAN_60_V2.md); outside ideas in [INSPIRATION.md](INSPIRATION
 | Mon | Write up verdicts A/B/C. **Freeze the event pipeline** for the forward test: the best arm that passed, otherwise Bonsai's 1-week score as now. PrismML build + benchmark (if permitted) | Regenerate the Alpaca keys and put them in `backend/.env` |
 | Mon–Tue (CPU) | Pre-register and run **"first reaction"** (the earnings-day move + Bonsai's labels, 20–40 day hold) and **"tilt SPY"** (over/underweight picked stocks inside the SPY holding instead of a separate sleeve). Build the autonomy runner | — |
 | Wed–Thu (GPU nights) | Build the **8-K breaking-news watcher** (deals, CEO changes, layoffs → Jan → Bonsai → code) and backtest it on 2024–26 under its own rule | Practice the routine: `forward_events.py` at ~08:45 ET and in the evening; open the viewer |
-| Wed–Fri | Autonomy runs on its own into a dry-run ledger. Fri: check it, SPY price cross-check against Alpaca, tag the frozen version in git, switch autonomy to the real ledgers for Mon 5 Oct | Glance at the viewer |
+| Mon–Fri | **Autonomy dry run (installed Sun 27 Sep):** the timers run everything into dry-run folders (events from Mon 28 Sep's real releases). Fri: check the heartbeats and alerts, SPY price cross-check against Alpaca, tag the frozen version in git, then `scripts/autonomy.sh live` for Mon 5 Oct | Keep the PC on and awake (it can't wake itself); glance at the viewer |
 
 **Rule for the week:** a test that passes joins the forward test as a **shadow** book at 0 weight. Nothing changes the
 real book before the 3-month review.
@@ -90,6 +90,17 @@ The pass/fail rules for this review are written before it, by the end of October
 | **PrismML llama.cpp fork** | **Yes, from the official PrismML-Eng repo, after tonight's runs** | The only real speed-up for Bonsai. It is benchmarked on the 100 dev releases and used only if quality (parse rate, verified quotes) matches Ollama and it is at least 1.5× faster. Arms A–C stay on Ollama so they are comparable. The build needs a permission you grant (see below) |
 | **Autonomy** | **On for the 5 Oct start**, after a dry run Wed–Fri | A missed 08:45 ET run can never be backfilled, so manual runs are the forward test's weakest link. Built this week (timers with wake from sleep, heartbeat, alerts); it runs Wed–Fri into a dry-run ledger, and goes live only if those runs are clean. The kill switch, mandate, order gate and drawdown limit are in place |
 | Mandate changes (crypto cap, AI picks weight) | only after a passed test | Code never changes the mandate on its own |
+
+## Autonomy: how it runs
+
+- `scripts/autonomy.sh status | dry | live | uninstall`. User timers (no system service), New York times:
+  events weekdays 08:45 and 18:30, allocator Mondays 18:00, reviews Saturdays 10:00, missed-run check daily 21:00.
+- Each run takes a lock, writes a heartbeat and alerts (desktop + `results/forward/alerts.jsonl`, also in the
+  viewer). Live runs commit and push the ledgers.
+- The PC must be on and awake at those times; the timers cannot wake it from sleep. A missed time runs when the PC
+  comes back (a late event run logs late releases as missed, never backfilled).
+- From 5 Oct, GPU research jobs must take the same lock (`results/forward/autorun.lock`) so they never kill the
+  forward runner's models.
 
 ## Standing rules
 
