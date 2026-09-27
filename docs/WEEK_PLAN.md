@@ -238,3 +238,12 @@ bottleneck, so not adopted). The bottleneck is Bonsai's brief (~800 output token
 the GPU with Jan and add little). Briefs now cite short source tags (S1, S2 ... mapped back to URLs before the
 source check) in compact JSON: ~500 tokens, 16.7 s -> ~11 s per brief, verified facts 31 vs 30 on 6 releases.
 The 24 smoke-test releases were redone with the final version so the whole run uses one prompt set.
+
+GPU tuning measured 2026-09-26 (evening), before the full brief phase:
+- Brief as plain lines instead of JSON: 7.7 s vs 9.4 s, but 2.25 vs 3.83 verified facts per brief. Reverted.
+- Holding period at the end of the decision prompt, a release's books back to back (`decide_multi.py`): 0.67 s per
+  decision, unchanged. Bonsai's linear-attention layers keep a running state, so llama.cpp cannot reuse part of a
+  prompt. Rankings matched the current prompt (Spearman 0.96-0.98). Not adopted.
+- Bonsai briefs 3 / 6 / 8 in flight: 9.9 / 9.5 / 9.6 s per brief. The hybrid model does not batch; stays at 3.
+- Jan's phase was capped by vLLM's 8 sequences (up to 3 waiting); the gather phase now allows 16.
+Remaining options (need a download): PrismML's llama.cpp fork with its Q1_0 kernels; TensorRT-LLM for Jan.
