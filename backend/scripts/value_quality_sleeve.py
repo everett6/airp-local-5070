@@ -55,7 +55,7 @@ def facts(cik: int, ua: str) -> dict | None:
             if e.code == 404:
                 return None
             time.sleep(2 * (attempt + 1))
-        except Exception:
+        except Exception:  # noqa: BLE001 - network/parse errors: retry, then give up on this company
             time.sleep(2 * (attempt + 1))
     else:
         return None
@@ -145,7 +145,7 @@ def prices_and_splits(tickers: list[str]) -> tuple[pd.DataFrame, dict[str, pd.Se
             try:
                 s = yf.Ticker(t).splits
                 out[t] = {str(k.date()): float(v) for k, v in s.items()}
-            except Exception:
+            except Exception:  # noqa: BLE001 - Yahoo errors: treat as no splits
                 out[t] = {}
             time.sleep(0.2)
         sf.write_text(json.dumps(out))
@@ -192,7 +192,8 @@ def main() -> None:
             px = close[tk].loc[:t_me].dropna()
             if px.empty:
                 continue
-            factor = float(splits.get(tk, pd.Series(dtype=float)).loc[lambda x: x.index > t_me].prod()) \
+            sp = splits.get(tk, pd.Series(dtype=float))
+            factor = float(sp[sp.index > t_me].prod()) \
                 if len(splits.get(tk, [])) else 1.0
             actual = float(px.iloc[-1]) * (factor if factor > 0 else 1.0)
             eq, sh, assets = instant_asof(s["eq"], t_me), instant_asof(s["shares"], t_me), instant_asof(s["assets"], t_me)
