@@ -5,6 +5,9 @@
     python scripts/llm_fields.py test                 # step 3: the one pre-registered return test
     python scripts/llm_fields.py extract-research     # arm B: release + Jan's as-of research evidence
     python scripts/llm_fields.py test-research        # arm B's pre-registered test (research beyond arm A)
+    python scripts/llm_fields.py dev-judgement        # arm C quality gate (100 dev releases; exit 3 = gate failed)
+    python scripts/llm_fields.py extract-judgement    # arm C: arm B + four judgement fields and a reason
+    python scripts/llm_fields.py test-judgement       # arm C's pre-registered test (judgement beyond arm B)
 
 Bonsai reads each earnings press release and labels 7 things code cannot compute from the numbers, each with an
 exact quote. Code keeps a non-default label only if its quote is word for word in the release. The prompt is chosen on
@@ -87,6 +90,33 @@ _RULES_R = _RULES.replace("use ONLY the release", "use ONLY the release and the 
 # arm B: P2 (frozen) plus the research evidence block and the one research-only field; nothing else changed
 PROMPT_R = _HEAD + _DEFS + _DEF_R + _RULES_R + "\nJSON: " + _SCHEMA_R
 EVIDENCE = BACKEND / "results"
+
+# arm C (docs/PLAN_60_V2.md "Arm C"): arm B's prompt plus four JUDGEMENT fields and a short reason written first.
+# Arm B's prompt and fields above are unchanged; this only adds.
+FIELDS_J = FIELDS_R | {
+    "earnings_quality": (("clean", "flattered", "not_clear"), "not_clear"),
+    "outlook_tone": (("confident", "cautious", "not_stated"), "not_stated"),
+    "net_read": (("bullish", "neutral", "bearish"), "neutral"),
+    "conviction": (("high", "low"), "low"),
+}
+_DEF_J = """- earnings_quality: flattered = the headline growth or beat leans on one-offs, a lower tax rate, a smaller share
+  count or adjustments that leave out recurring costs; clean = it comes from the core business (revenue and operating
+  profit); not_clear otherwise. Quote the sentence that shows it.
+- outlook_tone: how management talks about the coming quarters: confident = raised or firmly reaffirmed outlook with
+  upbeat specifics; cautious = headwinds, uncertainty, softer trends or a lowered outlook; not_stated if nothing.
+- net_read: YOUR judgement as a skeptical analyst, weighing the good against the bad (and the results against the
+  earlier guidance, if the evidence has it): does this release make the next few weeks better (bullish) or worse
+  (bearish) for the stock than a typical earnings release? neutral if it is mixed or ordinary. Quote the ONE sentence
+  that matters most.
+- conviction: high only if the release and evidence point clearly one way; low otherwise. Quote the deciding sentence.
+"""
+_SCHEMA_J = ('{"reason": "at most 40 words: the main good and bad points, weighed", '
+             + _SCHEMA_R[1:-1] + ", "
+             + ", ".join(f'"{k}": {{"label": "{"|".join(v[0])}", "quote": "..."}}' for k, v in FIELDS_J.items()
+                         if k not in FIELDS_R) + "}")
+PROMPT_J = (_HEAD + _DEFS + _DEF_R + _DEF_J + _RULES_R
+            + "\nWrite \"reason\" first: weigh the evidence before you label.\nJSON: " + _SCHEMA_J)
+J_GATE = {"parse_rate": 0.95, "verified_share": 0.85}  # fixed before the dev run; quality only, never returns
 
 SILVER = {  # code-only keyword labels, the quality yardstick: does the model flag a field when the words are there?
     "one_off": r"impairment|restructuring (charge|cost|expense)|goodwill write|litigation (charge|settlement)|write-?down",
@@ -246,9 +276,84 @@ async def extract_research() -> None:
         await llm.unload()
 
 
+def llm_client_j() -> Any:
+    from app.sandbox.walkforward import OllamaLLM
+    return OllamaLLM("bonsai-27b:latest", base_url="http://127.0.0.1:11435", concurrency=3, num_ctx=8192,
+                     num_predict=1000, cache=True, require_gpu=True)
+
+
+def _user_j(acc: str, tag: str) -> tuple[str, str, bool] | None:
+    text, rp = text_of(acc), research_folder(tag) / f"{acc}.json"
+    if text is None:
+        return None
+    ev = (json.loads(rp.read_text()).get("evidence") or "")[:6000] if rp.exists() else ""
+    user = text[:6000] + "\n\n=== Research evidence (web, as of the release) ===\n" + (ev or "No research evidence was found.")
+    return user, text[:6000] + "\n" + ev, bool(ev)
+
+
+async def _label_j(llm: Any, acc: str, tag: str) -> dict[str, Any] | None:
+    u = _user_j(acc, tag)
+    if u is None:
+        return None
+    user, source, has = u
+    t0 = time.monotonic()
+    raw = parse(await llm(PROMPT_J, user))
+    reason = str((raw or {}).get("reason", ""))[:400]
+    return {"accession": acc, "has_research": has, "s": time.monotonic() - t0, "reason": reason,
+            **verify(raw, source, FIELDS_J)}
+
+
+async def dev_judgement() -> bool:
+    """Arm C quality gate on the same 100 dev releases as step 1: parse rate and verified quotes only."""
+    ev = pd.read_csv(BACKEND / "data/events/events_sp500_2024.csv")
+    rows = list(ev.sample(100, random_state=1).itertuples())
+    llm = llm_client_j()
+    try:
+        t0 = time.monotonic()
+        recs = [x for x in await asyncio.gather(*(_label_j(llm, r.accession, "2024") for r in rows)) if x]
+    finally:
+        await llm.unload()
+    claimed = sum(r["claimed"] for r in recs)
+    q = {"n": len(recs), "parse_rate": float(np.mean([r["parsed"] for r in recs])),
+         "verified_share": sum(r["verified"] for r in recs) / claimed if claimed else 0.0,
+         "s_per_release": (time.monotonic() - t0) / max(1, len(recs)),
+         "label_counts": {f: pd.Series([r[f] for r in recs]).value_counts().to_dict() for f in FIELDS_J
+                          if f not in FIELDS_R}}
+    q["gate"] = J_GATE
+    q["pass"] = bool(q["parse_rate"] >= J_GATE["parse_rate"] and q["verified_share"] >= J_GATE["verified_share"])
+    (OUT / "llm_fields_judgement_dev.json").write_text(json.dumps(q, indent=1, default=str) + "\n")
+    print(json.dumps(q, indent=1, default=str), flush=True)
+    return q["pass"]
+
+
+async def extract_judgement() -> None:
+    """Arm C labels for the 2024 (train) and 2025-26 (test) samples; resumable."""
+    llm = llm_client_j()
+    try:
+        for tag, events, feats in (("2024", "data/events/events_sp500_2024.csv", "features_sp500_2024_secchk.csv"),
+                                   ("2025", "data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv")):
+            out = OUT / f"llm_fields_judgement_{tag}.jsonl"
+            done = {json.loads(x)["accession"] for x in out.read_text().splitlines()} if out.exists() else set()
+            keep = set(pd.read_csv(OUT / feats)["accession"])
+            rows = [r for r in pd.read_csv(BACKEND / events).itertuples() if r.accession in keep and r.accession not in done]
+            print(f"{tag}: {len(rows)} releases to label with judgement", flush=True)
+            t0 = time.monotonic()
+            for i in range(0, len(rows), 60):
+                chunk = rows[i:i + 60]
+                recs = [x for x in await asyncio.gather(*(_label_j(llm, r.accession, tag) for r in chunk)) if x]
+                with out.open("a") as fh:
+                    for rec in recs:
+                        fh.write(json.dumps(rec) + "\n")
+                n = i + len(chunk)
+                print(f"  {n}/{len(rows)} eta={(len(rows) - n) * (time.monotonic() - t0) / n / 60:.0f}min", flush=True)
+    finally:
+        await llm.unload()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=("dev", "extract", "extract-research", "test", "test-research"))
+    ap.add_argument("cmd", choices=("dev", "extract", "extract-research", "test", "test-research", "dev-judgement",
+                                    "extract-judgement", "test-judgement"))
     ap.add_argument("--prompt", default="")
     args = ap.parse_args()
     if args.cmd == "dev":
@@ -259,6 +364,13 @@ def main() -> None:
         asyncio.run(extract(args.prompt))
     elif args.cmd == "extract-research":
         asyncio.run(extract_research())
+    elif args.cmd == "dev-judgement":
+        raise SystemExit(0 if asyncio.run(dev_judgement()) else 3)
+    elif args.cmd == "extract-judgement":
+        asyncio.run(extract_judgement())
+    elif args.cmd == "test-judgement":
+        from llm_fields_test import judgement_main
+        judgement_main()
     elif args.cmd == "test-research":
         from llm_fields_test import research_main
         research_main()

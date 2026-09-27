@@ -122,3 +122,53 @@ def research_main() -> None:
               "ic": r5["full_B"]["mean_ic"], "result": "pass" if out["pass"] else "fail"})
     print(json.dumps(out, indent=1, default=str))
     print("verdict (pre-registered, 5-day):", "PASS" if out["pass"] else "FAIL")
+
+
+def judgement_main() -> None:
+    """Arm C (docs/PLAN_60_V2.md "Arm C"): arm B's inputs, Bonsai adds four judgement fields (earnings quality, outlook
+    tone, net read, conviction) with a reason written first; the same ridge scores them. Pass: the 2025-26 monthly IC of
+    (C - B) has a 95% CI above 0 AND C's own IC CI is above 0 (5-day)."""
+    from llm_fields import FIELDS_J, FIELDS_R
+    p = Prices.from_long(pd.read_parquet(BACKEND / "data/events/ohlcv_2023-01-01_2026-09-25.parquet"))
+    data = {}
+    for tag in ("2024", "2025"):
+        a = load(tag, p)
+        for arm, f, fields in (("r", "llm_fields_research", FIELDS_R), ("j", "llm_fields_judgement", FIELDS_J)):
+            x = pd.DataFrame([json.loads(v) for v in (EV / f"{f}_{tag}.jsonl").read_text().splitlines()])
+            x = x[["accession", *fields]].rename(columns={k: f"{k}_{arm}" for k in fields})
+            a = a.merge(x, on="accession")
+        data[tag] = a
+    train, test = data["2024"], data["2025"]
+    judged = {k: v for k, v in FIELDS_J.items() if k not in FIELDS_R}
+
+    def onehots(df: pd.DataFrame, fields: dict, arm: str) -> list[np.ndarray]:
+        return [np.column_stack([(df[f"{f}_{arm}"] == v).astype(float).to_numpy() for v in labels if v != default])
+                for f, (labels, default) in fields.items()]
+
+    def design_x(df: pd.DataFrame, which: str) -> np.ndarray:
+        cols = [design(df, False)]
+        if which == "B":
+            cols += onehots(df, FIELDS_R, "r")
+        elif which == "C":
+            cols += onehots(df, FIELDS_J, "j")
+        else:  # C without its judgement fields (descriptive)
+            cols += onehots(df, FIELDS_R, "j")
+        return np.column_stack(cols)
+    out: dict = {"n_train": len(train), "n_test": len(test)}
+    for h in ("fwd5", "fwd20"):
+        tr = train.dropna(subset=[h])
+        for arm in ("B", "C", "C_minus_judgement"):
+            test[f"{arm}_{h}"] = ridge(design_x(tr, arm), tr[h].to_numpy(float), lam=10.0)(design_x(test, arm))
+        test[f"netread_{h}"] = test["net_read_j"].map({"bullish": 1.0, "neutral": 0.0, "bearish": -1.0})
+        out[h] = {"B": monthly_ic(test, f"B_{h}", h), "C": monthly_ic(test, f"C_{h}", h),
+                  "C_minus_B": paired_diff(test, f"B_{h}", f"C_{h}", h),
+                  "judgement_within_C": paired_diff(test, f"C_minus_judgement_{h}", f"C_{h}", h),
+                  "net_read_alone": monthly_ic(test, f"netread_{h}", h)}
+    out["judgement_counts"] = {f: test[f"{f}_j"].value_counts().to_dict() for f in judged}
+    r5 = out["fwd5"]
+    out["pass"] = bool(r5["C_minus_B"]["ci_lo"] > 0 and (r5["C"]["ci_lo"] or 0) > 0)
+    (EV / "llm_fields_judgement_test.json").write_text(json.dumps(out, indent=1, default=str) + "\n")
+    register({"trial": "bonsai_judgement_fields_code", "date": time.strftime("%Y-%m-%d"), "kind": "signal_ic",
+              "ic": r5["C"]["mean_ic"], "result": "pass" if out["pass"] else "fail"})
+    print(json.dumps(out, indent=1, default=str))
+    print("verdict (pre-registered, 5-day):", "PASS" if out["pass"] else "FAIL")

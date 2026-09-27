@@ -693,3 +693,25 @@ Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capit
   - a week when SPY falls 10%: median −9.4%, 5th percentile −14.5%, 1st percentile −17.7%;
   - a week when BTC falls 25%: median −6.3%, 5th percentile −12.0%;
   - for comparison, the worst real week was −15.7% (13 Mar 2020) and the 1st-percentile real week −8.1%.
+
+### Arm C: more judgement for Bonsai (spec fixed 2026-09-27, before any extraction)
+
+The user asked for Bonsai to use more judgement. Bonsai gets it; code still checks it and decides how much it counts.
+
+- **Input:** the same as arm B (the release plus Jan's as-of research). **Prompt `PROMPT_J`:** arm B's prompt plus
+  four judgement fields. Bonsai writes a short `reason` first (up to 40 words weighing the good and the bad), then the
+  labels:
+  - `earnings_quality`: clean / flattered (the beat leans on one-offs, tax, share count or adjustments) / not_clear;
+  - `outlook_tone`: confident / cautious / not_stated;
+  - `net_read`: bullish / neutral / bearish, Bonsai's own weighed call for the next few weeks, quoting the ONE sentence
+    that matters most;
+  - `conviction`: high / low.
+- **Code keeps the last word.** Every non-default label needs a quote found word for word in the release or the
+  evidence, or it falls back to the default. The ridge learns on 2024 how much each label is worth; it is scored on
+  2025–26.
+- **Quality gate, before the full run (quality only, no returns):** on the same 100 dev releases, parse rate ≥ 0.95 and
+  verified-quote share ≥ 0.85. If the gate fails, the run stops and nothing is extracted.
+- **Pass, one trial (`bonsai_judgement_fields_code`):** the 2025–26 monthly rank IC of (C − B) has a 95% CI above 0
+  (paired monthly bootstrap) AND C's own IC CI is above 0, on 5-day returns vs sector. Reported but not deciding:
+  20-day returns, C against C without its judgement fields, and `net_read` alone.
+- **Runs after the current Jan → Bonsai run** (one model on the GPU at a time): `scripts/bonsai_judgement_run.sh`.
