@@ -363,6 +363,7 @@ def console() -> None:
 
     else:  # HEALTH
         lt = P.last_run_times(runs, recs)
+        auto = P.autonomy()
         gaps = P.missed_weekdays(recs)
         try:
             md = guard.load_mandate()
@@ -381,7 +382,12 @@ def console() -> None:
               ("mandate", mandate, mcls),
               ("trading state", f"{tstate} · {hinfo.get('reason', '')}" if hinfo else "ACTIVE", "neg" if hinfo
                else "pos"),
-              ("routine (by hand)", ("forward_events.py weekdays ~08:45 ET and evening · forward_allocator.py "
+              ("autonomy", f"mode {auto['mode']} · " + (" · ".join(
+                  f"{j} {r['start'][:16].replace('T', ' ')} UTC {'ok' if r.get('rc') == 0 else 'FAILED'}"
+                  for j, r in auto["last"].items()) or "no runs yet"), ""),
+              ("alerts", " | ".join(f"{a['at'][:16].replace('T', ' ')} {a['job']}: {a['msg']}" for a in auto["alerts"][:3])
+               or "none", "warn" if auto["alerts"] else "pos"),
+              ("routine", ("forward_events.py weekdays ~08:45 ET and evening · forward_allocator.py "
                                      "weekly · weekly_review.py Saturdays"), "")]
         with st.container(border=True):
             title("inspector")

@@ -235,6 +235,20 @@ def run_log(runs: list[dict[str, Any]], recs: list[dict[str, Any]], halt: dict[s
     return sorted(log, key=lambda x: x["at"], reverse=True)[:limit]
 
 
+def autonomy(fwd: Path = FWD) -> dict[str, Any]:
+    """Autorun mode, last heartbeat per job and the latest alerts (scripts/autorun.py)."""
+    def lines(name: str) -> list[dict[str, Any]]:
+        p = fwd / name
+        return [json.loads(x) for x in p.read_text().splitlines() if x.strip()] if p.exists() else []
+    mode_file = fwd / "AUTORUN_MODE"
+    hb = lines("heartbeat.jsonl")
+    last = {}
+    for r in hb:
+        last[r["job"]] = r
+    return {"mode": mode_file.read_text().strip() if mode_file.exists() else "not installed / dry",
+            "last": last, "alerts": lines("alerts.jsonl")[-10:][::-1]}
+
+
 def underwater(eq: pd.Series) -> pd.Series:
     """Drawdown below the running peak (0 at a new high, negative below it)."""
     return eq / eq.cummax() - 1

@@ -94,10 +94,17 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--no-commit", action="store_true")
+    ap.add_argument("--dir", default="", help="a separate books/ledger folder for dry runs (never the real books)")
     ap.add_argument("--halt", metavar="REASON", help="turn the kill switch on and exit")
     ap.add_argument("--reduce", metavar="REASON", help="reduce-only mode on and exit")
     ap.add_argument("--resume", action="store_true", help="turn the kill switch off and exit")
     args = ap.parse_args()
+    global DIR
+    dry = bool(args.dir)
+    if dry:
+        DIR = BACKEND / args.dir
+        if DIR.resolve() == (BACKEND / "results" / "forward" / "allocator").resolve():
+            raise SystemExit("--dir is for dry runs: give it a folder of its own")
     if args.status:
         status()
         print("kill switch:", halt_info() or "off")
@@ -132,14 +139,15 @@ def main() -> None:
     rec["price_sources"] = dict(SOURCES)
     name = next((n for n in REAL_BOOK if n in rec["books"]), None)
     if name is not None:
-        rec["drawdown"] = apply_drawdown_limit(name, rec["books"][name]["equity"], books[name].peak)
+        rec["drawdown"] = apply_drawdown_limit(name, rec["books"][name]["equity"], books[name].peak,
+                                               path=DIR / "HALT" if dry else HALT)
         if rec["drawdown"].get("action"):
             print("DRAWDOWN", rec["drawdown"])
     with ledger.open("a") as f:
         f.write(json.dumps(rec) + "\n")
     state_path.write_text(json.dumps(books_to_json(books), indent=1) + "\n")
     print(json.dumps(rec, indent=1))
-    if not args.no_commit:
+    if not args.no_commit and not dry:
         repo = BACKEND.parent
         subprocess.run(["git", "-C", str(repo), "add", str(DIR)], check=True)
         subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m",
