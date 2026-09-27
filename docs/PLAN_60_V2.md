@@ -165,3 +165,79 @@ so 3 months of paper results cannot prove a Sharpe of 1.25.
 | 4, 8 | Monthly forward reports: Sharpe with its CI, slippage, failure log |
 | 12 (day 90) | Implementation verdict + leverage choice (≤ 30% volatility), then continue |
 | 26 | 60% row can unlock (6 forward months, lower bound ≥ 1.25) |
+
+## This week, day by day (user request, 2026-09-27: "for this week every day")
+
+**How the week runs:**
+
+- CPU work happens in the day. GPU jobs run at night: Jan/Bonsai have the GPU to themselves, one job at a time.
+- Nothing runs as a service. Each day starts when you open a session.
+- Every test has its spec committed before it runs, and every day ends with a push.
+
+**Drawdown decision.** The user answered "no" to the 45–50% drawdown question (2026-09-27). So the top 60% row of the
+Stage 4 table stays **locked**. The book tops out at the highest row whose typical worst drop the user accepts; the
+limit is still to be given. Until then the cap is 30% volatility, which means a typical worst drop of about 35%.
+
+### Day-by-day schedule
+
+**Sun 27 Sep**
+
+- **Night (running now):** research v3 briefs, then decisions (~02:40).
+- **Day:**
+  - Score research v3.
+  - Value + quality result.
+  - Push, then shutdown (as commanded).
+- **Output:** research v3 verdict; value + quality verdict.
+
+**Mon 28**
+
+- **Day:**
+  1. 20-day Bonsai satellite test (CPU; its decisions already exist). Spec written first.
+  2. Pre-register the PC-off fallback rule (Bonsai-lite on days the GPU is off).
+  3. Build the spike check: list every historical trigger in 2024–26.
+- **Night:** Jan + Bonsai cause briefs for the historical spike triggers.
+- **Output:** 20-day verdict; trigger list; briefs.
+
+**Tue 29**
+
+- **Day:**
+  1. Spike check score: arm A (mechanical) vs arm B (analyze first).
+  2. Futures in the simulator (MES, micro BTC): margin, daily settlement, roll; with tests.
+  3. Build the S&P 400/600 earnings-release set for 2025-26 (EDGAR, free).
+- **Night:** fact sheets for the breadth set, plus the Bonsai-lite triage re-test.
+- **Output:** spike check verdict; futures sim.
+
+**Wed 30**
+
+- **Day:** check triage on the breadth set (pre-registered rule).
+- **Night:** Bonsai 1-week decisions on the breadth set, trading extreme scores only.
+- **Output:** breadth decisions.
+
+**Thu 1 Oct**
+
+- **Day:**
+  1. Breadth test verdict.
+  2. Assemble the combined book from everything that passed, using the adding rule.
+  3. Shadow books at 1.0× / 1.5× / 2.0×.
+- **Night:** a spare GPU night, in case a run failed.
+- **Output:** the combined book frozen, with its spec.
+
+**Fri 2**
+
+- **Day:**
+  1. Forward-test runner: a manual script with PC-off tolerance. A missed day is marked missed, never backfilled.
+  2. End-to-end dry run on the last 20 days.
+  3. Failure log and weekly review script.
+- **Output:** the runner is ready.
+
+**Sat 3**
+
+- **Day:**
+  1. Weekly review (failures, what passed).
+  2. Update the docs and README; push.
+  3. The forward test's first orders go in at the Mon 5 Oct open.
+- **Output:** the week's report.
+
+**Honest note.** Most tests so far have failed, and some of this week's will too. The plan does not bend its rules to
+make the week look good. Whatever passes by Thursday becomes the combined book. If nothing new passes, the book is the
+existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
