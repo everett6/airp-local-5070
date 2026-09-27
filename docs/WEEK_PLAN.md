@@ -144,3 +144,28 @@ Features: target upside (vs the last close before entry), dispersion, net target
 dispersion negative) with its 95% interval above zero in 2025-26, AND a positive point estimate in 2024. A feature
 that passes goes into the fact sheet, the research prefetch (replacing Wikipedia) and the combined score; one that
 fails is dropped. Four features x three books = 12 tests, so a single pass at the edge of its interval is a lead only.
+
+## Fact-sheet fix (2026-09-26): revenue cross-checked against SEC filings
+
+The reader misread ~8% of press-release revenues (thousands or billions read as millions, a segment's figure, a sign
+error). `build_features.py check_revenue` now checks each figure against the company's last SEC-filed quarterly
+revenue: kept if within 0.5x-2x, rescaled if x1000 or /1000 fits, otherwise dropped with a note on the fact sheet
+(true quarter-to-quarter swings beyond 2x: 2.3% of SEC filings). Impossible year-on-year revenue changes: 51 -> 7
+(2025-26) and 67 -> 4 (2024); 297 fact sheets changed. Adopted regardless of the scores (it removes wrong numbers).
+Bonsai re-decided on the cleaned sheets (`scripts/secchk_run.sh`, results/events/secchk_eval.txt), same releases:
+
+| Book | 2025-26 old -> cleaned | 2024 old -> cleaned | BUY/PASS flips on changed sheets |
+|---|---|---|---|
+| Quick money (5 d) | +0.092 -> **+0.103 [+0.051, +0.158]** | +0.024 -> +0.027 | 104 of 290 |
+| Mid term (20 d) | +0.091 -> +0.071 [+0.002, +0.142] | +0.020 -> +0.027 | 98 of 279 |
+| Long term (120 d) | -0.050 -> -0.043 | +0.050 -> +0.064 [+0.000, +0.120] | 68 of 249 |
+
+Combined score (`combine_scores.py`, now on the cleaned sheets and decisions; old outputs in
+results/events/pre_secchk): quick +0.073 -> +0.082 [+0.041, +0.131], long -0.005 -> -0.000; mid unchanged (it
+uses the original XBRL decisions). Quick-money book alone, top fifth, 10 bps: 22.46% / Sharpe 1.29 -> 21.42% / 1.24
+(one 2.5-year path; the IC moved up while this moved down). It now beats 47 of 50 random shuffles of its own
+scores (p = 0.06, was 0.02; shuffle mean 18.85%): still a lead for the forward test, weaker than before.
+
+Not adopted: rescaling EPS stated in cents by a P/E-below-1 rule. It fixed ~7 releases a year (WEC "76" cents) but
+also shrank real one-off losses (Centene's -$13.50 impairment quarter) and real high-EPS stocks, and the reader keeps
+no quote to tell them apart.

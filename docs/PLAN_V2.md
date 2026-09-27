@@ -158,3 +158,21 @@ data; 2.5 years; the 2025-26 part is a 1,180-release sample. Next: web research 
 **Web research per release** (scripts/research_events.py): the qwen3:8b agent with the as-of internet tools researches
 each release as of its SEC acceptance time, writes a source-checked brief, and the verified facts join Bonsai's fact
 sheet. Test: 400 random 2025-26 releases, Bonsai with vs without the research (oos_research400_with/_without.json).
+
+### Correction (2026-09-26): the Stage B "+2 points a year from stock picks" was wrong
+
+The master portfolio never held a stock: calibrated P(beats sector) centres on 0.47 (a stock trails its sector ETF a
+little more often than not), and only 0.4% of picks ever reached the fixed p >= 0.55 threshold. The 20.93% vs 18.76%
+gap came from comparing it with the crypto-mode backtest, which rebalances weekly instead of daily - not from stocks.
+Measured properly (same daily simulation, one run with no stock picks), 2024-03 to 2026-09, costs 10 bps:
+
+| Portfolio | CAGR | Sharpe | Max DD |
+|---|---|---|---|
+| SPY + crypto sleeve, no stocks | 20.40% | 1.18 | 21.1% |
+| + combined stock score, quarter Kelly on the edge over the base rate (stocks held 5% of days) | 20.49% | 1.18 | 21.1% |
+| + combined stock score, equal-weight top fifth, 2.5% per pick (stocks held 87% of days) | 17.58% | 1.04 | 23.6% |
+| SPY | 18.14% | 1.16 | 18.4% |
+
+Fixes: the edge is now measured against the book's known base rate (`Calibrator.base_rate`), and
+`master_portfolio.py --sizing top5th` trades the rank rule the signal tests use. Traded as a portfolio, the stock
+picks cost ~3 points a year against the SPY + crypto sleeve baseline.

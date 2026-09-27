@@ -37,15 +37,15 @@ from app.sandbox.events import Prices, monthly_ic, quintile_spread
 
 def runs(h: int) -> list[tuple[str, str, str]]:
     """(events, research table, Bonsai decisions) per year for a book. The 20-day book keeps its original decision
-    files; the 5- and 120-day books use the fact-sheet decisions made for them (same fact sheets, horizon in the
-    prompt)."""
+    files; the 5- and 120-day books use the fact-sheet decisions made for them (horizon in the prompt), on the
+    SEC-cross-checked fact sheets (build_features.py check_revenue; old decisions in results/events/pre_secchk)."""
     if h == 20:
         dec = ("results/events/decide_bonsai-27b_latest_xbrl2024.jsonl", "results/events/decide_bonsai-27b_latest_xbrl.jsonl")
     else:
-        dec = (f"results/events/decide_bonsai-27b_latest_factsheet2024_h{h}.jsonl",
-               f"results/events/decide_bonsai-27b_latest_factsheet_h{h}.jsonl")
-    return [("data/events/events_sp500_2024.csv", "results/events/features_sp500_2024.csv", dec[0]),
-            ("data/events/events_sp500_2025.csv", "results/events/features_sp500_2025.csv", dec[1])]
+        dec = (f"results/events/decide_bonsai-27b_latest_factsheet2024_secchk_h{h}.jsonl",
+               f"results/events/decide_bonsai-27b_latest_factsheet_secchk_h{h}.jsonl")
+    return [("data/events/events_sp500_2024.csv", "results/events/features_sp500_2024_secchk.csv", dec[0]),
+            ("data/events/events_sp500_2025.csv", "results/events/features_sp500_2025_secchk.csv", dec[1])]
 
 
 HORIZON = 20
