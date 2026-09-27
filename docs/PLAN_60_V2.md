@@ -351,7 +351,7 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
   - at least 20 triggers are labeled unexplained. With fewer, the verdict is "untestable", not a pass.
 - **Also reported, not in the verdict:** mean fwd5 per label, and the share of labels the code overruled.
 
-## Tue 29 item 2: futures in the simulator (done 2026-09-27 01:15)
+## Tue 29 item 2: futures in the simulator (done 2026-09-27 01:07)
 
 - **Code:** `backend/app/portfolio/futures.py`, with 8 tests in `tests/test_futures.py`.
 - **Pricing:** synthetic contracts priced by cost of carry from free spot data.
