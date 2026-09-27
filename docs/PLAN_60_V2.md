@@ -421,3 +421,22 @@ This replaces Tue night to Thu item 1, run in one night.
 4. **Dry run:** replays of 8–25 Sep 2026 with `--as-of` in a separate folder, using lite (the GPU was busy).
    - There is a deliberate gap on 14–16 Sep, to check that LEN (16 Sep) is logged as missed.
    - The first replay found a bug: the price frame needs SPY as its calendar. It is fixed.
+
+### Forward dry runs (2026-09-27 01:50–02:50)
+
+| Dry run | Schedule | Decided on time | Missed | Why missed |
+|---|---|---|---|---|
+| 1 (8–25 Sep) | evenings only, with a gap on 14–16 Sep | 4 | 8 | 6 pre-market releases; LEN (the gap, as intended); COST (bug 2) |
+| 2 (21–25 Sep) | about 08:45 ET and evenings, both fixes in | 6 | 0 | — |
+
+- **Bug 1:** the price frame needs SPY as its calendar. Fixed.
+- **Bug 2, the important one:** `build_features.py` and `decide_events.py` dropped any release whose entry day was not
+  yet in the price data, and in live use it never is.
+  - Every live release would have been missed.
+  - Fixed with `--live`: the fact sheet reads the closes before the entry, as it does in the backtests.
+  - The backtests are unchanged.
+- **Operational rule:**
+  - Run `forward_events.py` twice each weekday: about 08:45 ET for pre-market releases, and in the evening for after-close ones.
+  - Pre-market releases are about half of all releases.
+- **Still manual:** refreshing the SEC XBRL history (`build_xbrl_eps.py facts`, weekly), so fact sheets see the newest filed quarters.
+- Outcomes in dry run 1 were logged for the first 4 decisions: COO, ADBE, CPRT, ORCL. Lite decided them; they are not scored for anything.
