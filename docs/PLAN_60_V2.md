@@ -256,3 +256,65 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
   - the 90% CI of Sharpe(B1) − Sharpe(B0) is above 0 (63-day circular block bootstrap, 2000 draws).
 - **25 bps:** reported, not part of the verdict.
 - **Registry:** one trial is registered.
+
+### Mon 28 item 1 result (2026-09-27 00:55): FAIL
+
+| 2024-01-02 .. 2026-09-24 | B0 (SPY + crypto) | B1 (+ 20-day satellite) | B1 at B0's vol |
+|---|---|---|---|
+| 10 bps: CAGR / vol / Sharpe / max DD | 23.6% / 16.9% / 1.34 / 21.1% | 23.4% / 16.6% / 1.35 / 21.4% | 23.9% / 16.9% / 1.35 / 21.8% |
+| 25 bps | 21.6% / 16.9% / 1.24 / 21.6% | 20.7% / 16.6% / 1.22 / 21.9% | 21.1% / 16.9% / 1.22 / 22.3% |
+
+- At 10 bps the vol-matched CAGR is 0.3 points higher, but the Sharpe difference is +0.01 with a 90% CI of [−0.08, +0.13].
+- The CI includes 0, so the satellite is **not added**.
+- At 25 bps it costs 0.5 points.
+- Stocks were held on 67% of days, across 3,175 releases.
+- **Reading:** the 20-day picks are about as good as the SPY they replace. After costs they add nothing measurable.
+- Stock picking stays in the forward test as a shadow book at 0 weight; it is not dropped.
+- Result: `backend/results/satellite20_test.json`.
+
+## Mon 28 item 2: PC-off fallback rule (pre-registered 2026-09-27 00:55, before any forward data)
+
+- **When it applies:** on a forward-test day, an earnings release whose decision is not written by Bonsai-27B by the next open (PC off, GPU busy or a crash).
+- **What happens:** Bonsai-lite (`scripts/bonsai_lite.py`, the ridge trained on every Bonsai decision known before that day) scores the release on CPU.
+- **Flags:** the decision is flagged `source=lite` and scored as its own book, next to the Bonsai book. It is never mixed into Bonsai's IC.
+- **Backfill:** never. If the PC comes back later, Bonsai does **not** re-decide a release that lite already traded. A missed day with no lite run either is marked missed.
+- **Promotion rule, checked at the end of the forward test:**
+  - Lite becomes the default only if its forward IC is within 0.03 of Bonsai's on the same releases, AND its 90% CI is above 0.
+  - Otherwise it stays a fallback only.
+- **The weight is fixed in advance:** lite picks get half of Bonsai's Kelly weight. It was the weaker arm in the back test (IC 0.086 vs 0.103).
+
+## Optimization research (2026-09-27 01:05, user request: "do research for the optomizations")
+
+### Portfolio optimizations
+
+- **Volatility targeting** ([Moreira & Muir](https://www.nber.org/system/files/working_papers/w22208/w22208.pdf)):
+  - Cutting exposure when recent volatility is high raised Sharpe ratios for the market and for most factors.
+  - Counter-evidence: [Cederburg et al.](https://www.sciencedirect.com/science/article/abs/pii/S0304405X2030132X) tested 103 strategies and found no systematic gain once the approach is implementable.
+  - For crypto, [volatility management mainly cuts crashes](https://link.springer.com/article/10.1007/s11408-025-00474-9).
+  - Our book is SPY plus up to 20% crypto, whose volatility clusters, so it is worth one pre-registered test (below).
+- **No-trade bands** ([NBIM](https://www.nbim.no/contentassets/8cb41f89dce345f5a6a295238f7872fb/no-trade-band-rebalancing-rules-expected-returns-and-transaction-costs.pdf); [Leland](https://arxiv.org/pdf/1203.4156)):
+  - With proportional costs, it is best to trade only when a weight leaves a band, and then only to the band's edge.
+  - Studies cut costs by about 50%.
+  - Our costs at 10 bps are already small for B0, but they grow with futures rolls and leverage.
+  - Build it into the Stage 2 executor. It is a pure cost saving, so no signal test is needed; the executor's tests check that fills stay inside the band.
+
+### Pipeline optimizations
+
+- **Bonsai briefs** run at 9.3 s each on Ollama with 3 parallel slots.
+  - [Benchmarks](https://particula.tech/blog/ollama-vs-vllm-comparison) show vLLM about matching Ollama at 1 request, but up to about 16–19× the throughput at high concurrency.
+  - Serving Bonsai-27B on vLLM (as Jan already is) with 8–16 in flight could cut the 3 h brief phase to well under 1 h.
+  - **Needs your OK:** it needs a vLLM-loadable copy of Bonsai (a download), and a check that it fits in 16 GB VRAM at 4-bit.
+  - Not done tonight.
+- **Spike cause briefs** (88 triggers): at about 12 s each they take about 18 min. No change needed.
+
+## Optimization 1: volatility target on B0 (spec fixed before the run, 2026-09-27 01:05)
+
+- **Rule:** B0's daily returns (2018-01-02 .. 2026-09-24) are scaled by exposure e_d = min(1.5, 20% / σ̂_d).
+  - σ̂_d is the annualized 20-day realized vol of B0, up to the close of d−1.
+  - **Band:** e only changes when the new value is more than 0.10 away from the current one.
+  - **Cost:** 10 bps × |Δe|. Leverage above 1 pays financing of rf + 1.5% per year on the borrowed part.
+  - rf is the 3-month T-bill, FRED DTB3.
+- **Pass (the adoption rule):**
+  - scaled to B0's realized vol, the managed book has the higher CAGR, AND
+  - the 90% CI of the Sharpe difference is above 0 (63-day block bootstrap).
+- **Also reported, not in the verdict:** the same comparison with the drawdown brakes applied on top.
