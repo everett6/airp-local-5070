@@ -614,3 +614,19 @@ into a score.
   - the full model's own IC CI is above 0.
 - **Also reported:** the 20-day horizon, and each field's IC.
 - **Registry:** one trial.
+
+### Step 1 result: prompt optimization (2026-09-27 10:18). **P2 frozen.**
+
+Dev set: 100 releases from 2024. Only extraction quality was measured; no returns were looked at.
+
+| Prompt | Parse | Quotes verified | Keyword agreement | s / release | Score |
+|---|---|---|---|---|---|
+| P1: schema | 99% | 92.6% | 68.8% | 5.7 | 0.631 |
+| **P2: + definitions** | **100%** | **96.1%** | **80.3%** | 5.8 | **0.771** |
+| P3: + quote first | 98% | 93.7% | 78.0% | 6.6 | 0.716 |
+| P4: + examples | 100% | 93.9% | 80.0% | 6.5 | 0.752 |
+
+- The definitions did the work. Non-default labels per release fell from 3.5 to 2.4: fewer over-claims, and more
+  of the remaining ones are right.
+- Quote-first and the worked examples cost 13% more time and did not help.
+- Step 2 now runs with P2 on the 2024 (train) and 2025-26 (test) samples. `results/events/llm_fields_dev.json`.
