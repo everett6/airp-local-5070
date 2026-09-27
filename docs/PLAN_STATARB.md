@@ -62,6 +62,21 @@ uncorrelated with SPY + crypto.
 - Runs only on **2024-06 → 2026-09**, because the as-of news tools do not reach further back.
 - GPU cost: about 20 candidates a day × about 3 s for Jan, plus Bonsai briefs only when news is found.
 
+**User's choice (2026-09-27): version B is the target.** Arm A is still built first, because B is A plus a filter,
+and B is judged against A on the same days.
+
+**Coverage rule for B**, fixed before any run:
+
+- `news_as_of` reads archived pages (Wayback). A missing archive is **not** "no news".
+- Each candidate is labelled from the as-of tools over the signal window (t−4..t):
+  - **news:** an 8-K was accepted in the window (`sec_filings_as_of`), or an archived headline dated in the window
+    names the company.
+  - **no news:** there is an archive snapshot inside the window, and it has no such headline and no 8-K.
+  - **unknown:** there is no archive snapshot in the window and no 8-K.
+- **B trades only "no news" names.** "Unknown" names are excluded from B, and their share is reported.
+- If more than 50% of candidates are "unknown", B cannot be judged. It is then recorded as untestable with free
+  archives, not as passed or failed.
+
 ## Windows (opened once each, in this order)
 
 1. **2010–2017: bug check only.** Look for look-ahead, turnover and cost accounting errors. No parameter may change
