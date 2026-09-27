@@ -165,6 +165,14 @@ Every step has a rule written before its run. A failed step is recorded, not dro
        - Standalone: **2014-01 → 2026-09** (after Novy-Marx 2013); the Sharpe's 95% block-bootstrap CI must be above 0.
        - The adding rule against B0, 2018–26.
        - DSR above 0.95 on the registry's N.
+   - **Result (2026-09-27 00:52): FAIL on all three rules.**
+     - 211 tickers, all with XBRL facts; 189 monthly cross-sections with a median of 41 scored names.
+     - 2014–26: CAGR 2.2%, vol 10.6%, Sharpe 0.25, 95% CI [−0.28, +0.80], max DD 25.1%, turnover 3.4× a year.
+     - Its correlation to B0 is 0.10, but the vol-matched B1 has a CAGR of 19.9% vs 21.6% for B0.
+       The Sharpe-difference CI is [−0.32, +0.20]. DSR 0.0 (N = 14).
+     - It lost 15% in 2024. Among mega-caps, value+quality has been a weak long-short signal since 2017, which matches
+       the published decay of these factors.
+     - Not added. `backend/results/value_quality_sleeve.json`.
 
 ### Phase 3 (months 1–6): forward paper test with no leverage
 
