@@ -46,3 +46,21 @@ def test_a_missing_close_does_not_drop_a_position_from_equity():
     closes.loc["2026-10-01", "SPY"] = np.nan  # the latest bar is missing for SPY
     rec = step(books, opens, closes, datetime(2026, 10, 2, 15, 0, tzinfo=UTC), MasterConfig())
     assert rec["books"]["SPY"]["equity"] > 90_000  # still counted, at the previous close
+
+
+def test_brake_multiplier_follows_the_adopted_rule():
+    from app.portfolio.forward import brake_multiplier
+    assert brake_multiplier(100.0, 100.0) == 1.0
+    assert brake_multiplier(90.5, 100.0) == 1.0
+    assert brake_multiplier(89.9, 100.0) == 2 / 3
+    assert brake_multiplier(79.9, 100.0) == 0.5
+    assert brake_multiplier(100.0, 0.0) == 1.0
+
+
+def test_old_state_gets_the_new_book():
+    from app.portfolio.forward import books_from_json, books_to_json
+    old = {k: v for k, v in books_to_json(new_books()).items() if k != "master+brakes"}
+    for v in old.values():
+        v.pop("peak")
+    books = books_from_json(old)
+    assert "master+brakes" in books and books["master"].peak == 0.0

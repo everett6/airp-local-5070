@@ -7,7 +7,8 @@ Each run (scripts/forward_allocator.py) does, for every book (the allocator and 
   2. mark the book at the latest complete close (bars dated before today are complete; today's bar is ignored);
   3. decide new targets from those closes only and leave them pending for the next run.
 Paper money only: nothing here places a real order. Books: "master" (allocate() with no stock picks),
-"SPY" (98% SPY, bought once), "80/20 SPY/BTC" (rebalanced at each run).
+"master+brakes" (the same with the drawdown brakes on its own equity), "SPY" (98% SPY, bought once),
+"80/20 SPY/BTC" (rebalanced at each run).
 """
 from __future__ import annotations
 
@@ -32,6 +33,7 @@ class Book:
     decided_at: str | None = None                 # ISO UTC time of the decision
     trades: int = 0
     costs: float = 0.0
+    peak: float = 0.0                             # highest equity marked so far (drawdown brakes)
 
 
 def fill_day(days: pd.DatetimeIndex, decided_at: str) -> pd.Timestamp | None:
@@ -77,8 +79,17 @@ def execute(book: Book, opens: pd.Series, cost_bps: float = 5.0) -> dict[str, An
     return {"fills": fills}
 
 
-def targets(name: str, close: pd.DataFrame, day: pd.Timestamp, cfg: MasterConfig, held: dict[str, float]
-            ) -> tuple[dict[str, float] | None, dict[str, Any]]:
+def brake_multiplier(equity: float, peak: float) -> float:
+    """The adopted drawdown brakes (docs/PLAN_60.md): 2/3 exposure from 10% below the peak, 1/2 from 20%."""
+    dd = 1 - equity / peak if peak > 0 else 0.0
+    return 0.5 if dd >= 0.20 else (2 / 3 if dd >= 0.10 else 1.0)
+
+
+def targets(name: str, close: pd.DataFrame, day: pd.Timestamp, cfg: MasterConfig, held: dict[str, float],
+            brake: float = 1.0) -> tuple[dict[str, float] | None, dict[str, Any]]:
+    if name == "master+brakes":
+        a = allocate([], crypto_state(close, day, cfg.crypto_assets), cfg)
+        return {k: w * brake for k, w in a.weights.items()}, {"dropped": a.dropped, "brake": round(brake, 3)}
     if name == "master":
         a = allocate([], crypto_state(close, day, cfg.crypto_assets), cfg)
         return a.weights, {"dropped": a.dropped}
@@ -110,9 +121,10 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
         # each position at its last known close (a missing bar must not drop the position from equity)
         px = {a: float(closes[a].loc[:last].dropna().iloc[-1]) for a in b.positions}
         r["equity"] = round(b.cash + sum(q * px[a] for a, q in b.positions.items()), 2)
+        b.peak = max(b.peak, r["equity"])
         r["positions"] = {a: round(q, 6) for a, q in b.positions.items()}
         if b.pending is None:
-            t, info = targets(name, closes, last, cfg, b.positions)
+            t, info = targets(name, closes, last, cfg, b.positions, brake_multiplier(r["equity"], b.peak))
             if t is not None:
                 b.pending, b.decided_at = t, now_utc.isoformat(timespec="seconds")
                 r["new_targets"] = {a: round(w, 4) for a, w in t.items()}
@@ -125,12 +137,17 @@ def books_to_json(books: dict[str, Book]) -> dict[str, Any]:
     return {k: asdict(v) for k, v in books.items()}
 
 
+BOOKS = ("master", "master+brakes", "SPY", "80/20 SPY/BTC")
+
+
 def books_from_json(d: dict[str, Any]) -> dict[str, Book]:
-    return {k: Book(**v) for k, v in d.items()}
+    """Saved books, plus any book added since (it starts fresh at the next run)."""
+    books = {k: Book(**v) for k, v in d.items()}
+    return books | {n: Book(n) for n in BOOKS if n not in books}
 
 
 def new_books() -> dict[str, Book]:
-    return {n: Book(n) for n in ("master", "SPY", "80/20 SPY/BTC")}
+    return {n: Book(n) for n in BOOKS}
 
 
 def first_run_date(ledger: list[dict[str, Any]]) -> date | None:

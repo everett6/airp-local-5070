@@ -377,7 +377,7 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
   - **Levering the crypto sleeve through CME futures costs about 6–7 points a year.** Stage 4 must price that in.
   - The 5% basis is an assumption. Real CME basis has ranged from below 0 to above 15%/yr.
 
-## Breadth test: S&P 400/600, 1-week book, extremes only (spec fixed before any breadth decision, 2026-09-27 01:15)
+## Breadth test: S&P 400/600, 1-week book, extremes only (spec fixed before any breadth decision, committed 2026-09-27 01:12)
 
 This replaces Tue night to Thu item 1, run in one night.
 
