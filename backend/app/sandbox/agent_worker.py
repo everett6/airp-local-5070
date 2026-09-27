@@ -386,9 +386,9 @@ How to research well:
 Short-horizon stock moves are close to a coin flip and stocks rise slightly more often than they fall,
 so unless the evidence is unusually strong keep p_up between 0.40 and 0.60."""
 
-RESEARCH_SYSTEM_ASOF = """You are a careful equity research agent. Decide the probability that {ticker} closes
-HIGHER {horizon} trading days after its latest close. The decision time is {as_of} (UTC). Treat it as NOW:
-you must reason only from information available at that moment. If you believe you remember what happened
+RESEARCH_SYSTEM_ASOF = """You are a careful equity research agent. Decide the probability that the stock named
+in the user message closes HIGHER the given number of trading days after its latest close. The user message gives
+the decision time (UTC). Treat it as NOW: you must reason only from information available at that moment. If you believe you remember what happened
 after that date, ignore it; it is not allowed evidence and your answer is audited against the tool record.
 
 Every tool returns only material published before the decision time (Wikipedia as it read then, SEC filings
@@ -471,8 +471,8 @@ def _render_history(steps: list[dict[str, Any]], budget: int = MAX_OBS_CHARS) ->
     return out if len(out) <= budget else out[-budget:]
 
 
-BRIEF_SYSTEM = """You are a research analyst. A portfolio manager must decide whether to buy {ticker} for the next
-{horizon} trading days, at {as_of} (UTC). Summarize the evidence below for them.
+BRIEF_SYSTEM = """You are a research analyst. A portfolio manager must decide whether to buy the stock named in the
+user message, at the decision time given there. Summarize the evidence below for them.
 
 Rules:
 - Use ONLY facts written in the evidence. Every fact must cite the URL it came from, copied exactly.
@@ -544,21 +544,29 @@ def verify_brief(raw: dict[str, Any] | None, evidence: str) -> dict[str, Any]:
             "dropped": dropped, "parsed": bool(raw), "truncated": bool(raw.get("truncated"))}
 
 
+def subject_line(subj: dict[str, Any]) -> str:
+    """The per-release part of a prompt. It goes first in the user message, never in the system prompt, so the system
+    prompt and tool list stay byte-identical across releases and the servers' prefix caches reuse them."""
+    return (f"Stock: {subj['ticker']}. Decision time (UTC, treat as NOW): {subj['as_of']}. "
+            f"Horizon: {subj.get('horizon_days', 5)} trading days.\n\n")
+
+
 def write_brief(subj: dict[str, Any], steps: list[dict[str, Any]], budget: int) -> dict[str, Any]:
     evidence = _render_history([{**st, "thought": ""} for st in steps], budget)
-    _send({"llm_requests": [{"id": "b", "user": evidence or "No evidence was found.",
-                             "system": BRIEF_SYSTEM.format(ticker=subj["ticker"], as_of=subj["as_of"],
-                                                           horizon=subj.get("horizon_days", 5))}]})
+    _send({"llm_requests": [{"id": "b", "user": subject_line(subj) + (evidence or "No evidence was found."),
+                             "system": BRIEF_SYSTEM.format()}]})  # {{ }} in the JSON example -> { }
     return verify_brief(salvage_facts(_recv()["llm_responses"].get("b", "")), evidence)
 
 
 def run_research(msg: dict[str, Any]) -> dict[str, Any]:
     subj = msg["subject"]
     max_rounds, max_calls = int(msg.get("max_rounds", 3)), int(msg.get("max_calls_per_round", 6))
-    template = RESEARCH_SYSTEM_ASOF if msg.get("prompt") == "as_of" else RESEARCH_SYSTEM
+    as_of_prompt = msg.get("prompt") == "as_of"
+    template = RESEARCH_SYSTEM_ASOF if as_of_prompt else RESEARCH_SYSTEM
     system = template.format(ticker=subj["ticker"], horizon=subj.get("horizon_days", 5),
                                    as_of=subj["as_of"], tools=json.dumps(msg["tools"], indent=1),
                                    max_calls=max_calls)
+    head = subject_line(subj) if as_of_prompt else ""  # RESEARCH_SYSTEM_ASOF names no stock itself
     history_budget = min(MAX_OBS_CHARS, prompt_char_budget(int(msg.get("num_ctx", 8192)),
                                                            int(msg.get("num_predict", 600))) - len(system) - 300)
     steps: list[dict[str, Any]] = []
@@ -580,7 +588,7 @@ def run_research(msg: dict[str, Any]) -> dict[str, Any]:
         last = rnd > max_rounds
         if last and msg.get("skip_final"):
             break  # the caller only needs the evidence (and the brief), not a verbal probability
-        user = (f"Research so far:\n{_render_history(steps, history_budget)}" if steps else "No research yet.")
+        user = head + (f"Research so far:\n{_render_history(steps, history_budget)}" if steps else "No research yet.")
         if last:
             user += "\n\nYou have used all tool rounds. Reply now with the final JSON object."
         _send({"llm_requests": [{"id": "r", "system": system, "user": user}]})

@@ -115,7 +115,10 @@ def test_run_research_as_of_prompt_and_logprob_score(pipe):
                            "tools": [{"name": "news_as_of"}], "prompt": "as_of", "score": "logprob",
                            "max_rounds": 2, "num_ctx": 8192, "num_predict": 600})
     first = p.sent[0]["llm_requests"][0]
-    assert "The decision time is 2015-03-10" in first["system"] and "ignore it" in first["system"]
+    # the release's details lead the user message; the system prompt names no stock or date, so it is identical
+    # for every release and stays in the servers' prefix caches
+    assert first["user"].startswith("Stock: X. Decision time (UTC, treat as NOW): 2015-03-10")
+    assert "ignore it" in first["system"] and "2015" not in first["system"] and "X" not in first["system"].split()
     last = p.sent[-1]["llm_requests"][0]
     assert last["mode"] == "updown" and "earnings beat" in last["user"] and "headline" in last["user"]
     assert "20 trading days" in last["system"]

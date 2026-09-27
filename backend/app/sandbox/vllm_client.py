@@ -28,6 +28,7 @@ class VLLMChat:
         self.model, self.base_url = model, base_url.rstrip("/")
         self.num_ctx, self.num_predict = num_ctx, num_predict
         self.native_tools: list[dict[str, Any]] | None = None
+        self.thinking = True  # the tool-calling round's reasoning tokens (Jan-v1 is trained with them)
         self.calls = self.cache_hits = 0
         self._sem = asyncio.Semaphore(concurrency)
         self._client = httpx.AsyncClient(timeout=600)
@@ -70,7 +71,7 @@ class VLLMChat:
             raise ValueError("log-probability modes run on Ollama, not vLLM")
         native = (self.native_tools is not None and '"actions"' in system
                   and "You have used all tool rounds" not in user)
-        key = hashlib.sha256(f"{self.model}\0{system}\0{user}\0native={native}\0v2".encode()).hexdigest()
+        key = hashlib.sha256(f"{self.model}\0{system}\0{user}\0native={native}\0think={self.thinking}\0v2".encode()).hexdigest()
         if self.use_cache and key in self._cache:
             self.cache_hits += 1
             return self._cache[key]
@@ -80,7 +81,7 @@ class VLLMChat:
                 note = ("\n\nCall the tools directly with your tool-call format (several at once is fine). When you "
                         "have enough evidence, reply with the final JSON object only.")
                 for temp in (0.0, 0.7):
-                    body = self._body(system + note, user, True, 1024, temp) | {"tools": self.native_tools,
+                    body = self._body(system + note, user, self.thinking, 1024, temp) | {"tools": self.native_tools,
                                                                                  "tool_choice": "auto"}
                     m = await self._post(body)
                     if m.get("tool_calls"):

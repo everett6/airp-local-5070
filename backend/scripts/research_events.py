@@ -72,8 +72,10 @@ def prefetch_for(r, ex99: dict[str, str], names: dict[int, str], prev: dict[str,
     test (docs/WEEK_PLAN.md, 2026-09-26)."""
     t = str(r.ticker)
     calls = [{"tool": "price_history_as_of", "args": {"ticker": t, "days": 60}},
-             {"tool": "sec_filings_as_of", "args": {"ticker": t, "forms": ["8-K", "10-Q", "10-K"], "limit": 5}},
              {"tool": "news_as_of", "args": {"ticker": t}}]
+    if prev is None:  # v2 only: in v3 the filing list's item codes became "facts" ("reported 8.01 and 9.01")
+        calls.insert(1, {"tool": "sec_filings_as_of", "args": {"ticker": t, "forms": ["8-K", "10-Q", "10-K"],
+                                                               "limit": 5}})
     if ex99.get(r.accession):  # the earnings release itself
         calls.append({"tool": "read_filing", "args": {"url": ex99[r.accession], "max_chars": 4000}})
     if prev is None:
@@ -160,6 +162,8 @@ async def run(args: argparse.Namespace) -> None:
     ua = base.sec_user_agent
     if args.native_tools:
         llm.native_tools = base.specs_native()
+    if isinstance(llm, VLLMChat):
+        llm.thinking = args.jan_thinking
     writer = (OllamaLLM(args.brief_model, base_url=args.brief_base_url, concurrency=args.brief_workers, num_ctx=8192,
                         num_predict=1200, cache=args.llm_cache, require_gpu=True) if args.brief_model else None)
     router = Router(llm, writer)
@@ -244,6 +248,8 @@ def main() -> None:
     ap.add_argument("--events", default="data/events/events_sp500_2025.csv", help="for the press-release URLs")
     ap.add_argument("--members", default="data/events/members_2024_2026.csv", help="for company names")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--jan-thinking", action=argparse.BooleanOptionalAction, default=True,
+                    help="reasoning tokens in the tool-calling round (vLLM backend)")
     ap.add_argument("--llm-cache", action=argparse.BooleanOptionalAction, default=True,
                     help="replay model replies from the LLM cache (off for speed benchmarks)")
     args = ap.parse_args()
