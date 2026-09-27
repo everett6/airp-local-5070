@@ -528,3 +528,16 @@ Nothing is selected from this grid; the live rule stays at 21 × 100. Script: `s
   is above 0 (63-day block bootstrap).
 - **Also reported:** trades and costs.
 - **Registry:** one trial.
+
+### Optimization 2 result (2026-09-27 03:45): FAIL (lead)
+
+| 10 bps, 2018–26 | CAGR | vol | Sharpe | max DD | trades | costs on $100k |
+|---|---|---|---|---|---|---|
+| weekly (live) | 21.3% | 20.6% | 1.04 | 33.8% | 643 | $10,047 |
+| daily | 22.4% | 20.6% | 1.09 | 34.4% | 2,795 | $21,983 |
+
+- The Sharpe difference is +0.04, with a 90% CI of [−0.05, +0.16]. The CI includes 0, so it is **not adopted**.
+- The direction agrees with the monthly result: a faster check earns more even after twice the costs. But one more
+  point a year is inside the noise of one 8.7-year path.
+- It is a lead for the 3-month review, where the forward allocator's weekly runs can be compared with a daily
+  shadow.
