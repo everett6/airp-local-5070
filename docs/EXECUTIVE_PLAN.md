@@ -51,3 +51,24 @@ so learning from them cannot leak the future.
   walk-forward refits (calibrator, combined score) and pre-registered forward tests.
 - **Later, with the user's OK for any download:** fine-tune Jan (LoRA) on its research runs whose facts passed the
   source check.
+
+## Status at 04:05 on 2026-09-27
+
+- **Steps 1–5: done.**
+  - Research v3 failed its rule in every book, so step 5's portfolio comparison did not apply.
+  - Leak audit: 0 leaks. The 9 flags were all date labels.
+  - Results: WEEK_PLAN.md ("Research v3") and PLAN_60_V2.md.
+- **Step 6:** docs updated through the night and pushed after each result.
+- **Step 7 (shutdown)** comes after the breadth test.
+  - That test is the last GPU job, run on the user's 10-hour autonomous window.
+  - It is expected to finish around 08:30.
+- **Failure log: built.**
+  - `scripts/failure_review.py` writes `results/failures.jsonl` and appends to `results/failures_summary.jsonl`, with a test.
+  - **First review, research v3 (1,180 releases):**
+    - 1,781 brief facts were dropped because a number was not in the cited source: 1.5 per brief, 26% of all facts.
+    - 775 news lookups timed out, and 604 had no archived page.
+    - Analyst-target pages were missing or timed out 261 times.
+    - 18 calls used an unknown tool name; 5 replies could not be parsed.
+  - **Candidate fixes, each to be tested on the 24-release benchmark (`scripts/spec_bench.sh`) before adoption:**
+    - Skip `news_as_of` once the archive has timed out twice in a run.
+    - Show the brief writer each number next to its source tag, so it cites the right one.
