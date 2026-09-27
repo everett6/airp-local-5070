@@ -728,6 +728,62 @@ least two sleeves pass.
 - **Rules:** as for Sleeve 1. Standalone Sharpe CI > 0 over **2012-01 → 2026-09** (after Lustig, Roussanov and
   Verdelhan 2011, and Menkhoff et al. 2012), and the adding rule against B0 over 2018–26.
 
+### Results of A1–A3 (2026-09-27, 01:10): all three fail their pre-registered rules
+
+**A1 Bonsai-lite** (`results/events/bonsai_lite.json`)
+
+- Inputs: 1,180 releases, 26 features.
+- The ridge copy ranks releases with a **0.754 rank correlation to Bonsai**. It fits and predicts in milliseconds on
+  the CPU.
+
+| Arm | IC | 95% CI |
+|---|---|---|
+| (a) Bonsai | +0.103 | +0.051 to +0.158 |
+| (b) Lite alone | +0.086 | +0.004 to +0.173 |
+| (c) Triage (49% of Bonsai calls saved) | +0.083 | +0.011 to +0.158 |
+
+- Both (b) and (c) have a CI above 0, but both miss the "within 0.01 of Bonsai" margin, so **both FAIL**. Bonsai
+  stays the decider for the 1-week book.
+- **Lead, not adopted:** lite keeps most of the signal with no GPU. That makes it a candidate fallback for the
+  forward test on days the PC or the model server is off. That use needs its own pre-registered rule.
+
+**A2 Volatility-managed momentum** (`results/momentum_sleeve.json`)
+
+- Turnover 8.7× a year, average gross 1.4×.
+
+| Window | CAGR | Vol | Sharpe | 95% CI | Max DD | Worst year |
+|---|---|---|---|---|---|---|
+| 2016–26 | 0.7% | 12.9% | 0.12 | −0.49 to 0.70 | 31.5% | −23.2% (2016) |
+
+- Added to the book: correlation −0.01, but at equal risk the CAGR is 21.0% vs B0's 21.6%. Sharpe difference −0.02,
+  90% CI −0.37 to +0.29. **FAIL on both rules.**
+- In 100 mega-caps, momentum has been weak since 2016, consistent with its post-publication decay.
+
+**A3 G10 FX carry** (`results/fx_carry_sleeve.json`)
+
+- Turnover 2.6× a year, average gross 2.5×.
+- The EUR and GBP OECD rates stop at 2026-01 and are carried forward from there.
+
+| Window | CAGR | Vol | Sharpe | 95% CI | Max DD |
+|---|---|---|---|---|---|
+| 2012–26 | 1.1% | 13.1% | 0.15 | −0.16 to 0.59 | 31.7% |
+
+- 2008: −19.8%, the carry crash.
+- Added to the book: at equal risk the CAGR is 18.6% vs B0's 22.1%. Sharpe difference −0.14, 90% CI −0.32 to +0.13.
+  **FAIL on both rules.**
+
+**What the four sleeve tests say together** (trend, momentum, FX carry, plus Bonsai-lite for the event book):
+
+- The published "free lunch" families, run honestly, after costs and after publication, add nothing to a book that
+  is already mostly SPY + crypto in a strong 2018–26 bull market.
+- That matches the decay literature (McLean & Pontiff; the backtest-to-live haircut of Suhonen et al.).
+- For the 30–40% target, the only candidates left with a CI above 0 in this project are the Bonsai event book
+  (1-week) and the SPY + crypto core. Neither has shown a true Sharpe above 1 over a long enough sample.
+- **Next honest step:** keep the forward test running to accumulate out-of-sample months; do not lever up on
+  2025-26 alone.
+- **Sleeves still untested:** commodity/bond carry needs futures curve data that isn't freely available;
+  value + quality needs point-in-time fundamentals history (EDGAR XBRL, 2009+). Each gets its own spec before its run.
+
 ### Spike check: analyze before responding (design, to be built and tested next)
 
 - **Trigger (checked once a day at the close):**
