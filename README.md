@@ -12,6 +12,10 @@ only** (SEC filings, Yahoo prices, Wikipedia, the Internet Archive). Nothing her
   trading is cheap, and it is **not proven**. It still has to pass a forward test on new data.
 - Most of the money in every portfolio below comes from the **S&P 500 (SPY)** and a small **bitcoin/ether trend
   sleeve**, not from the stock picks.
+- **The book going into the forward test (from 5 Oct 2026):** SPY + the crypto trend sleeve (at most 20%) +
+  drawdown brakes. The AI picks run beside it as a shadow book with no money. 2018-2026 backtest without brakes:
+  21.6% a year, worst drop 34%; the brakes cut the worst drop to 27% at the same risk-adjusted return. Plan and every
+  test: [`docs/PLAN_60_V2.md`](docs/PLAN_60_V2.md).
 
 ## How it works
 
@@ -72,9 +76,16 @@ unproven extra of about a point a year that costs can erase.**
 | Analyst price targets from archived Yahoo pages | 0 of 12 pre-registered tests passed |
 | 3-month / 1-year / 2-year books | failed (sign flips between years) |
 | Speed tricks: speculative decoding, bigger batches, shorter brief format | measured; kept only what helped |
+| Web research v3 (faster, aimed at the earnings surprise), 5 books | no book improved (1 week: IC +0.102 with vs +0.103 without) |
+| 1-month AI picks as a satellite in the portfolio | no measurable gain (Sharpe +0.01, interval −0.08 to +0.13) |
+| Value + quality (SEC fundamentals), momentum, trend, FX carry, stat-arb, long-short event book | all failed their pre-set rules |
+| Volatility target; a 35% crypto cap | slightly better, but inside the noise: kept as leads, not adopted |
+| "Analyze a sudden spike before responding" (Jan + Bonsai explain each 4σ move) | explaining works; trading on it lost money (−0.19% per spike), so it is information only |
+| **Drawdown brakes** (cut risk to ⅔ at −10%, ½ at −20%) | **passed**: worst drop 33.8% → 27.2% at the same risk-adjusted return |
 
 Details: [`docs/WEEK_PLAN.md`](docs/WEEK_PLAN.md) (this week's tests, rules and results),
-[`docs/EXECUTIVE_SUMMARY.md`](docs/EXECUTIVE_SUMMARY.md), [`docs/EXECUTIVE_PLAN.md`](docs/EXECUTIVE_PLAN.md).
+[`docs/EXECUTIVE_SUMMARY.md`](docs/EXECUTIVE_SUMMARY.md), [`docs/PLAN_60_V2.md`](docs/PLAN_60_V2.md) (the current plan and
+every test since 26 Sep), [`docs/STRATEGY_RESEARCH.md`](docs/STRATEGY_RESEARCH.md) (literature review).
 
 ## Running it
 
@@ -296,7 +307,12 @@ Everything below was re-run for this repo; claims inherited from upstream that w
   overflow detection).
 - **Results:** v5, v6 and v7 finished 2026-09-22 and were scored against criteria fixed before they ran — all
   NOT PASSED; each replays identically from its committed cache with no GPU (`scripts/reproduce.py`).
-- **Forward test:** hash-chained ledger verified by the dashboard and by tests; first decision logged on time.
+- **Forward test (2026-09-27):** `scripts/forward_allocator.py` (SPY + crypto books, with and without brakes) and
+  `scripts/forward_events.py` (new S&P 500 releases → Bonsai's 1-week score, logged before the open in a
+  hash-chained ledger) are ready; `scripts/weekly_review.py` summarizes both. Run by hand: the event runner twice
+  each weekday (about 08:45 ET and evening). A dry run over 8-25 Sep 2026 found and fixed two bugs; the second dry
+  run decided 6 of 6 releases on time. Starts Mon 5 Oct.
+- **Forward test (v1, older):** hash-chained ledger verified by the dashboard and by tests; first decision logged on time.
   **Paused 2026-09-16:** the hourly timer was uninstalled at the owner's request, so weeks from 2026-09-21 are not
   logged unless `python -m app.forward.run` is run by hand before the Monday open (missed weeks can't be backfilled).
 - **Failure handling (2026-09-16):** a power loss that corrupted the LLM cache and a GPU crash (Xid 79) that made
