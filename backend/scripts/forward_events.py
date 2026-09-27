@@ -38,6 +38,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 sys.path.insert(0, str(BACKEND / "scripts"))
 
+import numpy as np
 import pandas as pd
 from event_eval import SECTOR_ETF
 
@@ -162,6 +163,26 @@ def bonsai(ev_csv: Path, ex: Path, feats: Path, tag: str, since: date, d: Path) 
     return {r["accession"]: float(r["logodds"]) for r in rows if not r.get("censored")}
 
 
+def pre_entry(ev: pd.DataFrame, p: Prices) -> pd.DataFrame:
+    """The price features event_eval.build computes, from closes before the acceptance only: at decision time the
+    entry day's bar does not exist yet, so build() would mark every new release unscorable."""
+    rows = []
+    for r in ev.itertuples():
+        t, etf = str(r.ticker).replace(".", "-"), SECTOR_ETF.get(str(r.sector))
+        if etf is None or t not in p.close.columns or etf not in p.close.columns:
+            continue
+        acc = datetime.fromisoformat(str(r.accepted_utc)).replace(tzinfo=UTC).astimezone(NY)
+        # bars strictly before the entry day: a pre-open release enters that day, a later one the next trading day
+        cutoff = pd.Timestamp(acc.date()) - pd.Timedelta(days=1 if acc.time() < OPEN else 0)
+        c, e = p.close[t].loc[:cutoff], p.close[etf].loc[:cutoff]
+        i = len(c)
+        row = {"accession": r.accession, "sector": r.sector, "momentum": np.nan}
+        if i >= 253 and pd.notna(c.iloc[i - 253]) and pd.notna(c.iloc[i - 22]):
+            row["momentum"] = float((c.iloc[i - 22] / c.iloc[i - 253] - 1) - (e.iloc[i - 22] / e.iloc[i - 253] - 1))
+        rows.append(row)
+    return pd.DataFrame(rows, columns=["accession", "sector", "momentum"])
+
+
 def lite(feats: Path, ev_csv: Path, p: Prices) -> dict[str, float]:
     """Bonsai-lite: ridge on every past Bonsai 1-week decision (S&P 500, 2024 and 2025-26), applied to new releases."""
     from bonsai_lite import SAMPLES, design, ridge
@@ -177,8 +198,7 @@ def lite(feats: Path, ev_csv: Path, p: Prices) -> dict[str, float]:
     train = pd.concat(frames, ignore_index=True)
     cats = {c: sorted(train[c].dropna().astype(str).unique()) for c in ("guidance", "tone", "sector")}
     model = ridge(design(train, cats), train["logodds"].to_numpy(float))
-    new = build(pd.read_csv(ev_csv), p)
-    new = new[new["scorable"]].merge(pd.read_csv(feats)[cols], on="accession")
+    new = pre_entry(pd.read_csv(ev_csv), p).merge(pd.read_csv(feats)[cols], on="accession")
     for c in ("guidance", "tone"):
         new[c] = new[c].fillna("none" if c == "guidance" else "neutral")
     if new.empty:
