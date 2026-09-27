@@ -484,3 +484,21 @@ This is built from what passed its pre-registered rule, and nothing else.
   - long-short; stat-arb; the trend, momentum and FX sleeves.
 - **Frozen:** changes before the 3-month review need a new pre-registered test. After the review, the Stage 4
   table applies.
+
+## Optimization research 2: how sturdy is the crypto trend rule? (2026-09-27 03:25; a check, not a trial)
+
+B0 was re-run with the trend rule's two parameters moved over a grid:
+- lookback: 10, 15, 21, 30, 42 and 63 trading days;
+- moving average: 50, 75, 100, 150 and 200 days.
+
+Nothing is selected from this grid; the live rule stays at 21 × 100. Script: `scripts/crypto_robustness.py`.
+
+- **A plateau, not a spike.**
+  - All 30 cells: Sharpe 0.85–1.07, median 0.96. Every one beats SPY alone (0.81).
+  - Only the shortest lookback (10 days) is clearly worse (0.85–0.88).
+  - Max drawdown is 34–39% everywhere: the drawdown is SPY's (2020, 2022), not crypto's.
+- **The live rule is lucky.** It sits in the 87th percentile of the grid (Sharpe 1.05, CAGR 21.6%).
+  - Fair forward expectation for B0: **Sharpe about 0.96, CAGR about 19–20%**, not the 21.6% backtest.
+  - With the brakes, subtract about 4 points of raw return. That leaves about 16% before any leverage.
+- **For the 30–40% target:** it confirms that the gap has to be closed with risk (leverage or a higher crypto cap),
+  not with a better-tuned rule. The shadow 1.5× and 2.0× books are the way to measure that on real data.
