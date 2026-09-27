@@ -214,6 +214,30 @@ vs the same releases' cleaned fact sheets alone (`horizons6_eval.py --with-tag j
 the with-research 95% interval above zero. Books: 1 week, 1 month, 3 months, 6 months, 1 year (2 years has no
 2025-26 outcomes). A book that passes gets research in the forward test; one that fails stays fact-sheet only.
 
+**Result (2026-09-27 03:02): no book passes. Research stays off in every book.**
+
+| Book | With research, IC [95% CI] | Fact sheet only | Rule |
+|---|---|---|---|
+| 1 week | +0.102 [+0.040, +0.170] | +0.103 [+0.051, +0.158] | fail (not higher) |
+| 1 month | +0.074 [+0.007, +0.142] | +0.094 [+0.024, +0.163] | fail |
+| 3 months | +0.052 [−0.028, +0.143] | +0.074 [−0.006, +0.150] | fail |
+| 6 months | −0.065 [−0.147, +0.008] | −0.043 | fail |
+| 1 year | −0.147 [−0.300, −0.023] | −0.143 | fail |
+
+- **The research itself worked:** 1,103 of 1,180 releases got verified facts (5,122 in all), and the press releases
+  were no longer blocked.
+- **Leak audit** (`research_audit.py`): 9 facts in 3 releases were flagged. None is a leak; all 9 were date labels
+  in the brief, checked by hand:
+  - DHR and CNC: the facts come from the release's own press release, accepted the evening before and dated the
+    next morning.
+  - ON: a Susquehanna price-target cut that the source page, captured before the decision, dates 22 January;
+    the brief wrote 22 February.
+- **Reading:** a second model's web notes on top of the checked fact sheet add nothing Bonsai can use, in three
+  tries (v1, v2, v3). The fact sheet already carries what moves the stock after earnings.
+- The pre-registered master-portfolio comparison with and without research only applied if a book passed, so it
+  was not run.
+- `results/events/research_v3_eval.txt`.
+
 ## More horizons result (2026-09-26): no new book passes
 
 Bonsai on the cleaned fact sheets (results/events/horizons6_eval.txt), monthly rank IC [95% CI]:
