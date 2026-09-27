@@ -475,7 +475,8 @@ BRIEF_SYSTEM = """You are a research analyst. A portfolio manager must decide wh
 user message, at the decision time given there. Summarize the evidence below for them.
 
 Rules:
-- Use ONLY facts written in the evidence. Every fact must cite the URL it came from, copied exactly.
+- Use ONLY facts written in the evidence. Every fact must cite its source by its tag from the source list at the
+  end of the evidence (e.g. "S2").
 - Never write a number that does not appear in the evidence.
 - Up to 6 facts, each under 30 words, most decision-relevant first. What moves a stock after earnings is the
   surprise against expectations, so put first: the guidance the company gave in its PREVIOUS release and whether
@@ -483,10 +484,10 @@ Rules:
   items; then deals, lawsuits, management changes. The manager already has this release's revenue, EPS and guidance
   figures and the stock's price, returns and volatility: do NOT repeat those.
 
-Reply with ONLY one JSON object:
-{{"facts": [{{"text": "<one sentence>", "source": "<url>", "date": "<YYYY-MM-DD or empty>"}}],
-  "catalysts": ["<possible upside driver>"], "risks": ["<possible downside driver>"],
-  "missing": ["<important thing you could not find>"]}}"""
+Reply with ONLY one JSON object, on one line, without indentation:
+{{"facts": [{{"text": "<one sentence>", "source": "<tag, e.g. S2>", "date": "<YYYY-MM-DD or empty>"}}],
+"catalysts": ["<possible upside driver>"], "risks": ["<possible downside driver>"]}}
+At most 3 catalysts and 3 risks."""
 
 _URL = re.compile(r"https?://[^\s\"'<>)\]]+")
 _NUM = re.compile(r"\d[\d,]*(?:\.\d+)?")
@@ -551,11 +552,25 @@ def subject_line(subj: dict[str, Any]) -> str:
             f"Horizon: {subj.get('horizon_days', 5)} trading days.\n\n")
 
 
+def source_tags(evidence: str) -> dict[str, str]:
+    """Short tags for the evidence's URLs ("S1" -> url), in order of appearance. The brief cites a tag instead of
+    copying a ~40-token URL per fact (a 6-fact brief was ~800 output tokens, the slowest step of research)."""
+    urls = list(dict.fromkeys(u.rstrip(".,;") for u in _URL.findall(evidence)))
+    return {f"S{i}": u for i, u in enumerate(urls, 1)}
+
+
 def write_brief(subj: dict[str, Any], steps: list[dict[str, Any]], budget: int) -> dict[str, Any]:
     evidence = _render_history([{**st, "thought": ""} for st in steps], budget)
-    _send({"llm_requests": [{"id": "b", "user": subject_line(subj) + (evidence or "No evidence was found."),
+    tags = source_tags(evidence)
+    listing = "\n\nSources:\n" + "\n".join(f"[{t}] {u}" for t, u in tags.items()) if tags else ""
+    _send({"llm_requests": [{"id": "b", "user": subject_line(subj) + (evidence or "No evidence was found.") + listing,
                              "system": BRIEF_SYSTEM.format()}]})  # {{ }} in the JSON example -> { }
-    return verify_brief(salvage_facts(_recv()["llm_responses"].get("b", "")), evidence)
+    raw = salvage_facts(_recv()["llm_responses"].get("b", ""))
+    for f in (raw or {}).get("facts", []) if isinstance((raw or {}).get("facts"), list) else []:
+        if isinstance(f, dict):  # a tag becomes its URL; verify_brief then checks the fact against that source
+            src = str(f.get("source", "")).strip().strip("[]")
+            f["source"] = tags.get(src.upper(), f.get("source", ""))
+    return verify_brief(raw, evidence)
 
 
 def run_research(msg: dict[str, Any]) -> dict[str, Any]:

@@ -199,3 +199,15 @@ def test_prefetch_runs_before_any_llm_round_and_skip_final_stops_after_the_round
     assert out["steps"][0]["round"] == 0 and len(out["steps"]) == 3
     assert sum("llm_requests" in s for s in p.sent) == 2  # two research rounds, no forced final round
     assert not out["answered"]
+
+
+def test_brief_cites_short_source_tags_mapped_back_to_urls(pipe):
+    replies = iter([json.dumps({"facts": [{"text": "Sales up 5%", "source": "S1"}, {"text": "Costs 9", "source": "S7"}]})])
+    p = pipe(lambda r: next(replies), lambda r: {"ok": True, "result": "https://n.example/a sales rose 5%"})
+    out = aw.run_research({"subject": {"ticker": "X", "as_of": "2015-03-10T20:00:00+00:00"},
+                           "tools": [{"name": "news_as_of"}], "prompt": "as_of", "brief": True, "skip_final": True,
+                           "prefetch": [{"tool": "news_as_of", "args": {"ticker": "X"}}], "max_rounds": 0,
+                           "num_ctx": 8192, "num_predict": 600})
+    assert "[S1] https://n.example/a" in p.sent[-1]["llm_requests"][0]["user"]
+    assert out["brief"]["facts"] == [{"text": "Sales up 5%", "source": "https://n.example/a", "date": ""}]
+    assert out["brief"]["dropped"]["unknown_source"] == 1  # an unknown tag is still an unknown source
