@@ -78,6 +78,18 @@ Every step has a rule written before its run. A failed step is recorded, not dro
    simulator allows shorting.
    - Test on 2024 and 2025-26 at 10 and 25 bps.
    - **Pass:** the net Sharpe's 95% CI is above 0 in *both* years.
+   - **Spec (fixed 2026-09-27 before the run; `scripts/longshort_event_book.py`):**
+     - Releases are grouped by the calendar week of their entry day.
+     - Weeks with fewer than 10 releases stay in cash.
+     - Within a week, Bonsai's 1-week log-odds ranks the releases: long the top fifth, short the bottom fifth, equal
+       weight, 1 unit per side.
+     - Each position runs from the entry-day open to the open 5 trading days later.
+     - **Primary:** raw stock returns, dollar-neutral, with 4 × cost per week (in and out, both sides).
+     - **Secondary, reported only:** the sector-ETF-hedged version (the IC's own outcome), with 8 × cost.
+     - Weekly returns, cash weeks included, annualized by √52.
+     - The Sharpe CI is a 13-week circular block bootstrap with 2,000 resamples.
+     - Both years use the SEC-cross-checked fact-sheet decisions (`factsheet2024_secchk_h5`,
+       `factsheet_secchk_h5`).
 3. **Breadth: S&P 400/600 earnings releases** (free EDGAR + Yahoo).
    - Same fact sheets and same Bonsai prompt.
    - A2-style bias control: the universe comes from dated membership, and delisted names are kept where data exists.
