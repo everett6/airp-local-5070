@@ -558,10 +558,100 @@ Everything above is free; nothing needs a subscription.
 
 Per the project rules, a failed strategy stays in the record as failed and is not silently dropped.
 
-## Open questions for the user
+## User decisions (2026-09-26, 23:50)
 
-1. **Instruments.** Does the paper simulator allow shorting, margin, futures or options?
-   - If not, trend and carry have to run long-only through ETFs (weaker evidence).
-   - Long-short factor results would not apply as published.
-2. **Drawdown tolerance.** What loss from peak is acceptable? That number, not the 66% target, should set leverage.
-3. **Scope.** Should these families become new sleeves next to the Bonsai event book, or stay a reading list for now?
+1. **Instruments.** The paper simulator allows shorting, margin, futures and options. Long-short and futures-style
+   sleeves are therefore in scope; the paper simulation charges financing and borrow costs.
+2. **Target: 30–40% a year.** Drawdown tolerance "depends". The AI has to analyze the market, and after a sudden
+   spike it analyzes *why* before responding.
+3. **Scope.** A strategy family becomes a sleeve **if it improves the gain**. This is judged at equal risk (below),
+   because raw gain can always be bought with leverage.
+
+### What 30–40% requires
+
+Same maths as Part 1: r = 4%, no financing spread or fees, so the numbers are optimistic.
+
+| Target | Sharpe at 20% vol | at 25% | at 30% | Least possible Sharpe (full Kelly) |
+|---|---|---|---|---|
+| 30% | 1.21 | 1.01 | 0.89 | 0.67 |
+| 35% | 1.40 | 1.17 | 1.02 | 0.72 |
+| 40% | 1.58 | 1.31 | 1.14 | 0.77 |
+
+Monte Carlo, 10 years, fat tails, with volatility set for a 35% CAGR:
+
+| Backtest Sharpe, vol | True Sharpe | Median CAGR | Median max DD | 90th pct max DD |
+|---|---|---|---|---|
+| 1.4, 20% | 1.4 | 35% | 24% | 33% |
+| | 0.98 | 24% | 28% | 39% |
+| | 0.70 | 18% | 31% | 43% |
+| 1.17, 25% | 1.17 | 35% | 32% | 43% |
+| | 0.82 | 24% | 36% | 50% |
+| | 0.58 | 17% | 40% | 56% |
+| 1.0, 30% | 1.0 | 34% | 40% | 54% |
+| | 0.70 | 23% | 45% | 61% |
+| | 0.50 | 16% | 50% | 67% |
+
+**Reading.** 30–40% is not ruled out the way 66% is. It needs a combined book with a *true, net* Sharpe of about
+1.0–1.4 at 20–30% volatility, and it means living with peak-to-trough losses of roughly 25–45%. No single family in
+Part 2 has a credible net Sharpe that high. The only route is to combine several roughly uncorrelated sleeves
+(trend, carry, factor, the event book, crypto) and then apply moderate leverage. Each sleeve therefore earns its
+place by raising the *combined* Sharpe. If the combined true Sharpe ends up nearer 0.7, the same risk gives about
+17–23%.
+
+### Rule for adding a sleeve (pre-registered, applies to every candidate)
+
+- **Baseline:** B0 is the current master book (SPY core + crypto sleeve, `master_portfolio.py crypto`), 2018-01-02 to
+  2026-09-24.
+- **Candidate:** B1 is B0 plus the candidate sleeve as an overlay.
+- **The sleeve is adopted only if both hold:**
+  - B1's CAGR, after scaling B1 to B0's realized volatility, is higher than B0's CAGR.
+  - The 90% block-bootstrap interval of Sharpe(B1) − Sharpe(B0) lies above 0 (3-month blocks, 2,000 resamples).
+- **Separately, the sleeve must work on its own:** its net Sharpe over its post-publication window has a 95%
+  block-bootstrap interval above 0.
+- **Costs:** base 10 bps per unit traded; also reported at 25 bps.
+- **Honesty:** one specification per sleeve, written below before its first run. A sleeve that fails stays in the
+  record as failed.
+
+### Sleeve 1: diversified trend following (spec written before any run)
+
+- **Script:** `scripts/trend_sleeve.py`.
+- **Instruments:** 20 liquid ETFs, standing in for futures because they have clean, split- and dividend-adjusted free
+  Yahoo data:
+  - Equities: SPY, QQQ, IWM, EFA, EEM, EWJ
+  - Bonds: TLT, IEF, LQD, HYG, TIP
+  - Commodities: GLD, SLV, USO, DBC, DBA
+  - Currencies: UUP, FXE, FXY
+  - Real estate: VNQ
+  - Cash: BIL.
+- **Signal** at each month-end close: the sign of the ETF's 252-day return minus BIL's 252-day return (Moskowitz,
+  Ooi, Pedersen 12-month rule). Long if positive, short if negative.
+- **Sizing:**
+  - Raw weight = sign ÷ the ETF's 63-day volatility.
+  - The book is scaled to 10% ex-ante volatility using the 252-day covariance, with a gross cap of 4×.
+  - Weights set at close t earn returns from t+1 to the next rebalance.
+- **Returns:**
+  - Σ w·(r − r_BIL), minus 10 bps × Σ|Δw| at each rebalance.
+  - Minus financing of 1.5% a year on long gross above 1×, and a 0.5% a year borrow fee on short gross.
+- **Windows:** full 2008-01 → 2026-09; post-publication 2013-01 → 2026-09 (the paper appeared in 2012).
+- **Pass rules:** as above. The standalone rule uses the 2013–26 window; the adding rule uses B0's 2018–26 window.
+
+### Spike check: analyze before responding (design, to be built and tested next)
+
+- **Trigger (checked once a day at the close):**
+  - A holding's |daily return| is above 4× its 60-day daily volatility, or
+  - SPY or BTC is above 3× its own.
+- **Response:**
+  1. Automatic *discretionary* changes to that asset are frozen for the day.
+  2. Jan gathers as-of news and filings for it.
+  3. Bonsai writes a source-checked "cause brief" and labels the cause: earnings, company news, sector,
+     macro/market-wide, or unexplained.
+  4. The master agent then applies a fixed rule per label. Examples:
+     - An unexplained spike halves the position until explained.
+     - A macro spike defers to the book's volatility target.
+- **Hard risk limits never wait for the analysis.** These include the volatility target, drawdown brakes and position
+  caps.
+- **Test:**
+  - Arm A: the mechanical response. Arm B: analyze first.
+  - Both run on every historical trigger in 2024–26.
+  - B is adopted if its 5-day forward return on the triggered positions beats A's, with a 95% interval above 0.
+- **Cost:** about 3 s for Jan plus about 9 s for Bonsai per trigger. Triggers are a handful per week.
