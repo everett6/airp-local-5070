@@ -517,3 +517,14 @@ Nothing is selected from this grid; the live rule stays at 21 × 100. Script: `s
 - **Trading less often hurts a lot:** checking the trend monthly instead of weekly loses about 2.7 points a year,
   because the crypto rule reacts late.
 - Weekly stays. Don't slow the book down to save costs.
+
+## Optimization 2: daily trend check (spec fixed before the run, 2026-09-27 03:42)
+
+- **Hypothesis:** from the cost check above, a slower check loses return. Checking the crypto trend daily instead of
+  weekly may gain.
+- **B1:** B0 with targets decided every trading day instead of every 5th. **B0:** the live weekly book. Both use the
+  same code at **10 bps**, 2018-01-02 .. 2026-09-24.
+- **Pass (the adding rule):** B1 scaled to B0's vol has the higher CAGR, AND the 90% CI of Sharpe(B1) − Sharpe(B0)
+  is above 0 (63-day block bootstrap).
+- **Also reported:** trades and costs.
+- **Registry:** one trial.
