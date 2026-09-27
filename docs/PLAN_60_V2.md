@@ -749,3 +749,34 @@ move back toward Bonsai's view?
 - **None of the three checks passes.** Past the first week, neither Bonsai's read, the market's reaction nor their
   disagreement predicts large-cap returns. Whatever Bonsai knows gets priced within days, which fits the 1-week IC of
   +0.10 fading to about 0 at 20 days.
+
+### 8-K breaking-news watcher (spec fixed 2026-09-27, before any text is read or any return computed)
+
+**Question:** can Bonsai read non-earnings news filings (deals, restructurings, leadership changes, distress) and tell
+good from bad well enough to trade the next week?
+
+- **Events:** `data/events/news8k_2024-01-01_2026-09-24.csv` from `scripts/build_8k_events.py`. These are 8-Ks
+  (not amendments) from S&P 500 members (as of Jan 1 of the year) with a news item and no Item 2.02:
+  - distress: 4.02, 3.01, 2.04, 1.03;
+  - restructuring: 2.05, 2.06;
+  - deal: 1.01, 2.01, 1.02;
+  - leadership: 5.02.
+  Items 7.01 and 8.01 on their own are left out (too broad).
+- **Input:** the filing's own text plus its press-release exhibit, if any (first 6,000 characters). The acceptance time
+  sets the entry: the next market open.
+- **Bonsai (W1):**
+  - a short `reason` first, then `direction` (positive / neutral / negative for the stock over the next week vs its
+    sector) and `size` (major / minor), each with a quote;
+  - code keeps a non-neutral label only if its quote is found word for word in the text.
+  - **Score, code only, nothing fitted:** direction (+1 / 0 / −1) × (2 if major, else 1).
+- **Quality gate first** (quality only, no returns): on 100 filings from 2024, parse rate ≥ 0.95 and verified-quote
+  share ≥ 0.85. If it fails, stop.
+- **Outcome:** the 5-day excess return vs the sector ETF from the entry open (the same `fwd5` as the earnings book).
+- **Pass (one trial, `news8k_bonsai_direction`), all three needed:**
+  1. the pooled 2024–26 monthly rank IC has a 95% CI above 0;
+  2. the mean IC is positive in 2024 and in 2025–26 separately;
+  3. long score > 0 minus short score < 0, per month, net of 0.4% (20 bps each way on each leg), has a 90%
+     monthly-bootstrap CI above 0.
+- **Reported, not deciding:** IC by category, and 20-day returns.
+- **W2 (Jan's research added) runs only if arm B passes tonight.** Otherwise research has failed four times, and W2
+  would be a fifth try at the same idea.
