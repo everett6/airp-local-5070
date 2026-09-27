@@ -558,7 +558,7 @@ Everything above is free; nothing needs a subscription.
 
 Per the project rules, a failed strategy stays in the record as failed and is not silently dropped.
 
-## User decisions (2026-09-26, 23:50)
+## User decisions (2026-09-26, 23:25)
 
 1. **Instruments.** The paper simulator allows shorting, margin, futures and options. Long-short and futures-style
    sleeves are therefore in scope; the paper simulation charges financing and borrow costs.
@@ -635,7 +635,7 @@ place by raising the *combined* Sharpe. If the combined true Sharpe ends up near
 - **Windows:** full 2008-01 → 2026-09; post-publication 2013-01 → 2026-09 (the paper appeared in 2012).
 - **Pass rules:** as above. The standalone rule uses the 2013–26 window; the adding rule uses B0's 2018–26 window.
 
-**Result (2026-09-27, 00:15): fails both rules.** Output: `results/trend_sleeve.json`, `trend_sleeve_25bps.json`.
+**Result (2026-09-26, 23:31): fails both rules.** Output: `results/trend_sleeve.json`, `trend_sleeve_25bps.json`.
 
 - **Data note:** the first run silently lacked GLD and IWM because a Yahoo batch download dropped them. It is kept as
   `trend_sleeve_run1_missing_GLD_IWM.json`; its Sharpe was 0.43 over 2013–26, so the verdict is the same. The script
@@ -676,7 +676,7 @@ place by raising the *combined* Sharpe. If the combined true Sharpe ends up near
 Each goes through the same adding rule. The combined book's leverage is chosen for 20–25% volatility only after at
 least two sleeves pass.
 
-### Algorithms added 2026-09-27, 00:40 (specs written before any run)
+### Algorithms added 2026-09-26, 23:38 (specs written before any run)
 
 **A1. "Bonsai-lite": a matrix model that copies Bonsai and triages releases** (`scripts/bonsai_lite.py`)
 
@@ -728,7 +728,7 @@ least two sleeves pass.
 - **Rules:** as for Sleeve 1. Standalone Sharpe CI > 0 over **2012-01 → 2026-09** (after Lustig, Roussanov and
   Verdelhan 2011, and Menkhoff et al. 2012), and the adding rule against B0 over 2018–26.
 
-### Results of A1–A3 (2026-09-27, 01:10): all three fail their pre-registered rules
+### Results of A1–A3 (2026-09-26, 23:41): all three fail their pre-registered rules
 
 **A1 Bonsai-lite** (`results/events/bonsai_lite.json`)
 
