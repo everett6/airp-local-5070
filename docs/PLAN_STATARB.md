@@ -120,3 +120,41 @@ a sector, or a wider universe, need their own new spec and count as new trials.
 | 4 | Bug-check window (2010–17), then commit | 30 min |
 | 5 | Holdout run, then results in STRATEGY_RESEARCH.md, commit, push | 10 min |
 | 6 | Arm B (after the spike check is built) | GPU, about 1 night |
+
+## Result: arm A (2026-09-27, 00:05), FAIL on every rule
+
+- **Dev window (2010–17, bug check).**
+  - Sharpe before costs: 0.07.
+  - Independent check: a raw 5-day reversal rank IC of 0.009 (t = 1.2), computed without the residual code. That
+    rules out a sign or timing bug.
+- **Holdout (2018–26-09, opened once).**
+  - Turnover is 0.8× a day and average gross 2.1×, which is inherent to 5-day holding.
+
+  | Cost | CAGR | Sharpe | Max DD |
+  |---|---|---|---|
+  | 5 bps | −6.5% | −0.57 | 53% |
+  | 10 bps | −15.5% | −1.50 (95% CI −2.22 to −0.76) | 79.6% |
+  | 25 bps | −37.7% | −4.26 | 98% |
+
+  - DSR is 0.0, with N = 7 trials.
+  - Added to B0, it drops the equal-risk CAGR from 21.8% to 2.6%.
+- **Why:** before costs the book earns only about +3–4% a year. At 10 bps, costs are about 20% a year. The literature
+  was right: in the 100 most liquid names, weekly reversal is too small to pay for weekly turnover.
+
+**What this means for arm B.** B keeps A's turnover per unit of gross, so it pays the same ~1.8 Sharpe of cost drag
+at 10 bps. It passes only if the no-news subset has **about 5–6× A's gross edge**. That is possible in principle (Chan
+2003 finds no-news reversal much stronger than the average), but unlikely in mega-caps.
+
+**The labelling job is large:**
+
+- 11,580 candidate entries in 2024-06 → 2026-09, which is 3,807 distinct episodes over 126 names.
+- Each episode needs an 8-K check plus archived-news lookups, which take up to 150 s each on the Wayback Machine.
+- That is **days of network time**, not one night.
+
+**Staged plan for B.** A stage that shows no edge ends B, and it is recorded as failed.
+
+1. **Cheap pre-screen** (CPU and EDGAR only, a new trial): drop episodes with an 8-K in the window. If the remaining
+   episodes' gross edge (before costs) is not at least 2× A's, B stops here.
+2. **If stage 1 passes:** Jan labels a random 500-episode sample. Measure the "unknown" share and the no-news gross
+   edge. If the unknown share is above 50%, or the edge is below 5× A's, B stops.
+3. **If stage 2 passes:** label all 3,807 episodes over several nights, then apply B's pass rule.
