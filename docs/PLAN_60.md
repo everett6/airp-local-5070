@@ -142,6 +142,27 @@ Every step has a rule written before its run. A failed step is recorded, not dro
      - **Adopted** as a standing rule for the Phase 3 forward test and for any levered book in Phase 4. There it is the
        cheap part of the drawdown protection.
 3. **Value + quality sleeve** from EDGAR XBRL point-in-time fundamentals (2009+). Its spec is written before its run.
+   - **Spec (fixed 2026-09-27, 00:20, before the run; `scripts/value_quality_sleeve.py`):**
+     - **Data:** SEC XBRL companyfacts (free) for every name that was ever in the top-100 universe.
+     - **Point-in-time:** a fact is usable from its `filed` date + 1 day.
+     - **Value** = book equity (StockholdersEquity) ÷ market cap.
+       - Market cap = the month-end close × the latest shares outstanding filed
+         (dei:EntityCommonStockSharesOutstanding).
+       - Negative book equity makes a name ineligible for value.
+     - **Quality** = gross profit ÷ total assets (Novy-Marx 2013).
+       - Gross profit = GrossProfit, or else Revenues − CostOfRevenue.
+       - Uses the last four quarters where available, otherwise the latest annual.
+       - Banks, insurers and other names without gross profit get no quality score.
+     - **Combined score** = the mean of the cross-sectional z-scores available for a name. Both scores are required.
+     - **Portfolio:**
+       - Each month-end, within that year's top-100 universe: long the top 20%, short the bottom 20%, equal weight.
+       - Weights set at close t earn returns from t+1; monthly rebalance.
+       - Costs: 10 bps × turnover, plus a 0.5% a year borrow fee on shorts.
+       - Scaled to 10% ex-ante volatility (126-day), with a 2× cap.
+     - **Windows and rules:**
+       - Standalone: **2014-01 → 2026-09** (after Novy-Marx 2013); the Sharpe's 95% block-bootstrap CI must be above 0.
+       - The adding rule against B0, 2018–26.
+       - DSR above 0.95 on the registry's N.
 
 ### Phase 3 (months 1–6): forward paper test with no leverage
 
