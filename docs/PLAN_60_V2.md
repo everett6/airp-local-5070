@@ -318,3 +318,16 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
   - scaled to B0's realized vol, the managed book has the higher CAGR, AND
   - the 90% CI of the Sharpe difference is above 0 (63-day block bootstrap).
 - **Also reported, not in the verdict:** the same comparison with the drawdown brakes applied on top.
+
+### Optimization 1 result (2026-09-27 01:15): FAIL
+
+| 2018–26 | CAGR | vol | Sharpe | max DD |
+|---|---|---|---|---|
+| B0 | 21.6% | 20.6% | 1.05 | 33.8% |
+| vol-targeted | 22.8% | 20.3% | 1.11 | 30.7% |
+| vol-targeted at B0's vol | 23.1% | 20.6% | 1.11 | 31.1% |
+
+- The Sharpe difference is +0.06, with a 90% CI of [−0.14, +0.25]. With the brakes it is +0.04 [−0.16, +0.24].
+- The direction is right: +1.5 points of CAGR and 3 points less drawdown. But the gain is inside the noise, which matches Cederburg et al.
+- Exposure averaged 1.17×, and was above 1 on 71% of days.
+- **Not adopted as a rule.** It goes to Stage 4 as a lead: if the forward test agrees, it combines with the leverage table.
