@@ -484,11 +484,10 @@ Rules:
   items; then deals, lawsuits, management changes. The manager already has this release's revenue, EPS and guidance
   figures and the stock's price, returns and volatility: do NOT repeat those.
 
-Reply with plain lines only (no JSON, no other text), one item per line:
-F|<source tag, e.g. S2>|<date YYYY-MM-DD, or ->|<the fact, one sentence>
-C|<possible upside driver>
-R|<possible downside driver>
-Up to 6 F lines, 3 C lines and 3 R lines."""
+Reply with ONLY one JSON object, on one line, without indentation:
+{{"facts": [{{"text": "<one sentence>", "source": "<tag, e.g. S2>", "date": "<YYYY-MM-DD or empty>"}}],
+"catalysts": ["<possible upside driver>"], "risks": ["<possible downside driver>"]}}
+At most 3 catalysts and 3 risks."""
 
 _URL = re.compile(r"https?://[^\s\"'<>)\]]+")
 _NUM = re.compile(r"\d[\d,]*(?:\.\d+)?")
@@ -566,30 +565,11 @@ def brief_request(subj: dict[str, Any], evidence: str) -> tuple[str, str, dict[s
     tags = source_tags(evidence)
     listing = "\n\nSources:\n" + "\n".join(f"[{t}] {u}" for t, u in tags.items()) if tags else ""
     user = subject_line(subj) + (evidence or "No evidence was found.") + listing
-    return BRIEF_SYSTEM, user, tags
-
-
-def parse_brief_lines(text: str) -> dict[str, Any] | None:
-    """The brief's line format (F|tag|date|fact, C|..., R|...) -> the {"facts", "catalysts", "risks"} record;
-    a reply that is JSON after all goes through salvage_facts."""
-    if text.lstrip().startswith("{"):
-        return salvage_facts(text)
-    facts: list[dict[str, str]] = []
-    out: dict[str, Any] = {"facts": facts, "catalysts": [], "risks": []}
-    for line in text.splitlines():
-        line = line.strip().strip("-*• ")
-        kind = line.split("|", 1)[0].strip().upper()
-        if kind == "F":
-            parts = [x.strip() for x in line.split("|", 3)]  # the fact itself may contain "|"
-            if len(parts) == 4 and parts[3]:
-                facts.append({"text": parts[3], "source": parts[1], "date": "" if parts[2] in ("-", "") else parts[2]})
-        elif kind in ("C", "R") and "|" in line and (item := line.split("|", 1)[1].strip()):
-            out["catalysts" if kind == "C" else "risks"].append(item)
-    return out if facts or out["catalysts"] or out["risks"] else None
+    return BRIEF_SYSTEM.format(), user, tags  # format(): {{ }} in the JSON example -> { }
 
 
 def finish_brief(reply: str, tags: dict[str, str], evidence: str) -> dict[str, Any]:
-    raw = parse_brief_lines(reply)
+    raw = salvage_facts(reply)
     for f in (raw or {}).get("facts", []) if isinstance((raw or {}).get("facts"), list) else []:
         if isinstance(f, dict):  # a tag becomes its URL; verify_brief then checks the fact against that source
             src = str(f.get("source", "")).strip().strip("[]")
@@ -604,7 +584,7 @@ def brief_evidence(steps: list[dict[str, Any]], budget: int) -> str:
 def write_brief(subj: dict[str, Any], steps: list[dict[str, Any]], budget: int) -> dict[str, Any]:
     evidence = brief_evidence(steps, budget)
     system, user, tags = brief_request(subj, evidence)
-    _send({"llm_requests": [{"id": "b", "user": user, "system": system, "mode": "text"}]})
+    _send({"llm_requests": [{"id": "b", "user": user, "system": system}]})
     return finish_brief(_recv()["llm_responses"].get("b", ""), tags, evidence)
 
 
