@@ -715,3 +715,23 @@ The user asked for Bonsai to use more judgement. Bonsai gets it; code still chec
   (paired monthly bootstrap) AND C's own IC CI is above 0, on 5-day returns vs sector. Reported but not deciding:
   20-day returns, C against C without its judgement fields, and `net_read` alone.
 - **Runs after the current Jan → Bonsai run** (one model on the GPU at a time): `scripts/bonsai_judgement_run.sh`.
+
+### Disagreement test: Bonsai vs the market's first reaction (spec fixed 2026-09-27, before any run)
+
+**Why this form.** Plain post-earnings drift was measured before (`eval_baseline.txt`) and is absent in the S&P 500:
+the earnings-day reaction vs the next 20 days has an IC of −0.016 and −0.034 in the two samples. So the test asks a
+narrower question: when Bonsai reads a release much better or worse than the market's first reaction, does the price
+move back toward Bonsai's view?
+
+- **Signal, code only, no fitting:** D = rank(Bonsai's 1-week log-odds) − rank(earnings-day reaction vs sector ETF),
+  both as percentiles within the entry month. The reaction is the stock's move vs its sector ETF on the first trading
+  day the release is public (`ear` in event_eval.build).
+- **Outcome:** the excess return vs the sector ETF over the 20 trading days after the reaction day (`fwd20_ear`). It
+  starts at the next open, so it does not overlap the reaction or Bonsai's 1-week horizon start.
+- **Samples:** 2024 (1,995 releases) and 2025–26 (1,180). With nothing fitted, both are out of sample.
+- **Pass (one trial, `disagreement_bonsai_vs_reaction`), all three needed:**
+  1. the monthly rank IC of D over 2024–26 pooled has a 95% CI above 0;
+  2. the mean IC is positive in each period separately;
+  3. the top-minus-bottom fifth of D, net of 0.4% (20 bps each way on each leg), has a 90% monthly-bootstrap CI
+     above 0.
+- **Reported, not deciding:** Bonsai alone and the reaction alone on `fwd20_ear`, and D over 60 days.
