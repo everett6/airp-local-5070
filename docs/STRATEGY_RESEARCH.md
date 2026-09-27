@@ -676,6 +676,58 @@ place by raising the *combined* Sharpe. If the combined true Sharpe ends up near
 Each goes through the same adding rule. The combined book's leverage is chosen for 20–25% volatility only after at
 least two sleeves pass.
 
+### Algorithms added 2026-09-27, 00:40 (specs written before any run)
+
+**A1. "Bonsai-lite": a matrix model that copies Bonsai and triages releases** (`scripts/bonsai_lite.py`)
+
+- **Features:** one row per release, all known at the decision time, built as one numpy matrix:
+  - EPS change vs a year earlier, as (q − prior) ÷ |prior|, clipped to ±2
+  - revenue growth, clipped to ±1
+  - a missing-value flag for each of those two
+  - guidance: raised / lowered / maintained / none, one-hot
+  - tone: positive / negative / neutral, one-hot
+  - 12-1 month momentum vs the sector ETF, clipped to ±1
+  - sector one-hot.
+
+  The announcement-day reaction is left out, because it may postdate the decision.
+- **Model:** ridge regression in closed form, (XᵀX + λI)⁻¹Xᵀy with λ = 1 on standardized features. The target is
+  Bonsai's 1-week-book log-odds.
+- **Walk-forward:** for each month of the 2025-26 sample, fit on all of 2024 plus the earlier 2025-26 months. No
+  Bonsai output from the month being predicted is ever used.
+- **Arms,** all on the same 2025-26 releases and scored as monthly rank IC on the 5-day excess return:
+  - (a) Bonsai.
+  - (b) Lite alone.
+  - (c) **Triage:** Bonsai is called only for releases whose lite score is in the month's top half, which halves the
+    GPU work. Every other release ranks below all called releases, ordered among themselves by lite score.
+- **Pass rules:**
+  - Lite *replaces* Bonsai for the 1-week book if IC(b) ≥ IC(a) − 0.01 **and** CI(b)'s lower bound is > 0.
+  - Triage is adopted if IC(c) ≥ IC(a) − 0.01 **and** CI(c)'s lower bound is > 0.
+  - Also reported: the rank correlation between lite and Bonsai (how well it copies).
+
+**A2. Volatility-managed stock momentum, long-short** (`scripts/momentum_sleeve.py`)
+
+- **Universe:** each year's point-in-time top-100 S&P 500 names (`data/hist`, 2010–26). About 10 delisted names have
+  no Yahoo data; this mild survivorship bias works in the sleeve's favor.
+- **Signal:** at each month-end, the return from t−252 to t−21.
+- **Positions:** long the top 20% and short the bottom 20%, equal-weighted within each side.
+- **Scaling** (Barroso & Santa-Clara): the book is scaled by 12% ÷ the realized volatility of the unscaled
+  long-short's daily returns over the prior 126 days, capped at 2×.
+- **Costs:** 10 bps × turnover, plus a 0.5% a year borrow fee on shorts.
+- **Rules:** as for Sleeve 1. Standalone Sharpe CI > 0 over **2016-01 → 2026-09** (the paper appeared in 2015), and
+  the adding rule against B0 over 2018–26.
+
+**A3. G10 currency carry** (`scripts/fx_carry_sleeve.py`)
+
+- **Currencies:** AUD, CAD, CHF, EUR, GBP, JPY, NZD, NOK and SEK against USD.
+- **Data:** Yahoo spot rates, and FRED/OECD 3-month interbank rates (IR3TIB01…M156N).
+- **Signal:** at each month-end, each currency's rate minus the US rate, using the *previous* month's value because
+  of publication lag.
+- **Positions:** long the top 3 and short the bottom 3, equal weight.
+- **Scaling:** to 10% ex-ante volatility using the 252-day covariance of daily returns, with a gross cap of 4×.
+- **Returns:** daily spot return in USD plus the rate differential ÷ 252, minus 10 bps × turnover.
+- **Rules:** as for Sleeve 1. Standalone Sharpe CI > 0 over **2012-01 → 2026-09** (after Lustig, Roussanov and
+  Verdelhan 2011, and Menkhoff et al. 2012), and the adding rule against B0 over 2018–26.
+
 ### Spike check: analyze before responding (design, to be built and tested next)
 
 - **Trigger (checked once a day at the close):**
