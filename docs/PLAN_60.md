@@ -90,7 +90,7 @@ Every step has a rule written before its run. A failed step is recorded, not dro
      - The Sharpe CI is a 13-week circular block bootstrap with 2,000 resamples.
      - Both years use the SEC-cross-checked fact-sheet decisions (`factsheet2024_secchk_h5`,
        `factsheet_secchk_h5`).
-   - **Result (2026-09-27, 00:20): FAIL.** Output: `results/events/longshort_event_book.json`.
+   - **Result (2026-09-27, 00:09): FAIL.** Output: `results/events/longshort_event_book.json`.
 
      | Version | 2024 Sharpe | 2025-26 Sharpe |
      |---|---|---|

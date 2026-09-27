@@ -121,7 +121,7 @@ a sector, or a wider universe, need their own new spec and count as new trials.
 | 5 | Holdout run, then results in STRATEGY_RESEARCH.md, commit, push | 10 min |
 | 6 | Arm B (after the spike check is built) | GPU, about 1 night |
 
-## Result: arm A (2026-09-27, 00:05), FAIL on every rule
+## Result: arm A (2026-09-27, 00:00), FAIL on every rule
 
 - **Dev window (2010–17, bug check).**
   - Sharpe before costs: 0.07.
