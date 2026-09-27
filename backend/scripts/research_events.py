@@ -26,7 +26,7 @@ sys.path.insert(0, str(BACKEND))
 
 import pandas as pd
 
-from app.sandbox.agent_worker import BRIEF_SYSTEM
+from app.sandbox.agent_worker import BRIEF_SYSTEM, brief_request, finish_brief
 from app.sandbox.events import Prices
 from app.sandbox.gpu_lock import gpu_job
 from app.sandbox.jail import AgentJail, JailError, JailLimits
@@ -103,7 +103,7 @@ def previous_releases(events: pd.DataFrame) -> dict[str, str]:
 
 
 async def research(r, llm: Router, fetcher: SafeFetcher, ua: str, lookup, rounds: int,
-                   prefetch: list[dict] | None = None, cap_s: float = 25.0) -> dict:
+                   prefetch: list[dict] | None = None, cap_s: float = 25.0, brief: bool = True) -> dict:
     as_of = datetime.fromisoformat(str(r.accepted_utc)).replace(tzinfo=UTC)
     gw = ToolGateway(mode="as_of", fetcher=fetcher, as_of=as_of, sec_user_agent=ua, price_lookup=lookup,
                      tool_cache=WEBCACHE, max_result_chars=5000, timeout_cap_s=cap_s,
@@ -114,7 +114,8 @@ async def research(r, llm: Router, fetcher: SafeFetcher, ua: str, lookup, rounds
         try:
             async with AgentJail(llm, tools=gw, limits=JailLimits()) as jail:
                 res = await jail.call({
-                    "task": "research", "prompt": "as_of", "brief": True, "skip_final": True,
+                    "task": "research", "prompt": "as_of", "brief": brief, "return_evidence": not brief,
+                    "skip_final": True,
                     "prefetch": prefetch or [],
                     "subject": {"ticker": str(r.ticker), "horizon_days": 20, "as_of": as_of.isoformat()},
                     "tools": gw.specs_for_prompt(), "max_rounds": rounds, "max_calls_per_round": 4,
@@ -141,6 +142,30 @@ def brief_lines(rec: dict) -> list[str]:
     return out
 
 
+async def write_briefs(writer: OllamaLLM, workers: int) -> None:
+    """Phase 2 of a two-phase run: Bonsai writes the brief for every release whose evidence phase 1 saved, with the
+    GPU to itself (while Jan shared it, a brief took 55-75 s instead of ~9 s). Same prompt as the one-phase run."""
+    todo = [p for p in sorted(OUT.glob("*.json")) if "evidence" in (d := json.loads(p.read_text())) and "brief" not in d]
+    print(f"{len(todo)} briefs to write, {workers} at a time", flush=True)
+    sem, n, t0 = asyncio.Semaphore(workers), 0, time.monotonic()
+
+    async def one(path: Path) -> None:
+        nonlocal n
+        async with sem:
+            rec = json.loads(path.read_text())
+            subj = {"ticker": rec["ticker"], "as_of": rec["as_of"], "horizon_days": 20}
+            system, user, tags = brief_request(subj, rec["evidence"])
+            t = time.monotonic()
+            rec["brief"] = finish_brief(await writer(system, user), tags, rec["evidence"])
+            rec["brief_s"] = round(time.monotonic() - t, 1)
+            path.write_text(json.dumps(rec, indent=1, default=str) + "\n")
+            n += 1
+            if n % 25 == 0 or n == len(todo):
+                rate = (time.monotonic() - t0) / n
+                print(f"  briefs {n}/{len(todo)} {rate:.1f}s/brief eta={(len(todo) - n) * rate / 3600:.1f}h", flush=True)
+    await asyncio.gather(*(one(p) for p in todo))
+
+
 async def run(args: argparse.Namespace) -> None:
     feats = pd.read_csv(BACKEND / args.features)
     if args.limit:
@@ -149,6 +174,15 @@ async def run(args: argparse.Namespace) -> None:
     global OUT
     OUT = OUT.with_name(OUT.name + "_" + args.model.split("/")[-1].replace(":", "_") + args.run_tag)
     OUT.mkdir(parents=True, exist_ok=True)
+    if args.phase == "brief":
+        writer = OllamaLLM(args.brief_model, base_url=args.brief_base_url, concurrency=args.brief_workers,
+                           num_ctx=8192, num_predict=1200, cache=args.llm_cache, require_gpu=True)
+        try:
+            await write_briefs(writer, args.brief_workers)
+        finally:
+            await writer.unload()
+        write_table(args, feats)
+        return
     llm: OllamaLLM | VLLMChat
     if args.backend == "vllm":  # same Jan weights served by vLLM (scripts/vllm_serve.sh); results go to the same folder
         llm = VLLMChat(args.vllm_model, base_url=args.vllm_url, concurrency=2 * args.workers, cache=args.llm_cache)
@@ -165,7 +199,8 @@ async def run(args: argparse.Namespace) -> None:
     if isinstance(llm, VLLMChat):
         llm.thinking = args.jan_thinking
     writer = (OllamaLLM(args.brief_model, base_url=args.brief_base_url, concurrency=args.brief_workers, num_ctx=8192,
-                        num_predict=1200, cache=args.llm_cache, require_gpu=True) if args.brief_model else None)
+                        num_predict=1200, cache=args.llm_cache, require_gpu=True)
+              if args.brief_model and args.phase == "both" else None)  # gather: no brief, Bonsai not loaded
     router = Router(llm, writer)
     await base.aclose()
     lookup = lookup_from(p)
@@ -189,7 +224,8 @@ async def run(args: argparse.Namespace) -> None:
                 return  # time budget used: stop taking new releases (resumable; the table below still gets written)
             r = queue.get_nowait()
             pre = prefetch_for(r, ex99, names, prev) if args.prefetch else None
-            rec = await research(r, router, fetcher, ua, lookup, args.rounds, pre, args.timeout_cap)
+            rec = await research(r, router, fetcher, ua, lookup, args.rounds, pre, args.timeout_cap,
+                                 brief=args.phase == "both")
             rec["models"] = {"research": args.model, "brief": args.brief_model or args.model}
             (OUT / f"{r.accession}.json").write_text(json.dumps(rec, indent=1, default=str) + "\n")
             done += 1
@@ -205,6 +241,12 @@ async def run(args: argparse.Namespace) -> None:
         await llm.unload()
         if writer is not None:
             await writer.unload()
+    if args.phase == "both":
+        write_table(args, feats)
+
+
+def write_table(args: argparse.Namespace, feats: pd.DataFrame) -> None:
+    """The "with research" fact sheets: researched releases only, verified brief facts appended."""
     rows = []
     for r in feats.itertuples():
         path = OUT / f"{r.accession}.json"
@@ -244,6 +286,9 @@ def main() -> None:
     ap.add_argument("--vllm-model", default="jan-v1-4b", help="served model name (scripts/vllm_serve.sh)")
     ap.add_argument("--rounds", type=int, default=1, help="model rounds after the prefetched first look (v2: 2)")
     ap.add_argument("--prefetch", action=argparse.BooleanOptionalAction, default=True)
+    ap.add_argument("--phase", choices=("both", "gather", "brief"), default="both",
+                    help="both: Jan and Bonsai together; gather: Jan + tools only, evidence saved; brief: Bonsai "
+                         "writes the saved releases' briefs (run gather, stop vLLM, then brief: no GPU sharing)")
     ap.add_argument("--run-tag", default="_v3", help="suffix of the results folder")
     ap.add_argument("--events", default="data/events/events_sp500_2025.csv", help="for the press-release URLs")
     ap.add_argument("--members", default="data/events/members_2024_2026.csv", help="for company names")

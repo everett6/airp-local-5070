@@ -559,18 +559,33 @@ def source_tags(evidence: str) -> dict[str, str]:
     return {f"S{i}": u for i, u in enumerate(urls, 1)}
 
 
-def write_brief(subj: dict[str, Any], steps: list[dict[str, Any]], budget: int) -> dict[str, Any]:
-    evidence = _render_history([{**st, "thought": ""} for st in steps], budget)
+def brief_request(subj: dict[str, Any], evidence: str) -> tuple[str, str, dict[str, str]]:
+    """(system, user, source tags) for the brief. Used in the jail and by the two-phase runner
+    (scripts/research_events.py --phase brief), so both write exactly the same prompt."""
     tags = source_tags(evidence)
     listing = "\n\nSources:\n" + "\n".join(f"[{t}] {u}" for t, u in tags.items()) if tags else ""
-    _send({"llm_requests": [{"id": "b", "user": subject_line(subj) + (evidence or "No evidence was found.") + listing,
-                             "system": BRIEF_SYSTEM.format()}]})  # {{ }} in the JSON example -> { }
-    raw = salvage_facts(_recv()["llm_responses"].get("b", ""))
+    user = subject_line(subj) + (evidence or "No evidence was found.") + listing
+    return BRIEF_SYSTEM.format(), user, tags  # format(): {{ }} in the JSON example -> { }
+
+
+def finish_brief(reply: str, tags: dict[str, str], evidence: str) -> dict[str, Any]:
+    raw = salvage_facts(reply)
     for f in (raw or {}).get("facts", []) if isinstance((raw or {}).get("facts"), list) else []:
         if isinstance(f, dict):  # a tag becomes its URL; verify_brief then checks the fact against that source
             src = str(f.get("source", "")).strip().strip("[]")
             f["source"] = tags.get(src.upper(), f.get("source", ""))
     return verify_brief(raw, evidence)
+
+
+def brief_evidence(steps: list[dict[str, Any]], budget: int) -> str:
+    return _render_history([{**st, "thought": ""} for st in steps], budget)
+
+
+def write_brief(subj: dict[str, Any], steps: list[dict[str, Any]], budget: int) -> dict[str, Any]:
+    evidence = brief_evidence(steps, budget)
+    system, user, tags = brief_request(subj, evidence)
+    _send({"llm_requests": [{"id": "b", "user": user, "system": system}]})
+    return finish_brief(_recv()["llm_responses"].get("b", ""), tags, evidence)
 
 
 def run_research(msg: dict[str, Any]) -> dict[str, Any]:
@@ -660,6 +675,8 @@ def run_research(msg: dict[str, Any]) -> dict[str, Any]:
         scored = {"p_up_logprob": float(got.get("p_up", 0.5)), "logprob_mass": float(got.get("mass", 0.0))}
     if msg.get("brief"):
         scored["brief"] = write_brief(subj, steps, history_budget)
+    elif msg.get("return_evidence"):  # two-phase runs: the brief is written later, with the GPU to itself
+        scored["evidence"] = brief_evidence(steps, history_budget)
     return {
         **scored,
         "p_up": p, "answered": final is not None,
