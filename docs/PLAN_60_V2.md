@@ -350,3 +350,29 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
   - the mean of B − A over all triggers has a 95% CI above 0 (bootstrap clustered by trigger day, 2000 draws), AND
   - at least 20 triggers are labeled unexplained. With fewer, the verdict is "untestable", not a pass.
 - **Also reported, not in the verdict:** mean fwd5 per label, and the share of labels the code overruled.
+
+## Tue 29 item 2: futures in the simulator (done 2026-09-27 01:15)
+
+- **Code:** `backend/app/portfolio/futures.py`, with 8 tests in `tests/test_futures.py`.
+- **Pricing:** synthetic contracts priced by cost of carry from free spot data.
+- **Mechanics:**
+  - daily settlement to cash; collateral earns the T-bill rate;
+  - margin calls cut the position to the initial margin;
+  - a run ends at 0 equity;
+  - quarterly (MES) and monthly (micro BTC) rolls, with costs on both legs.
+- **Sanity run, 2018-01 .. 2026-09, rebalanced weekly:**
+
+| Book | CAGR | vol | Sharpe | max DD |
+|---|---|---|---|---|
+| SPY price only | 14.5% | 19.0% | 0.81 | 33.7% |
+| MES 1.0× | 16.0% | 19.0% | 0.88 | 33.7% |
+| MES 1.5× | 21.8% | 28.6% | 0.83 | 47.2% |
+| MES 2.0× | 26.9% | 38.4% | 0.81 | 58.6% |
+
+- MES 1× matches SPY's total return (price plus about 1.3% of dividends). 35 rolls; no margin calls, even at 2×.
+- **Leverage keeps the Sharpe, not the drawdown.** 2× SPY had a 59% drawdown. This is why the 60% row stays locked
+  behind the drawdown limit.
+- **Micro BTC 1×:** 14.7%/yr vs 22.0% for spot.
+  - The gap is the assumed 5%/yr basis plus about 1%/yr of monthly roll costs.
+  - **Levering the crypto sleeve through CME futures costs about 6–7 points a year.** Stage 4 must price that in.
+  - The 5% basis is an assumption. Real CME basis has ranged from below 0 to above 15%/yr.
