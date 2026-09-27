@@ -172,3 +172,23 @@ at 10 bps. It passes only if the no-news subset has **about 5–6× A's gross ed
   (B1) and for arm A.
 - **Continue to stage 2 only if both hold:** B1's gross edge > 0, **and** it is ≥ 2× arm A's gross edge. Otherwise B
   stops and is recorded as failed. The trial is registered either way.
+
+### Arm B, stage 1 result (2026-09-27): B stops here
+
+- **Filter:** 11,580 candidates; 3,604 (31.1%) had an 8-K in their signal window and were dropped. Every name had a
+  CIK.
+- **Gross edge per unit of gross, before costs, 2024-06 → 2026-09:**
+
+  | Book | Gross edge a year | Sharpe at 0 bps |
+  |---|---|---|
+  | Arm A | 4.4% | 0.71 |
+  | B1 (no-8-K names only) | 4.1% | 0.63 |
+
+  The ratio is **0.93×**, against the required ≥ 2×.
+- **Reading:** removing moves that came with an SEC filing does not strengthen the reversal in these mega-caps. The
+  no-news idea (Chan 2003) does not show up here.
+- Even arm A's pre-cost edge (4.4% a year per unit gross) is far below its ~20% a year cost at 10 bps.
+- Stages 2–3, the Jan/Bonsai news labelling, are **not run**. That saves days of GPU and network time. The trial is
+  registered (`results/trials_registry.jsonl`, now N = 9).
+- **What would reopen it:** a new spec with a cheaper cost structure. Examples: holding periods of 20+ days, or
+  trading only the extreme tail, a few names a week. It would count as a new trial.

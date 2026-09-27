@@ -61,7 +61,8 @@ def load_etfs(end: str) -> pd.DataFrame:
     return df
 
 
-def build(end: str, cost_bps: float):
+def build(end: str, cost_bps: float, drop: set[tuple[str, str]] | None = None):
+    """drop: (ISO date, ticker) candidates removed after selection (arm B); their side's weight is re-split."""
     px = pd.read_parquet(HIST / "ohlcv_2010_2026_top100.parquet")
     px["Date"] = pd.to_datetime(px["Date"])
     close = px.pivot(index="Date", columns="Ticker", values="Close").sort_index()
@@ -112,10 +113,16 @@ def build(end: str, cost_bps: float):
     for d in days:
         if z.loc[d].notna().sum() < 4 * N_SIDE:
             continue
-        longs = rank_hi.columns[(rank_hi.loc[d] <= N_SIDE).to_numpy()]
-        shorts = rank_lo.columns[(rank_lo.loc[d] <= N_SIDE).to_numpy()]
-        stock_w.loc[d, longs] = 0.5 / N_SIDE
-        stock_w.loc[d, shorts] = -0.5 / N_SIDE
+        longs = list(rank_hi.columns[(rank_hi.loc[d] <= N_SIDE).to_numpy()])
+        shorts = list(rank_lo.columns[(rank_lo.loc[d] <= N_SIDE).to_numpy()])
+        if drop:
+            day = d.date().isoformat()
+            longs = [t for t in longs if (day, t) not in drop]
+            shorts = [t for t in shorts if (day, t) not in drop]
+        if longs:
+            stock_w.loc[d, longs] = 0.5 / len(longs)
+        if shorts:
+            stock_w.loc[d, shorts] = -0.5 / len(shorts)
         cands += [{"date": d.date().isoformat(), "ticker": t, "side": "long", "z": round(float(z.loc[d, t]), 3)}
                   for t in longs]
         cands += [{"date": d.date().isoformat(), "ticker": t, "side": "short", "z": round(float(z.loc[d, t]), 3)}
