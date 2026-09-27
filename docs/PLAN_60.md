@@ -90,6 +90,22 @@ Every step has a rule written before its run. A failed step is recorded, not dro
      - The Sharpe CI is a 13-week circular block bootstrap with 2,000 resamples.
      - Both years use the SEC-cross-checked fact-sheet decisions (`factsheet2024_secchk_h5`,
        `factsheet_secchk_h5`).
+   - **Result (2026-09-27, 00:20): FAIL.** Output: `results/events/longshort_event_book.json`.
+
+     | Version | 2024 Sharpe | 2025-26 Sharpe |
+     |---|---|---|
+     | Raw, 0 bps | 0.88 (CI −0.64 to 2.06) | 0.51 (CI −1.18 to 2.34) |
+     | Raw, 10 bps | 0.05 (CI −1.49 to 1.23) | 0.15 (CI −1.55 to 2.04) |
+     | Raw, 25 bps | −1.20 | −0.40 |
+     | Hedged, 0 bps | 1.56 (CI 0.46 to 2.88) | 0.40 |
+     | Hedged, 10 bps | −0.43 | −0.41 |
+
+     - 2024 traded 32 of 52 weeks; the 2025-26 sample traded only 30 of 90 weeks (thin).
+     - **Reading:** Bonsai's ranking has some pre-cost edge, but replacing both legs every week costs about 20–40% a
+       year at 10 bps, and that eats all of it.
+     - **Same lesson as stat-arb:** anything held 1 week and fully replaced pays a cost wall of roughly 4 × bps × 52.
+       Item 3 (breadth) is therefore re-specified *before* its run. It must either hold longer (the 20-day book), or
+       trade only the most extreme scores, so that turnover per unit of edge falls.
 3. **Breadth: S&P 400/600 earnings releases** (free EDGAR + Yahoo).
    - Same fact sheets and same Bonsai prompt.
    - A2-style bias control: the universe comes from dated membership, and delisted names are kept where data exists.
