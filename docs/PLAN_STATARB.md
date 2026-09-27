@@ -158,3 +158,17 @@ at 10 bps. It passes only if the no-news subset has **about 5–6× A's gross ed
 2. **If stage 1 passes:** Jan labels a random 500-episode sample. Measure the "unknown" share and the no-news gross
    edge. If the unknown share is above 50%, or the edge is below 5× A's, B stops.
 3. **If stage 2 passes:** label all 3,807 episodes over several nights, then apply B's pass rule.
+
+### Arm B, stage 1 spec (written 2026-09-27 before its run)
+
+- **Data:** each candidate's 8-K and 8-K/A filings, from SEC EDGAR's submissions API (free; the SEC user agent from
+  backend/.env), using the acceptance date.
+- **Filter:** a candidate formed at close t is **dropped** if an 8-K was accepted on any trading day in t−4..t. The
+  remaining names on that side keep the side's total weight, split equally. Dropped names are *not* replaced by the
+  next-ranked names.
+- **Everything else is exactly arm A:** hedges, overlapping 5-day books, t+1 open entry, volatility scaling.
+- **Window:** 2024-06-01 → 2026-09, the same days for both books.
+- **Measure:** gross edge = annualized mean return at 0 bps ÷ average gross exposure. Computed for the filtered book
+  (B1) and for arm A.
+- **Continue to stage 2 only if both hold:** B1's gross edge > 0, **and** it is ≥ 2× arm A's gross edge. Otherwise B
+  stops and is recorded as failed. The trial is registered either way.
