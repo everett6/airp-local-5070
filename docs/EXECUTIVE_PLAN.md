@@ -34,3 +34,20 @@ Ends with a push and a shutdown (the user asked for both).
 - If the research run breaks, the debug pass fixes and resumes it (every step is resumable) before the shutdown;
   if it cannot finish before the morning, the plan records where it stopped and the machine still shuts down only
   after the push.
+
+## Next plan, first item: failure log and weekly review (added 2026-09-26, 23:00)
+
+Process failures are collected in one place and turned into tested fixes. They are judged without any stock outcome,
+so learning from them cannot leak the future.
+
+- **Log** (`results/failures.jsonl`, one row per failure: time, run, release, stage, cause, detail), filled from
+  what the runs already record: tool errors and timeouts (tool_log), unparseable replies (parse_failures), brief
+  facts dropped by the source check (brief.dropped: no source / unknown source / number not in the evidence),
+  repeated tool calls, failed briefs or decisions, vLLM/Ollama start failures.
+- **Weekly review** (`scripts/failure_review.py`): failures grouped by cause and stage, with the change since the
+  previous week and the top causes. Each proposed fix is tested on the fixed 24-release benchmark
+  (`scripts/spec_bench.sh`) and adopted only if it wins, with the result recorded here.
+- **Not in scope:** learning from wrong picks. Stock outcomes are mostly noise; they only enter through the monthly
+  walk-forward refits (calibrator, combined score) and pre-registered forward tests.
+- **Later, with the user's OK for any download:** fine-tune Jan (LoRA) on its research runs whose facts passed the
+  source check.
