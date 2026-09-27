@@ -57,6 +57,15 @@ the Sharpe difference above 0).
    - Crypto has the highest-return, lowest-correlation asset in the book. Raising the cap from 20% to 35% adds return
      *without borrowing*, but adds crypto's drawdowns.
    - Test: cap 35% vs 20%, 2018–26, under the adding rule. It is one trial, not a sweep.
+   - **User OK'd the test (2026-09-27, 00:35).**
+   - **Spec (fixed before the run; `scripts/crypto_cap_test.py`):**
+     - B0 is run twice with the same code, at `crypto_cap` 0.20 and at 0.35, over 2018-01-02 → 2026-09-24.
+     - **Pass (adding rule):**
+       - Cap 35%, scaled to the 20%-cap book's realized volatility, has the higher CAGR.
+       - The 90% block-bootstrap CI of Sharpe(35%) − Sharpe(20%) lies above 0.
+     - Also reported: raw CAGR, volatility, max drawdown and worst year for both. Then the same comparison with the
+       brakes on.
+     - A pass changes the default cap **only after you confirm**, because the higher cap means deeper crypto drawdowns.
 
 ### Stage 2 (weeks 2–4): build it to trade
 
@@ -105,13 +114,33 @@ the Sharpe difference above 0).
 2. **Drawdown you would sit through at the 60% setting:** about 45–50%. If that is too much, the plan tops out at the
    row you can live with.
 
-## Timeline
+## Timeline: compressed to 3 months (user request, 2026-09-27)
 
-| When | Output |
+**What can be compressed:** building and testing. It runs in parallel, on CPU during the day and on the GPU at night.
+
+**What cannot:** how fast forward evidence builds up. After 3 months the Sharpe's standard error is still about ±2,
+so 3 months of paper results cannot prove a Sharpe of 1.25.
+
+**How the compressed plan copes:**
+
+1. **Levered "shadow" books from day 1.** Because it is paper money, the forward test runs the same book at 1.0×,
+   1.5× and 2.0× in parallel, with no extra risk. The Sharpe does not depend on leverage, so all three measure the
+   same thing, and on day 90 you see what each setting would really have done.
+2. **The day-90 decision rests on three pieces of evidence together:**
+   - the long backtests, several years each;
+   - the pre-registered holdouts;
+   - the 3-month forward test, which confirms the *implementation*: slippage and fills match the backtest, no rule
+     broken, forward IC within 2 standard errors of the backtest.
+3. **The day-90 leverage choice** uses the Stage 4 table, applied to the backtest Sharpe's lower bound after a 30%
+   haircut, and capped at **30% volatility**. That stays capped until 6 forward months exist. The 42% (60%) row
+   unlocks only after 6+ months, when the forward bound supports it.
+
+| Week | Output |
 |---|---|
-| Tonight | Value + quality result; research v3 scored; push; shutdown (as commanded) |
-| Week 1 | 20-day satellite test; crypto cap test (if OK'd); spike check built |
-| Week 2 | Extreme-only breadth test starts (GPU nights); futures leverage in the simulator |
-| Week 4 | Forward paper test at 1.0× starts, brakes on |
-| Month 6 | First leverage decision (Stage 4 table) |
-| Month 12 | Whether the 60% row is reachable |
+| 0 (tonight) | Value + quality result; crypto 35% cap test; research v3 scored; push; shutdown (as commanded) |
+| 1 | 20-day satellite test; spike check built; futures (MES, micro BTC) in the simulator; Bonsai-lite PC-off fallback |
+| 1–3 (GPU nights) | Extreme-only S&P 400/600 breadth test |
+| 2 | Combined book frozen from what passed; forward test starts with 1.0× / 1.5× / 2.0× shadow books, brakes on |
+| 4, 8 | Monthly forward reports: Sharpe with its CI, slippage, failure log |
+| 12 (day 90) | Implementation verdict + leverage choice (≤ 30% volatility), then continue |
+| 26 | 60% row can unlock (6 forward months, lower bound ≥ 1.25) |
