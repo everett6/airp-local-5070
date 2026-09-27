@@ -122,6 +122,13 @@ Every step has a rule written before its run. A failed step is recorded, not dro
 2. **Book-level brakes.** At −10% from peak, cut risk by a third; at −20%, cut it in half.
    - Test as a rule on 2018–26.
    - **Pass:** the worst drop gets smaller *and* the equal-risk CAGR doesn't fall by more than 1 point.
+   - **Spec (fixed 2026-09-27 before the run; `scripts/drawdown_brakes.py`):**
+     - Applied to B0's daily returns, 2018-01-02 → 2026-09-24.
+     - Exposure multiplier for day d, set from the **braked** book's own drawdown at the close of d−1:
+       ≥ 20% → 0.5; ≥ 10% → 2/3; otherwise 1.
+     - The cut part sits in cash earning 0 (conservative).
+     - Cost: 10 bps × |change in multiplier|.
+     - Equal risk: the braked book is scaled to B0's realized volatility before comparing CAGR.
 3. **Value + quality sleeve** from EDGAR XBRL point-in-time fundamentals (2009+). Its spec is written before its run.
 
 ### Phase 3 (months 1–6): forward paper test with no leverage
