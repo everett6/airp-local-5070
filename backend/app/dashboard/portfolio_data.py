@@ -4,6 +4,7 @@ Reads only what the forward runners write, and never writes anything:
   results/forward/allocator/state.json     the books now (cash, positions, pending targets)
   results/forward/allocator/ledger.jsonl   one record per allocator run (equity per book, fills)
   results/forward/<events dir>/ledger.jsonl  the hash-chained event ledger (decisions, missed, outcomes, runs)
+The only thing the viewer can change is the kill switch, and only to turn it ON (app/portfolio/guard.py).
 Live marks use Yahoo prices (free, may lag a few minutes). A live mark is a view, not a trade: the books only
 change when a runner is run by hand.
 """

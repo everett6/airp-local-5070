@@ -2,6 +2,8 @@
 
     python scripts/forward_allocator.py            # fetch prices, fill last run's orders, decide, log, git commit
     python scripts/forward_allocator.py --status   # print the ledger so far, change nothing
+    python scripts/forward_allocator.py --halt "reason"   # kill switch on: later runs mark the books, trade nothing
+    python scripts/forward_allocator.py --resume   # kill switch off (the only way to turn it off)
 
 Paper money only. Free Yahoo prices. Nothing runs on its own (no service, no timer). Each run appends one line to
 results/forward/allocator/ledger.jsonl and saves the books in state.json; both are committed to git by the run itself
@@ -26,6 +28,7 @@ import pandas as pd
 import yfinance as yf
 
 from app.portfolio.forward import books_from_json, books_to_json, new_books, step
+from app.portfolio.guard import HALT, halt, halt_info, halted
 from app.portfolio.master import MasterConfig
 from app.sandbox.events import Prices
 
@@ -63,9 +66,21 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--no-commit", action="store_true")
+    ap.add_argument("--halt", metavar="REASON", help="turn the kill switch on and exit")
+    ap.add_argument("--resume", action="store_true", help="turn the kill switch off and exit")
     args = ap.parse_args()
     if args.status:
         status()
+        print("kill switch:", halt_info() or "off")
+        return
+    if args.halt:
+        halt(args.halt, by="forward_allocator.py --halt")
+        print("kill switch ON:", halt_info())
+        return
+    if args.resume:
+        info = halt_info()
+        HALT.unlink(missing_ok=True)
+        print("kill switch OFF" + (f" (was: {info})" if info else " (it was not on)"))
         return
     DIR.mkdir(parents=True, exist_ok=True)
     state_path, ledger = DIR / "state.json", DIR / "ledger.jsonl"
@@ -76,7 +91,10 @@ def main() -> None:
         if last["run_at_utc"][:10] == now.date().isoformat():
             raise SystemExit(f"already ran today ({last['run_at_utc']}); run again on a later day")
     p = fetch(now)
-    rec = step(books, p.open, p.close, now, MasterConfig())
+    stop = halted()
+    if stop:
+        print("kill switch is ON: marking only, nothing fills or is decided.", halt_info())
+    rec = step(books, p.open, p.close, now, MasterConfig(), halted=stop)
     with ledger.open("a") as f:
         f.write(json.dumps(rec) + "\n")
     state_path.write_text(json.dumps(books_to_json(books), indent=1) + "\n")

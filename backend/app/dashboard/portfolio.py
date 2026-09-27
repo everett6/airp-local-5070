@@ -2,7 +2,7 @@
 
     cd backend && .venv/bin/streamlit run app/dashboard/portfolio.py --server.port 8502
 
-Nothing here trades or writes: the books change only when forward_allocator.py / forward_events.py are run by hand.
+Nothing here trades. Its one write is the Halt button (kill switch on); the books change only when forward_allocator.py / forward_events.py are run by hand.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ import pandas as pd
 import streamlit as st
 
 from app.dashboard import portfolio_data as P
+from app.portfolio import guard
 
 st.set_page_config(page_title="Paper Portfolio", page_icon="📈", layout="wide")
 
@@ -51,6 +52,19 @@ ev_dir = st.sidebar.selectbox("AI picks ledger", dirs,
 live = st.sidebar.toggle("Live prices", value=True, help="Marks the books at Yahoo's latest prices every minute.")
 st.sidebar.caption("Paper money only. Read-only: the books change only when the forward runners are run by hand. "
                    "Yahoo prices can lag a few minutes. Not investment advice.")
+
+hinfo = guard.halt_info()
+if hinfo:
+    st.error(f"**Kill switch ON** since {hinfo.get('at', '?')} ({hinfo.get('reason', '')}). Runs mark the books but "
+             "trade nothing. Turn it off with `python scripts/forward_allocator.py --resume`.")
+with st.sidebar.expander("🛑 Kill switch"):
+    if hinfo:
+        st.write("On. Only `forward_allocator.py --resume` turns it off.")
+    else:
+        why = st.text_input("Reason", "stopped from the viewer")
+        if st.checkbox("I want to stop all trading") and st.button("Halt trading", type="primary"):
+            guard.halt(why, by="portfolio viewer")
+            st.rerun()
 
 recs, ledger_err = P.load_events(ev_dir) if ev_dir else ([], None)
 picks = P.picks(recs)
@@ -217,6 +231,14 @@ def live_view() -> None:
         st.write(f"**Event ledger:** {'⚠️ ' + ledger_err if ledger_err else '✅ hash chain verified'} · "
                  f"{len(recs)} records · weekdays with no run: {len(gaps)}"
                  + (f" ({', '.join(d.isoformat() for d in gaps[-10:])})" if gaps else ""))
+        try:
+            md = guard.load_mandate()
+            st.write(f"**Mandate** (`config/mandate.json`): assets {', '.join(sorted(md.universe))}; at most "
+                     f"{md.max_weight:.0%} in one asset, {md.max_gross:.0%} invested, {md.max_crypto:.0%} crypto. Every "
+                     "order is checked against it when decided and again before it fills; a breach rejects it.")
+        except guard.MandateError as e:
+            st.error(f"Mandate unreadable, so every order will be rejected: {e}")
+        st.write(f"**Kill switch:** {'🛑 ON' if hinfo else 'off'}")
         st.markdown("**Routine (all by hand):**\n"
                     "- `forward_events.py` every weekday at ~08:45 ET **and** in the evening\n"
                     "- `forward_allocator.py` about weekly\n"
