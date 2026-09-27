@@ -5,7 +5,10 @@
   gate         every set of target weights is checked against the mandate when it is decided AND again just before
                it fills. It fails closed: a bad number, a missing or unreadable mandate, or any breach rejects the whole
                order set; the book keeps what it holds and the rejection is logged.
-  kill switch  results/forward/HALT. While it exists the allocator marks the books but fills and decides nothing.
+  kill switch  results/forward/HALT, with a mode (the trading states of NautilusTrader's risk engine):
+                 HALTED    the allocator marks the books but fills and decides nothing;
+                 REDUCING  orders may only shrink positions: every target weight is capped at the asset's current
+                           weight, so nothing new is bought and nothing is added to.
                Anyone may create it (scripts, the viewer's Halt button); only `forward_allocator.py --resume` removes it.
 The frozen book (SPY + 20% crypto cap, brakes) sits inside the default mandate, so the gate never binds on it.
 """
@@ -89,16 +92,36 @@ def gate(targets: dict[str, Any], path: Path = MANDATE) -> list[str]:
         return [str(e)]
 
 
-def halted(path: Path = HALT) -> bool:
-    return path.exists()
-
-
-def halt(reason: str, by: str, path: Path = HALT) -> None:
-    """Engage the kill switch (idempotent: the first halt's record is kept)."""
+def state(path: Path = HALT) -> str:
+    """ACTIVE, HALTED or REDUCING. An unreadable HALT file counts as HALTED (fail closed)."""
     if not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"at": datetime.now(UTC).isoformat(timespec="seconds"), "by": by,
-                                    "reason": reason}) + "\n")
+        return "ACTIVE"
+    info = halt_info(path) or {}
+    return "REDUCING" if info.get("mode") == "REDUCING" else "HALTED"
+
+
+def halted(path: Path = HALT) -> bool:
+    return state(path) == "HALTED"
+
+
+def halt(reason: str, by: str, path: Path = HALT, mode: str = "HALTED") -> None:
+    """Engage the kill switch. HALTED always wins: it may replace REDUCING, never the other way round; a second halt
+    keeps the first record."""
+    if mode not in ("HALTED", "REDUCING"):
+        raise ValueError(f"unknown mode {mode!r}")
+    if path.exists() and not (mode == "HALTED" and state(path) == "REDUCING"):
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"at": datetime.now(UTC).isoformat(timespec="seconds"), "by": by,
+                                "reason": reason, "mode": mode}) + "\n")
+
+
+def reduce_only(targets: dict[str, float], positions: dict[str, float], cash: float, px: dict[str, float]
+                ) -> dict[str, float]:
+    """REDUCING: each target weight capped at the asset's current weight at these prices (new assets get 0)."""
+    equity = cash + sum(q * px[a] for a, q in positions.items() if a in px)
+    cur = {a: q * px[a] / equity for a, q in positions.items() if a in px} if equity > 0 else {}
+    return {a: min(w, cur.get(a, 0.0)) for a, w in targets.items()}
 
 
 def halt_info(path: Path = HALT) -> dict[str, Any] | None:

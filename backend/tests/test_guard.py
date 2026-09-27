@@ -6,7 +6,17 @@ import numpy as np
 import pandas as pd
 
 from app.portfolio.forward import new_books, step
-from app.portfolio.guard import MANDATE, check, gate, halt, halt_info, halted, load_mandate
+from app.portfolio.guard import (
+    MANDATE,
+    check,
+    gate,
+    halt,
+    halt_info,
+    halted,
+    load_mandate,
+    reduce_only,
+    state,
+)
 from app.portfolio.master import MasterConfig
 
 M = load_mandate()
@@ -79,3 +89,36 @@ def test_kill_switch_marks_but_never_fills_or_decides(tmp_path):
     halt("test", by="pytest", path=h)
     halt("second", by="pytest", path=h)  # idempotent: the first record is kept
     assert halted(h) and (halt_info(h) or {})["reason"] == "test"
+
+
+def test_reducing_only_ever_sells(tmp_path):
+    opens, closes = frames(end="2026-10-09")
+    books = new_books()
+    step(books, opens[opens.index <= "2026-09-25"], closes[closes.index <= "2026-09-25"],
+         datetime(2026, 9, 25, 15, 0, tzinfo=UTC), MasterConfig())
+    step(books, opens[opens.index <= "2026-10-02"], closes[closes.index <= "2026-10-02"],
+         datetime(2026, 10, 2, 15, 0, tzinfo=UTC), MasterConfig())
+    held = {k: dict(b.positions) for k, b in books.items()}
+    assert held["master"]
+    books["master"].pending = {"SPY": 0.98}  # a pending order that would buy more SPY and sell the crypto
+    rec = step(books, opens, closes, datetime(2026, 10, 9, 15, 0, tzinfo=UTC), MasterConfig(), reducing=True)
+    assert rec["reducing"]
+    for k, b in books.items():
+        assert set(b.positions) <= set(held[k])  # nothing new bought
+        assert all(b.positions[a] <= held[k][a] + 1e-9 for a in b.positions)  # nothing added to
+    assert books["master"].positions["SPY"] == held["master"]["SPY"]  # the SPY buy was blocked
+
+
+def test_trading_states_and_precedence(tmp_path):
+    h = tmp_path / "HALT"
+    assert state(h) == "ACTIVE"
+    halt("wobbly", by="pytest", path=h, mode="REDUCING")
+    assert state(h) == "REDUCING" and not halted(h)
+    halt("stop", by="pytest", path=h)  # HALTED replaces REDUCING
+    assert state(h) == "HALTED"
+    halt("calmer", by="pytest", path=h, mode="REDUCING")  # never the other way round
+    assert state(h) == "HALTED"
+    h.write_text("{not json")
+    assert state(h) == "HALTED"  # unreadable: fail closed
+    assert reduce_only({"SPY": 0.9, "BTC-USD": 0.2}, {"SPY": 10.0}, 1000.0, {"SPY": 100.0}) == {"SPY": 0.5,
+                                                                                                 "BTC-USD": 0.0}

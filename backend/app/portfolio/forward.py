@@ -23,6 +23,7 @@ from typing import Any
 import pandas as pd
 
 from app.portfolio.guard import MANDATE, gate
+from app.portfolio.guard import reduce_only as cap_to_current
 from app.portfolio.master import MasterConfig, allocate, crypto_state
 
 FRACTIONAL = ("BTC-USD", "ETH-USD")
@@ -47,8 +48,9 @@ def fill_day(days: pd.DatetimeIndex, decided_at: str) -> pd.Timestamp | None:
     return later[0] if len(later) else None
 
 
-def execute(book: Book, opens: pd.Series, cost_bps: float = 5.0) -> dict[str, Any]:
-    """Trade the pending targets at these opens: sells first, whole shares except crypto, cash never negative."""
+def execute(book: Book, opens: pd.Series, cost_bps: float = 5.0, reduce_only: bool = False) -> dict[str, Any]:
+    """Trade the pending targets at these opens: sells first, whole shares except crypto, cash never negative.
+    `reduce_only` (trading state REDUCING): no quantity may grow, so only sells happen."""
     assert book.pending is not None
     s = cost_bps / 1e4
     px = {a: float(v) for a, v in opens.items() if pd.notna(v)}
@@ -57,6 +59,8 @@ def execute(book: Book, opens: pd.Series, cost_bps: float = 5.0) -> dict[str, An
     equity = book.cash + sum(q * px[a] for a, q in book.positions.items())
     want = {a: (equity * w / (px[a] * (1 + s))) for a, w in book.pending.items() if a in px}
     want = {a: (q if a in FRACTIONAL else math.floor(q)) for a, q in want.items()}
+    if reduce_only:
+        want = {a: min(q, book.positions.get(a, 0.0)) for a, q in want.items()}
     fills = []
     for a in sorted(set(book.positions) | set(want)):
         delta = want.get(a, 0.0) - book.positions.get(a, 0.0)
@@ -103,9 +107,10 @@ def targets(name: str, close: pd.DataFrame, day: pd.Timestamp, cfg: MasterConfig
 
 
 def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_utc: datetime, cfg: MasterConfig,
-         mandate: Path = MANDATE, halted: bool = False) -> dict[str, Any]:
+         mandate: Path = MANDATE, halted: bool = False, reducing: bool = False) -> dict[str, Any]:
     """One forward run. `opens`/`closes` are on the SPY trading calendar; bars dated on or after today's UTC date
-    are dropped (possibly incomplete). `halted`: the kill switch is on (mark only)."""
+    are dropped (possibly incomplete). `halted`: the kill switch is on (mark only). `reducing`: orders may only shrink
+    positions (targets capped at current weights, at decision and again at fill)."""
     today = now_utc.date()
     opens = opens[pd.DatetimeIndex(opens.index).date < today]
     closes = closes[pd.DatetimeIndex(closes.index).date < today]
@@ -115,6 +120,8 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
                            "data_through": last.date().isoformat(), "books": {}}
     if halted:
         rec["halted"] = True
+    elif reducing:
+        rec["reducing"] = True
     for name, b in books.items():
         r: dict[str, Any] = {}
         if b.pending is not None and not halted and (bad := gate(b.pending, mandate)):
@@ -125,7 +132,7 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
             fd = fill_day(days, b.decided_at)
             if fd is not None:
                 r["filled_on"] = fd.date().isoformat()
-                r.update(execute(b, pd.Series(opens.loc[fd])))
+                r.update(execute(b, pd.Series(opens.loc[fd]), reduce_only=reducing))
             else:
                 r["waiting_for_open_after"] = datetime.fromisoformat(b.decided_at).date().isoformat()
         # each position at its last known close (a missing bar must not drop the position from equity)
@@ -135,6 +142,8 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
         r["positions"] = {a: round(q, 6) for a, q in b.positions.items()}
         if b.pending is None and not halted:
             t, info = targets(name, closes, last, cfg, b.positions, brake_multiplier(r["equity"], b.peak))
+            if t is not None and reducing:
+                t = cap_to_current(t, b.positions, b.cash, px)
             if t is not None and (bad := gate(t, mandate)):
                 r["rejected"] = bad  # fail closed: nothing is left pending
             elif t is not None:

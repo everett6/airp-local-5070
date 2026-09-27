@@ -3,6 +3,7 @@
     python scripts/forward_allocator.py            # fetch prices, fill last run's orders, decide, log, git commit
     python scripts/forward_allocator.py --status   # print the ledger so far, change nothing
     python scripts/forward_allocator.py --halt "reason"   # kill switch on: later runs mark the books, trade nothing
+    python scripts/forward_allocator.py --reduce "reason"  # reduce-only: positions may shrink, never grow
     python scripts/forward_allocator.py --resume   # kill switch off (the only way to turn it off)
 
 Paper money only. Free Yahoo prices. Nothing runs on its own (no service, no timer). Each run appends one line to
@@ -30,7 +31,7 @@ import yfinance as yf
 
 from app.data_ingestion import bars
 from app.portfolio.forward import books_from_json, books_to_json, new_books, step
-from app.portfolio.guard import HALT, halt, halt_info, halted
+from app.portfolio.guard import HALT, halt, halt_info, state
 from app.portfolio.master import MasterConfig
 from app.sandbox.events import Prices
 
@@ -91,6 +92,7 @@ def main() -> None:
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--no-commit", action="store_true")
     ap.add_argument("--halt", metavar="REASON", help="turn the kill switch on and exit")
+    ap.add_argument("--reduce", metavar="REASON", help="reduce-only mode on and exit")
     ap.add_argument("--resume", action="store_true", help="turn the kill switch off and exit")
     args = ap.parse_args()
     if args.status:
@@ -100,6 +102,10 @@ def main() -> None:
     if args.halt:
         halt(args.halt, by="forward_allocator.py --halt")
         print("kill switch ON:", halt_info())
+        return
+    if args.reduce:
+        halt(args.reduce, by="forward_allocator.py --reduce", mode="REDUCING")
+        print("trading state:", state(), halt_info())
         return
     if args.resume:
         info = halt_info()
@@ -115,10 +121,11 @@ def main() -> None:
         if last["run_at_utc"][:10] == now.date().isoformat():
             raise SystemExit(f"already ran today ({last['run_at_utc']}); run again on a later day")
     p = fetch(now)
-    stop = halted()
-    if stop:
-        print("kill switch is ON: marking only, nothing fills or is decided.", halt_info())
-    rec = step(books, p.open, p.close, now, MasterConfig(), halted=stop)
+    mode = state()
+    if mode != "ACTIVE":
+        print(f"trading state {mode}:", "marking only, nothing fills or is decided." if mode == "HALTED" else
+              "orders may only shrink positions.", halt_info())
+    rec = step(books, p.open, p.close, now, MasterConfig(), halted=mode == "HALTED", reducing=mode == "REDUCING")
     rec["price_sources"] = dict(SOURCES)
     with ledger.open("a") as f:
         f.write(json.dumps(rec) + "\n")

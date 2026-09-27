@@ -164,9 +164,10 @@ ev_dir = st.sidebar.selectbox("AI picks ledger", dirs,
                               ) if dirs else None
 live = st.sidebar.toggle("Live prices (60 s)", value=True)
 hinfo = guard.halt_info()
+tstate = guard.state()
 with st.sidebar.expander("Kill switch", expanded=bool(hinfo)):
     if hinfo:
-        st.markdown(f'<span class="neg">ON</span> since {esc(hinfo.get("at", "?"))}<br>'
+        st.markdown(f'<span class="neg">{tstate}</span> since {esc(hinfo.get("at", "?"))}<br>'
                     f'<span class="q-note">{esc(hinfo.get("reason", ""))}</span><br>'
                     '<span class="q-note">Only <code>forward_allocator.py --resume</code> turns it off.</span>',
                     unsafe_allow_html=True)
@@ -182,7 +183,8 @@ recs, ledger_err = P.load_events(ev_dir) if ev_dir else ([], None)
 picks = P.picks(recs)
 open_picks = picks[picks["status"] == "open"]
 
-stage = ('<span class="q-pill halt">KILL SWITCH ON</span>' if hinfo else
+stage = (f'<span class="q-pill halt">{tstate}: {"NOTHING TRADES" if tstate == "HALTED" else "SELLS ONLY"}</span>'
+         if hinfo else
          f'<span class="q-pill {"on" if live else ""}">STAGE: FORWARD · {"LIVE" if live else "PAUSED"}</span>')
 st.markdown(f'<div class="q-head"><span class="q-mark">◆</span><b>PAPER BOOK</b> / forward test · paper money · '
             f'{esc(P.BOOK_LABELS.get(book or "", book or "no book"))}{stage}</div>', unsafe_allow_html=True)
@@ -376,7 +378,8 @@ def console() -> None:
               ("weekdays with no run", f"{len(gaps)}" + (f" ({', '.join(d.isoformat() for d in gaps[-6:])})"
                                                          if gaps else ""), "warn" if gaps else ""),
               ("mandate", mandate, mcls),
-              ("kill switch", f"ON · {hinfo.get('reason', '')}" if hinfo else "off", "neg" if hinfo else "pos"),
+              ("trading state", f"{tstate} · {hinfo.get('reason', '')}" if hinfo else "ACTIVE", "neg" if hinfo
+               else "pos"),
               ("routine (by hand)", ("forward_events.py weekdays ~08:45 ET and evening · forward_allocator.py "
                                      "weekly · weekly_review.py Saturdays"), "")]
         with st.container(border=True):
