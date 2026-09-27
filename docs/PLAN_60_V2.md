@@ -485,7 +485,7 @@ This is built from what passed its pre-registered rule, and nothing else.
 - **Frozen:** changes before the 3-month review need a new pre-registered test. After the review, the Stage 4
   table applies.
 
-## Optimization research 2: how sturdy is the crypto trend rule? (2026-09-27 03:25; a check, not a trial)
+## Optimization research 2: how sturdy is the crypto trend rule? (2026-09-27 03:16; a check, not a trial)
 
 B0 was re-run with the trend rule's two parameters moved over a grid:
 - lookback: 10, 15, 21, 30, 42 and 63 trading days;
