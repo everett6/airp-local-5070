@@ -156,7 +156,12 @@ async def write_briefs(writer: OllamaLLM, workers: int) -> None:
             subj = {"ticker": rec["ticker"], "as_of": rec["as_of"], "horizon_days": 20}
             system, user, tags = brief_request(subj, rec["evidence"])
             t = time.monotonic()
-            rec["brief"] = finish_brief(await writer(system, user), tags, rec["evidence"])
+            try:
+                reply = await writer(system, user)
+            except Exception as e:  # noqa: BLE001 - one failed brief must not stop the phase; a re-run retries it
+                print(f"  brief failed for {rec['ticker']} {path.stem}: {type(e).__name__}: {e}"[:300], flush=True)
+                return
+            rec["brief"] = finish_brief(reply, tags, rec["evidence"])
             rec["brief_s"] = round(time.monotonic() - t, 1)
             path.write_text(json.dumps(rec, indent=1, default=str) + "\n")
             n += 1
