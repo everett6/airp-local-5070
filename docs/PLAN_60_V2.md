@@ -301,10 +301,12 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
 ### Pipeline optimizations
 
 - **Bonsai briefs** run at 9.3 s each on Ollama with 3 parallel slots.
-  - [Benchmarks](https://particula.tech/blog/ollama-vs-vllm-comparison) show vLLM about matching Ollama at 1 request, but up to about 16–19× the throughput at high concurrency.
-  - Serving Bonsai-27B on vLLM (as Jan already is) with 8–16 in flight could cut the 3 h brief phase to well under 1 h.
-  - **Needs your OK:** it needs a vLLM-loadable copy of Bonsai (a download), and a check that it fits the 12 GB card at 4-bit.
-  - Not done tonight.
+  - [Benchmarks](https://particula.tech/blog/ollama-vs-vllm-comparison) show vLLM up to about 16–19× Ollama's throughput at high concurrency.
+  - **But our own measurement (WEEK_PLAN, 26 Sep) rules that out for Bonsai:** 3, 6 and 8 in flight gave 9.9, 9.5 and 9.6 s per brief.
+    - Bonsai is a hybrid linear-attention model at 1 bit. Its batches don't speed up, and llama.cpp can't reuse a partial prompt.
+    - Stock vLLM has no 1-bit Q1_0 kernels for it, so moving Bonsai to vLLM is not a real option.
+  - **The one real speed-up is PrismML's llama.cpp fork**, which has Q1_0 kernels. It needs a download and your OK; not done tonight.
+  - Jan is already on vLLM (FP4) and is not the bottleneck.
 - **Spike cause briefs** (88 triggers): at about 12 s each they take about 18 min. No change needed.
 
 ## Optimization 1: volatility target on B0 (spec fixed before the run, committed 2026-09-27 00:42)
