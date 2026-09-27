@@ -672,3 +672,6 @@ Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capit
   2. Sample 20,000 weeks conditioned on (a) SPY −10% in the week and (b) BTC −25% in the week.
   3. Report the frozen book's weekly loss at today's targets (SPY 78%, BTC 11.6%, ETH 8.4%): median and 5th percentile,
      next to the worst historical weeks. This informs the maximum-drawdown decision; it changes nothing.
+- *Implementation note (2026-09-27, before any result was seen):* the first run stopped when the CVaR solver
+  (CLARABEL) failed on 2 of 194 fits (2018-03-01 and 2024-04-08, both with only BTC on). Those days use B0's weights,
+  the same fallback the spec gives for too little data. Nothing was registered by the stopped run.
