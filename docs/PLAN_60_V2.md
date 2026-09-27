@@ -400,3 +400,24 @@ This replaces Tue night to Thu item 1, run in one night.
 - **Pass = rule 1 AND rule 2.** 25 bps is reported, not part of the verdict.
 - **Registry:** one trial.
 - **A pass** makes the breadth book a candidate for the combined book. **A fail** leaves the combined book unchanged.
+
+## Fri 2 items, done early (2026-09-27 01:20–02:00)
+
+1. **Forward runner for the event book:** `backend/scripts/forward_events.py`. It is manual; no service or timer.
+   - **Discovery:** new S&P 500 Item 2.02 8-Ks from the SEC.
+   - **Fact sheet:** the same reader and code check as the backtests.
+   - **Decision:** Bonsai's 1-week log-odds.
+     - If the GPU is busy or `--no-gpu` is set, Bonsai-lite decides instead, flagged `source=lite` (the fallback rule).
+   - **Ledger:** hash-chained.
+     - A decision counts only if it is written before its entry open (09:30 ET, first weekday after the SEC acceptance).
+     - Late or impossible decisions are logged as `missed`, never backfilled.
+   - **Outcomes:** once 5 trading days have passed, the release's 5-day return vs its sector is appended.
+2. **Allocator:** `forward_allocator.py` now also runs a **master+brakes** book (the adopted brakes, on its own equity).
+3. **Weekly review:** `backend/scripts/weekly_review.py` covers:
+   - the books;
+   - shadow 1.0/1.5/2.0× books, levered on paper from the braked book, with borrowing at rf + 1.5%;
+   - the event scoreboard;
+   - failures: weekdays with no run, and missed decisions with their reasons.
+4. **Dry run:** replays of 8–25 Sep 2026 with `--as-of` in a separate folder, using lite (the GPU was busy).
+   - There is a deliberate gap on 14–16 Sep, to check that LEN (16 Sep) is logged as missed.
+   - The first replay found a bug: the price frame needs SPY as its calendar. It is fixed.

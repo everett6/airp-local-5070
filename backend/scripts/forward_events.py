@@ -249,7 +249,7 @@ def main() -> None:
     use_gpu = not args.no_gpu and gpu_free()
     logodds: dict[str, float] = {}
     source = "bonsai" if use_gpu else "lite"
-    tickers = {str(t).replace(".", "-") for t in allev["ticker"]} | set(SECTOR_ETF.values())
+    tickers = {str(t).replace(".", "-") for t in allev["ticker"]} | set(SECTOR_ETF.values()) | {"SPY"}
     p = prices_for(tickers, now.date() - timedelta(days=420), now.date())
     if len(new):
         new_csv = d / "events_new.csv"
