@@ -230,3 +230,11 @@ Bonsai on the cleaned fact sheets (results/events/horizons6_eval.txt), monthly r
 The pattern of the 6-month book repeats at 1 year: positive in 2024 (inside Bonsai's training data) and negative in
 2025-26. Long horizons are where remembered outcomes would help most, so the 2024 numbers are the least trustworthy
 there. The 3-month book is the closest miss and follows the short books' sign in both years: a lead, not a book.
+
+Speed benchmark before the full run (24 releases, LLM cache off, tools replayed; `scripts/spec_bench.sh`):
+prompts with a shared cached prefix 545 s (prefix-cache hits 26% -> 64%), Jan without reasoning tokens 534 s, vLLM
+n-gram speculative decoding 461 s (26.8% draft acceptance, facts per release 4.71 -> 4.46; one run, and Jan is not the
+bottleneck, so not adopted). The bottleneck is Bonsai's brief (~800 output tokens at 67 tok/s; 3 in parallel share
+the GPU with Jan and add little). Briefs now cite short source tags (S1, S2 ... mapped back to URLs before the
+source check) in compact JSON: ~500 tokens, 16.7 s -> ~11 s per brief, verified facts 31 vs 30 on 6 releases.
+The 24 smoke-test releases were redone with the final version so the whole run uses one prompt set.
