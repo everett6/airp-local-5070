@@ -112,9 +112,9 @@ def simulate_futures(targets: dict[date, dict[str, float]], opens: pd.DataFrame,
     sim = FuturesSim()
     prev: date | None = None
 
-    def px(s: FutureSpec, frame: pd.DataFrame, d: pd.Timestamp, r: float, expiry: date) -> float | None:
-        v = frame.at[d, s.underlying] if s.underlying in frame.columns else float("nan")
-        return None if pd.isna(v) else fut_price(s, float(v), r, d.date(), expiry)
+    def px(s: FutureSpec, frame: pd.DataFrame, d: pd.Timestamp, r: float, expiry: date | None) -> float | None:
+        v: Any = frame.at[d, s.underlying] if s.underlying in frame.columns else float("nan")
+        return None if expiry is None or pd.isna(v) else fut_price(s, float(v), r, d.date(), expiry)
 
     def settle(p: _Pos, s: FutureSpec, price: float) -> None:
         nonlocal cash

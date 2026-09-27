@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from scipy.stats import kurtosis, norm, skew
@@ -37,11 +38,11 @@ def deflated_sharpe(returns: np.ndarray, n_trials: int, var_sharpe: float) -> fl
     return float(norm.cdf((sr - sr0) * math.sqrt(t - 1) / denom))
 
 
-def register(entry: dict, path: Path = REGISTRY) -> None:
+def register(entry: dict[str, Any], path: Path = REGISTRY) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a") as f:
         f.write(json.dumps(entry) + "\n")
 
 
-def load_registry(path: Path = REGISTRY) -> list[dict]:
+def load_registry(path: Path = REGISTRY) -> list[dict[str, Any]]:
     return [json.loads(x) for x in path.read_text().splitlines()] if path.exists() else []
