@@ -52,7 +52,7 @@ so learning from them cannot leak the future.
 - **Later, with the user's OK for any download:** fine-tune Jan (LoRA) on its research runs whose facts passed the
   source check.
 
-## Status at 04:05 on 2026-09-27
+## Status at 04:00 on 2026-09-27
 
 - **Steps 1–5: done.**
   - Research v3 failed its rule in every book, so step 5's portfolio comparison did not apply.
