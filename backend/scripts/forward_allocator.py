@@ -18,15 +18,17 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
+import httpx
 import pandas as pd
 import yfinance as yf
 
+from app.data_ingestion import bars
 from app.portfolio.forward import books_from_json, books_to_json, new_books, step
 from app.portfolio.guard import HALT, halt, halt_info, halted
 from app.portfolio.master import MasterConfig
@@ -36,14 +38,36 @@ DIR = BACKEND / "results" / "forward" / "allocator"
 ASSETS = ("SPY", "BTC-USD", "ETH-USD")
 
 
+SOURCES: dict[str, str] = {}
+
+
+def fallback(t: str, start: date, end: date) -> tuple[pd.DataFrame, str]:
+    """When Yahoo returns nothing: Binance's public klines for crypto; for SPY, Alpaca (IEX feed) then Polygon, if the
+    user has put their own free keys in backend/.env. The source used is written into the run's ledger record."""
+    tries = [("binance", bars.binance_daily)] if t in bars.BINANCE_PAIRS else [("alpaca-iex", bars.alpaca_daily),
+                                                                              ("polygon", bars.polygon_daily)]
+    why = []
+    for name, fn in tries:
+        try:
+            df = fn(t, start, end)
+            if not df.empty:
+                return df, name
+            why.append(f"{name}: empty")
+        except (bars.NoKeyError, httpx.HTTPError) as e:
+            why.append(f"{name}: {e}")
+    raise SystemExit(f"no prices for {t} from Yahoo or any fallback ({'; '.join(why)}); try again later")
+
+
 def fetch(now: datetime) -> Prices:
     frames = []
+    start, end = (now - timedelta(days=400)).date(), (now + timedelta(days=1)).date()
     for t in ASSETS:
-        df = yf.download(t, start=(now - timedelta(days=400)).date().isoformat(),
-                         end=(now + timedelta(days=1)).date().isoformat(), auto_adjust=True, progress=False,
+        df = yf.download(t, start=start.isoformat(), end=end.isoformat(), auto_adjust=True, progress=False,
                          multi_level_index=False)
+        SOURCES[t] = "yahoo"
         if df.empty:
-            raise SystemExit(f"no prices for {t} from Yahoo; try again later")
+            df, SOURCES[t] = fallback(t, start, end)
+            print(f"Yahoo had no prices for {t}; using {SOURCES[t]}")
         frames.append(df[["Open", "High", "Low", "Close", "Volume"]].assign(Ticker=t))
     long = pd.concat(frames).rename_axis("Date").reset_index()
     long["Date"] = pd.to_datetime(long["Date"]).dt.date.astype(str)
@@ -95,6 +119,7 @@ def main() -> None:
     if stop:
         print("kill switch is ON: marking only, nothing fills or is decided.", halt_info())
     rec = step(books, p.open, p.close, now, MasterConfig(), halted=stop)
+    rec["price_sources"] = dict(SOURCES)
     with ledger.open("a") as f:
         f.write(json.dumps(rec) + "\n")
     state_path.write_text(json.dumps(books_to_json(books), indent=1) + "\n")
