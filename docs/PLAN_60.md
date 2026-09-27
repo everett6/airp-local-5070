@@ -129,6 +129,18 @@ Every step has a rule written before its run. A failed step is recorded, not dro
      - The cut part sits in cash earning 0 (conservative).
      - Cost: 10 bps × |change in multiplier|.
      - Equal risk: the braked book is scaled to B0's realized volatility before comparing CAGR.
+   - **Result (2026-09-27, 00:15): PASS.** Output: `results/drawdown_brakes.json`.
+
+     | Book | CAGR | Vol | Sharpe | Max DD | Worst year |
+     |---|---|---|---|---|---|
+     | B0 | 21.6% | 20.6% | 1.05 | 33.8% | −23.0% |
+     | Braked (on 38% of days) | 17.7% | 16.6% | 1.07 | 27.2% | −19.7% |
+     | Braked, scaled to B0's vol | 21.9% | 20.6% | 1.07 | 32.9% | — |
+
+     - **Reading:** the brakes mostly *lower risk*. The Sharpe barely moves, so they don't add edge, but they cut the
+       worst drop by 6.6 points at almost no cost in equal-risk return. That fits the literature on risk overlays.
+     - **Adopted** as a standing rule for the Phase 3 forward test and for any levered book in Phase 4. There it is the
+       cheap part of the drawdown protection.
 3. **Value + quality sleeve** from EDGAR XBRL point-in-time fundamentals (2009+). Its spec is written before its run.
 
 ### Phase 3 (months 1–6): forward paper test with no leverage
