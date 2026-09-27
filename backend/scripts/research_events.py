@@ -149,10 +149,10 @@ async def run(args: argparse.Namespace) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     llm: OllamaLLM | VLLMChat
     if args.backend == "vllm":  # same Jan weights served by vLLM (scripts/vllm_serve.sh); results go to the same folder
-        llm = VLLMChat(args.vllm_model, base_url=args.vllm_url, concurrency=2 * args.workers)
+        llm = VLLMChat(args.vllm_model, base_url=args.vllm_url, concurrency=2 * args.workers, cache=args.llm_cache)
     else:
         llm = OllamaLLM(args.model, base_url=args.base_url, concurrency=args.workers, num_ctx=8192,
-                        num_predict=1200, cache=True, require_gpu=True)
+                        num_predict=1200, cache=args.llm_cache, require_gpu=True)
     base = ToolGateway.from_env("as_of", as_of=datetime(2000, 1, 1, tzinfo=UTC))
     if not base.sec_user_agent:
         raise SystemExit("set SEC_USER_AGENT in backend/.env")
@@ -161,7 +161,7 @@ async def run(args: argparse.Namespace) -> None:
     if args.native_tools:
         llm.native_tools = base.specs_native()
     writer = (OllamaLLM(args.brief_model, base_url=args.brief_base_url, concurrency=args.brief_workers, num_ctx=8192,
-                        num_predict=1200, cache=True, require_gpu=True) if args.brief_model else None)
+                        num_predict=1200, cache=args.llm_cache, require_gpu=True) if args.brief_model else None)
     router = Router(llm, writer)
     await base.aclose()
     lookup = lookup_from(p)
@@ -244,6 +244,8 @@ def main() -> None:
     ap.add_argument("--events", default="data/events/events_sp500_2025.csv", help="for the press-release URLs")
     ap.add_argument("--members", default="data/events/members_2024_2026.csv", help="for company names")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--llm-cache", action=argparse.BooleanOptionalAction, default=True,
+                    help="replay model replies from the LLM cache (off for speed benchmarks)")
     args = ap.parse_args()
     with gpu_job("research_events"):
         asyncio.run(run(args))

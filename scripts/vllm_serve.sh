@@ -24,8 +24,12 @@ else
   export VLLM_USE_FLASHINFER_SAMPLER=0
   ATTN=(--attention-backend TRITON_ATTN)
 fi
+# SPEC=ngram: prompt-lookup speculative decoding (drafts copied spans of the prompt; free, no draft model)
+SPECARGS=()
+[ "${SPEC:-}" = "ngram" ] && SPECARGS=(--speculative-config \
+  '{"method": "ngram", "num_speculative_tokens": 3, "prompt_lookup_max": 4, "prompt_lookup_min": 2}')
 exec "$HOME/vllm-env/bin/vllm" serve "$MODEL" --served-model-name jan-v1-4b --host 127.0.0.1 --port 8000 \
   --max-model-len 8192 --gpu-memory-utilization "$GPU_UTIL" --enable-prefix-caching --max-num-seqs 8 \
   --max-num-batched-tokens 4096 \
   --enable-auto-tool-choice --tool-call-parser hermes --reasoning-parser qwen3 "${ATTN[@]}" \
-  "${QARGS[@]}"
+  "${QARGS[@]}" "${SPECARGS[@]}"
