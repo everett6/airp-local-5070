@@ -635,6 +635,47 @@ place by raising the *combined* Sharpe. If the combined true Sharpe ends up near
 - **Windows:** full 2008-01 → 2026-09; post-publication 2013-01 → 2026-09 (the paper appeared in 2012).
 - **Pass rules:** as above. The standalone rule uses the 2013–26 window; the adding rule uses B0's 2018–26 window.
 
+**Result (2026-09-27, 00:15): fails both rules.** Output: `results/trend_sleeve.json`, `trend_sleeve_25bps.json`.
+
+- **Data note:** the first run silently lacked GLD and IWM because a Yahoo batch download dropped them. It is kept as
+  `trend_sleeve_run1_missing_GLD_IWM.json`; its Sharpe was 0.43 over 2013–26, so the verdict is the same. The script
+  now re-fetches missing tickers and refuses to run on a partial universe. The spec itself is unchanged.
+
+**The sleeve alone** (turnover 11× a year, average gross 2.4×):
+
+| Cost | Window | Excess CAGR | Vol | Sharpe | 95% CI | Max DD | Worst year |
+|---|---|---|---|---|---|---|---|
+| 10 bps | 2013–26 | 4.1% | 11.0% | 0.42 | −0.10 to 0.96 | 24.0% | −14.7% (2016) |
+| 25 bps | 2013–26 | — | — | 0.25 | −0.28 to 0.78 | — | — |
+
+- Best years: 2013 and 2022 (+23.4% each). Worst years: 2016 (−14.7%), 2018 (−13.3%), 2023 (−8.7%).
+- This matches the literature: trend has been weak since 2009, and 0.4 is the forward Sharpe AQR itself assumes.
+
+**Added to the book, 2018–26:**
+
+| Book | CAGR | Vol | Sharpe | Max DD |
+|---|---|---|---|---|
+| B0 (current master book) | 21.6% | 20.6% | 1.05 | 33.8% |
+| B1 (B0 + trend overlay) | 23.8% | 24.9% | 0.98 | 39.6% |
+| B1 scaled to B0's volatility | 19.9% | 20.6% | 0.98 | — |
+
+- Correlation between the trend sleeve and B0: 0.14.
+- Sharpe(B1) − Sharpe(B0) = −0.07, 90% CI −0.34 to +0.20.
+- **Verdict:** trend adds return only by adding risk; at equal risk it lowers the gain. It is **not adopted**. It stays
+  in the record and is a candidate for re-testing only as part of a combined multi-sleeve book (next plan), under a
+  new pre-registered rule.
+
+### Next sleeves to test (specs to be written before each run)
+
+1. **Multi-asset carry**, through futures in the simulator.
+2. **Value + momentum + quality stock factor book**, long-short, on the point-in-time universe with monthly
+   membership.
+3. **Volatility-managed momentum.**
+4. **The spike check** (below).
+
+Each goes through the same adding rule. The combined book's leverage is chosen for 20–25% volatility only after at
+least two sleeves pass.
+
 ### Spike check: analyze before responding (design, to be built and tested next)
 
 - **Trigger (checked once a day at the close):**
