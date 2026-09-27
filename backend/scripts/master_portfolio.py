@@ -120,6 +120,10 @@ def book_events(ev: pd.DataFrame, dec_path: str, h: int, stocks: Prices, days: p
 
 
 def full_mode(args: argparse.Namespace) -> dict:
+    return full_run(args)[0]
+
+
+def full_run(args: argparse.Namespace) -> tuple[dict, dict[str, WeightSim]]:
     """One or more books (--book decisions.jsonl:horizon, repeatable; default --decide at --horizon). Each book has its
     own calibrator (fed only outcomes known by the day) and holding period; all share the stock sleeve's caps. A
     ticker picked by two books is held once, sized by the more confident book."""
@@ -186,7 +190,8 @@ def full_mode(args: argparse.Namespace) -> dict:
             "events_scored": sum(len(b["evs"]) for b in books), "cost_bps": args.cost_bps,
             "results": [stats(master, "master portfolio"), stats(base, "SPY + crypto sleeve (no stocks)"),
                         stats(spy, "SPY")],
-            "yearly": {"master": yearly(master), "SPY + crypto": yearly(base), "SPY": yearly(spy)}}
+            "yearly": {"master": yearly(master), "SPY + crypto": yearly(base), "SPY": yearly(spy)}}, \
+        {"master": master, "base": base, "spy": spy}
 
 
 def main() -> None:

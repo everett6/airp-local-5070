@@ -241,3 +241,18 @@ limit is still to be given. Until then the cap is 30% volatility, which means a 
 **Honest note.** Most tests so far have failed, and some of this week's will too. The plan does not bend its rules to
 make the week look good. Whatever passes by Thursday becomes the combined book. If nothing new passes, the book is the
 existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
+
+## Mon 28 item 1: 20-day Bonsai satellite test (spec fixed before the run, 2026-09-27 00:45)
+
+- **Book:** Bonsai-27B's 20-day decisions on S&P 500 earnings releases.
+  - 2024: `decide_bonsai-27b_latest_factsheet2024_secchk.jsonl`.
+  - 2025-26: `decide_bonsai-27b_latest_factsheet_secchk.jsonl`.
+  - Both are merged into one book with one calibrator (min 300 known outcomes before the first pick).
+  - Events file: `events_sp500_2024_2026.csv`.
+- **Portfolio:** `master_portfolio.full_run`, Kelly sizing, crypto cap 20%, 2024-01-02 .. 2026-09-24.
+- **B0:** the same run with no stocks (SPY core + crypto sleeve). **B1:** the same run with the satellite.
+- **Pass (the sleeve adoption rule), at 10 bps:**
+  - B1, scaled to B0's realized vol, has the higher CAGR, AND
+  - the 90% CI of Sharpe(B1) − Sharpe(B0) is above 0 (63-day circular block bootstrap, 2000 draws).
+- **25 bps:** reported, not part of the verdict.
+- **Registry:** one trial is registered.
