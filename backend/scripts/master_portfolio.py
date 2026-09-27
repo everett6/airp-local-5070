@@ -167,6 +167,15 @@ def full_run(args: argparse.Namespace) -> tuple[dict, dict[str, WeightSim]]:
                     if len(recent) < 30 or p < float(np.quantile(recent, 0.8)):
                         continue
                     weight = args.pick_weight
+                elif args.sizing == "zext":
+                    # extremes only: the log-odds' z-score against this book's previous 90 days of releases (earlier
+                    # releases only, at least 100) above +1.5, equal weight
+                    recent = [q for dd, q in b["ps"] if (d - dd).days <= 90]
+                    b["ps"].append((d, e["logodds"]))
+                    if len(recent) < 100 or np.std(recent) == 0 or \
+                            (e["logodds"] - np.mean(recent)) / np.std(recent) <= 1.5:
+                        continue
+                    weight = args.pick_weight
                 held[(e["ticker"], b["name"])] = {
                     "cand": Candidate(e["ticker"], p, float(c), e["sector"], b["name"],
                                       base=b["cal"].base_rate(d), weight=weight),
@@ -207,7 +216,7 @@ def main() -> None:
     ap.add_argument("--horizon", type=int, default=20, help="holding period and outcome in trading days (5/20/120)")
     ap.add_argument("--book", action="append", default=[], help="decisions.jsonl:horizon, repeatable (three books)")
     ap.add_argument("--cost-bps", type=float, default=5.0, help="per-trade cost + slippage in basis points")
-    ap.add_argument("--sizing", choices=("kelly", "top5th"), default="kelly",
+    ap.add_argument("--sizing", choices=("kelly", "top5th", "zext"), default="kelly",
                     help="kelly: quarter Kelly on the edge over the base rate; top5th: equal-weight top fifth")
     ap.add_argument("--pick-weight", type=float, default=0.025, help="per-pick weight for --sizing top5th")
     ap.add_argument("--tag", default="", help="suffix for results/master_full<tag>.json")

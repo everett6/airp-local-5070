@@ -376,3 +376,27 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
   - The gap is the assumed 5%/yr basis plus about 1%/yr of monthly roll costs.
   - **Levering the crypto sleeve through CME futures costs about 6–7 points a year.** Stage 4 must price that in.
   - The 5% basis is an assumption. Real CME basis has ranged from below 0 to above 15%/yr.
+
+## Breadth test: S&P 400/600, 1-week book, extremes only (spec fixed before any breadth decision, 2026-09-27 01:15)
+
+This replaces Tue night to Thu item 1, run in one night.
+
+- **Releases:** all 6,943 S&P 400/600 earnings releases filed 2025-01-01 .. 2026-09-24.
+  - File: `data/events/events_breadth_2025.csv`, shuffled with seed 0.
+- **Fact sheets:** built exactly as for the S&P 500 set.
+  - The press release is read by the same number reader (qwen3:8b). It only extracts numbers, each quoted word for word and re-checked by code. It does no research.
+  - Then SEC XBRL numbers filed before the release, and `build_features.py` (name `breadth_2025`).
+- **Decisions:** Bonsai-27B's 1-week (h5) decision on every release with a fact sheet, tag `breadth`.
+  - **Change from the plan:** Bonsai decides every release (about 0.7 s each). No Bonsai-lite triage is used.
+    Triage would save under 1 h of GPU and would add a second model to the test.
+- **Rule 1 (signal):**
+  - Outcome: the release's 5-day return vs its sector ETF, from the entry open.
+  - Test: the monthly rank IC of Bonsai's log-odds against that outcome (at least 20 releases a month); its 95% CI must be above 0.
+- **Rule 2 (extremes in the book):**
+  - B1 = B0 + a 1-week satellite holding only releases whose log-odds z-score is above +1.5.
+    - z is computed against the book's previous 90 days of releases, earlier ones only, with at least 100.
+    - Each pick is 2.5% at the book's usual caps (`master_portfolio --sizing zext`).
+  - Compared against B0 with the adding rule at 10 bps, 2025-01-02 .. 2026-09-24.
+- **Pass = rule 1 AND rule 2.** 25 bps is reported, not part of the verdict.
+- **Registry:** one trial.
+- **A pass** makes the breadth book a candidate for the combined book. **A fail** leaves the combined book unchanged.
