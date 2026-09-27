@@ -208,6 +208,8 @@ class OllamaLLM:
             del body["format"]
             body["options"]["num_predict"] = 1
             body |= {"logprobs": True, "top_logprobs": 20}
+        elif mode == "text":  # plain text: the brief's line format (JSON's quotes and keys cost ~30% more tokens)
+            del body["format"]
         elif mode is not None:
             raise ValueError(f"unknown LLM mode {mode!r}")
         async with self._sem:

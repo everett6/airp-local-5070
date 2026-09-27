@@ -67,11 +67,11 @@ class VLLMChat:
                 "chat_template_kwargs": {"enable_thinking": thinking}}
 
     async def __call__(self, system: str, user: str, mode: str | None = None) -> str:
-        if mode is not None:
+        if mode not in (None, "text"):
             raise ValueError("log-probability modes run on Ollama, not vLLM")
         native = (self.native_tools is not None and '"actions"' in system
                   and "You have used all tool rounds" not in user)
-        key = hashlib.sha256(f"{self.model}\0{system}\0{user}\0native={native}\0think={self.thinking}\0v2".encode()).hexdigest()
+        key = hashlib.sha256(f"{self.model}\0{system}\0{user}\0native={native}\0think={self.thinking}\0mode={mode}\0v2".encode()).hexdigest()
         if self.use_cache and key in self._cache:
             self.cache_hits += 1
             return self._cache[key]
@@ -93,8 +93,8 @@ class VLLMChat:
                         text = t  # prose without a call falls through to a retry, then to plain JSON
                         break
             if not text:
-                body = self._body(system, user, False, self.num_predict, 0.0) | {
-                    "response_format": {"type": "json_object"}}
+                body = self._body(system, user, False, self.num_predict, 0.0) | (
+                    {} if mode == "text" else {"response_format": {"type": "json_object"}})
                 text = _as_actions((await self._post(body)).get("content") or "")
         self.calls += 1
         if self.use_cache and text.strip():

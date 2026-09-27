@@ -202,7 +202,7 @@ def test_prefetch_runs_before_any_llm_round_and_skip_final_stops_after_the_round
 
 
 def test_brief_cites_short_source_tags_mapped_back_to_urls(pipe):
-    replies = iter([json.dumps({"facts": [{"text": "Sales up 5%", "source": "S1"}, {"text": "Costs 9", "source": "S7"}]})])
+    replies = iter(["F|S1|-|Sales up 5%\nF|S7|2015-03-01|Costs 9\nC|new stores\nR|tariffs\nnoise line"])
     p = pipe(lambda r: next(replies), lambda r: {"ok": True, "result": "https://n.example/a sales rose 5%"})
     out = aw.run_research({"subject": {"ticker": "X", "as_of": "2015-03-10T20:00:00+00:00"},
                            "tools": [{"name": "news_as_of"}], "prompt": "as_of", "brief": True, "skip_final": True,
@@ -211,3 +211,12 @@ def test_brief_cites_short_source_tags_mapped_back_to_urls(pipe):
     assert "[S1] https://n.example/a" in p.sent[-1]["llm_requests"][0]["user"]
     assert out["brief"]["facts"] == [{"text": "Sales up 5%", "source": "https://n.example/a", "date": ""}]
     assert out["brief"]["dropped"]["unknown_source"] == 1  # an unknown tag is still an unknown source
+    assert out["brief"]["catalysts"] == ["new stores"] and out["brief"]["risks"] == ["tariffs"]
+    assert p.sent[-1]["llm_requests"][0]["mode"] == "text"
+
+
+def test_brief_lines_parser_falls_back_to_json():
+    assert aw.parse_brief_lines('{"facts": [{"text": "a", "source": "S1"}]}')["facts"][0]["source"] == "S1"
+    assert aw.parse_brief_lines("F|S2|2026-01-02|Guidance raised | again")["facts"] == [
+        {"text": "Guidance raised | again", "source": "S2", "date": "2026-01-02"}]
+    assert aw.parse_brief_lines("nothing useful") is None
