@@ -16,6 +16,10 @@ Each run:
      stricter, never looser). A late or impossible decision is logged as `missed` and is never backfilled;
   5. outcomes: once 5 trading days have passed, the release's 5-day return vs its sector ETF is appended.
 
+When to run: twice each weekday. About 08:45 ET catches the pre-market releases (most are filed 06:30-08:45 ET and
+enter at that morning's open), and any time in the evening catches the after-close ones (they enter the next morning).
+An evening-only schedule misses every pre-market release (the 8-25 Sep 2026 dry run missed 6 of 13 that way).
+
 --as-of replays the runner at an earlier time for a dry run (--dir keeps that ledger apart); it never touches the
 real ledger. Lookahead guard: discovery only keeps filings accepted before the run's time, and outcomes only use
 bars dated before the run's date.
@@ -129,7 +133,7 @@ def run(cmd: list[str]) -> bool:
     return subprocess.run(cmd, cwd=BACKEND, check=False).returncode == 0
 
 
-def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str) -> Path:
+def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str, prices: Path) -> Path:
     ex = d / "extract.jsonl"
     run([PY, "scripts/extract_events.py", "fetch", "--events", str(ev_csv), "--from", since.isoformat()])
     if use_gpu:
@@ -147,15 +151,17 @@ def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str) -> 
                 if r.accession not in done:
                     f.write(json.dumps({"accession": r.accession, "ticker": r.ticker, "cik": int(r.cik),
                                         "accepted_utc": r.accepted_utc, "model": "none"}) + "\n")
-    run([PY, "scripts/build_features.py", "--events", str(ev_csv), "--extract", str(ex), "--name", tag])
+    run([PY, "scripts/build_features.py", "--events", str(ev_csv), "--extract", str(ex), "--name", tag,
+         "--prices", str(prices), "--live"])
     return BACKEND / "results" / "events" / f"features_{tag}.csv"
 
 
-def bonsai(ev_csv: Path, ex: Path, feats: Path, tag: str, since: date, d: Path) -> dict[str, float]:
+def bonsai(ev_csv: Path, ex: Path, feats: Path, tag: str, since: date, d: Path, prices: Path) -> dict[str, float]:
     srv = Ollama(11435, str(Path.home() / ".ollama" / "models"), 3, d / "ollama.log")
     try:
         run([PY, "scripts/decide_events.py", "--events", str(ev_csv), "--extract", str(ex), "--features", str(feats),
-             "--tag", tag, "--horizon", str(H), "--explain", "0", "--from", since.isoformat(), "--to", "2099-12-31"])
+             "--tag", tag, "--horizon", str(H), "--explain", "0", "--from", since.isoformat(), "--to", "2099-12-31",
+             "--prices", str(prices), "--live"])
     finally:
         srv.stop()
     p = BACKEND / "results" / "events" / f"decide_bonsai-27b_latest_{tag}_h{H}.jsonl"
@@ -206,7 +212,8 @@ def lite(feats: Path, ev_csv: Path, p: Prices) -> dict[str, float]:
     return dict(zip(new["accession"], model(design(new, cats)), strict=True))
 
 
-def prices_for(tickers: set[str], start: date, end: date) -> Prices:
+def prices_for(tickers: set[str], start: date, end: date, save: Path) -> Prices:
+    """Daily bars dated before `end` (Yahoo, free), also saved in the long format the pipeline scripts read."""
     import yfinance as yf
     frames = []
     for t in sorted(tickers):
@@ -216,6 +223,7 @@ def prices_for(tickers: set[str], start: date, end: date) -> Prices:
             frames.append(df[["Open", "High", "Low", "Close", "Volume"]].assign(Ticker=t))
     long = pd.concat(frames).rename_axis("Date").reset_index()
     long["Date"] = pd.to_datetime(long["Date"]).dt.date.astype(str)
+    long.to_parquet(save)
     return Prices.from_long(long)
 
 
@@ -270,13 +278,14 @@ def main() -> None:
     logodds: dict[str, float] = {}
     source = "bonsai" if use_gpu else "lite"
     tickers = {str(t).replace(".", "-") for t in allev["ticker"]} | set(SECTOR_ETF.values()) | {"SPY"}
-    p = prices_for(tickers, now.date() - timedelta(days=420), now.date())
+    px_file = d / "prices.parquet"
+    p = prices_for(tickers, now.date() - timedelta(days=420), now.date(), px_file)
     if len(new):
         new_csv = d / "events_new.csv"
         new.to_csv(new_csv, index=False)
-        feats = fact_sheets(d, new_csv, since, use_gpu, tag)
+        feats = fact_sheets(d, new_csv, since, use_gpu, tag, px_file)
         if use_gpu:
-            logodds = bonsai(new_csv, d / "extract.jsonl", feats, tag, since, d)
+            logodds = bonsai(new_csv, d / "extract.jsonl", feats, tag, since, d, px_file)
         else:
             logodds = lite(feats, new_csv, p)
     for r in new.itertuples():

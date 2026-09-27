@@ -103,6 +103,8 @@ async def run(args: argparse.Namespace) -> None:
     async def one(n: int, r: Any) -> dict[str, Any] | None:
         etf = SECTOR_ETF.get(str(r.sector))
         i = entry_index(days, datetime.fromisoformat(str(r.accepted_utc)))
+        if i is None and args.live:
+            i = len(days)  # forward test: the entry day is not in the prices yet; the prompt reads earlier closes only
         if etf is None or i is None or str(r.ticker).replace(".", "-") not in p.close.columns:
             return None
         user = sheets[r.accession] if sheets else event_text(r, ex[r.accession], p, i, etf)
@@ -150,6 +152,8 @@ def main() -> None:
     ap.add_argument("--horizon", type=int, default=20, choices=sorted(HORIZONS),
                     help="5 quick money, 20 mid term, 120 long term (trading days to beat the sector)")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--live", action="store_true",
+                    help="forward test: a release whose entry day is not in the prices yet uses the closes before it")
     ap.add_argument("--parallel", type=int, default=3, help="requests in flight (the Ollama server's slots)")
     ap.add_argument("--explain", type=int, default=100, help="write a bull/bear case for the first N events")
     args = ap.parse_args()

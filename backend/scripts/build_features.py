@@ -86,6 +86,8 @@ def main() -> None:
     ap.add_argument("--xbrl", default="data/xbrl/eps_quarterly.csv")
     ap.add_argument("--prices", default="data/events/ohlcv_2023-01-01_2026-09-25.parquet")
     ap.add_argument("--name", default="sp500_2025")
+    ap.add_argument("--live", action="store_true",
+                    help="forward test: a release whose entry day is not in the prices yet uses the closes before it")
     args = ap.parse_args()
     ev = pd.read_csv(BACKEND / args.events)
     ex = {json.loads(x)["accession"]: json.loads(x) for x in (BACKEND / args.extract).read_text().splitlines()}
@@ -99,6 +101,8 @@ def main() -> None:
         etf = SECTOR_ETF.get(str(r.sector))
         t = str(r.ticker).replace(".", "-")
         i = entry_index(days, datetime.fromisoformat(str(r.accepted_utc)))
+        if i is None and args.live:
+            i = len(days)  # the fact sheet only reads closes before the entry (event_text uses i - 1 and earlier)
         if e is None or etf is None or i is None or t not in p.close.columns:
             continue
         tool = sec_tool(by_cik.get(int(r.cik), pd.DataFrame(columns=xb.columns)), str(r.accepted_utc))
@@ -135,7 +139,7 @@ def main() -> None:
             extra += history_lines(tool["history"])
         eps, rev = filled.get("eps") or {}, filled.get("revenue") or {}
         rows.append({"accession": r.accession, "ticker": r.ticker, "cik": r.cik, "sector": r.sector,
-                     "accepted_utc": r.accepted_utc, "entry": days[i].date().isoformat(),
+                     "accepted_utc": r.accepted_utc, "entry": days[i].date().isoformat() if i < len(days) else "pending",
                      "eps_q": eps.get("q"), "eps_prior": eps.get("prior"),
                      "eps_prior_source": "reader" if "prior" in plausible("eps", e.get("eps") or {})[0] else
                      ("sec" if "prior" in eps else None),
