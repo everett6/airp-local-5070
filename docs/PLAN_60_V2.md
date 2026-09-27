@@ -66,6 +66,27 @@ the Sharpe difference above 0).
      - Also reported: raw CAGR, volatility, max drawdown and worst year for both. Then the same comparison with the
        brakes on.
      - A pass changes the default cap **only after you confirm**, because the higher cap means deeper crypto drawdowns.
+   - **Result (2026-09-27, 00:40): FAIL on the pre-registered rule, but a close call.** Output:
+     `results/crypto_cap_test.json`.
+     - Average crypto weight: 8.8% at the 20% cap, 15.5% at the 35% cap. The trend filter keeps crypto out much of
+       the time.
+
+     | Book | CAGR | Vol | Sharpe | Max DD | Worst year |
+     |---|---|---|---|---|---|
+     | 20% cap | 21.6% | 20.6% | 1.05 | 33.8% | −23.0% |
+     | 35% cap | 26.8% | 24.4% | 1.10 | 34.4% | −26.9% |
+     | 35% cap, scaled to the 20% cap's volatility | 22.7% | 20.6% | 1.10 | 29.8% | — |
+
+     - Sharpe difference: +0.04, 90% CI −0.11 to +0.16. **The CI includes 0, so FAIL.** With the brakes on: +0.06,
+       CI −0.13 to +0.22, also FAIL.
+     - **Reading:**
+       - The 35% cap gives about 5 points more return a year for about 4 points more volatility, at almost the same
+         worst drop.
+       - Per unit of risk it is at least as good as the 20% cap, but not *provably* better. So the default stays at
+         20%.
+     - **Lead for Stage 4:** when the plan does take more risk, raising the crypto cap is a candidate way to do it,
+       instead of borrowing. It gets its own pre-registered rule then: raising volatility via the cap vs via futures
+       leverage, compared at equal volatility.
 
 ### Stage 2 (weeks 2–4): build it to trade
 
