@@ -502,3 +502,18 @@ Nothing is selected from this grid; the live rule stays at 21 × 100. Script: `s
   - With the brakes, subtract about 4 points of raw return. That leaves about 16% before any leverage.
 - **For the 30–40% target:** it confirms that the gap has to be closed with risk (leverage or a higher crypto cap),
   not with a better-tuned rule. The shadow 1.5× and 2.0× books are the way to measure that on real data.
+
+## Optimization research 3: trading costs of B0 (2026-09-27 03:40; a check, not a trial)
+
+| Rebalance | Cost per trade | Trades 2018–26 | Costs on $100k | CAGR |
+|---|---|---|---|---|
+| weekly (live) | 5 bps | 639 | $5,084 | 21.59% |
+| weekly (live) | 10 bps | 643 | $10,047 | 21.33% |
+| monthly | 5 bps | 196 | $2,387 | 18.88% |
+| monthly | 10 bps | 198 | $4,743 | 18.73% |
+
+- Costs take only about 0.25 points a year at 10 bps. A no-trade band can save at most that, so it is a
+  nice-to-have for the Stage 2 executor, not a lever.
+- **Trading less often hurts a lot:** checking the trend monthly instead of weekly loses about 2.7 points a year,
+  because the crypto rule reacts late.
+- Weekly stays. Don't slow the book down to save costs.
