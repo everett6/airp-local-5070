@@ -65,24 +65,47 @@ def lookup_from(p: Prices):
     return fn
 
 
-def prefetch_for(r, ex99: dict[str, str], names: dict[int, str]) -> list[dict]:
-    """The routine first look, fetched in parallel by code before the model's first round."""
+def prefetch_for(r, ex99: dict[str, str], names: dict[int, str], prev: dict[str, str] | None = None) -> list[dict]:
+    """The routine first look, fetched in parallel by code before the model's first round. With `prev` (v3): the
+    company's previous earnings release (the guidance it gave then) instead of Wikipedia background (36% of v2's
+    facts, no signal). Analyst targets are not prefetched: all four of their features failed the pre-registered
+    test (docs/WEEK_PLAN.md, 2026-09-26)."""
     t = str(r.ticker)
     calls = [{"tool": "price_history_as_of", "args": {"ticker": t, "days": 60}},
              {"tool": "sec_filings_as_of", "args": {"ticker": t, "forms": ["8-K", "10-Q", "10-K"], "limit": 5}},
              {"tool": "news_as_of", "args": {"ticker": t}}]
     if ex99.get(r.accession):  # the earnings release itself
         calls.append({"tool": "read_filing", "args": {"url": ex99[r.accession], "max_chars": 4000}})
-    if names.get(int(r.cik)):
-        calls.append({"tool": "wiki_as_of", "args": {"title": names[int(r.cik)], "max_chars": 1500}})
+    if prev is None:
+        if names.get(int(r.cik)):
+            calls.append({"tool": "wiki_as_of", "args": {"title": names[int(r.cik)], "max_chars": 1500}})
+        return calls
+    if prev.get(r.accession):
+        calls.append({"tool": "read_filing", "args": {"url": prev[r.accession], "max_chars": 3000}})
     return calls
 
 
+def previous_releases(events: pd.DataFrame) -> dict[str, str]:
+    """accession -> the same company's previous earnings release (EX-99.1 URL), filed 30-200 days earlier."""
+    ev = events.dropna(subset=["ex99_url"]).sort_values("accepted_utc")
+    out: dict[str, str] = {}
+    for _, g in ev.groupby("cik"):
+        t = pd.to_datetime(g["accepted_utc"])
+        for k in range(1, len(g)):
+            j = k - 1
+            while j >= 0 and (t.iloc[k] - t.iloc[j]).days < 30:  # a same-quarter re-file or amendment
+                j -= 1
+            if j >= 0 and (t.iloc[k] - t.iloc[j]).days <= 200:
+                out[g["accession"].iloc[k]] = g["ex99_url"].iloc[j]
+    return out
+
+
 async def research(r, llm: Router, fetcher: SafeFetcher, ua: str, lookup, rounds: int,
-                   prefetch: list[dict] | None = None) -> dict:
+                   prefetch: list[dict] | None = None, cap_s: float = 25.0) -> dict:
     as_of = datetime.fromisoformat(str(r.accepted_utc)).replace(tzinfo=UTC)
     gw = ToolGateway(mode="as_of", fetcher=fetcher, as_of=as_of, sec_user_agent=ua, price_lookup=lookup,
-                     tool_cache=WEBCACHE, max_result_chars=5000, timeout_cap_s=25.0)
+                     tool_cache=WEBCACHE, max_result_chars=5000, timeout_cap_s=cap_s,
+                     own_filing=str(r.accession).replace("-", ""))
     t0 = time.monotonic()
     err = ""
     for _ in range(2):
@@ -137,13 +160,14 @@ async def run(args: argparse.Namespace) -> None:
     ua = base.sec_user_agent
     if args.native_tools:
         llm.native_tools = base.specs_native()
-    writer = (OllamaLLM(args.brief_model, base_url=args.brief_base_url, concurrency=1, num_ctx=8192,
+    writer = (OllamaLLM(args.brief_model, base_url=args.brief_base_url, concurrency=args.brief_workers, num_ctx=8192,
                         num_predict=1200, cache=True, require_gpu=True) if args.brief_model else None)
     router = Router(llm, writer)
     await base.aclose()
     lookup = lookup_from(p)
     ev = pd.read_csv(BACKEND / args.events)
     ex99 = {a: u for a, u in zip(ev["accession"], ev["ex99_url"].fillna(""), strict=True) if u}
+    prev = previous_releases(pd.read_csv(BACKEND / args.all_events)) if args.prefetch_set == "v3" else None
     mem = pd.read_csv(BACKEND / args.members)
     names = {int(c): str(n) for c, n in zip(mem["cik"], mem["name"], strict=True)}
     todo = [r for r in feats.itertuples() if not (OUT / f"{r.accession}.json").exists()]
@@ -160,8 +184,8 @@ async def run(args: argparse.Namespace) -> None:
             if deadline and time.time() > deadline:
                 return  # time budget used: stop taking new releases (resumable; the table below still gets written)
             r = queue.get_nowait()
-            pre = prefetch_for(r, ex99, names) if args.prefetch else None
-            rec = await research(r, router, fetcher, ua, lookup, args.rounds, pre)
+            pre = prefetch_for(r, ex99, names, prev) if args.prefetch else None
+            rec = await research(r, router, fetcher, ua, lookup, args.rounds, pre, args.timeout_cap)
             rec["models"] = {"research": args.model, "brief": args.brief_model or args.model}
             (OUT / f"{r.accession}.json").write_text(json.dumps(rec, indent=1, default=str) + "\n")
             done += 1
@@ -202,13 +226,21 @@ def main() -> None:
     ap.add_argument("--brief-model", default="bonsai-27b:latest", help="writes the brief; '' = the research model")
     ap.add_argument("--brief-base-url", default="http://127.0.0.1:11435")
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--brief-workers", type=int, default=3, help="briefs in flight on the writer (Ollama slots)")
+    ap.add_argument("--timeout-cap", type=float, default=15.0,
+                    help="seconds per tool call (v2: 25; a third of news lookups ran into it and returned nothing)")
+    ap.add_argument("--prefetch-set", choices=("v2", "v3"), default="v3",
+                    help="v2: prices, filings, news, release, Wikipedia; v3: Wikipedia replaced by the previous "
+                         "earnings release")
+    ap.add_argument("--all-events", default="data/events/events_2024-01-01_2026-09-24.csv",
+                    help="every earnings release, for the previous release")
     ap.add_argument("--deadline", default="", help="local time (YYYY-MM-DDTHH:MM) after which no new release starts")
     ap.add_argument("--backend", choices=("ollama", "vllm"), default="ollama")
     ap.add_argument("--vllm-url", default="http://127.0.0.1:8000")
     ap.add_argument("--vllm-model", default="jan-v1-4b", help="served model name (scripts/vllm_serve.sh)")
-    ap.add_argument("--rounds", type=int, default=2, help="model rounds after the prefetched first look")
+    ap.add_argument("--rounds", type=int, default=1, help="model rounds after the prefetched first look (v2: 2)")
     ap.add_argument("--prefetch", action=argparse.BooleanOptionalAction, default=True)
-    ap.add_argument("--run-tag", default="_v2", help="suffix of the results folder")
+    ap.add_argument("--run-tag", default="_v3", help="suffix of the results folder")
     ap.add_argument("--events", default="data/events/events_sp500_2025.csv", help="for the press-release URLs")
     ap.add_argument("--members", default="data/events/members_2024_2026.csv", help="for company names")
     ap.add_argument("--limit", type=int, default=0)

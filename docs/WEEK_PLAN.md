@@ -184,3 +184,32 @@ data): it can at most be a lead, and only if its 2024 interval is above zero. Ca
 months' outcome windows overlap almost entirely, so the month bootstrap interval is too narrow; a pass there needs a
 forward test before any money-like sizing. A walk-forward combined score and portfolio are not possible for 1 and 2
 years inside this price window (too few outcomes known before the decisions).
+
+## Research fix result (2026-09-26): analyst targets fail
+
+834 of the 1,180 sampled 2025-26 releases had an archived Yahoo quote page in the 60 days before them
+(results/events/analyst_eval_2025.txt). **All 12 tests fail the pre-registered rule** (none has its interval above
+zero in the set direction). Quick money: every feature's IC is negative (-0.013 to -0.055). The only intervals that
+exclude zero point the *wrong* way: at 120 days, high target dispersion did better (negated IC -0.105
+[-0.223, -0.009]) and net target raises did worse (-0.090, only 4 months). Found after the fact, so leads at most.
+Per the rule the features are dropped: not in the fact sheet, the combined score or the research prefetch, and the
+2024 fetch is not run.
+
+## Research v3 (2026-09-26): web research back on, faster and aimed at the surprise; rule set before results
+
+Measured on v2's 1,007 releases (167 s each, 6 in flight, ~28 s per release overall):
+- the press release itself was blocked in 693 of 1,285 reads: EDGAR's Eastern-time stamp plus the +5 h safety margin
+  put it an hour "after" its own decision time in summer. Fixed: the filing being decided on is readable
+  (`ToolGateway.own_filing`); every other source keeps the margin.
+- news lookups: 647 of 2,030 timed out at 25 s (a third of the calls, nothing returned). Cap now 15 s.
+- Jan's second round: mostly archived pages, 64 of 468 succeeded. Now 1 round after the prefetch.
+- Bonsai wrote briefs one at a time; now 3 in flight (the model is 4 GB; 3 Ollama slots).
+- Wikipedia (36% of v2's facts) is replaced by the company's previous earnings release (guidance it gave; 1,174 of
+  1,180 releases have one). The brief now asks for guidance met/beat/missed and one-offs first, and not to repeat
+  the fact sheet's numbers.
+
+`scripts/research_v3_run.sh`: research on the 1,180-release sample, then Bonsai's books on the researched fact sheets
+vs the same releases' cleaned fact sheets alone (`horizons6_eval.py --with-tag jan_research_v3`).
+**Pass rule (same as Block 1, per book):** own-horizon IC with research higher than without on the same releases AND
+the with-research 95% interval above zero. Books: 1 week, 1 month, 3 months, 6 months, 1 year (2 years has no
+2025-26 outcomes). A book that passes gets research in the forward test; one that fails stays fact-sheet only.

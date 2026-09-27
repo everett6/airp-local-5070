@@ -333,6 +333,7 @@ class ToolGateway:
     mode: str  # "live" | "backtest" | "as_of"
     fetcher: SafeFetcher
     as_of: datetime | None = None  # decision time, required in as_of mode
+    own_filing: str = ""  # as_of mode: accession (no dashes) of the filing being decided on; readable at its own time
     price_lookup: asof.PriceLookup | None = None
     tool_cache: Path | None = None  # as_of mode: tool results keyed by (tool, args, as_of), replayed exactly
     sec_user_agent: str = ""

@@ -136,6 +136,13 @@ async def test_read_filing_rechecks_acceptance_time_and_url():
     assert not ok and "only https://www.sec.gov/Archives" in err
     docs, ok = await call(gw(sec_handler()), "filing_documents", url=url)
     assert ok and [d["name"] for d in docs["documents"]] == ["b.htm", "ex99.htm"]
+    # the release being decided on is readable at its own acceptance time; other late filings stay blocked
+    res, ok = await call(gw(sec_handler(header_ts="20150310173000"), own_filing="000100000150000050"),
+                         "read_filing", url=url)
+    assert ok and "Revenue rose" in res["text"]
+    err, ok = await call(gw(sec_handler(header_ts="20150310173000"), own_filing="000100000150000099"),
+                         "read_filing", url=url)
+    assert not ok and "after the decision time" in err
 
 
 def archive_handler(cdx_ts="20150301120000", redirect_to=None):

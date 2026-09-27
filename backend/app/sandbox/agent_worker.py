@@ -477,8 +477,11 @@ BRIEF_SYSTEM = """You are a research analyst. A portfolio manager must decide wh
 Rules:
 - Use ONLY facts written in the evidence. Every fact must cite the URL it came from, copied exactly.
 - Never write a number that does not appear in the evidence.
-- Up to 6 facts, each under 30 words, most decision-relevant first (earnings, guidance, deals, lawsuits,
-  management, analyst moves). Do NOT list the stock's price, returns or volatility: the manager has those.
+- Up to 6 facts, each under 30 words, most decision-relevant first. What moves a stock after earnings is the
+  surprise against expectations, so put first: the guidance the company gave in its PREVIOUS release and whether
+  this quarter met, beat or missed it; analyst estimates or rating changes if the evidence has them; one-off
+  items; then deals, lawsuits, management changes. The manager already has this release's revenue, EPS and guidance
+  figures and the stock's price, returns and volatility: do NOT repeat those.
 
 Reply with ONLY one JSON object:
 {{"facts": [{{"text": "<one sentence>", "source": "<url>", "date": "<YYYY-MM-DD or empty>"}}],

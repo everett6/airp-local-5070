@@ -203,7 +203,7 @@ def _sec_parts(url: str) -> tuple[str, str]:
 async def filing_documents(gw: ToolGateway, a: dict[str, Any]) -> Any:
     as_of = _as_of(gw)
     cik, acc = _sec_parts(a["url"])
-    if await _filing_accepted(gw, cik, acc) > as_of:
+    if acc != gw.own_filing and await _filing_accepted(gw, cik, acc) > as_of:
         raise FetchError("filing was accepted after the decision time")
     r = await gw.fetcher.fetch(f"https://www.sec.gov/Archives/edgar/data/{cik}/{acc}/index.json",
                                headers={"User-Agent": gw.sec_user_agent})
@@ -216,7 +216,9 @@ async def filing_documents(gw: ToolGateway, a: dict[str, Any]) -> Any:
 async def read_filing(gw: ToolGateway, a: dict[str, Any]) -> Any:
     as_of = _as_of(gw)
     cik, acc = _sec_parts(a["url"])
-    accepted = await _filing_accepted(gw, cik, acc)
+    # the release being decided on is accepted at the decision time itself; the +5 h Eastern-time margin would
+    # otherwise put it an hour "after" itself in summer (54% of the releases were blocked, 2026-09-26)
+    accepted = as_of if acc == gw.own_filing else await _filing_accepted(gw, cik, acc)
     if accepted > as_of:
         raise FetchError("filing was accepted after the decision time")
     r = await gw.fetcher.fetch(a["url"], headers={"User-Agent": gw.sec_user_agent}, max_bytes=8_000_000)
