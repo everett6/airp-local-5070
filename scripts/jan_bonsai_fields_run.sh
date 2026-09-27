@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# "LLM extracts, code scores", arms A and B (docs/PLAN_60_V2.md): wait for arm A's release-only labels, score them;
-# Jan gathers as-of research for the 2024 sample (vLLM, GPU to itself); Bonsai labels release + research (Ollama);
-# code scores arm B. One model on the GPU at a time. Resumable. Manual run, not a service:
+# "LLM extracts, code scores", arms A and B (docs/PLAN_60_V2.md): Jan gathers as-of research for the 2024 sample
+# (vLLM, GPU to itself); Bonsai labels release + research (arm B), then finishes the release-only labels (arm A,
+# resumes where it stopped); code scores arm A, then arm B. Jan runs first (27 Sep, user's request). One model on the GPU at a time. Resumable. Manual run, not a service:
 #   systemd-inhibit --what=idle:sleep scripts/jan_bonsai_fields_run.sh
 set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -12,9 +12,6 @@ VLLM=""; OLL=""
 trap '[ -n "$VLLM" ] && kill -- -$VLLM 2>/dev/null; [ -n "$OLL" ] && kill $OLL 2>/dev/null' EXIT
 gpu_idle() { until ! nvidia-smi --query-compute-apps=process_name --format=csv,noheader | grep -qi "python\|vllm\|ollama"; do sleep 5; done; }
 
-LOG "waiting for arm A (release-only labels)"
-while pgrep -f "[l]lm_fields.py extract --prompt" > /dev/null; do sleep 60; done
-$PY scripts/llm_fields.py test 2>&1 | tee results/events/llm_fields_test.txt
 pkill -f "[o]llama serve" ; sleep 5; gpu_idle
 
 LOG "Jan: as-of research on the 2024 sample"
@@ -36,8 +33,11 @@ OLLAMA_MODELS=$HOME/.ollama/models OLLAMA_NOPRUNE=1 OLLAMA_HOST=127.0.0.1:11435 
 OLL=$!
 until curl -s -m 2 127.0.0.1:11435/api/tags > /dev/null; do sleep 2; done
 $PY scripts/llm_fields.py extract-research || LOG "arm B labels failed"
+LOG "Bonsai: finish release-only labels (arm A)"
+$PY scripts/llm_fields.py extract --prompt P2 || LOG "arm A labels failed"
 kill $OLL 2>/dev/null; OLL=""
 
-LOG "code scores arm B (pre-registered)"
+LOG "code scores arm A, then arm B (pre-registered)"
+$PY scripts/llm_fields.py test 2>&1 | tee results/events/llm_fields_test.txt
 $PY scripts/llm_fields.py test-research 2>&1 | tee results/events/llm_fields_research_test.txt
 LOG done
