@@ -630,3 +630,26 @@ Dev set: 100 releases from 2024. Only extraction quality was measured; no return
   of the remaining ones are right.
 - Quote-first and the worked examples cost 13% more time and did not help.
 - Step 2 now runs with P2 on the 2024 (train) and 2025-26 (test) samples. `results/events/llm_fields_dev.json`.
+
+## Arm B: Jan researches → Bonsai labels → code decides (spec fixed 2026-09-27 ~10:35, before any arm-B data)
+
+User request: "make sure u are doing the jan web research then feed into bonsai which uses algorithms to help make
+judgement calls". Arm A (release only, running now) stays as specified. Arm B adds Jan's web research.
+
+- **Jan (research):** Jan-v1-4B gathers as-of evidence per release, with the same tools and prefetch as research v3.
+  The prefetch includes the company's previous release, which holds the guidance it gave. The research audit applies.
+  - 2025-26: the existing v3 evidence (1,180 releases).
+  - 2024: a new gather on the 2024 sample (`--run-tag _v3_2024`). Releases whose previous release predates 2024
+    may lack it; that is recorded.
+- **Bonsai (reading):** frozen prompt P2 plus the evidence (the release's first 6,000 characters and Jan's evidence,
+  up to 6,000), and one more field that only the research can answer:
+  - `vs_prior_guidance`: beat / met / missed / not_stated. This quarter's results vs the guidance range from the
+    company's previous release.
+- **Code check:** as in arm A, but a quote may come from the release or from Jan's evidence. No re-tuning: P2's
+  wording is unchanged, and only the evidence block and the one field definition are added.
+- **Code (the judgement):** the same ridge as arm A, trained on 2024 and scored on 2025-26. Full B = base + the 8 fields.
+- **Pass for arm B:**
+  - the 2025-26 monthly IC of (full B − full A) has a 95% CI above 0 (paired monthly bootstrap), AND
+  - full B's own IC CI is above 0 (5-day return vs sector).
+  - So research must add something beyond what Bonsai reads in the release alone.
+- **Registry:** one more trial. Also reported: the 20-day horizon, and the `vs_prior_guidance` field alone.
