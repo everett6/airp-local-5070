@@ -1,0 +1,157 @@
+{
+ "accession": "spike-2024-12-04_CRM",
+ "ticker": "CRM",
+ "as_of": "2024-12-04T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"CRM\", \"days\": 20}) -> {\"ticker\": \"CRM\", \"last_date\": \"2024-12-03\", \"last_close\": 326.67, \"ret_1d\": 0.0013, \"ret_5d\": -0.0226, \"ret_20d\": 0.1121, \"ret_60d\": null, \"vol_20d_annualized\": 0.366, \"closes_last_30\": [293.73, 293.21, 302.49, 306.31, 317.32, 336.82, 336.25, 336.81, 326.88, 320.58, 317.62, 318.78, 321.02, 330.95, 337.1, 334.23, 338.25, 325.27, 325.25, 326.25, 326.67]}\n  - news_as_of({\"ticker\": \"CRM\", \"window_days\": 10}) -> ERROR: timed out\n  - sec_filings_as_of({\"ticker\": \"CRM\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"CRM\", \"cik\": 1108524, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-12-03\", \"accepted_utc_latest\": \"2024-12-04T02:03:38+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852424000033/crm-20241203.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n\n[round 2] thought: \n  - filing_documents({\"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852424000033/crm-20241203.htm\"}) -> {\"documents\": [{\"name\": \"0001108524-24-000033.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852424000033/0001108524-24-000033.txt\"}, {\"name\": \"crm-20241203.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852424000033/crm-20241203.htm\"}, {\"name\": \"crm-q3fy25xexhibit991.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852424000033/crm-q3fy25xexhibit991.htm\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852424000033/R1.htm\"}]}\n  - analyst_targets_as_of({\"ticker\": \"CRM\", \"window_days\": 10}) -> {\"url\": \"https://finance.yahoo.com/quote/CRM/\", \"captured_utc\": \"2024-12-02T07:56:29+00:00\", \"target_avg\": 348.94, \"target_low\": 236.0, \"price_on_page\": 329.99, \"target_high\": 450.0, \"actions\": [], \"raises\": 0, \"lowers\": 0, \"headline_up\": 3, \"headline_down\": 0, \"headlines_about_company\": 7}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to check CRM's historical price behavior over the last 20 trading days to estimate the probability of closing higher in the next 20 days. I'll start with price history data and news filings.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "CRM",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "CRM",
+      "window_days": 10
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "CRM",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to analyze CRM's recent price history and any relevant news/earnings filings to estimate the probability of a 20-day price increase. Starting with the 8-K filing from Dec 3 to check for recent events.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1108524/000110852424000033/crm-20241203.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "analyst_targets_as_of",
+     "args": {
+      "ticker": "CRM",
+      "window_days": 10
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "CRM",
+    "days": 20
+   },
+   "started": "2026-09-27T10:05:38.105+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"CRM\", \"last_date\": \"2024-12-03\", \"last_close\": 326.67, \"ret_1d\": 0.0013, \"ret_5d\": -0.0226, \"ret_20d\": 0.1121, \"ret_60d\": null, \"vol_20d_annualized\": 0.366, \"closes_last_30\": [293.73, 293."
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "CRM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:05:38.106+00:00",
+   "ok": true,
+   "elapsed_ms": 1521,
+   "chars": 344,
+   "error": null,
+   "preview": "{\"ticker\": \"CRM\", \"cik\": 1108524, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-12-03\", \"accepted_utc_latest\": \"2024-12-04T02:03:38+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "CRM",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:05:38.105+00:00",
+   "ok": false,
+   "elapsed_ms": 15001,
+   "chars": 0,
+   "error": "timed out",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1108524/000110852424000033/crm-20241203.htm"
+   },
+   "started": "2026-09-27T10:05:59.309+00:00",
+   "ok": true,
+   "elapsed_ms": 153,
+   "chars": 525,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001108524-24-000033.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852424000033/0001108524-24-000033.txt\"}, {\"name\": \"crm-20241203.htm\", \"url\": \"https://"
+  },
+  {
+   "id": "2.1",
+   "tool": "analyst_targets_as_of",
+   "args": {
+    "ticker": "CRM",
+    "window_days": 10,
+    "name": ""
+   },
+   "started": "2026-09-27T10:05:59.309+00:00",
+   "ok": true,
+   "elapsed_ms": 6338,
+   "chars": 291,
+   "error": null,
+   "preview": "{\"url\": \"https://finance.yahoo.com/quote/CRM/\", \"captured_utc\": \"2024-12-02T07:56:29+00:00\", \"target_avg\": 348.94, \"target_low\": 236.0, \"price_on_page\": 329.99, \"target_high\": 450.0, \"actions\": [], \"r"
+  }
+ ],
+ "elapsed_s": 33.8,
+ "day": "2024-12-04",
+ "asset": "CRM",
+ "ret_pct": 10.99,
+ "z": 6.24,
+ "fwd5_pct": -1.6,
+ "cause": {
+  "label_model": "earnings",
+  "reason": "The asset moved significantly following an 8-K filing dated 2024-12-03, which is standard for quarterly earnings reports.",
+  "source": "https://www.sec.gov/Archives/edgar/data/1108524/000110852424000033/crm-20241203.htm",
+  "label": "earnings",
+  "earnings_release_near": true
+ }
+}

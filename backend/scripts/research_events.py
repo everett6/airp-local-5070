@@ -1,0 +1,311 @@
+"""Research sub-agent on every earnings release: web tools as of the release, a source-checked brief, into the
+research table, then Bonsai decides with it.
+
+    python scripts/research_events.py --features results/events/features_sp500_2025.csv --limit 400
+    python scripts/decide_events.py --features results/events/features_sp500_2025_research.csv --tag research ...
+
+Per release: the jailed research agent (default Jan-v1-4B with native tool calls; Bonsai-27B writes the brief) gets the as-of internet tools (app/tools/asof.py: SEC filings and the
+release itself, Wikipedia revisions, archived news pages, price history), all limited to what existed at the SEC
+acceptance time of the release (entry is the next open, so nothing it reads postdates the decision). It writes a
+brief whose facts are checked against the fetched sources (agent_worker.verify_brief); only verified facts are added
+to the fact sheet. Results: results/events_research_<model><run-tag>/<accession>.json and
+features_<name>_research_<model><run-tag>.csv (researched releases only).
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import sys
+import time
+from datetime import UTC, datetime
+from pathlib import Path
+
+BACKEND = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND))
+
+import pandas as pd
+
+from app.sandbox.agent_worker import BRIEF_SYSTEM, brief_request, finish_brief
+from app.sandbox.events import Prices
+from app.sandbox.gpu_lock import gpu_job
+from app.sandbox.jail import AgentJail, JailError, JailLimits
+from app.sandbox.vllm_client import VLLMChat
+from app.sandbox.walkforward import OllamaLLM
+from app.tools.gateway import ToolGateway
+from app.tools.netguard import SafeFetcher
+
+OUT = BACKEND / "results" / "events_research"  # + "_<model>"
+
+
+class Router:
+    """Research rounds go to the tool-using model (Jan); the brief (summarize + cite, then code-checked) goes to the
+    writer model (Bonsai). Both stay loaded together (Jan on vLLM or Ollama, Bonsai on Ollama; ~10 GB)."""
+
+    def __init__(self, research: OllamaLLM | VLLMChat, writer: OllamaLLM | None) -> None:
+        self.research, self.writer = research, writer
+        self.num_ctx, self.num_predict = research.num_ctx, research.num_predict
+
+    async def __call__(self, system: str, user: str, mode: str | None = None) -> str:
+        llm = self.writer if self.writer is not None and system.startswith(BRIEF_SYSTEM[:60]) else self.research
+        return await (llm(system, user, mode=mode) if mode else llm(system, user))
+
+
+WEBCACHE = BACKEND / "results" / "webcache"
+
+
+def lookup_from(p: Prices):
+    def fn(ticker: str, as_of: datetime, n: int) -> list[tuple[str, float]]:
+        t = ticker.replace(".", "-")
+        if t not in p.close.columns:
+            return []
+        # closes strictly before the as-of day: the release day's close is after the release
+        s = p.close[t].loc[: pd.Timestamp(as_of.date()) - pd.Timedelta(days=1)].dropna().tail(n)
+        return [(d.date().isoformat(), float(v)) for d, v in s.items()]
+    return fn
+
+
+def prefetch_for(r, ex99: dict[str, str], names: dict[int, str], prev: dict[str, str] | None = None) -> list[dict]:
+    """The routine first look, fetched in parallel by code before the model's first round. With `prev` (v3): the
+    company's previous earnings release (the guidance it gave then) instead of Wikipedia background (36% of v2's
+    facts, no signal). Analyst targets are not prefetched: all four of their features failed the pre-registered
+    test (docs/WEEK_PLAN.md, 2026-09-26)."""
+    t = str(r.ticker)
+    calls = [{"tool": "price_history_as_of", "args": {"ticker": t, "days": 60}},
+             {"tool": "news_as_of", "args": {"ticker": t}}]
+    if prev is None:  # v2 only: in v3 the filing list's item codes became "facts" ("reported 8.01 and 9.01")
+        calls.insert(1, {"tool": "sec_filings_as_of", "args": {"ticker": t, "forms": ["8-K", "10-Q", "10-K"],
+                                                               "limit": 5}})
+    if ex99.get(r.accession):  # the earnings release itself
+        calls.append({"tool": "read_filing", "args": {"url": ex99[r.accession], "max_chars": 4000}})
+    if prev is None:
+        if names.get(int(r.cik)):
+            calls.append({"tool": "wiki_as_of", "args": {"title": names[int(r.cik)], "max_chars": 1500}})
+        return calls
+    if prev.get(r.accession):
+        calls.append({"tool": "read_filing", "args": {"url": prev[r.accession], "max_chars": 3000}})
+    return calls
+
+
+def previous_releases(events: pd.DataFrame) -> dict[str, str]:
+    """accession -> the same company's previous earnings release (EX-99.1 URL), filed 30-200 days earlier."""
+    ev = events.dropna(subset=["ex99_url"]).sort_values("accepted_utc")
+    out: dict[str, str] = {}
+    for _, g in ev.groupby("cik"):
+        t = pd.to_datetime(g["accepted_utc"])
+        for k in range(1, len(g)):
+            j = k - 1
+            while j >= 0 and (t.iloc[k] - t.iloc[j]).days < 30:  # a same-quarter re-file or amendment
+                j -= 1
+            if j >= 0 and (t.iloc[k] - t.iloc[j]).days <= 200:
+                out[g["accession"].iloc[k]] = g["ex99_url"].iloc[j]
+    return out
+
+
+async def research(r, llm: Router, fetcher: SafeFetcher, ua: str, lookup, rounds: int,
+                   prefetch: list[dict] | None = None, cap_s: float = 25.0, brief: bool = True) -> dict:
+    as_of = datetime.fromisoformat(str(r.accepted_utc)).replace(tzinfo=UTC)
+    gw = ToolGateway(mode="as_of", fetcher=fetcher, as_of=as_of, sec_user_agent=ua, price_lookup=lookup,
+                     tool_cache=WEBCACHE, max_result_chars=5000, timeout_cap_s=cap_s,
+                     own_filing=str(r.accession).replace("-", ""))
+    t0 = time.monotonic()
+    err = ""
+    for _ in range(2):
+        try:
+            async with AgentJail(llm, tools=gw, limits=JailLimits()) as jail:
+                res = await jail.call({
+                    "task": "research", "prompt": "as_of", "brief": brief, "return_evidence": not brief,
+                    "skip_final": True,
+                    "prefetch": prefetch or [],
+                    "subject": {"ticker": str(r.ticker), "horizon_days": 20, "as_of": as_of.isoformat()},
+                    "tools": gw.specs_for_prompt(), "max_rounds": rounds, "max_calls_per_round": 4,
+                    "num_ctx": llm.num_ctx, "num_predict": llm.num_predict})
+            return {"accession": r.accession, "ticker": r.ticker, "as_of": as_of.isoformat(), **res,
+                    "tool_log": gw.log, "elapsed_s": round(time.monotonic() - t0, 1)}
+        except (JailError, OSError) as e:
+            err = f"{type(e).__name__}: {e}"[:500]
+    return {"accession": r.accession, "ticker": r.ticker, "as_of": as_of.isoformat(), "error": err,
+            "tool_log": gw.log, "elapsed_s": round(time.monotonic() - t0, 1)}
+
+
+def brief_lines(rec: dict) -> list[str]:
+    b = rec.get("brief") or {}
+    facts = [f for f in b.get("facts", []) if isinstance(f, dict) and f.get("text")]
+    if not facts:
+        return []
+    out = ["Research agent (web sources as of the release, each fact checked against its source):"]
+    out += [f"  - {str(f['text'])[:300]} ({str(f.get('date', ''))[:10]})" for f in facts[:6]]
+    for key, label in (("catalysts", "Upcoming"), ("risks", "Risks")):
+        items = [str(x)[:200] for x in b.get(key, []) if x][:3]
+        if items:
+            out.append(f"{label}: " + "; ".join(items))
+    return out
+
+
+async def write_briefs(writer: OllamaLLM, workers: int) -> None:
+    """Phase 2 of a two-phase run: Bonsai writes the brief for every release whose evidence phase 1 saved, with the
+    GPU to itself (while Jan shared it, a brief took 55-75 s instead of ~9 s). Same prompt as the one-phase run."""
+    todo = [p for p in sorted(OUT.glob("*.json")) if "evidence" in (d := json.loads(p.read_text())) and "brief" not in d]
+    print(f"{len(todo)} briefs to write, {workers} at a time", flush=True)
+    sem, n, t0 = asyncio.Semaphore(workers), 0, time.monotonic()
+
+    async def one(path: Path) -> None:
+        nonlocal n
+        async with sem:
+            rec = json.loads(path.read_text())
+            subj = {"ticker": rec["ticker"], "as_of": rec["as_of"], "horizon_days": 20}
+            system, user, tags = brief_request(subj, rec["evidence"])
+            t = time.monotonic()
+            try:
+                reply = await writer(system, user)
+            except Exception as e:  # noqa: BLE001 - one failed brief must not stop the phase; a re-run retries it
+                print(f"  brief failed for {rec['ticker']} {path.stem}: {type(e).__name__}: {e}"[:300], flush=True)
+                return
+            rec["brief"] = finish_brief(reply, tags, rec["evidence"])
+            rec["brief_s"] = round(time.monotonic() - t, 1)
+            path.write_text(json.dumps(rec, indent=1, default=str) + "\n")
+            n += 1
+            if n % 25 == 0 or n == len(todo):
+                rate = (time.monotonic() - t0) / n
+                print(f"  briefs {n}/{len(todo)} {rate:.1f}s/brief eta={(len(todo) - n) * rate / 3600:.1f}h", flush=True)
+    await asyncio.gather(*(one(p) for p in todo))
+
+
+async def run(args: argparse.Namespace) -> None:
+    feats = pd.read_csv(BACKEND / args.features)
+    if args.limit:
+        feats = feats.head(args.limit)  # the event files are shuffled with a fixed seed: a random sample
+    p = Prices.from_long(pd.read_parquet(BACKEND / args.prices))
+    global OUT
+    OUT = OUT.with_name(OUT.name + "_" + args.model.split("/")[-1].replace(":", "_") + args.run_tag)
+    OUT.mkdir(parents=True, exist_ok=True)
+    if args.phase == "brief":
+        writer = OllamaLLM(args.brief_model, base_url=args.brief_base_url, concurrency=args.brief_workers,
+                           num_ctx=8192, num_predict=1200, cache=args.llm_cache, require_gpu=True)
+        try:
+            await write_briefs(writer, args.brief_workers)
+        finally:
+            await writer.unload()
+        write_table(args, feats)
+        return
+    llm: OllamaLLM | VLLMChat
+    if args.backend == "vllm":  # same Jan weights served by vLLM (scripts/vllm_serve.sh); results go to the same folder
+        llm = VLLMChat(args.vllm_model, base_url=args.vllm_url, concurrency=2 * args.workers, cache=args.llm_cache)
+    else:
+        llm = OllamaLLM(args.model, base_url=args.base_url, concurrency=args.workers, num_ctx=8192,
+                        num_predict=1200, cache=args.llm_cache, require_gpu=True)
+    base = ToolGateway.from_env("as_of", as_of=datetime(2000, 1, 1, tzinfo=UTC))
+    if not base.sec_user_agent:
+        raise SystemExit("set SEC_USER_AGENT in backend/.env")
+    fetcher = SafeFetcher(base.fetcher.user_agent, timeout_s=40.0, total_timeout_s=80.0)
+    ua = base.sec_user_agent
+    if args.native_tools:
+        llm.native_tools = base.specs_native()
+    if isinstance(llm, VLLMChat):
+        llm.thinking = args.jan_thinking
+    writer = (OllamaLLM(args.brief_model, base_url=args.brief_base_url, concurrency=args.brief_workers, num_ctx=8192,
+                        num_predict=1200, cache=args.llm_cache, require_gpu=True)
+              if args.brief_model and args.phase == "both" else None)  # gather: no brief, Bonsai not loaded
+    router = Router(llm, writer)
+    await base.aclose()
+    lookup = lookup_from(p)
+    ev = pd.read_csv(BACKEND / args.events)
+    ex99 = {a: u for a, u in zip(ev["accession"], ev["ex99_url"].fillna(""), strict=True) if u}
+    prev = previous_releases(pd.read_csv(BACKEND / args.all_events)) if args.prefetch_set == "v3" else None
+    mem = pd.read_csv(BACKEND / args.members)
+    names = {int(c): str(n) for c, n in zip(mem["cik"], mem["name"], strict=True)}
+    todo = [r for r in feats.itertuples() if not (OUT / f"{r.accession}.json").exists()]
+    deadline = datetime.fromisoformat(args.deadline).timestamp() if args.deadline else 0.0
+    print(f"{len(feats)} releases, {len(todo)} to research, {args.workers} at a time", flush=True)
+    queue: asyncio.Queue = asyncio.Queue()
+    for r in todo:
+        queue.put_nowait(r)
+    done, t0 = 0, time.monotonic()
+
+    async def worker() -> None:
+        nonlocal done
+        while not queue.empty():
+            if deadline and time.time() > deadline:
+                return  # time budget used: stop taking new releases (resumable; the table below still gets written)
+            r = queue.get_nowait()
+            pre = prefetch_for(r, ex99, names, prev) if args.prefetch else None
+            rec = await research(r, router, fetcher, ua, lookup, args.rounds, pre, args.timeout_cap,
+                                 brief=args.phase == "both")
+            rec["models"] = {"research": args.model, "brief": args.brief_model or args.model}
+            (OUT / f"{r.accession}.json").write_text(json.dumps(rec, indent=1, default=str) + "\n")
+            done += 1
+            rate = (time.monotonic() - t0) / done
+            nf = len((rec.get("brief") or {}).get("facts", []))
+            print(f"[{done}/{len(todo)}] {r.ticker:6s} facts={nf} tools={len(rec.get('tool_log', []))} "
+                  f"ok={sum(e['ok'] for e in rec.get('tool_log', []))} {rec['elapsed_s']}s "
+                  f"{rate:.1f}s/release eta={(len(todo) - done) * rate / 3600:.1f}h", flush=True)
+    try:
+        await asyncio.gather(*(worker() for _ in range(args.workers)))
+    finally:
+        await fetcher.aclose()
+        await llm.unload()
+        if writer is not None:
+            await writer.unload()
+    if args.phase == "both":
+        write_table(args, feats)
+
+
+def write_table(args: argparse.Namespace, feats: pd.DataFrame) -> None:
+    """The "with research" fact sheets: researched releases only, verified brief facts appended."""
+    rows = []
+    for r in feats.itertuples():
+        path = OUT / f"{r.accession}.json"
+        if not path.exists():
+            continue  # only researched releases: the table is the "with research" arm
+        extra = brief_lines(json.loads(path.read_text()))
+        rows.append({**r._asdict(), "research_facts": max(0, len(extra) - 1),
+                     "fact_sheet": r.fact_sheet + ("\n" + "\n".join(extra) if extra else "")})
+    out = BACKEND / args.features.replace(".csv", f"_research_{OUT.name.split('_', 2)[-1]}.csv")
+    df = pd.DataFrame(rows).drop(columns=["Index"])
+    df.to_csv(out, index=False)
+    print(f"{out.name}: {len(df)} releases, {int((df['research_facts'] > 0).sum())} with verified research facts")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--features", default="results/events/features_sp500_2025.csv")
+    ap.add_argument("--prices", default="data/events/ohlcv_2023-01-01_2026-09-25.parquet")
+    ap.add_argument("--model", default="hf.co/janhq/Jan-v1-4B-GGUF:Q4_K_M")
+    ap.add_argument("--base-url", default="http://127.0.0.1:11436")
+    ap.add_argument("--native-tools", action=argparse.BooleanOptionalAction, default=True,
+                    help="use the model's own tool-call format (Jan-v1 is trained on it)")
+    ap.add_argument("--brief-model", default="bonsai-27b:latest", help="writes the brief; '' = the research model")
+    ap.add_argument("--brief-base-url", default="http://127.0.0.1:11435")
+    ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--brief-workers", type=int, default=3, help="briefs in flight on the writer (Ollama slots)")
+    ap.add_argument("--timeout-cap", type=float, default=15.0,
+                    help="seconds per tool call (v2: 25; a third of news lookups ran into it and returned nothing)")
+    ap.add_argument("--prefetch-set", choices=("v2", "v3"), default="v3",
+                    help="v2: prices, filings, news, release, Wikipedia; v3: Wikipedia replaced by the previous "
+                         "earnings release")
+    ap.add_argument("--all-events", default="data/events/events_2024-01-01_2026-09-24.csv",
+                    help="every earnings release, for the previous release")
+    ap.add_argument("--deadline", default="", help="local time (YYYY-MM-DDTHH:MM) after which no new release starts")
+    ap.add_argument("--backend", choices=("ollama", "vllm"), default="ollama")
+    ap.add_argument("--vllm-url", default="http://127.0.0.1:8000")
+    ap.add_argument("--vllm-model", default="jan-v1-4b", help="served model name (scripts/vllm_serve.sh)")
+    ap.add_argument("--rounds", type=int, default=1, help="model rounds after the prefetched first look (v2: 2)")
+    ap.add_argument("--prefetch", action=argparse.BooleanOptionalAction, default=True)
+    ap.add_argument("--phase", choices=("both", "gather", "brief"), default="both",
+                    help="both: Jan and Bonsai together; gather: Jan + tools only, evidence saved; brief: Bonsai "
+                         "writes the saved releases' briefs (run gather, stop vLLM, then brief: no GPU sharing)")
+    ap.add_argument("--run-tag", default="_v3", help="suffix of the results folder")
+    ap.add_argument("--events", default="data/events/events_sp500_2025.csv", help="for the press-release URLs")
+    ap.add_argument("--members", default="data/events/members_2024_2026.csv", help="for company names")
+    ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--jan-thinking", action=argparse.BooleanOptionalAction, default=True,
+                    help="reasoning tokens in the tool-calling round (vLLM backend)")
+    ap.add_argument("--llm-cache", action=argparse.BooleanOptionalAction, default=True,
+                    help="replay model replies from the LLM cache (off for speed benchmarks)")
+    args = ap.parse_args()
+    with gpu_job("research_events"):
+        asyncio.run(run(args))
+
+
+if __name__ == "__main__":
+    main()

@@ -136,6 +136,13 @@ async def test_read_filing_rechecks_acceptance_time_and_url():
     assert not ok and "only https://www.sec.gov/Archives" in err
     docs, ok = await call(gw(sec_handler()), "filing_documents", url=url)
     assert ok and [d["name"] for d in docs["documents"]] == ["b.htm", "ex99.htm"]
+    # the release being decided on is readable at its own acceptance time; other late filings stay blocked
+    res, ok = await call(gw(sec_handler(header_ts="20150310173000"), own_filing="000100000150000050"),
+                         "read_filing", url=url)
+    assert ok and "Revenue rose" in res["text"]
+    err, ok = await call(gw(sec_handler(header_ts="20150310173000"), own_filing="000100000150000099"),
+                         "read_filing", url=url)
+    assert not ok and "after the decision time" in err
 
 
 def archive_handler(cdx_ts="20150301120000", redirect_to=None):
@@ -153,7 +160,8 @@ def archive_handler(cdx_ts="20150301120000", redirect_to=None):
         if "/web/" in u and "id_/" in u:
             if redirect_to and redirect_to not in u:
                 return httpx.Response(302, headers={"location": f"https://web.archive.org/web/{redirect_to}id_/x"})
-            return httpx.Response(200, text="<title>AAPL news</title><p>Apple Watch launch event.</p>",
+            return httpx.Response(200, text="<title>AAPL news</title><p>Apple Watch launch event.</p>" + "".join(
+                f"<p>Headline {i}: Apple shares move as investors weigh the new product cycle.</p>" for i in range(8)),
                                   headers={"content-type": "text/html"})
         return httpx.Response(404)
     return h
@@ -213,3 +221,17 @@ async def test_capture_index_is_fetched_once_per_page_and_reused(tmp_path):
                           tool_cache=tmp_path)
     res, ok = await call(later, "news_as_of", ticker="AAPL")
     assert ok and res["captured_utc"].startswith("2015-03-11") and len(calls) == n  # new month, no new lookup
+
+
+async def test_news_skips_an_empty_javascript_shell_and_tries_the_next_source():
+    from app.tools import asof
+    def h(req):
+        u = str(req.url)
+        if "/cdx/search/cdx" in u:
+            return httpx.Response(200, text='[["timestamp","original"],["20150301000000","https://x"]]')
+        if "finance.yahoo.com" in u:
+            return httpx.Response(200, text="<title>AAPL</title><div id=app></div>", headers={"content-type": "text/html"})
+        return httpx.Response(200, text="<title>MW</title>" + "<p>MarketWatch headline about Apple results.</p>" * 12,
+                              headers={"content-type": "text/html"})
+    res, ok = await call(gw(h), "news_as_of", ticker="AAPL")
+    assert ok and res["source"] == "marketwatch" and len(res["text"]) >= asof.MIN_PAGE_CHARS

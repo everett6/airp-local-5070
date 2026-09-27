@@ -386,9 +386,9 @@ How to research well:
 Short-horizon stock moves are close to a coin flip and stocks rise slightly more often than they fall,
 so unless the evidence is unusually strong keep p_up between 0.40 and 0.60."""
 
-RESEARCH_SYSTEM_ASOF = """You are a careful equity research agent. Decide the probability that {ticker} closes
-HIGHER {horizon} trading days after its latest close. The decision time is {as_of} (UTC). Treat it as NOW:
-you must reason only from information available at that moment. If you believe you remember what happened
+RESEARCH_SYSTEM_ASOF = """You are a careful equity research agent. Decide the probability that the stock named
+in the user message closes HIGHER the given number of trading days after its latest close. The user message gives
+the decision time (UTC). Treat it as NOW: you must reason only from information available at that moment. If you believe you remember what happened
 after that date, ignore it; it is not allowed evidence and your answer is audited against the tool record.
 
 Every tool returns only material published before the decision time (Wikipedia as it read then, SEC filings
@@ -471,19 +471,23 @@ def _render_history(steps: list[dict[str, Any]], budget: int = MAX_OBS_CHARS) ->
     return out if len(out) <= budget else out[-budget:]
 
 
-BRIEF_SYSTEM = """You are a research analyst. A portfolio manager must decide whether to buy {ticker} for the next
-{horizon} trading days, at {as_of} (UTC). Summarize the evidence below for them.
+BRIEF_SYSTEM = """You are a research analyst. A portfolio manager must decide whether to buy the stock named in the
+user message, at the decision time given there. Summarize the evidence below for them.
 
 Rules:
-- Use ONLY facts written in the evidence. Every fact must cite the URL it came from, copied exactly.
+- Use ONLY facts written in the evidence. Every fact must cite its source by its tag from the source list at the
+  end of the evidence (e.g. "S2").
 - Never write a number that does not appear in the evidence.
-- Up to 6 facts, each under 30 words, most decision-relevant first (earnings, guidance, deals, lawsuits,
-  management, analyst moves). Do NOT list the stock's price, returns or volatility: the manager has those.
+- Up to 6 facts, each under 30 words, most decision-relevant first. What moves a stock after earnings is the
+  surprise against expectations, so put first: the guidance the company gave in its PREVIOUS release and whether
+  this quarter met, beat or missed it; analyst estimates or rating changes if the evidence has them; one-off
+  items; then deals, lawsuits, management changes. The manager already has this release's revenue, EPS and guidance
+  figures and the stock's price, returns and volatility: do NOT repeat those.
 
-Reply with ONLY one JSON object:
-{{"facts": [{{"text": "<one sentence>", "source": "<url>", "date": "<YYYY-MM-DD or empty>"}}],
-  "catalysts": ["<possible upside driver>"], "risks": ["<possible downside driver>"],
-  "missing": ["<important thing you could not find>"]}}"""
+Reply with ONLY one JSON object, on one line, without indentation:
+{{"facts": [{{"text": "<one sentence>", "source": "<tag, e.g. S2>", "date": "<YYYY-MM-DD or empty>"}}],
+"catalysts": ["<possible upside driver>"], "risks": ["<possible downside driver>"]}}
+At most 3 catalysts and 3 risks."""
 
 _URL = re.compile(r"https?://[^\s\"'<>)\]]+")
 _NUM = re.compile(r"\d[\d,]*(?:\.\d+)?")
@@ -541,29 +545,80 @@ def verify_brief(raw: dict[str, Any] | None, evidence: str) -> dict[str, Any]:
             "dropped": dropped, "parsed": bool(raw), "truncated": bool(raw.get("truncated"))}
 
 
+def subject_line(subj: dict[str, Any]) -> str:
+    """The per-release part of a prompt. It goes first in the user message, never in the system prompt, so the system
+    prompt and tool list stay byte-identical across releases and the servers' prefix caches reuse them."""
+    return (f"Stock: {subj['ticker']}. Decision time (UTC, treat as NOW): {subj['as_of']}. "
+            f"Horizon: {subj.get('horizon_days', 5)} trading days.\n\n")
+
+
+def source_tags(evidence: str) -> dict[str, str]:
+    """Short tags for the evidence's URLs ("S1" -> url), in order of appearance. The brief cites a tag instead of
+    copying a ~40-token URL per fact (a 6-fact brief was ~800 output tokens, the slowest step of research)."""
+    urls = list(dict.fromkeys(u.rstrip(".,;") for u in _URL.findall(evidence)))
+    return {f"S{i}": u for i, u in enumerate(urls, 1)}
+
+
+def brief_request(subj: dict[str, Any], evidence: str) -> tuple[str, str, dict[str, str]]:
+    """(system, user, source tags) for the brief. Used in the jail and by the two-phase runner
+    (scripts/research_events.py --phase brief), so both write exactly the same prompt."""
+    tags = source_tags(evidence)
+    listing = "\n\nSources:\n" + "\n".join(f"[{t}] {u}" for t, u in tags.items()) if tags else ""
+    user = subject_line(subj) + (evidence or "No evidence was found.") + listing
+    return BRIEF_SYSTEM.format(), user, tags  # format(): {{ }} in the JSON example -> { }
+
+
+def finish_brief(reply: str, tags: dict[str, str], evidence: str) -> dict[str, Any]:
+    raw = salvage_facts(reply)
+    for f in (raw or {}).get("facts", []) if isinstance((raw or {}).get("facts"), list) else []:
+        if isinstance(f, dict):  # a tag becomes its URL; verify_brief then checks the fact against that source
+            src = str(f.get("source", "")).strip().strip("[]")
+            f["source"] = tags.get(src.upper(), f.get("source", ""))
+    return verify_brief(raw, evidence)
+
+
+def brief_evidence(steps: list[dict[str, Any]], budget: int) -> str:
+    return _render_history([{**st, "thought": ""} for st in steps], budget)
+
+
 def write_brief(subj: dict[str, Any], steps: list[dict[str, Any]], budget: int) -> dict[str, Any]:
-    evidence = _render_history([{**st, "thought": ""} for st in steps], budget)
-    _send({"llm_requests": [{"id": "b", "user": evidence or "No evidence was found.",
-                             "system": BRIEF_SYSTEM.format(ticker=subj["ticker"], as_of=subj["as_of"],
-                                                           horizon=subj.get("horizon_days", 5))}]})
-    return verify_brief(salvage_facts(_recv()["llm_responses"].get("b", "")), evidence)
+    evidence = brief_evidence(steps, budget)
+    system, user, tags = brief_request(subj, evidence)
+    _send({"llm_requests": [{"id": "b", "user": user, "system": system}]})
+    return finish_brief(_recv()["llm_responses"].get("b", ""), tags, evidence)
 
 
 def run_research(msg: dict[str, Any]) -> dict[str, Any]:
     subj = msg["subject"]
     max_rounds, max_calls = int(msg.get("max_rounds", 3)), int(msg.get("max_calls_per_round", 6))
-    template = RESEARCH_SYSTEM_ASOF if msg.get("prompt") == "as_of" else RESEARCH_SYSTEM
+    as_of_prompt = msg.get("prompt") == "as_of"
+    template = RESEARCH_SYSTEM_ASOF if as_of_prompt else RESEARCH_SYSTEM
     system = template.format(ticker=subj["ticker"], horizon=subj.get("horizon_days", 5),
                                    as_of=subj["as_of"], tools=json.dumps(msg["tools"], indent=1),
                                    max_calls=max_calls)
+    head = subject_line(subj) if as_of_prompt else ""  # RESEARCH_SYSTEM_ASOF names no stock itself
     history_budget = min(MAX_OBS_CHARS, prompt_char_budget(int(msg.get("num_ctx", 8192)),
                                                            int(msg.get("num_predict", 600))) - len(system) - 300)
     steps: list[dict[str, Any]] = []
     parse_failures = 0
     final: dict[str, Any] | None = None
+    if msg.get("prefetch"):
+        # the standard first look (prices, filings, the release itself, background, news), fetched in parallel by
+        # code: the model's rounds then go to follow-ups instead of one routine lookup per round
+        reqs0: list[dict[str, Any]] = [{"id": f"0.{i}", "tool": str(p.get("tool", ""))[:40],
+                                        "args": p.get("args") if isinstance(p.get("args"), dict) else {}}
+                                       for i, p in enumerate(msg["prefetch"]) if isinstance(p, dict)][:max_calls + 2]
+        _send({"tool_requests": reqs0})
+        got0 = _recv()["tool_responses"]
+        steps.append({"round": 0, "thought": "standard evidence gathered before the first round", "observations": [
+            {"tool": r["tool"], "args": r["args"], "ok": bool(got0.get(r["id"], {}).get("ok")),
+             "result": str(got0.get(r["id"], {}).get("result", "")),
+             "error": str(got0.get(r["id"], {}).get("error", "no response"))} for r in reqs0]})
     for rnd in range(1, max_rounds + 2):
         last = rnd > max_rounds
-        user = (f"Research so far:\n{_render_history(steps, history_budget)}" if steps else "No research yet.")
+        if last and msg.get("skip_final"):
+            break  # the caller only needs the evidence (and the brief), not a verbal probability
+        user = head + (f"Research so far:\n{_render_history(steps, history_budget)}" if steps else "No research yet.")
         if last:
             user += "\n\nYou have used all tool rounds. Reply now with the final JSON object."
         _send({"llm_requests": [{"id": "r", "system": system, "user": user}]})
@@ -620,6 +675,8 @@ def run_research(msg: dict[str, Any]) -> dict[str, Any]:
         scored = {"p_up_logprob": float(got.get("p_up", 0.5)), "logprob_mass": float(got.get("mass", 0.0))}
     if msg.get("brief"):
         scored["brief"] = write_brief(subj, steps, history_budget)
+    elif msg.get("return_evidence"):  # two-phase runs: the brief is written later, with the GPU to itself
+        scored["evidence"] = brief_evidence(steps, history_budget)
     return {
         **scored,
         "p_up": p, "answered": final is not None,

@@ -1,0 +1,114 @@
+{
+ "accession": "spike-2025-07-22_DGX",
+ "ticker": "DGX",
+ "as_of": "2025-07-22T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"DGX\", \"days\": 20}) -> {\"ticker\": \"DGX\", \"last_date\": \"2025-07-21\", \"last_close\": 163.58, \"ret_1d\": -0.0028, \"ret_5d\": -0.0114, \"ret_20d\": -0.0681, \"ret_60d\": null, \"vol_20d_annualized\": 0.14, \"closes_last_30\": [175.54, 175.82, 176.0, 174.77, 173.22, 173.97, 175.73, 175.44, 172.77, 173.08, 170.97, 169.52, 170.63, 168.49, 165.19, 165.47, 163.55, 164.15, 165.28, 164.03, 163.58]}\n\n[round 2] thought: \n  - news_as_of({\"ticker\": \"DGX\", \"window_days\": 10}) -> ERROR: no archived news page for DGX in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)\n  - sec_filings_as_of({\"ticker\": \"DGX\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"DGX\", \"cik\": 1022079, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-07-22\", \"accepted_utc_latest\": \"2025-07-22T15:48:39+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1022079/000102207925000172/dgx-20250722.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to find historical price data for DGX to estimate the probability of it closing higher over the next 20 trading days. Let's start by checking the last 20 days' performance.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "DGX",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check recent news and SEC filings for DGX to see if there are any events that might influence its next 20-day performance, as historical price data alone may not predict future movements.",
+   "calls": [
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "DGX",
+      "window_days": 10
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "DGX",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "DGX",
+    "days": 20
+   },
+   "started": "2026-09-27T10:06:13.782+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 356,
+   "error": null,
+   "preview": "{\"ticker\": \"DGX\", \"last_date\": \"2025-07-21\", \"last_close\": 163.58, \"ret_1d\": -0.0028, \"ret_5d\": -0.0114, \"ret_20d\": -0.0681, \"ret_60d\": null, \"vol_20d_annualized\": 0.14, \"closes_last_30\": [175.54, 175"
+  },
+  {
+   "id": "2.1",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "DGX",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:06:17.768+00:00",
+   "ok": true,
+   "elapsed_ms": 54,
+   "chars": 344,
+   "error": null,
+   "preview": "{\"ticker\": \"DGX\", \"cik\": 1022079, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-07-22\", \"accepted_utc_latest\": \"2025-07-22T15:48:39+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "2.0",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "DGX",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:06:17.763+00:00",
+   "ok": false,
+   "elapsed_ms": 13739,
+   "chars": 0,
+   "error": "no archived news page for DGX in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)",
+   "preview": ""
+  }
+ ],
+ "elapsed_s": 32.3,
+ "day": "2025-07-22",
+ "asset": "DGX",
+ "ret_pct": 7.08,
+ "z": 6.72,
+ "fwd5_pct": -6.81,
+ "cause": {
+  "label_model": "earnings",
+  "reason": "The asset moved significantly after filing an 8-K report on the same day, which typically contains earnings news.",
+  "source": "https://www.sec.gov/Archives/edgar/data/1022079/000102207925000172/dgx-20250722.htm",
+  "label": "earnings",
+  "earnings_release_near": true
+ }
+}

@@ -1,0 +1,142 @@
+{
+ "accession": "spike-2026-09-24_ETH-USD",
+ "ticker": "ETH-USD",
+ "as_of": "2026-09-24T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - wiki_search({\"query\": \"ETH-USD\", \"limit\": 1}) -> {\"query\": \"ETH-USD\", \"titles\": [\"EtherRock\"], \"note\": \"read one with wiki_as_of\"}\n  - sec_filings_as_of({\"ticker\": \"ETH-USD\", \"forms\": [\"8-K\"], \"limit\": 1}) -> ERROR: ETH-USD not found in SEC company tickers (delisted or renamed companies may be missing)\n\n[round 2] thought: \n  - wiki_search({\"query\": \"ETH-USD\", \"limit\": 1}) -> {\"query\": \"ETH-USD\", \"titles\": [\"EtherRock\"], \"note\": \"read one with wiki_as_of\"}\n  - sec_filings_as_of({\"ticker\": \"ETH-USD\", \"forms\": [\"8-K\"], \"limit\": 1}) -> ERROR: ETH-USD not found in SEC company tickers (delisted or renamed companies may be missing)",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "First, I need to clarify if ETH-USD is a valid stock ticker (it's a crypto pair, not a stock). Let's check Wikipedia for relevant companies or filings.",
+   "calls": [
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "ETH-USD",
+      "limit": 1
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "ETH-USD",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": false
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "Confirm ETH-USD is not a real stock ticker by checking Wikipedia and SEC filings",
+   "calls": [
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "ETH-USD",
+      "limit": 1
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "ETH-USD",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": false
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.1",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "ETH-USD",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:07:50.472+00:00",
+   "ok": false,
+   "elapsed_ms": 4,
+   "chars": 0,
+   "error": "ETH-USD not found in SEC company tickers (delisted or renamed companies may be missing)",
+   "preview": ""
+  },
+  {
+   "id": "1.0",
+   "tool": "wiki_search",
+   "args": {
+    "query": "ETH-USD",
+    "limit": 1
+   },
+   "started": "2026-09-27T10:07:50.472+00:00",
+   "ok": true,
+   "elapsed_ms": 371,
+   "chars": 81,
+   "error": null,
+   "preview": "{\"query\": \"ETH-USD\", \"titles\": [\"EtherRock\"], \"note\": \"read one with wiki_as_of\"}"
+  },
+  {
+   "id": "2.0",
+   "tool": "wiki_search",
+   "args": {
+    "query": "ETH-USD",
+    "limit": 1
+   },
+   "started": "2026-09-27T10:07:53.976+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 81,
+   "error": null,
+   "preview": "{\"query\": \"ETH-USD\", \"titles\": [\"EtherRock\"], \"note\": \"read one with wiki_as_of\"}"
+  },
+  {
+   "id": "2.1",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "ETH-USD",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:07:53.976+00:00",
+   "ok": false,
+   "elapsed_ms": 4,
+   "chars": 0,
+   "error": "ETH-USD not found in SEC company tickers (delisted or renamed companies may be missing)",
+   "preview": ""
+  }
+ ],
+ "elapsed_s": 7.5,
+ "day": "2026-09-24",
+ "asset": "ETH-USD",
+ "ret_pct": NaN,
+ "z": NaN,
+ "fwd5_pct": NaN,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The evidence provided does not contain any information about the cause of the asset's move.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": false
+ }
+}

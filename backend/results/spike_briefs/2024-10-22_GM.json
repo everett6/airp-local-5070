@@ -1,0 +1,156 @@
+{
+ "accession": "spike-2024-10-22_GM",
+ "ticker": "GM",
+ "as_of": "2024-10-22T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"GM\", \"days\": 20}) -> {\"ticker\": \"GM\", \"last_date\": \"2024-10-21\", \"last_close\": 48.0, \"ret_1d\": -0.0051, \"ret_5d\": 0.0062, \"ret_20d\": 0.0185, \"ret_60d\": null, \"vol_20d_annualized\": 0.299, \"closes_last_30\": [47.13, 47.16, 44.86, 44.94, 45.6, 43.99, 44.03, 43.97, 44.13, 44.81, 45.11, 45.14, 47.02, 46.79, 46.96, 47.71, 46.94, 48.08, 48.44, 48.25, 48.0]}\n  - news_as_of({\"ticker\": \"GM\", \"window_days\": 10}) -> ERROR: no archived news page for GM in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)\n  - sec_filings_as_of({\"ticker\": \"GM\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"GM\", \"cik\": 1467858, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-10-22\", \"accepted_utc_latest\": \"2024-10-22T16:26:32+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gm-20241022.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n\n[round 2] thought: \n  - filing_documents({\"url\": \"https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gm-20241022.htm\"}) -> {\"documents\": [{\"name\": \"0001467858-24-000115.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/0001467858-24-000115.txt\"}, {\"name\": \"gm-20241022.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gm-20241022.htm\"}, {\"name\": \"gmq32024pressreleaseandfin.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gmq32024pressreleaseandfin.htm\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/R1.htm\"}]}\n  - read_filing({\"url\": \"https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gm-20241022.htm\", \"max_chars\": 1000}) -> {\"url\": \"https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gm-20241022.htm\", \"accepted_utc_latest\": \"2024-10-22T12:26:32+00:00\", \"title\": \"gm-20241022\", \"text\": \"0001467858FALSE00014678582024-10-222024-10-22\\nUNITED STATES SECURITIES AND EXCHANGE COMMISSION\\nDate of Report (Date of earliest event reported): October 22, 2024\\n(Exact name of registrant as specified in its charter)\\n(State or other jurisdiction of incorporation)\\n300 Renaissance Center,Detroit,Michigan48265-3000\\n(Address of principal executive offices)(Zip Code)\\n(Registrant's telephone number, including area code)\\n(Former name or former address, if changed since last report)\\nCheck the appropriate box below if the Form 8-K filing is intended to simultaneously satisfy the filing obligation of the registrant under any of the following provisions:\\n\u2610 Written communications pursuant to Rule 425 under the Securities Act (17 CFR 230.425)\\n\u2610 Soliciting material pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12)\\n\u2610 Pre-commencement communications pursuant to Rule 14d-2(b) under the Exchange Act (17 CFR 240.14d-2(b))\\n\u2610 Pre-commencement communications pursuant to Rule 13e-4(c) under \"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to check historical price movements of GM over the last 20 trading days to estimate the probability of closing higher in the next 20 days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "GM",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "GM",
+      "window_days": 10
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "GM",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check the latest SEC 8-K filing for GM to see if there's any news or events that might influence stock movement in the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gm-20241022.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "read_filing",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gm-20241022.htm",
+      "max_chars": 1000
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "GM",
+    "days": 20
+   },
+   "started": "2026-09-27T10:04:32.468+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 330,
+   "error": null,
+   "preview": "{\"ticker\": \"GM\", \"last_date\": \"2024-10-21\", \"last_close\": 48.0, \"ret_1d\": -0.0051, \"ret_5d\": 0.0062, \"ret_20d\": 0.0185, \"ret_60d\": null, \"vol_20d_annualized\": 0.299, \"closes_last_30\": [47.13, 47.16, 4"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "GM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:04:32.469+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 342,
+   "error": null,
+   "preview": "{\"ticker\": \"GM\", \"cik\": 1467858, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-10-22\", \"accepted_utc_latest\": \"2024-10-22T16:26:32+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "GM",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:04:32.468+00:00",
+   "ok": false,
+   "elapsed_ms": 11646,
+   "chars": 0,
+   "error": "no archived news page for GM in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gm-20241022.htm"
+   },
+   "started": "2026-09-27T10:04:48.618+00:00",
+   "ok": true,
+   "elapsed_ms": 2582,
+   "chars": 533,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001467858-24-000115.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/0001467858-24-000115.txt\"}, {\"name\": \"gm-20241022.htm\", \"url\": \"https://w"
+  },
+  {
+   "id": "2.1",
+   "tool": "read_filing",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gm-20241022.htm",
+    "max_chars": 1000
+   },
+   "started": "2026-09-27T10:04:48.618+00:00",
+   "ok": true,
+   "elapsed_ms": 3792,
+   "chars": 1194,
+   "error": null,
+   "preview": "{\"url\": \"https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gm-20241022.htm\", \"accepted_utc_latest\": \"2024-10-22T12:26:32+00:00\", \"title\": \"gm-20241022\", \"text\": \"0001467858FALSE000146"
+  }
+ ],
+ "elapsed_s": 27.8,
+ "day": "2024-10-22",
+ "asset": "GM",
+ "ret_pct": 9.81,
+ "z": 4.84,
+ "fwd5_pct": -4.72,
+ "cause": {
+  "label_model": "earnings",
+  "reason": "The asset moved significantly following the filing of an 8-K report on October 22, 2024, which typically contains earnings news.",
+  "source": "https://www.sec.gov/Archives/edgar/data/1467858/000146785824000115/gm-20241022.htm",
+  "label": "earnings",
+  "earnings_release_near": true
+ }
+}

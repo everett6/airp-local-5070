@@ -1,0 +1,158 @@
+{
+ "accession": "spike-2026-08-06_DDOG",
+ "ticker": "DDOG",
+ "as_of": "2026-08-06T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"DDOG\", \"days\": 20}) -> {\"ticker\": \"DDOG\", \"last_date\": \"2026-08-05\", \"last_close\": 283.17, \"ret_1d\": -0.0173, \"ret_5d\": 0.0718, \"ret_20d\": 0.0846, \"ret_60d\": null, \"vol_20d_annualized\": 0.436, \"closes_last_30\": [261.09, 269.0, 257.54, 260.24, 270.73, 264.46, 262.32, 258.69, 263.2, 254.79, 245.77, 244.39, 246.86, 251.86, 250.88, 264.2, 268.56, 267.97, 273.6, 288.15, 283.17]}\n  - news_as_of({\"ticker\": \"DDOG\", \"window_days\": 20}) -> ERROR: timed out\n  - sec_filings_as_of({\"ticker\": \"DDOG\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"DDOG\", \"cik\": 1561550, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-08-06\", \"accepted_utc_latest\": \"2026-08-06T16:07:37+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/ddog-20260806.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n\n[round 2] thought: \n  - filing_documents({\"url\": \"https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/ddog-20260806.htm\"}) -> {\"documents\": [{\"name\": \"0001628280-26-053829.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/0001628280-26-053829.txt\"}, {\"name\": \"ddog-20260806.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/ddog-20260806.htm\"}, {\"name\": \"ex-991x20260630x8k.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/ex-991x20260630x8k.htm\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/R1.htm\"}]}\n  - archived_page({\"url\": \"https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/ddog-20260806.htm\", \"window_days\": 20, \"max_chars\": 1000}) -> ERROR: could not connect to web.archive.org: All connection attempts failed",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to find the price history of DDOG (Doggie) to see if it closed higher than the previous close in the next 20 trading days. I'll check the price history up to the decision time to see the last 20 days' performance and any relevant news or filings.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "DDOG",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "DDOG",
+      "window_days": 20
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "DDOG",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check the 8-K filing from the latest date to see if there's any event that might influence DDOG's price movement in the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/ddog-20260806.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "archived_page",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/ddog-20260806.htm",
+      "window_days": 20,
+      "max_chars": 1000
+     },
+     "ok": false
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "DDOG",
+    "days": 20
+   },
+   "started": "2026-09-27T10:07:41.602+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 353,
+   "error": null,
+   "preview": "{\"ticker\": \"DDOG\", \"last_date\": \"2026-08-05\", \"last_close\": 283.17, \"ret_1d\": -0.0173, \"ret_5d\": 0.0718, \"ret_20d\": 0.0846, \"ret_60d\": null, \"vol_20d_annualized\": 0.436, \"closes_last_30\": [261.09, 269"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "DDOG",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:07:41.607+00:00",
+   "ok": true,
+   "elapsed_ms": 5120,
+   "chars": 346,
+   "error": null,
+   "preview": "{\"ticker\": \"DDOG\", \"cik\": 1561550, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-08-06\", \"accepted_utc_latest\": \"2026-08-06T16:07:37+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edg"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "DDOG",
+    "window_days": 20,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:07:41.603+00:00",
+   "ok": false,
+   "elapsed_ms": 15002,
+   "chars": 0,
+   "error": "timed out",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/ddog-20260806.htm"
+   },
+   "started": "2026-09-27T10:08:02.402+00:00",
+   "ok": true,
+   "elapsed_ms": 161,
+   "chars": 521,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001628280-26-053829.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/0001628280-26-053829.txt\"}, {\"name\": \"ddog-20260806.htm\", \"url\": \"https:/"
+  },
+  {
+   "id": "2.1",
+   "tool": "archived_page",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/ddog-20260806.htm",
+    "window_days": 20,
+    "max_chars": 1000
+   },
+   "started": "2026-09-27T10:08:02.402+00:00",
+   "ok": false,
+   "elapsed_ms": 1055,
+   "chars": 0,
+   "error": "could not connect to web.archive.org: All connection attempts failed",
+   "preview": ""
+  }
+ ],
+ "elapsed_s": 39.4,
+ "day": "2026-08-06",
+ "asset": "DDOG",
+ "ret_pct": -19.03,
+ "z": -5.76,
+ "fwd5_pct": 7.49,
+ "cause": {
+  "label_model": "earnings",
+  "reason": "The asset moved significantly following the filing of an 8-K report on 2026-08-06, which typically contains earnings news.",
+  "source": "https://www.sec.gov/Archives/edgar/data/1561550/000162828026053829/ddog-20260806.htm",
+  "label": "earnings",
+  "earnings_release_near": true
+ }
+}

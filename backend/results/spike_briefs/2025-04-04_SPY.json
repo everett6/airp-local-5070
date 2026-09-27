@@ -1,0 +1,114 @@
+{
+ "accession": "spike-2025-04-04_SPY",
+ "ticker": "SPY",
+ "as_of": "2025-04-04T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"SPY\", \"days\": 20}) -> {\"ticker\": \"SPY\", \"last_date\": \"2025-04-03\", \"last_close\": 527.94, \"ret_1d\": -0.0493, \"ret_5d\": -0.0536, \"ret_20d\": -0.0601, \"ret_60d\": null, \"vol_20d_annualized\": 0.255, \"closes_last_30\": [561.68, 564.82, 549.78, 545.21, 548.1, 540.8, 551.97, 556.22, 550.21, 556.2, 554.59, 554.78, 564.71, 566.07, 559.31, 557.83, 546.59, 550.26, 551.82, 555.31, 527.94]}\n\n[round 2] thought: \n  - news_as_of({\"ticker\": \"SPY\", \"window_days\": 20}) -> ERROR: timed out\n  - sec_filings_as_of({\"ticker\": \"SPY\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"SPY\", \"cik\": 884394, \"filings\": [], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to find the price history of SPY for the last 20 trading days to see if it closed higher than the previous close on each day. I'll check the price history as of the decision time to get the most recent 20 days of data.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "SPY",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check if SPY closed higher than its previous close for each of the last 20 trading days to determine the probability. The price history data shows the last 20 closes, but I need to verify if each day's close is higher than the prior day's close.",
+   "calls": [
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "SPY",
+      "window_days": 20
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "SPY",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "SPY",
+    "days": 20
+   },
+   "started": "2026-09-27T10:06:09.578+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"SPY\", \"last_date\": \"2025-04-03\", \"last_close\": 527.94, \"ret_1d\": -0.0493, \"ret_5d\": -0.0536, \"ret_20d\": -0.0601, \"ret_60d\": null, \"vol_20d_annualized\": 0.255, \"closes_last_30\": [561.68, 56"
+  },
+  {
+   "id": "2.1",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "SPY",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:06:26.079+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 137,
+   "error": null,
+   "preview": "{\"ticker\": \"SPY\", \"cik\": 884394, \"filings\": [], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}"
+  },
+  {
+   "id": "2.0",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "SPY",
+    "window_days": 20,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:06:26.078+00:00",
+   "ok": false,
+   "elapsed_ms": 15002,
+   "chars": 0,
+   "error": "timed out",
+   "preview": ""
+  }
+ ],
+ "elapsed_s": 48.6,
+ "day": "2025-04-04",
+ "asset": "SPY",
+ "ret_pct": -5.85,
+ "z": -4.9,
+ "fwd5_pct": 11.21,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The provided evidence does not contain any news, filings, or macroeconomic data that explains the sharp decline in the asset's price.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": false
+ }
+}

@@ -1,0 +1,156 @@
+{
+ "accession": "spike-2024-07-25_WM",
+ "ticker": "WM",
+ "as_of": "2024-07-25T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"WM\", \"days\": 20}) -> {\"ticker\": \"WM\", \"last_date\": \"2024-07-24\", \"last_close\": 210.02, \"ret_1d\": -0.0062, \"ret_5d\": -0.0266, \"ret_20d\": 0.0251, \"ret_60d\": null, \"vol_20d_annualized\": 0.149, \"closes_last_30\": [204.88, 205.47, 205.47, 206.12, 202.27, 202.38, 203.08, 203.21, 203.49, 202.91, 204.03, 204.6, 206.51, 208.69, 213.41, 215.76, 215.55, 215.26, 215.88, 211.32, 210.02]}\n  - sec_filings_as_of({\"ticker\": \"WM\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"WM\", \"cik\": 823768, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-07-24\", \"accepted_utc_latest\": \"2024-07-25T01:40:28+00:00\", \"items\": \"2.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_8k.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n  - news_as_of({\"ticker\": \"WM\", \"window_days\": 10}) -> ERROR: no archived news page for WM in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)\n\n[round 2] thought: \n  - filing_documents({\"url\": \"https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_8k.htm\"}) -> {\"documents\": [{\"name\": \"0001104659-24-082358.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/0001104659-24-082358.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/R1.htm\"}, {\"name\": \"tm2420025d1_8k.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_8k.htm\"}, {\"name\": \"tm2420025d1_ex99-1.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_ex99-1.htm\"}, {\"name\": \"tm2420025d1_ex99-2.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_ex99-2.htm\"}]}\n  - read_filing({\"url\": \"https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_8k.htm\", \"max_chars\": 1000}) -> {\"url\": \"https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_8k.htm\", \"accepted_utc_latest\": \"2024-07-24T21:40:28+00:00\", \"title\": \"\", \"text\": \"or 15(d) of the Securities Exchange Act of 1934\\nDate of Report (Date of earliest event reported):\\nManagement, Inc.\\n(Exact Name of Registrant as Specified in Charter)\\nRegistrant\u2019s Telephone number, including\\n(Former Name or Former Address, if Changed Since\\nCheck the appropriate box below if the Form 8-K\\nfiling is intended to simultaneously satisfy the filing obligation of the registrant under any of the following provisions:\\ncommunications pursuant to Rule 425 under the Securities Act (17 CFR 230.425)\\nmaterial pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12)\\ncommunications pursuant to Rule 14d-2(b) under the Exchange Act (17 CFR 240.14d-2(b))\\ncommunications pursuant to Rule 13e-4(c) under the Exchange Act (17 CFR 240.13e-4(c))\\nSecurities registered pursuant to Section 12(b) of\\nthe Act:\\nName of each exchange on which registered\\nby check mark whether the registrant is an emerging growth company as defined in Rule 405 of the Securities Act of 1933 (\u00a7230.405\\nof this chapte\"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to check the historical price movements for WM over the last 20 trading days to estimate the probability it closes higher in the next 20 days. I'll also review recent SEC filings and news to ensure no material events affect this prediction.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "WM",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "WM",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "WM",
+      "window_days": 10
+     },
+     "ok": false
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check the most recent SEC 8-K filing's EX-99.1 press release to see if there were any material events that could impact WM's stock price movement over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_8k.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "read_filing",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_8k.htm",
+      "max_chars": 1000
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "WM",
+    "days": 20
+   },
+   "started": "2026-09-27T10:03:25.149+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"WM\", \"last_date\": \"2024-07-24\", \"last_close\": 210.02, \"ret_1d\": -0.0062, \"ret_5d\": -0.0266, \"ret_20d\": 0.0251, \"ret_60d\": null, \"vol_20d_annualized\": 0.149, \"closes_last_30\": [204.88, 205."
+  },
+  {
+   "id": "1.2",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "WM",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:03:25.153+00:00",
+   "ok": false,
+   "elapsed_ms": 5,
+   "chars": 0,
+   "error": "no archived news page for WM in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)",
+   "preview": ""
+  },
+  {
+   "id": "1.1",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "WM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:03:25.150+00:00",
+   "ok": true,
+   "elapsed_ms": 1790,
+   "chars": 348,
+   "error": null,
+   "preview": "{\"ticker\": \"WM\", \"cik\": 823768, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-07-24\", \"accepted_utc_latest\": \"2024-07-25T01:40:28+00:00\", \"items\": \"2.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/e"
+  },
+  {
+   "id": "2.1",
+   "tool": "read_filing",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_8k.htm",
+    "max_chars": 1000
+   },
+   "started": "2026-09-27T10:03:32.126+00:00",
+   "ok": true,
+   "elapsed_ms": 2774,
+   "chars": 1188,
+   "error": null,
+   "preview": "{\"url\": \"https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_8k.htm\", \"accepted_utc_latest\": \"2024-07-24T21:40:28+00:00\", \"title\": \"\", \"text\": \"or 15(d) of the Securities Exc"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_8k.htm"
+   },
+   "started": "2026-09-27T10:03:32.126+00:00",
+   "ok": true,
+   "elapsed_ms": 3791,
+   "chars": 654,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001104659-24-082358.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/0001104659-24-082358.txt\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov"
+  }
+ ],
+ "elapsed_s": 18.1,
+ "day": "2024-07-25",
+ "asset": "WM",
+ "ret_pct": -8.03,
+ "z": -7.5,
+ "fwd5_pct": 3.18,
+ "cause": {
+  "label_model": "earnings",
+  "reason": "The asset moved significantly after filing an 8-K report on July 24, which typically contains earnings news.",
+  "source": "https://www.sec.gov/Archives/edgar/data/823768/000110465924082358/tm2420025d1_8k.htm",
+  "label": "earnings",
+  "earnings_release_near": true
+ }
+}

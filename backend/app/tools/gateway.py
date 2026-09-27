@@ -299,12 +299,19 @@ TOOLS: dict[str, ToolSpec] = {s.name: s for s in [
              {"url": Param("str", "https://www.sec.gov/Archives/edgar/data/... URL", required=True, max_len=500),
               "max_chars": Param("int", "max characters of text", default=4000, min=500, max=8000)},
              asof.read_filing, modes=("as_of",), timeout_s=40),
-    ToolSpec("news_as_of", "The company's news page (Reuters, MarketWatch, CNBC, Nasdaq, Yahoo) as archived in the "
+    ToolSpec("news_as_of", "The company's news page (Yahoo, MarketWatch, Reuters, CNBC) as archived in the "
              "weeks before the decision time: recent headlines.",
              {"ticker": Param("str", "e.g. AAPL", required=True, max_len=10),
               "window_days": Param("int", "how far back a copy may be", default=45, min=3, max=120),
               "max_chars": Param("int", "max characters of text", default=4000, min=500, max=8000)},
              asof.news_as_of, modes=("as_of",), timeout_s=150),
+    ToolSpec("analyst_targets_as_of", "Analysts' average 1-year price target (with low/high) and their latest rating "
+             "actions (target raised/lowered, upgrades/downgrades), from the last archived quote page before the "
+             "decision time. Parsed numbers, not prose.",
+             {"ticker": Param("str", "e.g. AAPL", required=True, max_len=10),
+              "window_days": Param("int", "how far back a copy may be", default=60, min=3, max=120),
+              "name": Param("str", "company name (to pick its own headlines)", default="", max_len=100)},
+             asof.analyst_targets_as_of, modes=("as_of",), timeout_s=150),  # quote pages are ~2 MB
     ToolSpec("archived_page", "Any web page (e.g. an article linked from news_as_of) as archived before the "
              "decision time.",
              {"url": Param("str", "original page URL", required=True, max_len=2000),
@@ -326,12 +333,14 @@ class ToolGateway:
     mode: str  # "live" | "backtest" | "as_of"
     fetcher: SafeFetcher
     as_of: datetime | None = None  # decision time, required in as_of mode
+    own_filing: str = ""  # as_of mode: accession (no dashes) of the filing being decided on; readable at its own time
     price_lookup: asof.PriceLookup | None = None
     tool_cache: Path | None = None  # as_of mode: tool results keyed by (tool, args, as_of), replayed exactly
     sec_user_agent: str = ""
     brave_api_key: str = ""
     max_calls_per_batch: int = 8
     max_result_chars: int = 6000
+    timeout_cap_s: float | None = None  # caps every tool's own timeout (bulk runs: a slow archive is skipped)
     allow_unjailed_python: bool = False
     python_timeout_s: float = 10.0
     on_event: Callable[[dict[str, Any]], None] | None = None
@@ -369,6 +378,18 @@ class ToolGateway:
 
     def specs_for_prompt(self) -> list[dict[str, Any]]:
         return [s.for_prompt() for s in self.available()]
+
+    def specs_native(self) -> list[dict[str, Any]]:
+        """The same tools as JSON-schema function definitions, for models with native tool calling."""
+        kind: dict[str, dict[str, Any]] = {"str": {"type": "string"}, "int": {"type": "integer"},
+                "list[str]": {"type": "array", "items": {"type": "string"}}}
+        return [{"type": "function", "function": {
+            "name": s.name, "description": s.description,
+            "parameters": {"type": "object",
+                           "properties": {k: {**kind[p.type], "description": p.description}
+                                          for k, p in s.params.items()},
+                           "required": [k for k, p in s.params.items() if p.required]}}}
+            for s in self.available()]
 
     async def robots_allowed(self, url: str) -> bool:
         parts = urlsplit(url)
@@ -408,7 +429,8 @@ class ToolGateway:
                 out: dict[str, Any] = json.loads(cache.read_text())
                 entry["cached"] = True
             else:
-                result = await asyncio.wait_for(spec.handler(self, args), spec.timeout_s)
+                limit = spec.timeout_s if self.timeout_cap_s is None else min(spec.timeout_s, self.timeout_cap_s)
+                result = await asyncio.wait_for(spec.handler(self, args), limit)
                 text = json.dumps(result, ensure_ascii=False, default=str)
                 if len(text) > self.max_result_chars:
                     text = text[: self.max_result_chars] + "…(truncated)"

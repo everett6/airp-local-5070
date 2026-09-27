@@ -1,0 +1,61 @@
+import sys
+from datetime import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+
+from forward_events import entry_deadline, score
+
+from app.forward.schedule import NY
+
+
+def test_after_close_release_enters_at_next_open():
+    # 16:05 ET Tuesday (20:05 UTC in summer) -> Wednesday 09:30 ET
+    assert entry_deadline("2026-09-22T20:05:00") == datetime(2026, 9, 23, 9, 30, tzinfo=NY)
+
+
+def test_pre_open_release_enters_the_same_morning():
+    # 07:00 ET Tuesday -> Tuesday 09:30 ET
+    assert entry_deadline("2026-09-22T11:00:00") == datetime(2026, 9, 22, 9, 30, tzinfo=NY)
+
+
+def test_friday_evening_and_weekend_releases_enter_on_monday():
+    assert entry_deadline("2026-09-25T21:00:00") == datetime(2026, 9, 28, 9, 30, tzinfo=NY)
+    assert entry_deadline("2026-09-26T15:00:00") == datetime(2026, 9, 28, 9, 30, tzinfo=NY)
+
+
+def test_score_counts_each_source_separately_and_ignores_missed():
+    recs = [{"type": "decision", "accession": f"a{i}", "source": "bonsai", "logodds": i, "on_time": True}
+            for i in range(12)]
+    recs += [{"type": "outcome", "accession": f"a{i}", "fwd5": i / 100} for i in range(12)]
+    recs += [{"type": "missed", "accession": "m1"}, {"type": "decision", "accession": "l1", "source": "lite",
+                                                      "logodds": 0.1, "on_time": True}]
+    s = score(recs)
+    assert s["bonsai_ic"] == 1.0 and s["bonsai_n"] == 12
+    assert "lite_ic" not in s  # fewer than 10 scored lite decisions
+    assert s["missed"] == 1 and s["on_time"] == 13
+
+
+def test_lite_features_use_only_bars_before_the_entry():
+    import numpy as np
+    import pandas as pd
+    import pytest
+    from forward_events import pre_entry
+
+    from app.sandbox.events import Prices
+    idx = pd.bdate_range("2025-01-01", "2026-09-22")
+    rows = []
+    for t, drift in (("AAA", 0.001), ("XLK", 0.0), ("SPY", 0.0)):
+        c = 100 * np.exp(drift * np.arange(len(idx)))
+        rows += [{"Date": d.date().isoformat(), "Ticker": t, "Open": v, "High": v, "Low": v, "Close": v, "Volume": 1}
+                 for d, v in zip(idx, c, strict=True)]
+    p = Prices.from_long(pd.DataFrame(rows))
+    ev = pd.DataFrame([{"accession": "a", "ticker": "AAA", "sector": "Information Technology",
+                        "accepted_utc": "2026-09-22T20:05:00"},  # after the close: entry is the 23rd, not in the data
+                       {"accession": "b", "ticker": "AAA", "sector": "Information Technology",
+                        "accepted_utc": "2026-09-22T11:00:00"}])  # pre-open: entry is the 22nd
+    out = pre_entry(ev, p).set_index("accession")
+    assert out.loc["a", "momentum"] > 0 and out.loc["b", "momentum"] > 0
+
+    assert out.loc["a", "momentum"] == pytest.approx(np.exp(0.001 * 231) - 1)
+    assert out.loc["b", "momentum"] == pytest.approx(np.exp(0.001 * 231) - 1)

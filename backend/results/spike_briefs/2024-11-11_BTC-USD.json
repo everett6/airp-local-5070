@@ -1,0 +1,113 @@
+{
+ "accession": "spike-2024-11-11_BTC-USD",
+ "ticker": "BTC-USD",
+ "as_of": "2024-11-11T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - wiki_search({\"query\": \"BTC-USD\", \"limit\": 1}) -> {\"query\": \"BTC-USD\", \"titles\": [\"BTC-e\"], \"note\": \"read one with wiki_as_of\"}\n\n[round 2] thought: \n  - wiki_as_of({\"title\": \"BTC-USD\", \"max_chars\": 1000}) -> ERROR: no Wikipedia article 'BTC-USD' existed at the decision time\n  - sec_filings_as_of({\"ticker\": \"BTC-USD\", \"forms\": [\"8-K\"], \"limit\": 1}) -> ERROR: BTC-USD not found in SEC company tickers (delisted or renamed companies may be missing)",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to clarify if 'BTC-USD' refers to a real stock ticker (e.g., a company) or a crypto derivative. Since BTC-USD isn't a traditional stock ticker, I'll check Wikipedia for relevant terms.",
+   "calls": [
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "BTC-USD",
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to clarify if 'BTC-USD' is a real stock ticker by checking Wikipedia and SEC filings to confirm it's not a crypto derivative or exchange product.",
+   "calls": [
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "BTC-USD",
+      "max_chars": 1000
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "BTC-USD",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": false
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "wiki_search",
+   "args": {
+    "query": "BTC-USD",
+    "limit": 1
+   },
+   "started": "2026-09-27T10:05:26.735+00:00",
+   "ok": true,
+   "elapsed_ms": 235,
+   "chars": 77,
+   "error": null,
+   "preview": "{\"query\": \"BTC-USD\", \"titles\": [\"BTC-e\"], \"note\": \"read one with wiki_as_of\"}"
+  },
+  {
+   "id": "2.1",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "BTC-USD",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:05:31.263+00:00",
+   "ok": false,
+   "elapsed_ms": 4,
+   "chars": 0,
+   "error": "BTC-USD not found in SEC company tickers (delisted or renamed companies may be missing)",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "BTC-USD",
+    "max_chars": 1000
+   },
+   "started": "2026-09-27T10:05:31.263+00:00",
+   "ok": false,
+   "elapsed_ms": 337,
+   "chars": 0,
+   "error": "no Wikipedia article 'BTC-USD' existed at the decision time",
+   "preview": ""
+  }
+ ],
+ "elapsed_s": 7.4,
+ "day": "2024-11-11",
+ "asset": "BTC-USD",
+ "ret_pct": 15.88,
+ "z": 5.61,
+ "fwd5_pct": 2.06,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The evidence provided does not contain any specific news or data points that explain the 15.88% move in BTC-USD.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": false
+ }
+}

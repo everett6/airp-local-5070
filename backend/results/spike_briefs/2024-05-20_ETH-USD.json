@@ -1,0 +1,113 @@
+{
+ "accession": "spike-2024-05-20_ETH-USD",
+ "ticker": "ETH-USD",
+ "as_of": "2024-05-20T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - wiki_search({\"query\": \"ETH-USD\", \"limit\": 1}) -> {\"query\": \"ETH-USD\", \"titles\": [\"EtherRock\"], \"note\": \"read one with wiki_as_of\"}\n\n[round 2] thought: \n  - sec_filings_as_of({\"ticker\": \"ETH-USD\", \"forms\": [\"8-K\"], \"limit\": 1}) -> ERROR: ETH-USD not found in SEC company tickers (delisted or renamed companies may be missing)\n  - wiki_as_of({\"title\": \"EtherRock\", \"max_chars\": 1000}) -> {\"title\": \"EtherRock\", \"revision_time\": \"2023-06-16T10:41:50Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1160419636\", \"text\": \"The original 2013 public domain clipart on which the collection is based\\nEtherRock also called EthRock is an early Ethereum based non-fungible token (NFT) project from 2017 that depicts various-colored rocks.[1] There are 100 EtherRocks.[2]\\nIn December 2017, 100 EtherRocks were produced via a smart contract, using artwork taken from a clipart website,[2] and published on the Ethereum blockchain. Only 30 rocks were sold in the first three years of the project's existence.[3]\\nIn the early weeks of August 2021, Gary Vaynerchuk tweeted about EtherRock and the price spiked so much that the $300,000 became the lowest available price for one of the NFTs.[2] Justin Sun has been reported to have bought an EtherRock for $500,000.[4][5]\\nIn March 2022, a collector by the name of \\\"Dino Dealer\\\" claimed to have accidentally listed an EthRock for 444 WEI ($0.0012 USD) instead of 444 ETH ($1.2M USD), and said that it had been immediately sniped by a bot. The NFT was then relisted at $600,000.[6][7][8][\"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to verify if 'ETH-USD' refers to a real stock ticker (e.g., a company's symbol) or if it's a mistake. Since ETH-USD is a cryptocurrency pair, I'll check Wikipedia for any company named similarly.",
+   "calls": [
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "ETH-USD",
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to confirm if 'ETH-USD' is a valid stock ticker by checking SEC filings and Wikipedia search results from previous step",
+   "calls": [
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "ETH-USD",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": false
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "EtherRock",
+      "max_chars": 1000
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "wiki_search",
+   "args": {
+    "query": "ETH-USD",
+    "limit": 1
+   },
+   "started": "2026-09-27T10:02:39.059+00:00",
+   "ok": true,
+   "elapsed_ms": 1053,
+   "chars": 81,
+   "error": null,
+   "preview": "{\"query\": \"ETH-USD\", \"titles\": [\"EtherRock\"], \"note\": \"read one with wiki_as_of\"}"
+  },
+  {
+   "id": "2.0",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "ETH-USD",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:02:43.919+00:00",
+   "ok": false,
+   "elapsed_ms": 201,
+   "chars": 0,
+   "error": "ETH-USD not found in SEC company tickers (delisted or renamed companies may be missing)",
+   "preview": ""
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "EtherRock",
+    "max_chars": 1000
+   },
+   "started": "2026-09-27T10:02:43.919+00:00",
+   "ok": true,
+   "elapsed_ms": 2726,
+   "chars": 1145,
+   "error": null,
+   "preview": "{\"title\": \"EtherRock\", \"revision_time\": \"2023-06-16T10:41:50Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1160419636\", \"text\": \"The original 2013 public domain clipart on which the collection"
+  }
+ ],
+ "elapsed_s": 10.8,
+ "day": "2024-05-20",
+ "asset": "ETH-USD",
+ "ret_pct": 18.41,
+ "z": 4.26,
+ "fwd5_pct": 4.84,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The provided evidence only discusses the history of the EtherRock NFT project and does not contain any information about the cause of the ETH-USD price move on 2024-05-20.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": false
+ }
+}

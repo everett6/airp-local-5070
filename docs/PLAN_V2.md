@@ -92,3 +92,87 @@ Neither lead survives a year it was not found in, and 2024 is inside Bonsai's tr
 helped it. The 2025-26 numbers were a small-sample fluke of 12-17 months. Decision: no LLM stock picking, no fine-tuning;
 the project continues as the SPY core + BTC/ETH trend-sleeve allocator (the one piece that held over 2018-2026),
 next step its forward paper test (Stage D, manual weekly command).
+
+## Next (2026-09-25): research sub-agent swap test and Stage D
+
+**Jan-v1-4B as the research sub-agent** (the model that searches the as-of internet tools and writes the checked
+brief). Jan-v1 is a Qwen3-4B fine-tune for agentic web research (janhq/Jan-v1-4B-GGUF). Test: the same research tasks
+as the qwen3:8b analyst run (every 4th month of 2025-01..2026-08, top-20 screen, 100 tasks), same tools and web cache,
+`scripts/compare_research.py analyst analyst_jan`. Rule fixed before the run: Jan replaces qwen3:8b only with at least
+as many source-verified facts per brief AND >= 1.5x faster (it is half the size, so it also frees ~2.5 GB of VRAM).
+This measures research quality, not returns: per the stock-picking verdict, briefs are no longer used to pick stocks,
+so the research agent only matters for future pre-registered hypotheses and for the allocator's review step.
+
+**Stage D: forward paper test of the allocator** (the part that held up 2018-2026).
+- `python scripts/forward_allocator.py`, by hand about once a week; `--status` prints the ledger. No service, no timer.
+- Books: master (SPY core + BTC/ETH trend sleeve, crypto <= 20%), SPY buy-and-hold, fixed 80/20 SPY/BTC.
+- Orders decided at a run fill at the first open after the run's UTC date; today's bar is never used; 5 bps costs;
+  whole SPY shares, fractional crypto (app/portfolio/forward.py, tests/test_forward_allocator.py).
+- Each run appends to results/forward/allocator/ledger.jsonl and commits it to git itself, so results can't be
+  edited afterwards.
+- Started 2026-09-25 (first targets: SPY 78%, BTC 11.6%, ETH 8.4%). Gate on 2026-12-25: the allocator's forward
+  return, volatility and drawdown vs SPY and 80/20 are within the range of 13-week windows in the 2018-2026 backtest;
+  if not, find out why before trusting the backtest.
+
+### Jan-v1-4B result (2026-09-25): FAIL, keep qwen3:8b
+
+Same 100 research tasks, same tools and web cache, 1-slot server (results/compare_analyst_vs_analyst_jan.json):
+
+| | qwen3:8b | Jan-v1-4B |
+|---|---|---|
+| source-verified facts per brief | 4.47 | 0.36 |
+| tasks with a final answer | 100% | 0% |
+| unparseable replies per task | 0.31 | 3.33 |
+| tool calls per task (ok) | 6.1 (98%) | 2.0 (97%) |
+| seconds per task | 47.4 | 27.0 (1.76x faster) |
+
+Why: Jan is trained for native tool calling (the chat template's tool-call format). Asked for our text-JSON action
+protocol it writes single `{"name", "args"}` calls or invents a tool's output (copying price data from its context)
+instead of requesting it. A fair test would need native tool calling in agent_worker; not worth it while research
+briefs feed no decision (stock-picking verdict). Speed note: research time is ~all GPU (tool calls replay from the
+cache in ~0 s), so if research becomes a bottleneck again the free wins are OLLAMA_NUM_PARALLEL=4 (the 4 workers were
+queueing on a 1-slot server), OLLAMA_FLASH_ATTENTION=1 and OLLAMA_KV_CACHE_TYPE=q8_0; vLLM (prefix caching of the
+re-sent research history) is the next step after that. Post-hoc ternary quantization of a 4B model is not worth it.
+
+## Stage B (2026-09-25): all stock signals combined, walk-forward, in the master portfolio
+
+Stock picking continues (the user's call; failed tests are findings, not a stop). scripts/combine_scores.py: EPS
+change, Bonsai P(BUY) with the research table, momentum, guidance -> logistic regression refit monthly on releases
+whose 20-day outcome was already known; 2,672 S&P 500 releases scored Mar 2024 - Aug 2026 (results/events/
+combined_eval.json). Combined score 20-day IC +0.033 [-0.032, +0.097], 60-day +0.071 [+0.007, +0.134]; Bonsai alone
++0.075 [+0.020, +0.129] at 20 days on the same releases (the regression's weights: Bonsai +0.08, EPS +0.04, momentum
++0.03, guidance ~0).
+
+Master agent (calibrated quarter-Kelly, caps, crypto sleeve, SPY core), 2024-03-01 -> 2026-09-24:
+
+| Portfolio | CAGR | Sharpe | Max DD |
+|---|---|---|---|
+| SPY + crypto sleeve + stock picks (combined score) | 20.93% | 1.20 | 21.0% |
+| SPY + crypto sleeve only | 18.76% | 1.10 | 20.8% |
+| SPY | 18.15% | 1.16 | 18.4% |
+
+Stock picks added ~2 points a year over the crypto sleeve alone. Caveats: 2024 Bonsai answers are inside its training
+data; 2.5 years; the 2025-26 part is a 1,180-release sample. Next: web research per release (below), then all
+2025-26 releases, then a stock book in the forward test.
+
+**Web research per release** (scripts/research_events.py): the qwen3:8b agent with the as-of internet tools researches
+each release as of its SEC acceptance time, writes a source-checked brief, and the verified facts join Bonsai's fact
+sheet. Test: 400 random 2025-26 releases, Bonsai with vs without the research (oos_research400_with/_without.json).
+
+### Correction (2026-09-26): the Stage B "+2 points a year from stock picks" was wrong
+
+The master portfolio never held a stock: calibrated P(beats sector) centres on 0.47 (a stock trails its sector ETF a
+little more often than not), and only 0.4% of picks ever reached the fixed p >= 0.55 threshold. The 20.93% vs 18.76%
+gap came from comparing it with the crypto-mode backtest, which rebalances weekly instead of daily - not from stocks.
+Measured properly (same daily simulation, one run with no stock picks), 2024-03 to 2026-09, costs 10 bps:
+
+| Portfolio | CAGR | Sharpe | Max DD |
+|---|---|---|---|
+| SPY + crypto sleeve, no stocks | 20.40% | 1.18 | 21.1% |
+| + combined stock score, quarter Kelly on the edge over the base rate (stocks held 5% of days) | 20.49% | 1.18 | 21.1% |
+| + combined stock score, equal-weight top fifth, 2.5% per pick (stocks held 87% of days) | 17.58% | 1.04 | 23.6% |
+| SPY | 18.14% | 1.16 | 18.4% |
+
+Fixes: the edge is now measured against the book's known base rate (`Calibrator.base_rate`), and
+`master_portfolio.py --sizing top5th` trades the rank rule the signal tests use. Traded as a portfolio, the stock
+picks cost ~3 points a year against the SPY + crypto sleeve baseline.

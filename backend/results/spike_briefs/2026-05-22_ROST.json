@@ -1,0 +1,136 @@
+{
+ "accession": "spike-2026-05-22_ROST",
+ "ticker": "ROST",
+ "as_of": "2026-05-22T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - wiki_search({\"query\": \"ROST\", \"limit\": 1}) -> {\"query\": \"ROST\", \"titles\": [\"Rost\"], \"note\": \"read one with wiki_as_of\"}\n  - sec_filings_as_of({\"ticker\": \"ROST\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"ROST\", \"cik\": 745732, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-05-21\", \"accepted_utc_latest\": \"2026-05-22T01:02:44+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/745732/000074573226000025/rost-20260521.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n\n[round 2] thought: \n  - price_history_as_of({\"ticker\": \"ROST\", \"days\": 20}) -> {\"ticker\": \"ROST\", \"last_date\": \"2026-05-21\", \"last_close\": 216.35, \"ret_1d\": -0.0028, \"ret_5d\": 0.0184, \"ret_20d\": -0.0429, \"ret_60d\": null, \"vol_20d_annualized\": 0.252, \"closes_last_30\": [226.04, 225.49, 225.29, 224.64, 224.21, 226.91, 227.95, 225.14, 226.54, 228.02, 223.61, 224.93, 213.72, 216.83, 210.94, 212.44, 211.92, 210.26, 211.85, 216.94, 216.35]}\n  - news_as_of({\"ticker\": \"ROST\", \"window_days\": 10}) -> ERROR: no archived news page for ROST in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "First, I need to verify if ROST is a real stock ticker by searching Wikipedia for relevant companies.",
+   "calls": [
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "ROST",
+      "limit": 1
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "ROST",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check the last 20 trading days' price history to estimate the probability of ROST closing higher in the next 20 days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "ROST",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "ROST",
+      "window_days": 10
+     },
+     "ok": false
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "wiki_search",
+   "args": {
+    "query": "ROST",
+    "limit": 1
+   },
+   "started": "2026-09-27T10:07:09.884+00:00",
+   "ok": true,
+   "elapsed_ms": 2399,
+   "chars": 73,
+   "error": null,
+   "preview": "{\"query\": \"ROST\", \"titles\": [\"Rost\"], \"note\": \"read one with wiki_as_of\"}"
+  },
+  {
+   "id": "1.1",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "ROST",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:07:09.885+00:00",
+   "ok": true,
+   "elapsed_ms": 5750,
+   "chars": 344,
+   "error": null,
+   "preview": "{\"ticker\": \"ROST\", \"cik\": 745732, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-05-21\", \"accepted_utc_latest\": \"2026-05-22T01:02:44+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "2.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "ROST",
+    "days": 20
+   },
+   "started": "2026-09-27T10:07:22.460+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 358,
+   "error": null,
+   "preview": "{\"ticker\": \"ROST\", \"last_date\": \"2026-05-21\", \"last_close\": 216.35, \"ret_1d\": -0.0028, \"ret_5d\": 0.0184, \"ret_20d\": -0.0429, \"ret_60d\": null, \"vol_20d_annualized\": 0.252, \"closes_last_30\": [226.04, 22"
+  },
+  {
+   "id": "2.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "ROST",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:07:22.460+00:00",
+   "ok": false,
+   "elapsed_ms": 8985,
+   "chars": 0,
+   "error": "no archived news page for ROST in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)",
+   "preview": ""
+  }
+ ],
+ "elapsed_s": 28.0,
+ "day": "2026-05-22",
+ "asset": "ROST",
+ "ret_pct": 8.11,
+ "z": 4.51,
+ "fwd5_pct": -5.64,
+ "cause": {
+  "label_model": "earnings",
+  "reason": "The asset moved significantly following an 8-K filing dated 2026-05-21, which typically contains earnings news.",
+  "source": "https://www.sec.gov/Archives/edgar/data/745732/000074573226000025/rost-20260521.htm",
+  "label": "earnings",
+  "earnings_release_near": true
+ }
+}

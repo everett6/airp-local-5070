@@ -37,7 +37,7 @@ def sec_tool(hist: pd.DataFrame, released: str) -> dict[str, Any]:
     """XBRL rows for one company filed strictly before the release date."""
     h = hist[hist["filed"] < released[:10]].sort_values("end")
     if h.empty:
-        return {"history": [], "prior": None}
+        return {"history": [], "rev_ref": None, "prior": None}
     last_end = pd.Timestamp(h["end"].iloc[-1])
     target = last_end - pd.Timedelta(days=274)
     cand = h.assign(gap=(pd.to_datetime(h["end"]) - target).abs().dt.days)
@@ -46,9 +46,27 @@ def sec_tool(hist: pd.DataFrame, released: str) -> dict[str, Any]:
     rows = []
     for r in h.tail(4).itertuples():
         rows.append({"end": r.end, "eps": r.eps, "eps_prior": r.eps_prior, "rev": r.rev, "rev_prior": r.rev_prior})
-    return {"history": rows,
+    revs = h["rev"].dropna()
+    return {"history": rows, "rev_ref": float(revs.iloc[-1]) if len(revs) else None,
             "prior": None if prior is None else {"end": prior["end"], "eps": prior["eps"], "rev": prior["rev"],
                                                  "filed": prior["filed"]}}
+
+
+def check_revenue(value: Any, ref: float | None) -> float | None:
+    """A reader revenue figure (millions) cross-checked against the last quarterly revenue filed with the SEC: kept if
+    within 2x of it, rescaled if it is off by a unit (thousands or billions), else dropped. Unchecked without a ref."""
+    if value is None or pd.isna(value):
+        return None
+    if not ref or ref <= 0:
+        return float(value)
+    for scale in (1.0, 0.001, 1000.0):
+        if 0.5 <= value * scale / ref <= 2:  # true quarter-to-quarter swings exceed 2x in 2.3% of SEC filings
+            return float(value * scale)
+    return None
+
+
+def rev_raw(filled: dict[str, Any], k: str) -> str:
+    return f"{(filled.get('revenue') or {}).get(k, float('nan')):,.1f}"
 
 
 def history_lines(hist: list[dict[str, Any]]) -> list[str]:
@@ -68,6 +86,8 @@ def main() -> None:
     ap.add_argument("--xbrl", default="data/xbrl/eps_quarterly.csv")
     ap.add_argument("--prices", default="data/events/ohlcv_2023-01-01_2026-09-25.parquet")
     ap.add_argument("--name", default="sp500_2025")
+    ap.add_argument("--live", action="store_true",
+                    help="forward test: a release whose entry day is not in the prices yet uses the closes before it")
     args = ap.parse_args()
     ev = pd.read_csv(BACKEND / args.events)
     ex = {json.loads(x)["accession"]: json.loads(x) for x in (BACKEND / args.extract).read_text().splitlines()}
@@ -81,13 +101,26 @@ def main() -> None:
         etf = SECTOR_ETF.get(str(r.sector))
         t = str(r.ticker).replace(".", "-")
         i = entry_index(days, datetime.fromisoformat(str(r.accepted_utc)))
+        if i is None and args.live:
+            i = len(days)  # the fact sheet only reads closes before the entry (event_text uses i - 1 and earlier)
         if e is None or etf is None or i is None or t not in p.close.columns:
             continue
         tool = sec_tool(by_cik.get(int(r.cik), pd.DataFrame(columns=xb.columns)), str(r.accepted_utc))
         filled = json.loads(json.dumps(e))  # the reader's record with the SEC tool's year-earlier numbers added
         for key in ("revenue", "eps", "adj_eps"):  # extracts made before the plausibility rule get it here
             filled[key] = plausible(key, filled.get(key) or {})[0]
-        notes = []
+        notes, dropped = [], []
+        rev = dict(filled.get("revenue") or {})
+        for k in ("q", "prior"):
+            if k in rev:
+                v = check_revenue(rev[k], tool["rev_ref"])
+                if v is None:
+                    rev.pop(k)
+                    dropped.append(f"the release's {'revenue' if k == 'q' else 'year-earlier revenue'} "
+                                 f"({rev_raw(filled, k)}M as read) was dropped: it does not match the SEC-filed scale")
+                elif v != rev[k]:
+                    rev[k] = v
+        filled["revenue"] = rev if "q" in rev else {}
         for key, src in (("eps", "eps"), ("revenue", "rev")):
             d = filled.get(key) or {}
             if "q" in d and "prior" not in d and tool["prior"] and pd.notna(tool["prior"][src]):
@@ -99,12 +132,14 @@ def main() -> None:
         extra = []
         if notes:
             extra.append("Year-earlier figures added from SEC filings: " + "; ".join(notes) + ".")
+        if dropped:
+            extra.append("SEC cross-check: " + "; ".join(dropped) + ".")
         if tool["history"]:
             extra.append("Earlier quarters as filed with the SEC (diluted EPS vs a year earlier):")
             extra += history_lines(tool["history"])
         eps, rev = filled.get("eps") or {}, filled.get("revenue") or {}
         rows.append({"accession": r.accession, "ticker": r.ticker, "cik": r.cik, "sector": r.sector,
-                     "accepted_utc": r.accepted_utc, "entry": days[i].date().isoformat(),
+                     "accepted_utc": r.accepted_utc, "entry": days[i].date().isoformat() if i < len(days) else "pending",
                      "eps_q": eps.get("q"), "eps_prior": eps.get("prior"),
                      "eps_prior_source": "reader" if "prior" in plausible("eps", e.get("eps") or {})[0] else
                      ("sec" if "prior" in eps else None),

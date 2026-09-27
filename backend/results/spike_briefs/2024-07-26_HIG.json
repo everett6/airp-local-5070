@@ -1,0 +1,156 @@
+{
+ "accession": "spike-2024-07-26_HIG",
+ "ticker": "HIG",
+ "as_of": "2024-07-26T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"HIG\", \"days\": 20}) -> {\"ticker\": \"HIG\", \"last_date\": \"2024-07-25\", \"last_close\": 98.47, \"ret_1d\": 0.0038, \"ret_5d\": -0.026, \"ret_20d\": 0.0009, \"ret_60d\": null, \"vol_20d_annualized\": 0.191, \"closes_last_30\": [98.39, 98.88, 96.75, 96.13, 96.26, 95.87, 94.99, 95.41, 95.99, 96.33, 97.52, 97.92, 98.81, 99.11, 101.08, 101.1, 97.3, 98.23, 98.08, 98.1, 98.47]}\n  - news_as_of({\"ticker\": \"HIG\", \"window_days\": 10}) -> ERROR: no archived news page for HIG in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)\n  - sec_filings_as_of({\"ticker\": \"HIG\", \"forms\": [\"8-K\"], \"limit\": 5}) -> {\"ticker\": \"HIG\", \"cik\": 874766, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-07-25\", \"accepted_utc_latest\": \"2024-07-26T01:16:31+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/hig-20240725.htm\"}, {\"form\": \"8-K\", \"filed\": \"2024-06-04\", \"accepted_utc_latest\": \"2024-06-05T01:18:48+00:00\", \"items\": \"5.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000084/hig-20240531.htm\"}, {\"form\": \"8-K\", \"filed\": \"2024-05-16\", \"accepted_utc_latest\": \"2024-05-17T01:27:16+00:00\", \"items\": \"5.03,5.07\", \"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000079/hig-20240515.htm\"}, {\"form\": \"8-K\", \"filed\": \"2024-04-30\", \"accepted_utc_latest\": \"2024-04-30T19:15:36+00:00\", \"items\": \"9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000075/hig-20240430.htm\"}, {\"form\": \"8-K\", \"filed\": \"2024-04-25\", \"accepted_utc_latest\": \"2024-04-26T01:16:07+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000072/hig-20240425.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n\n[round 2] thought: \n  - filing_documents({\"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/hig-20240725.htm\"}) -> {\"documents\": [{\"name\": \"0000874766-24-000107.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/0000874766-24-000107.txt\"}, {\"name\": \"ex991earningsnewsrelease63.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/ex991earningsnewsrelease63.htm\"}, {\"name\": \"ex992ifs6302024.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/ex992ifs6302024.htm\"}, {\"name\": \"hig-20240725.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/hig-20240725.htm\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/R1.htm\"}]}\n  - read_filing({\"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/hig-20240725.htm\", \"max_chars\": 1000}) -> {\"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/hig-20240725.htm\", \"accepted_utc_latest\": \"2024-07-25T21:16:31+00:00\", \"title\": \"hig-20240725\", \"text\": \"0000874766false00008747662024-07-252024-07-250000874766us-gaap:CommonStockMember2024-07-252024-07-250000874766us-gaap:DeferrableNotesMember2024-07-252024-07-250000874766us-gaap:NoncumulativePreferredStockMember2024-07-252024-07-25\\nDate of Report (Date of earliest event reported): July 25, 2024\\nTHE HARTFORD FINANCIAL SERVICES GROUP, INC.\\n(Exact name of registrant as specified in its charter)\\nThe Hartford Financial Services Group, Inc.\\nOne Hartford Plaza, Hartford, Connecticut 06155\\n(Address of Principal Executive Offices) (Zip Code)\\nRegistrant\u2019s telephone number, including area code: (860) 547-5000\\nCheck the appropriate box below if the Form 8-K filing is intended to simultaneously satisfy the filing obligation of the registrant under any of the following provisions:\\n\u2610 Written communications pursuant to Rule 425 under the Securities Act (17 CFR 230.425)\\n\u2610 Soliciting material pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12)\\n\u2610 Pre-commencement communications pursuant to \"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "First step: retrieve HIG's price history up to the decision time to assess past 20-day performance patterns.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "HIG",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "HIG",
+      "window_days": 10
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "HIG",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 5
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check if there's a recent press release or SEC filing from HIG's latest 8-K that might indicate expected stock movement patterns for the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/hig-20240725.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "read_filing",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/hig-20240725.htm",
+      "max_chars": 1000
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "HIG",
+    "days": 20
+   },
+   "started": "2026-09-27T10:03:36.988+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 332,
+   "error": null,
+   "preview": "{\"ticker\": \"HIG\", \"last_date\": \"2024-07-25\", \"last_close\": 98.47, \"ret_1d\": 0.0038, \"ret_5d\": -0.026, \"ret_20d\": 0.0009, \"ret_60d\": null, \"vol_20d_annualized\": 0.191, \"closes_last_30\": [98.39, 98.88, "
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "HIG",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:03:36.989+00:00",
+   "ok": false,
+   "elapsed_ms": 0,
+   "chars": 0,
+   "error": "no archived news page for HIG in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)",
+   "preview": ""
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "HIG",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 5
+   },
+   "started": "2026-09-27T10:03:36.990+00:00",
+   "ok": true,
+   "elapsed_ms": 1908,
+   "chars": 1170,
+   "error": null,
+   "preview": "{\"ticker\": \"HIG\", \"cik\": 874766, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-07-25\", \"accepted_utc_latest\": \"2024-07-26T01:16:31+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "2.1",
+   "tool": "read_filing",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/hig-20240725.htm",
+    "max_chars": 1000
+   },
+   "started": "2026-09-27T10:03:44.935+00:00",
+   "ok": true,
+   "elapsed_ms": 438,
+   "chars": 1193,
+   "error": null,
+   "preview": "{\"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/hig-20240725.htm\", \"accepted_utc_latest\": \"2024-07-25T21:16:31+00:00\", \"title\": \"hig-20240725\", \"text\": \"0000874766false00008"
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/hig-20240725.htm"
+   },
+   "started": "2026-09-27T10:03:44.935+00:00",
+   "ok": true,
+   "elapsed_ms": 547,
+   "chars": 660,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000874766-24-000107.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/874766/000087476624000107/0000874766-24-000107.txt\"}, {\"name\": \"ex991earningsnewsrelease63.htm\", \"ur"
+  }
+ ],
+ "elapsed_s": 21.1,
+ "day": "2024-07-26",
+ "asset": "HIG",
+ "ret_pct": 7.13,
+ "z": 6.56,
+ "fwd5_pct": -1.85,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The provided evidence only contains historical SEC filings from previous months and does not contain any news or data from July 26, 2024, that could explain the 7.13% price move.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": true
+ }
+}

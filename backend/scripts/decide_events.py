@@ -39,6 +39,8 @@ SECTOR_ETF = {"Information Technology": "XLK", "Financials": "XLF", "Health Care
 DECIDE_SYSTEM = ("You are a portfolio manager reacting to an earnings release. Buy only stocks you expect to beat "
                  "their sector over the next 20 trading days after this release. Use only the facts given. "
                  "Answer with exactly one word: BUY or PASS.")
+# the books, by holding period in trading days: a week, a month, three months, about six months, a year, two years
+HORIZONS = {5: "1 week", 20: "1 month", 63: "3 months", 120: "6 months", 252: "1 year", 504: "2 years"}
 EXPLAIN_SYSTEM = ("You are a portfolio manager reacting to an earnings release. Using only the facts given, reply "
                   "with ONLY JSON: {\"bull\": [\"...\"], \"bear\": [\"...\"], \"decision\": \"BUY\" or \"PASS\", "
                   "\"reason\": \"1-2 sentences\"}")
@@ -82,7 +84,8 @@ async def run(args: argparse.Namespace) -> None:
     ex = {json.loads(x)["accession"]: json.loads(x) for x in (BACKEND / args.extract).read_text().splitlines()}
     p = Prices.from_long(pd.read_parquet(BACKEND / args.prices))
     days = pd.DatetimeIndex(p.open.index)
-    slug = args.model.replace(":", "_").replace("/", "_") + (f"_{args.tag}" if args.tag else "")
+    slug = (args.model.replace(":", "_").replace("/", "_") + (f"_{args.tag}" if args.tag else "")
+            + ("" if args.horizon == 20 else f"_h{args.horizon}"))
     sheets = (pd.read_csv(BACKEND / args.features).set_index("accession")["fact_sheet"].to_dict()
               if args.features else {})
     out_path = BACKEND / "results" / "events" / f"decide_{slug}.jsonl"
@@ -92,32 +95,42 @@ async def run(args: argparse.Namespace) -> None:
     if args.limit:
         todo = todo[: args.limit]
     print(f"{len(todo)} events to decide with {args.model} ({len(done)} done)", flush=True)
-    llm = OllamaLLM(args.model, base_url=args.base_url, concurrency=1, num_ctx=4096, num_predict=400, cache=True,
+    llm = OllamaLLM(args.model, base_url=args.base_url, concurrency=args.parallel, num_ctx=4096, num_predict=400, cache=True,
                     require_gpu=True)
     t0 = time.monotonic()
+    system = DECIDE_SYSTEM.replace("next 20 trading days", f"next {args.horizon} trading days")
+
+    async def one(n: int, r: Any) -> dict[str, Any] | None:
+        etf = SECTOR_ETF.get(str(r.sector))
+        i = entry_index(days, datetime.fromisoformat(str(r.accepted_utc)))
+        if i is None and args.live:
+            i = len(days)  # forward test: the entry day is not in the prices yet; the prompt reads earlier closes only
+        if etf is None or i is None or str(r.ticker).replace(".", "-") not in p.close.columns:
+            return None
+        user = sheets[r.accession] if sheets else event_text(r, ex[r.accession], p, i, etf)
+        got = json.loads(await llm(system, user, mode="buypass_lo"))
+        lo = float(got["logodds"])
+        # p_buy: the model's own probability of answering BUY rather than PASS (from its token probabilities).
+        # The master agent turns it into a calibrated P(beats sector) using only events whose outcome was
+        # already known (app/portfolio/master.py).
+        rec = {"accession": r.accession, "ticker": r.ticker, "model": args.model, "logodds": lo,
+               "p_buy": 1.0 / (1.0 + math.exp(-max(-50.0, min(50.0, lo)))),
+               "mass": got["mass"], "censored": got["censored"], "buy": lo > 0}
+        if n <= args.explain:
+            rec["explanation"] = (await llm(EXPLAIN_SYSTEM, user))[:2000]
+        rec["prompt_user"] = user
+        return rec
+
     try:
         with out_path.open("a") as f:
-            for n, r in enumerate(todo, start=1):
-                etf = SECTOR_ETF.get(str(r.sector))
-                i = entry_index(days, datetime.fromisoformat(str(r.accepted_utc)))
-                if etf is None or i is None or str(r.ticker).replace(".", "-") not in p.close.columns:
-                    continue
-                user = sheets[r.accession] if sheets else event_text(r, ex[r.accession], p, i, etf)
-                got = json.loads(await llm(DECIDE_SYSTEM, user, mode="buypass_lo"))
-                lo = float(got["logodds"])
-                # p_buy: the model's own probability of answering BUY rather than PASS (from its token
-                # probabilities). The master agent turns it into a calibrated P(beats sector) using only events
-                # whose outcome was already known (app/portfolio/master.py).
-                rec = {"accession": r.accession, "ticker": r.ticker, "model": args.model, "logodds": lo,
-                       "p_buy": 1.0 / (1.0 + math.exp(-max(-50.0, min(50.0, lo)))),
-                       "mass": got["mass"], "censored": got["censored"], "buy": lo > 0}
-                if n <= args.explain:
-                    raw = await llm(EXPLAIN_SYSTEM, user)
-                    rec["explanation"] = raw[:2000]
-                rec["prompt_user"] = user
-                f.write(json.dumps(rec) + "\n")
+            for c in range(0, len(todo), args.parallel):  # one-token answers: several in flight fill the GPU
+                chunk = list(enumerate(todo[c:c + args.parallel], start=c + 1))
+                for rec in await asyncio.gather(*(one(n, r) for n, r in chunk)):
+                    if rec is not None:
+                        f.write(json.dumps(rec) + "\n")
                 f.flush()
-                if n % 100 == 0:
+                n = c + len(chunk)
+                if n // 100 != c // 100:
                     rate = (time.monotonic() - t0) / n
                     print(f"  {n}/{len(todo)} {rate:.2f}s/event eta={(len(todo) - n) * rate / 60:.0f}min", flush=True)
     finally:
@@ -136,7 +149,12 @@ def main() -> None:
     ap.add_argument("--features", default=None,
                     help="research table from build_features.py: the model reads its fact_sheet column")
     ap.add_argument("--tag", default="", help="suffix for the output file (e.g. xbrl)")
+    ap.add_argument("--horizon", type=int, default=20, choices=sorted(HORIZONS),
+                    help="5 quick money, 20 mid term, 120 long term (trading days to beat the sector)")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--live", action="store_true",
+                    help="forward test: a release whose entry day is not in the prices yet uses the closes before it")
+    ap.add_argument("--parallel", type=int, default=3, help="requests in flight (the Ollama server's slots)")
     ap.add_argument("--explain", type=int, default=100, help="write a bull/bear case for the first N events")
     args = ap.parse_args()
     with gpu_job(f"decide_events {args.model}"):

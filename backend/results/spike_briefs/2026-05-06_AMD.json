@@ -1,0 +1,136 @@
+{
+ "accession": "spike-2026-05-06_AMD",
+ "ticker": "AMD",
+ "as_of": "2026-05-06T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"AMD\", \"days\": 20}) -> {\"ticker\": \"AMD\", \"last_date\": \"2026-05-05\", \"last_close\": 355.26, \"ret_1d\": 0.0402, \"ret_5d\": 0.0992, \"ret_20d\": 0.6037, \"ret_60d\": null, \"vol_20d_annualized\": 0.78, \"closes_last_30\": [221.53, 231.82, 236.64, 245.04, 246.83, 255.07, 258.12, 278.26, 278.39, 274.95, 284.49, 303.46, 305.33, 347.81, 334.63, 323.21, 337.11, 354.49, 360.54, 341.54, 355.26]}\n  - news_as_of({\"ticker\": \"AMD\", \"window_days\": 10}) -> ERROR: timed out\n  - sec_filings_as_of({\"ticker\": \"AMD\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"AMD\", \"cik\": 2488, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-05-05\", \"accepted_utc_latest\": \"2026-05-06T01:16:06+00:00\", \"items\": \"2.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/2488/000000248826000072/amd-20260505.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n\n[round 2] thought: \n  - read_filing({\"url\": \"https://www.sec.gov/Archives/edgar/data/2488/000000248826000072/amd-20260505.htm\", \"max_chars\": 1000}) -> {\"url\": \"https://www.sec.gov/Archives/edgar/data/2488/000000248826000072/amd-20260505.htm\", \"accepted_utc_latest\": \"2026-05-05T21:16:06+00:00\", \"title\": \"amd-20260505\", \"text\": \"0000002488false00000024882026-05-052026-05-05\\nPursuant to Section 13 or 15(d) of the Securities Exchange Act of 1934\\nDate of Report (Date of earliest event reported)\\nADVANCED MICRO DEVICES, INC.\\n(Exact name of registrant as specified in its charter)\\n(Address of principal executive offices) (Zip Code)\\n(Registrant\u2019s telephone number, including area code)\\n(Former Name or Former Address, if Changed Since Last Report)\\nCheck the appropriate box below if the Form 8-K filing is intended to simultaneously satisfy the filing obligation of the registrant under any of the following provisions:\\nWritten communications pursuant to Rule 425 under the Securities Act (17 CFR 230.425)\\nSoliciting material pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12)\\nPre-commencement communications pursuant to Rule 14d-2(b) under the Exchange Act (17 CFR 240.14d-2(b))\\nPre-commencement communications pursuant to Rule 13e-4(c) under the Exchange Act (17 CFR 240.13e-4(c))\\nSecurities registered pursuant t\"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to check AMD's historical price movements to estimate the probability of closing higher over the next 20 trading days. Starting with price history data from the last 20 days to see patterns.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "AMD",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "AMD",
+      "window_days": 10
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "AMD",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check if the latest SEC filings or news from the last 20 days provide evidence about AMD's stock direction. I'll read the 8-K filing from May 5, 2026, to see if there's any relevant news or events.",
+   "calls": [
+    {
+     "tool": "read_filing",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/2488/000000248826000072/amd-20260505.htm",
+      "max_chars": 1000
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "AMD",
+    "days": 20
+   },
+   "started": "2026-09-27T10:07:10.335+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 354,
+   "error": null,
+   "preview": "{\"ticker\": \"AMD\", \"last_date\": \"2026-05-05\", \"last_close\": 355.26, \"ret_1d\": 0.0402, \"ret_5d\": 0.0992, \"ret_20d\": 0.6037, \"ret_60d\": null, \"vol_20d_annualized\": 0.78, \"closes_last_30\": [221.53, 231.82"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "AMD",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:07:10.337+00:00",
+   "ok": true,
+   "elapsed_ms": 5346,
+   "chars": 343,
+   "error": null,
+   "preview": "{\"ticker\": \"AMD\", \"cik\": 2488, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-05-05\", \"accepted_utc_latest\": \"2026-05-06T01:16:06+00:00\", \"items\": \"2.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/ed"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "AMD",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:07:10.336+00:00",
+   "ok": false,
+   "elapsed_ms": 15001,
+   "chars": 0,
+   "error": "timed out",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "read_filing",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/2488/000000248826000072/amd-20260505.htm",
+    "max_chars": 1000
+   },
+   "started": "2026-09-27T10:07:31.369+00:00",
+   "ok": true,
+   "elapsed_ms": 193,
+   "chars": 1193,
+   "error": null,
+   "preview": "{\"url\": \"https://www.sec.gov/Archives/edgar/data/2488/000000248826000072/amd-20260505.htm\", \"accepted_utc_latest\": \"2026-05-05T21:16:06+00:00\", \"title\": \"amd-20260505\", \"text\": \"0000002488false0000002"
+  }
+ ],
+ "elapsed_s": 28.3,
+ "day": "2026-05-06",
+ "asset": "AMD",
+ "ret_pct": 18.61,
+ "z": 4.91,
+ "fwd5_pct": 5.64,
+ "cause": {
+  "label_model": "earnings",
+  "reason": "The asset moved significantly following the filing of an 8-K report on May 5, 2026, which is standard for earnings announcements.",
+  "source": "https://www.sec.gov/Archives/edgar/data/2488/000000248826000072/amd-20260505.htm",
+  "label": "earnings",
+  "earnings_release_near": true
+ }
+}
