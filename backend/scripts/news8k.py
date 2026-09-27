@@ -58,16 +58,21 @@ def text_path(acc: str) -> Path:
 
 
 ITEM = re.compile(r"Item\s+[1-9]\.\d\d", re.IGNORECASE)
+COVER_END = re.compile(r"(extended transition period|emerging growth company)[^\n]*\n", re.IGNORECASE)
 
 
 def text_of(acc: str) -> str | None:
-    """The filing from its first "Item x.xx" heading on (the cover page before it is boilerplate), 6,000 chars."""
+    """The filing from its first "Item x.xx" heading on (the cover page before it is boilerplate), 6,000 chars. When
+    the heading was lost in the HTML conversion, from the end of the cover's check-box boilerplate instead."""
     p = text_path(acc)
     if not p.exists():
         return None
     t = gzip.decompress(p.read_bytes()).decode()
     m = ITEM.search(t)
-    return t[m.start() if m else 0:][:MAX_CHARS]
+    if m:
+        return t[m.start():][:MAX_CHARS]
+    ends = [c.end() for c in COVER_END.finditer(t[:6000])]  # headings lost in the HTML: skip the check-box cover
+    return t[ends[-1] if ends else 0:][:MAX_CHARS]
 
 
 async def fetch() -> None:
