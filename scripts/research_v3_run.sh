@@ -17,12 +17,12 @@ VLLM=""; OLL=""
 trap '[ -n "$VLLM" ] && kill -- -$VLLM 2>/dev/null; [ -n "$OLL" ] && kill $OLL 2>/dev/null' EXIT
 
 LOG "phase 1: gather (Jan + tools) on $LIMIT releases"
-GPU_UTIL=${GPU_UTIL:-0.85} nohup setsid "$ROOT/scripts/vllm_serve.sh" > results/events/vllm_v3.log 2>&1 &
+MAX_SEQS=${MAX_SEQS:-16} GPU_UTIL=${GPU_UTIL:-0.85} nohup setsid "$ROOT/scripts/vllm_serve.sh" > results/events/vllm_v3.log 2>&1 &
 VLLM=$!
 until curl -s -m 2 127.0.0.1:8000/v1/models > /dev/null; do
   kill -0 $VLLM 2>/dev/null || { LOG "vLLM exited"; tail -20 results/events/vllm_v3.log; exit 1; }; sleep 5
 done
-$PY scripts/research_events.py "${ARGS[@]}" --backend vllm --workers 12 --phase gather || LOG "gather failed"
+$PY scripts/research_events.py "${ARGS[@]}" --backend vllm --workers 16 --phase gather || LOG "gather failed"
 kill -- -$VLLM 2>/dev/null; wait $VLLM 2>/dev/null; VLLM=""
 until ! nvidia-smi --query-compute-apps=process_name --format=csv,noheader | grep -qi "python\|vllm"; do sleep 3; done
 
