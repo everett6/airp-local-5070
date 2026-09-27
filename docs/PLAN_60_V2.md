@@ -563,3 +563,54 @@ Nothing is selected from this grid; the live rule stays at 21 × 100. Script: `s
   - 6,597 of 6,943 releases got a fact sheet;
   - 4,595 have an EPS pair, 1,581 of them completed from SEC filings.
 - `results/events/breadth_eval.json`, `results/events/breadth_eval.txt`.
+
+## "LLM extracts, code scores" (spec fixed 2026-09-27 ~10:00, before any extraction exists)
+
+**Why:** Bonsai's score is about 65% EPS growth, which code computes exactly. An LLM earns its place only by reading
+what code cannot: the release's words. Here Bonsai stops deciding and only extracts labeled facts; code turns them
+into a score.
+
+**Fields**, each a label plus an exact quote (at most 30 words) from the release:
+
+| Field | Labels |
+|---|---|
+| one_off | charge (impairment, restructuring, litigation, write-down) / gain / none |
+| demand | strengthening / stable / weakening / not_stated (orders, backlog, bookings, pipeline, traffic) |
+| margin | expanded / stable / contracted / not_stated (gross or operating margin vs a year earlier) |
+| capital_return | increased (new or larger buyback or dividend) / cut (reduced or suspended) / none |
+| leadership | change (CEO or CFO leaving or named) / none |
+| risk_flag | yes (restatement, material weakness, going concern, delisting, investigation) / no |
+| segment_weakness | yes (management names a segment or region that declined) / no |
+
+- **Code check:** any label other than none / not_stated / no counts only if its quote is word for word in the
+  release. Otherwise it becomes none / not_stated / no.
+
+**Step 1: prompt optimization. It uses only extraction quality, never stock returns.**
+- **Dev set:** 100 random 2024 S&P 500 releases (seed 1).
+- **Candidates:**
+  - P1: schema only;
+  - P2: schema plus a definition of each label;
+  - P3: P2 with the quote written before the label (evidence first);
+  - P4: P3 plus two short worked examples.
+- **Quality metrics per candidate:**
+  - parse rate;
+  - quote-verified share of the non-default labels (the hallucination proxy);
+  - agreement with keyword "silver labels" from code (e.g. "repurchase" + "authoriz" → capital_return increased;
+    "impairment" / "restructuring charge" → one_off charge);
+  - seconds per release.
+- **Score** = parse rate × verified share × silver agreement. The highest score wins; within 0.02, the faster one.
+- The winning prompt is frozen and committed before step 2.
+
+**Step 2: extract** with the frozen prompt, on:
+- the 2024 S&P 500 fact-sheet sample (about 2,000 releases): training;
+- the 2025-26 sample (1,180 releases): test.
+
+**Step 3: one return test.**
+- **Base model:** ridge on EPS growth + revenue growth. **Full model:** base + the 7 fields (one-hot).
+- Both are trained on 2024 only and scored on 2025-26 releases.
+- **Outcome:** the 5-day return vs the sector ETF.
+- **Pass:**
+  - the monthly rank IC of (full − base) on 2025-26 has a 95% CI above 0 (paired monthly bootstrap), AND
+  - the full model's own IC CI is above 0.
+- **Also reported:** the 20-day horizon, and each field's IC.
+- **Registry:** one trial.
