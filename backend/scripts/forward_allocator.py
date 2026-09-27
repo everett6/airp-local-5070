@@ -31,7 +31,7 @@ import yfinance as yf
 
 from app.data_ingestion import bars
 from app.portfolio.forward import books_from_json, books_to_json, new_books, step
-from app.portfolio.guard import HALT, halt, halt_info, state
+from app.portfolio.guard import HALT, apply_drawdown_limit, halt, halt_info, state
 from app.portfolio.master import MasterConfig
 from app.sandbox.events import Prices
 
@@ -57,6 +57,9 @@ def fallback(t: str, start: date, end: date) -> tuple[pd.DataFrame, str]:
         except (bars.NoKeyError, httpx.HTTPError) as e:
             why.append(f"{name}: {e}")
     raise SystemExit(f"no prices for {t} from Yahoo or any fallback ({'; '.join(why)}); try again later")
+
+
+REAL_BOOK = ("master+brakes", "master")  # the book the drawdown limit watches (the first one present)
 
 
 def fetch(now: datetime) -> Prices:
@@ -127,6 +130,11 @@ def main() -> None:
               "orders may only shrink positions.", halt_info())
     rec = step(books, p.open, p.close, now, MasterConfig(), halted=mode == "HALTED", reducing=mode == "REDUCING")
     rec["price_sources"] = dict(SOURCES)
+    name = next((n for n in REAL_BOOK if n in rec["books"]), None)
+    if name is not None:
+        rec["drawdown"] = apply_drawdown_limit(name, rec["books"][name]["equity"], books[name].peak)
+        if rec["drawdown"].get("action"):
+            print("DRAWDOWN", rec["drawdown"])
     with ledger.open("a") as f:
         f.write(json.dumps(rec) + "\n")
     state_path.write_text(json.dumps(books_to_json(books), indent=1) + "\n")

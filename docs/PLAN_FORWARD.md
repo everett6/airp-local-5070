@@ -1,6 +1,6 @@
 # Plan from here (written 2026-09-27)
 
-Paper money only, free data only, and every run is started by hand until you switch on autonomy. Every test has its
+Paper money only, free data only. Runs are started by hand until autonomy goes live on 5 Oct (see Decisions). Every test has its
 pass rule committed before it runs and is logged in `backend/results/trials_registry.jsonl`. Details and results are
 in [PLAN_60_V2.md](PLAN_60_V2.md); outside ideas in [INSPIRATION.md](INSPIRATION.md).
 
@@ -33,10 +33,10 @@ in [PLAN_60_V2.md](PLAN_60_V2.md); outside ideas in [INSPIRATION.md](INSPIRATION
 
 | Day | Me | You |
 |---|---|---|
-| Mon | Write up verdicts A/B/C. **Freeze the event pipeline** for the forward test: the best arm that passed, otherwise Bonsai's 1-week score as now | Regenerate the Alpaca keys and put them in `backend/.env` |
-| Mon–Tue (CPU) | Pre-register and run **"first reaction"** (the earnings-day move + Bonsai's labels, 20–40 day hold) and **"tilt SPY"** (over/underweight picked stocks inside the SPY holding instead of a separate sleeve) | Pick your **maximum drawdown**. The stress test: a week SPY falls 10% costs the book about 9–15% |
+| Mon | Write up verdicts A/B/C. **Freeze the event pipeline** for the forward test: the best arm that passed, otherwise Bonsai's 1-week score as now. PrismML build + benchmark (if permitted) | Regenerate the Alpaca keys and put them in `backend/.env` |
+| Mon–Tue (CPU) | Pre-register and run **"first reaction"** (the earnings-day move + Bonsai's labels, 20–40 day hold) and **"tilt SPY"** (over/underweight picked stocks inside the SPY holding instead of a separate sleeve). Build the autonomy runner | — |
 | Wed–Thu (GPU nights) | Build the **8-K breaking-news watcher** (deals, CEO changes, layoffs → Jan → Bonsai → code) and backtest it on 2024–26 under its own rule | Practice the routine: `forward_events.py` at ~08:45 ET and in the evening; open the viewer |
-| Fri | Dry run of the full weekday routine; SPY price cross-check against Alpaca; tag the frozen version in git | Decide: PrismML download (Bonsai speed-up), yes or no |
+| Wed–Fri | Autonomy runs on its own into a dry-run ledger. Fri: check it, SPY price cross-check against Alpaca, tag the frozen version in git, switch autonomy to the real ledgers for Mon 5 Oct | Glance at the viewer |
 
 **Rule for the week:** a test that passes joins the forward test as a **shadow** book at 0 weight. Nothing changes the
 real book before the 3-month review.
@@ -45,16 +45,17 @@ real book before the 3-month review.
 
 | Cadence | Command | Who |
 |---|---|---|
-| Every weekday, ~08:45 ET and evening | `python scripts/forward_events.py` | you (or autonomy, once on) |
-| Weekly (Mondays) | `python scripts/forward_allocator.py` | you |
+| Every weekday, ~08:45 ET and evening | `python scripts/forward_events.py` | autonomy (you, if it is off) |
+| Weekly (Mondays) | `python scripts/forward_allocator.py` | autonomy (you, if it is off) |
 | Saturdays | `python scripts/weekly_review.py` and `python scripts/failure_review.py` | you, then I read them |
 | Any time | `scripts/portfolio_ui.sh --lan` (phone too) | you |
 | Emergency | `forward_allocator.py --halt "why"` or `--reduce "why"`; `--resume` to undo | you |
 
 - **Monthly (me):** a report with the forward Sharpe and its CI, fills vs the backtest, each shadow book's IC, and
   missed runs and failures.
-- **Autonomy (optional, from week 3):** once two weeks of manual runs are clean and you say "switch it on": timers
-  with wake-from-sleep, a heartbeat and phone alerts. The kill switch and mandate are already in place.
+- **Autonomy (from 5 Oct, if the Wed–Fri dry run is clean):** timers with wake from sleep run the commands above; a
+  heartbeat and alerts report missed runs. The kill switch, mandate, order gate and 35% drawdown limit stay in force,
+  and `--halt` stops everything at any time.
 
 ## Phase 3: 3-month review, early Jan 2027
 
@@ -64,8 +65,8 @@ The pass/fail rules for this review are written before it, by the end of October
    within 2 standard errors of the backtest.
 2. **AI picks:** if the event book's IC holds up (lower bound above 0 on backtest + forward data combined), it gets a
    small real weight (10–20%) through a pre-registered sizing rule and a mandate change that you commit.
-3. **Leverage:** stays at 1.0× (at most 30% volatility) until 6 forward months exist and you have set a maximum
-   drawdown.
+3. **Leverage:** stays at 1.0× (at most 30% volatility) until 6 forward months exist. The 35% drawdown limit caps it
+   at the 25–30% volatility row after that.
 
 ## Phase 4: month 6 on, about Apr 2027
 
@@ -77,15 +78,15 @@ The pass/fail rules for this review are written before it, by the end of October
   - Bonsai asked several times and averaged (needs PrismML);
   - a bounded RD-Agent-style signal search: a fixed budget, a held-back period, every candidate registered.
 
-## Decisions only you can make
+## Decisions (the user delegated 1, 3 and 4 on 2026-09-27; my choices and why)
 
-| Decision | Needed by | Why |
+| Decision | Choice | Why |
 |---|---|---|
-| Maximum drawdown you would sit through | Fri 2 Oct (for alerts); month 6 (for leverage) | Sets the brake alerts and caps any leverage |
-| Alpaca keys in `backend/.env` | Fri 2 Oct | The SPY cross-check and a price fallback |
-| The PrismML llama.cpp fork download | any time | The only real speed-up for Bonsai; enables averaging several answers |
-| Switching on autonomy | after 2 clean weeks | Runs keep going when you are busy |
-| Mandate changes (crypto cap, AI picks weight) | only after a passed test | The mandate is yours; code never changes it |
+| **Maximum drawdown** | **35% from the peak** (alert at 25%), in `config/mandate.json` | The frozen book's worst backtest drop was 27% with brakes and 34% without, so a tighter limit would trip in an ordinary bad year and sell at the bottom. 35% still rules out the 60% setting (drops of 45–50%) and caps any later leverage at the 25–30% volatility row (about 20–30% a year). At the limit the allocator switches to **REDUCING** (sells only) until `--resume`; at 25% it flags the run |
+| Alpaca keys in `backend/.env` | yours to do | Only you add credentials; regenerate them first, since the old ones are in the chat |
+| **PrismML llama.cpp fork** | **Yes, from the official PrismML-Eng repo, after tonight's runs** | The only real speed-up for Bonsai. It is benchmarked on the 100 dev releases and used only if quality (parse rate, verified quotes) matches Ollama and it is at least 1.5× faster. Arms A–C stay on Ollama so they are comparable. The build needs a permission you grant (see below) |
+| **Autonomy** | **On for the 5 Oct start**, after a dry run Wed–Fri | A missed 08:45 ET run can never be backfilled, so manual runs are the forward test's weakest link. Built this week (timers with wake from sleep, heartbeat, alerts); it runs Wed–Fri into a dry-run ledger, and goes live only if those runs are clean. The kill switch, mandate, order gate and drawdown limit are in place |
+| Mandate changes (crypto cap, AI picks weight) | only after a passed test | Code never changes the mandate on its own |
 
 ## Standing rules
 

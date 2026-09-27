@@ -8,6 +8,7 @@ import pandas as pd
 from app.portfolio.forward import new_books, step
 from app.portfolio.guard import (
     MANDATE,
+    apply_drawdown_limit,
     check,
     gate,
     halt,
@@ -122,3 +123,16 @@ def test_trading_states_and_precedence(tmp_path):
     assert state(h) == "HALTED"  # unreadable: fail closed
     assert reduce_only({"SPY": 0.9, "BTC-USD": 0.2}, {"SPY": 10.0}, 1000.0, {"SPY": 100.0}) == {"SPY": 0.5,
                                                                                                  "BTC-USD": 0.0}
+
+
+def test_drawdown_limit_switches_to_reducing(tmp_path):
+    assert M.max_drawdown == 0.35 and M.alert_drawdown == 0.25
+    h = tmp_path / "HALT"
+    ok = apply_drawdown_limit("master+brakes", 90_000, 100_000, path=h)
+    assert "action" not in ok and ok["from_peak"] == 0.1 and state(h) == "ACTIVE"
+    assert apply_drawdown_limit("master+brakes", 74_000, 100_000, path=h)["action"] == "alert"
+    assert state(h) == "ACTIVE"
+    hit = apply_drawdown_limit("master+brakes", 64_000, 100_000, path=h)
+    assert hit["action"] == "REDUCING" and state(h) == "REDUCING"
+    assert "drawdown limit" == (halt_info(h) or {})["by"]
+    assert "error" in apply_drawdown_limit("x", 1, 1, mandate=tmp_path / "missing.json", path=h)

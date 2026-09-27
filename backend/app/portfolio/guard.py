@@ -10,6 +10,8 @@
                  REDUCING  orders may only shrink positions: every target weight is capped at the asset's current
                            weight, so nothing new is bought and nothing is added to.
                Anyone may create it (scripts, the viewer's Halt button); only `forward_allocator.py --resume` removes it.
+  drawdown     the mandate's max_drawdown / alert_drawdown, measured on the real book from its peak: the allocator
+               flags the run at the alert level and switches the kill switch to REDUCING at the limit.
 The frozen book (SPY + 20% crypto cap, brakes) sits inside the default mandate, so the gate never binds on it.
 """
 from __future__ import annotations
@@ -38,6 +40,8 @@ class Mandate:
     max_weight: float
     max_gross: float
     max_crypto: float
+    max_drawdown: float = 1.0      # from the book's peak: at or beyond it the allocator switches to REDUCING
+    alert_drawdown: float = 1.0    # from the book's peak: the run is flagged
 
 
 def _num(d: dict[str, Any], k: str, lo: float, hi: float) -> float:
@@ -57,8 +61,15 @@ def load_mandate(path: Path = MANDATE) -> Mandate:
         raise MandateError("mandate 'universe' must be a non-empty list of symbols")
     if not isinstance(cry, list) or not set(cry) <= set(uni):
         raise MandateError("mandate 'crypto' must be a list of symbols inside the universe")
+    dd = {k: _num(d, k, 0.01, 1) for k in ("max_drawdown", "alert_drawdown") if k in d}
     return Mandate(frozenset(uni), frozenset(cry), _num(d, "max_weight", 0, 1), _num(d, "max_gross", 0, 1),
-                   _num(d, "max_crypto", 0, 1))
+                   _num(d, "max_crypto", 0, 1), **dd)
+
+
+def drawdown_check(equity: float, peak: float, m: Mandate) -> str | None:
+    """'limit' at or beyond the mandate's max drawdown, 'alert' at or beyond the alert level, else None."""
+    dd = 1 - equity / peak if peak > 0 else 0.0
+    return "limit" if dd >= m.max_drawdown else ("alert" if dd >= m.alert_drawdown else None)
 
 
 def check(targets: dict[str, Any], m: Mandate) -> list[str]:
@@ -122,6 +133,28 @@ def reduce_only(targets: dict[str, float], positions: dict[str, float], cash: fl
     equity = cash + sum(q * px[a] for a, q in positions.items() if a in px)
     cur = {a: q * px[a] / equity for a, q in positions.items() if a in px} if equity > 0 else {}
     return {a: min(w, cur.get(a, 0.0)) for a, w in targets.items()}
+
+
+def apply_drawdown_limit(book: str, equity: float, peak: float, mandate: Path = MANDATE, path: Path = HALT
+                         ) -> dict[str, Any]:
+    """The mandate's drawdown rules on the real book after a run: at the limit the kill switch goes to REDUCING (the
+    next run's fills can only sell); at the alert level the run is flagged. An unreadable mandate is reported (the
+    gate already rejects every order then)."""
+    try:
+        m = load_mandate(mandate)
+    except MandateError as e:
+        return {"book": book, "error": str(e)}
+    dd = 1 - equity / peak if peak > 0 else 0.0
+    out: dict[str, Any] = {"book": book, "from_peak": round(dd, 4), "alert_at": m.alert_drawdown,
+                           "limit_at": m.max_drawdown}
+    act = drawdown_check(equity, peak, m)
+    if act == "limit":
+        halt(f"{book} is {dd:.1%} below its peak (limit {m.max_drawdown:.0%})", by="drawdown limit", path=path,
+             mode="REDUCING")
+        out["action"] = "REDUCING"
+    elif act == "alert":
+        out["action"] = "alert"
+    return out
 
 
 def halt_info(path: Path = HALT) -> dict[str, Any] | None:

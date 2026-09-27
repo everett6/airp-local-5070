@@ -194,6 +194,10 @@ def run_log(runs: list[dict[str, Any]], recs: list[dict[str, Any]], halt: dict[s
     missed releases, outcomes, and the kill switch."""
     log: list[dict[str, str]] = []
     for r in runs:
+        dd = r.get("drawdown") or {}
+        if dd.get("action"):
+            log.append({"at": r["run_at_utc"], "job": "drawdown", "what": f"{dd['book']} {dd['from_peak']:.1%} below "
+                        f"its peak: " + ("LIMIT hit: sells only (REDUCING) until --resume" if dd["action"] == "REDUCING" else "alert")})
         for name, b in r["books"].items():
             msg = []
             if b.get("fills"):

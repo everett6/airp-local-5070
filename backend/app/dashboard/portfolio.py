@@ -367,7 +367,8 @@ def console() -> None:
         try:
             md = guard.load_mandate()
             mandate = (f"{', '.join(sorted(md.universe))} · ≤{md.max_weight:.0%} one asset · ≤{md.max_gross:.0%} "
-                       f"invested · ≤{md.max_crypto:.0%} crypto · checked when decided and again before filling")
+                       f"invested · ≤{md.max_crypto:.0%} crypto · checked when decided and again before filling · alert at "
+                       f"{md.alert_drawdown:.0%} below the peak, sells only (REDUCING) at {md.max_drawdown:.0%}")
             mcls = ""
         except guard.MandateError as e:
             mandate, mcls = f"UNREADABLE, so every order is rejected: {e}", "neg"
@@ -393,7 +394,7 @@ def console() -> None:
         if log:
             st.markdown('<div class="q-log">' + "".join(
                 f'<div><span class="t">{esc(x["at"][:16].replace("T", " "))}</span><span class="j">{esc(x["job"])}'
-                f'</span><span class="{"neg" if "REJECTED" in x["what"] or "MISSED" in x["what"] else ""}">'
+                f'</span><span class="{"neg" if any(w in x["what"] for w in ("REJECTED", "MISSED", "LIMIT")) else ""}">'
                 f'{esc(x["what"])}</span></div>' for x in log) + "</div>", unsafe_allow_html=True)
         else:
             empty("Nothing has run yet.")
