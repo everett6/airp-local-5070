@@ -242,7 +242,7 @@ limit is still to be given. Until then the cap is 30% volatility, which means a 
 make the week look good. Whatever passes by Thursday becomes the combined book. If nothing new passes, the book is the
 existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
 
-## Mon 28 item 1: 20-day Bonsai satellite test (spec fixed before the run, 2026-09-27 00:45)
+## Mon 28 item 1: 20-day Bonsai satellite test (spec fixed before the run, committed 2026-09-27 00:40)
 
 - **Book:** Bonsai-27B's 20-day decisions on S&P 500 earnings releases.
   - 2024: `decide_bonsai-27b_latest_factsheet2024_secchk.jsonl`.
@@ -257,7 +257,7 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
 - **25 bps:** reported, not part of the verdict.
 - **Registry:** one trial is registered.
 
-### Mon 28 item 1 result (2026-09-27 00:55): FAIL
+### Mon 28 item 1 result (2026-09-27 00:42): FAIL
 
 | 2024-01-02 .. 2026-09-24 | B0 (SPY + crypto) | B1 (+ 20-day satellite) | B1 at B0's vol |
 |---|---|---|---|
@@ -272,7 +272,7 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
 - Stock picking stays in the forward test as a shadow book at 0 weight; it is not dropped.
 - Result: `backend/results/satellite20_test.json`.
 
-## Mon 28 item 2: PC-off fallback rule (pre-registered 2026-09-27 00:55, before any forward data)
+## Mon 28 item 2: PC-off fallback rule (pre-registered 2026-09-27 00:42, before any forward data)
 
 - **When it applies:** on a forward-test day, an earnings release whose decision is not written by Bonsai-27B by the next open (PC off, GPU busy or a crash).
 - **What happens:** Bonsai-lite (`scripts/bonsai_lite.py`, the ridge trained on every Bonsai decision known before that day) scores the release on CPU.
@@ -283,7 +283,7 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
   - Otherwise it stays a fallback only.
 - **The weight is fixed in advance:** lite picks get half of Bonsai's Kelly weight. It was the weaker arm in the back test (IC 0.086 vs 0.103).
 
-## Optimization research (2026-09-27 01:05, user request: "do research for the optomizations")
+## Optimization research (2026-09-27 00:42, user request: "do research for the optomizations")
 
 ### Portfolio optimizations
 
@@ -307,7 +307,7 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
   - Not done tonight.
 - **Spike cause briefs** (88 triggers): at about 12 s each they take about 18 min. No change needed.
 
-## Optimization 1: volatility target on B0 (spec fixed before the run, 2026-09-27 01:05)
+## Optimization 1: volatility target on B0 (spec fixed before the run, committed 2026-09-27 00:42)
 
 - **Rule:** B0's daily returns (2018-01-02 .. 2026-09-24) are scaled by exposure e_d = min(1.5, 20% / σ̂_d).
   - σ̂_d is the annualized 20-day realized vol of B0, up to the close of d−1.
@@ -319,7 +319,7 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
   - the 90% CI of the Sharpe difference is above 0 (63-day block bootstrap).
 - **Also reported, not in the verdict:** the same comparison with the drawdown brakes applied on top.
 
-### Optimization 1 result (2026-09-27 01:15): FAIL
+### Optimization 1 result (2026-09-27 00:44): FAIL
 
 | 2018–26 | CAGR | vol | Sharpe | max DD |
 |---|---|---|---|---|
