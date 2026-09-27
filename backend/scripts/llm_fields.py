@@ -3,6 +3,8 @@
     python scripts/llm_fields.py dev                  # step 1: the 4 prompts on 100 dev releases, quality metrics only
     python scripts/llm_fields.py extract --prompt P3  # step 2: the frozen prompt on the 2024 and 2025-26 samples
     python scripts/llm_fields.py test                 # step 3: the one pre-registered return test
+    python scripts/llm_fields.py extract-research     # arm B: release + Jan's as-of research evidence
+    python scripts/llm_fields.py test-research        # arm B's pre-registered test (research beyond arm A)
 
 Bonsai reads each earnings press release and labels 7 things code cannot compute from the numbers, each with an
 exact quote. Code keeps a non-default label only if its quote is word for word in the release. The prompt is chosen on
@@ -74,6 +76,18 @@ PROMPTS = {
     "P4": _HEAD + _DEFS + _RULES + "\nWrite each field's quote BEFORE its label.\n" + _EX + "JSON: " + _SCHEMA_Q,
 }
 
+FIELDS_R = FIELDS | {"vs_prior_guidance": (("beat", "met", "missed", "not_stated"), "not_stated")}
+_SCHEMA_R = "{" + ", ".join(f'"{k}": {{"label": "{"|".join(v[0])}", "quote": "..."}}' for k, v in FIELDS_R.items()) + "}"
+_DEF_R = """- vs_prior_guidance: this quarter's results vs the guidance range the company gave in its PREVIOUS earnings
+  release (in the research evidence): beat = above the range, met = inside it, missed = below it; not_stated if the
+  evidence has no earlier guidance for this quarter. Quote the earlier guidance.
+"""
+_RULES_R = _RULES.replace("use ONLY the release", "use ONLY the release and the research evidence").replace(
+    "word for word", "word for word from the release or the evidence")
+# arm B: P2 (frozen) plus the research evidence block and the one research-only field; nothing else changed
+PROMPT_R = _HEAD + _DEFS + _DEF_R + _RULES_R + "\nJSON: " + _SCHEMA_R
+EVIDENCE = BACKEND / "results"
+
 SILVER = {  # code-only keyword labels, the quality yardstick: does the model flag a field when the words are there?
     "one_off": r"impairment|restructuring (charge|cost|expense)|goodwill write|litigation (charge|settlement)|write-?down",
     "capital_return": r"((repurchase|buyback)[^.]{0,80}(authoriz|new|additional|increase))|((increas|rais)\w* (its |the |our )?(quarterly )?(cash )?dividend)|((suspend|reduc|cut)\w* (its |the |our )?(quarterly )?dividend)",
@@ -95,11 +109,12 @@ def parse(reply: str) -> dict[str, Any] | None:
     return o if isinstance(o, dict) else None
 
 
-def verify(raw: dict[str, Any] | None, text: str) -> dict[str, Any]:
-    """Code has the last word: a non-default label needs a quote found word for word in the release."""
+def verify(raw: dict[str, Any] | None, text: str, fields: dict[str, tuple[tuple[str, ...], str]] = FIELDS
+           ) -> dict[str, Any]:
+    """Code has the last word: a non-default label needs a quote found word for word in the source text."""
     body = _norm(text)
     out: dict[str, Any] = {"parsed": raw is not None, "claimed": 0, "verified": 0}
-    for f, (labels, default) in FIELDS.items():
+    for f, (labels, default) in fields.items():
         v = (raw or {}).get(f)
         label = str(v.get("label", "")).strip().lower() if isinstance(v, dict) else ""
         quote = str(v.get("quote", "")).strip() if isinstance(v, dict) else ""
@@ -193,9 +208,47 @@ async def extract(prompt: str) -> None:
         await llm.unload()
 
 
+def research_folder(tag: str) -> Path:
+    return EVIDENCE / ("events_research_Jan-v1-4B-GGUF_Q4_K_M_v3" + ("_2024" if tag == "2024" else ""))
+
+
+async def extract_research() -> None:
+    """Arm B: the release plus Jan's as-of evidence; quotes may come from either."""
+    llm = llm_client()
+    try:
+        for tag, events, feats in (("2024", "data/events/events_sp500_2024.csv", "features_sp500_2024_secchk.csv"),
+                                   ("2025", "data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv")):
+            out = OUT / f"llm_fields_research_{tag}.jsonl"
+            done = {json.loads(x)["accession"] for x in out.read_text().splitlines()} if out.exists() else set()
+            keep = set(pd.read_csv(OUT / feats)["accession"])
+            rows = [r for r in pd.read_csv(BACKEND / events).itertuples() if r.accession in keep and r.accession not in done]
+            print(f"{tag}: {len(rows)} releases to label with research", flush=True)
+            t0 = time.monotonic()
+
+            async def one(r: Any, tag: str = tag) -> dict[str, Any] | None:
+                text, rp = text_of(r.accession), research_folder(tag) / f"{r.accession}.json"
+                if text is None:
+                    return None
+                ev = (json.loads(rp.read_text()).get("evidence") or "")[:6000] if rp.exists() else ""
+                user = (text[:6000] + "\n\n=== Research evidence (web, as of the release) ===\n"
+                        + (ev or "No research evidence was found."))
+                reply = await llm(PROMPT_R, user)
+                return {"accession": r.accession, "has_research": bool(ev),
+                        **verify(parse(reply), text[:6000] + "\n" + ev, FIELDS_R)}
+            for i in range(0, len(rows), 60):
+                recs = [x for x in await asyncio.gather(*(one(r) for r in rows[i:i + 60])) if x is not None]
+                with out.open("a") as fh:
+                    for rec in recs:
+                        fh.write(json.dumps(rec) + "\n")
+                n = i + len(rows[i:i + 60])
+                print(f"  {n}/{len(rows)} eta={(len(rows) - n) * (time.monotonic() - t0) / n / 60:.0f}min", flush=True)
+    finally:
+        await llm.unload()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=("dev", "extract", "test"))
+    ap.add_argument("cmd", choices=("dev", "extract", "extract-research", "test", "test-research"))
     ap.add_argument("--prompt", default="")
     args = ap.parse_args()
     if args.cmd == "dev":
@@ -204,6 +257,11 @@ def main() -> None:
         if args.prompt not in PROMPTS:
             raise SystemExit("--prompt must be the frozen winner from `dev`")
         asyncio.run(extract(args.prompt))
+    elif args.cmd == "extract-research":
+        asyncio.run(extract_research())
+    elif args.cmd == "test-research":
+        from llm_fields_test import research_main
+        research_main()
     else:
         from llm_fields_test import main as test_main
         test_main()

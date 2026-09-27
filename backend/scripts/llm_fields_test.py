@@ -83,3 +83,42 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def research_main() -> None:
+    """Arm B (docs/PLAN_60_V2.md "Arm B"): Jan's research -> Bonsai's 8 labels -> the same ridge. Pass: the 2025-26
+    monthly IC of (full B - full A) has a 95% CI above 0 AND full B's own IC CI is above 0 (5-day)."""
+    from llm_fields import FIELDS_R
+    p = Prices.from_long(pd.read_parquet(BACKEND / "data/events/ohlcv_2023-01-01_2026-09-25.parquet"))
+    data = {}
+    for tag in ("2024", "2025"):
+        a = load(tag, p)
+        b = pd.DataFrame([json.loads(x) for x in (EV / f"llm_fields_research_{tag}.jsonl").read_text().splitlines()])
+        b = b[["accession", "has_research", *FIELDS_R]].rename(columns={f: f"{f}_r" for f in FIELDS_R})
+        data[tag] = a.merge(b, on="accession")
+    train, test = data["2024"], data["2025"]
+
+    def design_b(df: pd.DataFrame) -> np.ndarray:
+        cols = [design(df, False)]
+        for f, (labels, default) in FIELDS_R.items():
+            cols.append(np.column_stack([(df[f"{f}_r"] == v).astype(float).to_numpy() for v in labels if v != default]))
+        return np.column_stack(cols)
+    out: dict = {"n_train": len(train), "n_test": len(test),
+                 "with_research": {"2024": float(train["has_research"].mean()), "2025": float(test["has_research"].mean())}}
+    for h in ("fwd5", "fwd20"):
+        tr = train.dropna(subset=[h])
+        test[f"A_{h}"] = ridge(design(tr, True), tr[h].to_numpy(float), lam=10.0)(design(test, True))
+        test[f"B_{h}"] = ridge(design_b(tr), tr[h].to_numpy(float), lam=10.0)(design_b(test))
+        g = test["vs_prior_guidance_r"].map({"beat": 1.0, "met": 0.0, "missed": -1.0})
+        test[f"guid_{h}"] = g
+        out[h] = {"full_A": monthly_ic(test, f"A_{h}", h), "full_B": monthly_ic(test, f"B_{h}", h),
+                  "B_minus_A": paired_diff(test, f"A_{h}", f"B_{h}", h),
+                  "vs_prior_guidance_alone": monthly_ic(test, f"guid_{h}", h, min_n=10)}
+    out["vs_prior_guidance_counts"] = test["vs_prior_guidance_r"].value_counts().to_dict()
+    r5 = out["fwd5"]
+    out["pass"] = bool(r5["B_minus_A"]["ci_lo"] > 0 and (r5["full_B"]["ci_lo"] or 0) > 0)
+    (EV / "llm_fields_research_test.json").write_text(json.dumps(out, indent=1, default=str) + "\n")
+    register({"trial": "jan_research_bonsai_fields_code", "date": time.strftime("%Y-%m-%d"), "kind": "signal_ic",
+              "ic": r5["full_B"]["mean_ic"], "result": "pass" if out["pass"] else "fail"})
+    print(json.dumps(out, indent=1, default=str))
+    print("verdict (pre-registered, 5-day):", "PASS" if out["pass"] else "FAIL")
