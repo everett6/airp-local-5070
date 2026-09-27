@@ -1,0 +1,114 @@
+{
+ "accession": "spike-2025-07-31_HWM",
+ "ticker": "HWM",
+ "as_of": "2025-07-31T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"HWM\", \"days\": 20}) -> {\"ticker\": \"HWM\", \"last_date\": \"2025-07-30\", \"last_close\": 191.61, \"ret_1d\": 0.0157, \"ret_5d\": 0.0308, \"ret_20d\": 0.0903, \"ret_60d\": null, \"vol_20d_annualized\": 0.231, \"closes_last_30\": [175.74, 175.47, 180.56, 179.76, 178.97, 180.92, 178.04, 179.19, 183.82, 184.17, 183.8, 188.31, 189.97, 187.32, 182.84, 185.89, 186.29, 189.0, 187.65, 188.65, 191.61]}\n\n[round 2] thought: \n  - news_as_of({\"ticker\": \"HWM\", \"window_days\": 10}) -> ERROR: timed out\n  - sec_filings_as_of({\"ticker\": \"HWM\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"HWM\", \"cik\": 4281, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-07-31\", \"accepted_utc_latest\": \"2025-07-31T16:05:37+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/4281/000110465925072451/tm2522109d1_8k.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "HWM",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check the next 20 trading days' performance using price history data from the decision time (2025-07-31) and analyze if there's evidence from news or filings to estimate the probability.",
+   "calls": [
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "HWM",
+      "window_days": 10
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "HWM",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "HWM",
+    "days": 20
+   },
+   "started": "2026-09-27T10:06:19.379+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 353,
+   "error": null,
+   "preview": "{\"ticker\": \"HWM\", \"last_date\": \"2025-07-30\", \"last_close\": 191.61, \"ret_1d\": 0.0157, \"ret_5d\": 0.0308, \"ret_20d\": 0.0903, \"ret_60d\": null, \"vol_20d_annualized\": 0.231, \"closes_last_30\": [175.74, 175.4"
+  },
+  {
+   "id": "2.1",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "HWM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:06:33.462+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 340,
+   "error": null,
+   "preview": "{\"ticker\": \"HWM\", \"cik\": 4281, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-07-31\", \"accepted_utc_latest\": \"2025-07-31T16:05:37+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/d"
+  },
+  {
+   "id": "2.0",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "HWM",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:06:33.462+00:00",
+   "ok": false,
+   "elapsed_ms": 15001,
+   "chars": 0,
+   "error": "timed out",
+   "preview": ""
+  }
+ ],
+ "elapsed_s": 35.2,
+ "day": "2025-07-31",
+ "asset": "HWM",
+ "ret_pct": -6.44,
+ "z": -4.41,
+ "fwd5_pct": 3.33,
+ "cause": {
+  "label_model": "earnings",
+  "reason": "The asset moved significantly on the day an 8-K filing was accepted, which typically contains earnings news.",
+  "source": "https://www.sec.gov/Archives/edgar/data/4281/000110465925072451/tm2522109d1_8k.htm",
+  "label": "earnings",
+  "earnings_release_near": true
+ }
+}

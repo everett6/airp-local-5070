@@ -1,0 +1,157 @@
+{
+ "accession": "spike-2024-07-18_CTAS",
+ "ticker": "CTAS",
+ "as_of": "2024-07-18T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"CTAS\", \"days\": 20}) -> {\"ticker\": \"CTAS\", \"last_date\": \"2024-07-17\", \"last_close\": 176.45, \"ret_1d\": -0.0078, \"ret_5d\": 0.0056, \"ret_20d\": 0.0174, \"ret_60d\": null, \"vol_20d_annualized\": 0.136, \"closes_last_30\": [173.43, 174.3, 173.2, 173.69, 174.3, 175.26, 173.44, 174.46, 171.67, 170.16, 172.67, 172.26, 174.48, 174.31, 174.37, 175.47, 175.5, 176.94, 175.24, 177.84, 176.45]}\n  - news_as_of({\"ticker\": \"CTAS\", \"window_days\": 10}) -> ERROR: no archived news page for CTAS in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)\n  - sec_filings_as_of({\"ticker\": \"CTAS\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"CTAS\", \"cik\": 723254, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-07-18\", \"accepted_utc_latest\": \"2024-07-18T17:47:31+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/723254/000072325424000032/ctas-20240718.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n\n[round 2] thought: \n  - filing_documents({\"url\": \"https://www.sec.gov/Archives/edgar/data/723254/000072325424000032/ctas-20240718.htm\"}) -> {\"documents\": [{\"name\": \"0000723254-24-000032.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/723254/000072325424000032/0000723254-24-000032.txt\"}, {\"name\": \"ctas-20240718.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/723254/000072325424000032/ctas-20240718.htm\"}, {\"name\": \"ex992024-5x31.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/723254/000072325424000032/ex992024-5x31.htm\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/723254/000072325424000032/R1.htm\"}]}\n  - analyst_targets_as_of({\"ticker\": \"CTAS\", \"window_days\": 10}) -> ERROR: no archived quote page for CTAS in the 10 days before the decision time",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to find the probability that CTAS stock closes higher than its latest close in the next 20 trading days. I'll start by checking the price history to see if there's a pattern or recent trend, and look at SEC filings and news to understand any upcoming events that might affect the stock.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "CTAS",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "CTAS",
+      "window_days": 10
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "CTAS",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check the most recent SEC filing (8-K) for CTAS to see if there's any event affecting the stock, then verify analyst targets and historical patterns to estimate the probability.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/723254/000072325424000032/ctas-20240718.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "analyst_targets_as_of",
+     "args": {
+      "ticker": "CTAS",
+      "window_days": 10
+     },
+     "ok": false
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "CTAS",
+    "days": 20
+   },
+   "started": "2026-09-27T10:02:58.494+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 353,
+   "error": null,
+   "preview": "{\"ticker\": \"CTAS\", \"last_date\": \"2024-07-17\", \"last_close\": 176.45, \"ret_1d\": -0.0078, \"ret_5d\": 0.0056, \"ret_20d\": 0.0174, \"ret_60d\": null, \"vol_20d_annualized\": 0.136, \"closes_last_30\": [173.43, 174"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "CTAS",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:02:58.494+00:00",
+   "ok": false,
+   "elapsed_ms": 1,
+   "chars": 0,
+   "error": "no archived news page for CTAS in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)",
+   "preview": ""
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "CTAS",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:02:58.496+00:00",
+   "ok": true,
+   "elapsed_ms": 57,
+   "chars": 344,
+   "error": null,
+   "preview": "{\"ticker\": \"CTAS\", \"cik\": 723254, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-07-18\", \"accepted_utc_latest\": \"2024-07-18T17:47:31+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "2.1",
+   "tool": "analyst_targets_as_of",
+   "args": {
+    "ticker": "CTAS",
+    "window_days": 10,
+    "name": ""
+   },
+   "started": "2026-09-27T10:03:04.320+00:00",
+   "ok": false,
+   "elapsed_ms": 4,
+   "chars": 0,
+   "error": "no archived quote page for CTAS in the 10 days before the decision time",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/723254/000072325424000032/ctas-20240718.htm"
+   },
+   "started": "2026-09-27T10:03:04.320+00:00",
+   "ok": true,
+   "elapsed_ms": 2104,
+   "chars": 507,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000723254-24-000032.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/723254/000072325424000032/0000723254-24-000032.txt\"}, {\"name\": \"ctas-20240718.htm\", \"url\": \"https://"
+  }
+ ],
+ "elapsed_s": 30.6,
+ "day": "2024-07-18",
+ "asset": "CTAS",
+ "ret_pct": 5.44,
+ "z": 6.25,
+ "fwd5_pct": 0.13,
+ "cause": {
+  "label_model": "earnings",
+  "reason": "The asset moved significantly on the day an 8-K filing was accepted, which typically contains earnings news.",
+  "source": "https://www.sec.gov/Archives/edgar/data/723254/000072325424000032/ctas-20240718.htm",
+  "label": "earnings",
+  "earnings_release_near": true
+ }
+}

@@ -1,0 +1,86 @@
+{
+ "accession": "spike-2024-07-25_NOC",
+ "ticker": "NOC",
+ "as_of": "2024-07-25T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"NOC\", \"days\": 20}) -> {\"ticker\": \"NOC\", \"last_date\": \"2024-07-24\", \"last_close\": 425.85, \"ret_1d\": -0.0004, \"ret_5d\": 0.0044, \"ret_20d\": 0.0318, \"ret_60d\": null, \"vol_20d_annualized\": 0.114, \"closes_last_30\": [412.71, 415.61, 418.9, 419.9, 418.99, 421.27, 421.0, 418.73, 414.41, 408.13, 410.55, 416.12, 416.33, 416.02, 419.14, 423.97, 423.43, 421.82, 421.97, 426.02, 425.85]}\n\n[round 2] thought: \n  - news_as_of({\"ticker\": \"NOC\", \"window_days\": 20}) -> ERROR: timed out",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to check historical price movements of NOC over the last 20 trading days to estimate the probability of closing higher in the next 20 days. I'll start by retrieving price history data.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "NOC",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to find the probability that NOC will close higher in the next 20 trading days. I'll check the historical price movements from the last 20 days to see if there's a pattern. The price history shows the last 20 days' closes, but I need to determine if the stock is likely to rise in the next 20 days.",
+   "calls": [
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "NOC",
+      "window_days": 20
+     },
+     "ok": false
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "NOC",
+    "days": 20
+   },
+   "started": "2026-09-27T10:03:29.797+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 353,
+   "error": null,
+   "preview": "{\"ticker\": \"NOC\", \"last_date\": \"2024-07-24\", \"last_close\": 425.85, \"ret_1d\": -0.0004, \"ret_5d\": 0.0044, \"ret_20d\": 0.0318, \"ret_60d\": null, \"vol_20d_annualized\": 0.114, \"closes_last_30\": [412.71, 415."
+  },
+  {
+   "id": "2.0",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "NOC",
+    "window_days": 20,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:03:47.270+00:00",
+   "ok": false,
+   "elapsed_ms": 15003,
+   "chars": 0,
+   "error": "timed out",
+   "preview": ""
+  }
+ ],
+ "elapsed_s": 38.8,
+ "day": "2024-07-25",
+ "asset": "NOC",
+ "ret_pct": 6.43,
+ "z": 7.03,
+ "fwd5_pct": 3.86,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The provided evidence only includes price history data and a failed news query, offering no information about the cause of the asset's move.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": true
+ }
+}

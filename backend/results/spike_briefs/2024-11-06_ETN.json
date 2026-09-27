@@ -1,0 +1,108 @@
+{
+ "accession": "spike-2024-11-06_ETN",
+ "ticker": "ETN",
+ "as_of": "2024-11-06T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"ETN\", \"days\": 20}) -> {\"ticker\": \"ETN\", \"last_date\": \"2024-11-05\", \"last_close\": 330.42, \"ret_1d\": 0.0192, \"ret_5d\": -0.0206, \"ret_20d\": 0.0085, \"ret_60d\": null, \"vol_20d_annualized\": 0.203, \"closes_last_30\": [327.64, 330.25, 328.97, 333.32, 337.44, 330.04, 333.03, 340.25, 339.94, 338.86, 335.42, 336.8, 337.12, 336.34, 337.34, 337.38, 334.7, 323.74, 327.08, 324.21, 330.42]}\n  - news_as_of({\"ticker\": \"ETN\", \"window_days\": 14}) -> ERROR: no archived news page for ETN in the 14 days before the decision time (tried yahoo, marketwatch, cnbc)\n\n[round 2] thought: \n  - wiki_search({\"query\": \"ETN\", \"limit\": 1}) -> {\"query\": \"ETN\", \"titles\": [\"ETN\"], \"note\": \"read one with wiki_as_of\"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to gather historical price data for ETN to determine the probability of it closing higher in the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "ETN",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "ETN",
+      "window_days": 14
+     },
+     "ok": false
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "",
+   "calls": [
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "ETN",
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "ETN",
+    "days": 20
+   },
+   "started": "2026-09-27T10:05:08.166+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 354,
+   "error": null,
+   "preview": "{\"ticker\": \"ETN\", \"last_date\": \"2024-11-05\", \"last_close\": 330.42, \"ret_1d\": 0.0192, \"ret_5d\": -0.0206, \"ret_20d\": 0.0085, \"ret_60d\": null, \"vol_20d_annualized\": 0.203, \"closes_last_30\": [327.64, 330."
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "ETN",
+    "window_days": 14,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:05:08.167+00:00",
+   "ok": false,
+   "elapsed_ms": 10704,
+   "chars": 0,
+   "error": "no archived news page for ETN in the 14 days before the decision time (tried yahoo, marketwatch, cnbc)",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "wiki_search",
+   "args": {
+    "query": "ETN",
+    "limit": 1
+   },
+   "started": "2026-09-27T10:05:31.153+00:00",
+   "ok": true,
+   "elapsed_ms": 651,
+   "chars": 71,
+   "error": null,
+   "preview": "{\"query\": \"ETN\", \"titles\": [\"ETN\"], \"note\": \"read one with wiki_as_of\"}"
+  }
+ ],
+ "elapsed_s": 37.6,
+ "day": "2024-11-06",
+ "asset": "ETN",
+ "ret_pct": 6.43,
+ "z": 4.18,
+ "fwd5_pct": 2.64,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "No news or external factors were found in the provided evidence to explain the asset's significant move.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": false
+ }
+}

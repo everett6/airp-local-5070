@@ -1,0 +1,136 @@
+{
+ "accession": "spike-2024-10-22_PM",
+ "ticker": "PM",
+ "as_of": "2024-10-22T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - wiki_search({\"query\": \"PM\", \"limit\": 1}) -> {\"query\": \"PM\", \"titles\": [\"PM\"], \"note\": \"read one with wiki_as_of\"}\n  - price_history_as_of({\"ticker\": \"PM\", \"days\": 20}) -> {\"ticker\": \"PM\", \"last_date\": \"2024-10-21\", \"last_close\": 111.71, \"ret_1d\": -0.0104, \"ret_5d\": -0.0093, \"ret_20d\": -0.0066, \"ret_60d\": null, \"vol_20d_annualized\": 0.095, \"closes_last_30\": [112.45, 112.56, 113.0, 113.48, 113.27, 114.0, 113.24, 112.31, 111.16, 111.84, 111.66, 111.56, 112.85, 112.11, 112.78, 112.76, 113.08, 113.52, 112.81, 112.88, 111.71]}\n\n[round 2] thought: \n  - sec_filings_as_of({\"ticker\": \"PM\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"PM\", \"cik\": 1413329, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-10-22\", \"accepted_utc_latest\": \"2024-10-22T16:01:37+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1413329/000141332924000167/pm-20241022.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n  - news_as_of({\"ticker\": \"PM\", \"window_days\": 10}) -> ERROR: no archived news page for PM in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to find the company with ticker PM to confirm it's a valid stock, then check historical price movements and relevant news to estimate the probability.",
+   "calls": [
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "PM",
+      "limit": 1
+     },
+     "ok": true
+    },
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "PM",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to verify if PM is a valid ticker, check recent SEC filings and news for relevant events to inform the probability of a higher close in the next 20 days.",
+   "calls": [
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "PM",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "PM",
+      "window_days": 10
+     },
+     "ok": false
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.1",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "PM",
+    "days": 20
+   },
+   "started": "2026-09-27T10:04:20.365+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"PM\", \"last_date\": \"2024-10-21\", \"last_close\": 111.71, \"ret_1d\": -0.0104, \"ret_5d\": -0.0093, \"ret_20d\": -0.0066, \"ret_60d\": null, \"vol_20d_annualized\": 0.095, \"closes_last_30\": [112.45, 112"
+  },
+  {
+   "id": "1.0",
+   "tool": "wiki_search",
+   "args": {
+    "query": "PM",
+    "limit": 1
+   },
+   "started": "2026-09-27T10:04:20.365+00:00",
+   "ok": true,
+   "elapsed_ms": 547,
+   "chars": 69,
+   "error": null,
+   "preview": "{\"query\": \"PM\", \"titles\": [\"PM\"], \"note\": \"read one with wiki_as_of\"}"
+  },
+  {
+   "id": "2.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "PM",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:04:32.650+00:00",
+   "ok": false,
+   "elapsed_ms": 5,
+   "chars": 0,
+   "error": "no archived news page for PM in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "PM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:04:32.646+00:00",
+   "ok": true,
+   "elapsed_ms": 96,
+   "chars": 342,
+   "error": null,
+   "preview": "{\"ticker\": \"PM\", \"cik\": 1413329, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2024-10-22\", \"accepted_utc_latest\": \"2024-10-22T16:01:37+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  }
+ ],
+ "elapsed_s": 20.0,
+ "day": "2024-10-22",
+ "asset": "PM",
+ "ret_pct": 10.47,
+ "z": 10.96,
+ "fwd5_pct": 1.22,
+ "cause": {
+  "label_model": "earnings",
+  "reason": "The asset moved significantly following an 8-K filing dated 2024-10-22, which typically contains earnings news.",
+  "source": "https://www.sec.gov/Archives/edgar/data/1413329/000141332924000167/pm-20241022.htm",
+  "label": "earnings",
+  "earnings_release_near": true
+ }
+}

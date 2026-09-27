@@ -1,0 +1,136 @@
+{
+ "accession": "spike-2024-11-06_BTC-USD",
+ "ticker": "BTC-USD",
+ "as_of": "2024-11-06T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - wiki_search({\"query\": \"BTC-USD\", \"limit\": 1}) -> {\"query\": \"BTC-USD\", \"titles\": [\"BTC-e\"], \"note\": \"read one with wiki_as_of\"}\n  - sec_filings_as_of({\"ticker\": \"BTC-USD\", \"forms\": [\"8-K\"], \"limit\": 1}) -> ERROR: BTC-USD not found in SEC company tickers (delisted or renamed companies may be missing)\n\n[round 2] thought: \n  - wiki_search({\"query\": \"BTC-USD\", \"limit\": 1}) -> {\"query\": \"BTC-USD\", \"titles\": [\"BTC-e\"], \"note\": \"read one with wiki_as_of\"}\n  - wiki_as_of({\"title\": \"BTC-e\", \"max_chars\": 100}) -> {\"title\": \"BTC-e\", \"revision_time\": \"2024-08-28T01:51:58Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1242667027\", \"text\": \"BTC-e Domain Seized by U.S. Law Enforcement\\nBTC-e was a cryptocurrency trading platform primarily serving the Russian market, with servers located in the United States. The U.S. government seized their website and funds in 2017.[1][2] It was founded in July 2011 by Alexander Vinnik and Aleksandr Bilyuchenko,[3] and as of February 2015 handled around 3% of all Bitcoin exchange volume.[4] The platform was eventually taken over by Russian Orthodox oligarch Konstantin Malofeev, and funds from BTC-e \"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to check if BTC-USD is a valid stock ticker (it's not a traditional stock), so I'll search Wikipedia for relevant articles",
+   "calls": [
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "BTC-USD",
+      "limit": 1
+     },
+     "ok": true
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "BTC-USD",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": false
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to clarify that BTC-USD is not a traditional stock ticker (it's a cryptocurrency pair), so there's no historical price data to analyze for this query",
+   "calls": [
+    {
+     "tool": "wiki_search",
+     "args": {
+      "query": "BTC-USD",
+      "limit": 1
+     },
+     "ok": true
+    },
+    {
+     "tool": "wiki_as_of",
+     "args": {
+      "title": "BTC-e",
+      "max_chars": 100
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.1",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "BTC-USD",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:05:17.743+00:00",
+   "ok": false,
+   "elapsed_ms": 4,
+   "chars": 0,
+   "error": "BTC-USD not found in SEC company tickers (delisted or renamed companies may be missing)",
+   "preview": ""
+  },
+  {
+   "id": "1.0",
+   "tool": "wiki_search",
+   "args": {
+    "query": "BTC-USD",
+    "limit": 1
+   },
+   "started": "2026-09-27T10:05:17.743+00:00",
+   "ok": true,
+   "elapsed_ms": 1450,
+   "chars": 77,
+   "error": null,
+   "preview": "{\"query\": \"BTC-USD\", \"titles\": [\"BTC-e\"], \"note\": \"read one with wiki_as_of\"}"
+  },
+  {
+   "id": "2.0",
+   "tool": "wiki_search",
+   "args": {
+    "query": "BTC-USD",
+    "limit": 1
+   },
+   "started": "2026-09-27T10:05:23.588+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 77,
+   "error": null,
+   "preview": "{\"query\": \"BTC-USD\", \"titles\": [\"BTC-e\"], \"note\": \"read one with wiki_as_of\"}"
+  },
+  {
+   "id": "2.1",
+   "tool": "wiki_as_of",
+   "args": {
+    "title": "BTC-e",
+    "max_chars": 500
+   },
+   "started": "2026-09-27T10:05:23.588+00:00",
+   "ok": true,
+   "elapsed_ms": 649,
+   "chars": 636,
+   "error": null,
+   "preview": "{\"title\": \"BTC-e\", \"revision_time\": \"2024-08-28T01:51:58Z\", \"url\": \"https://en.wikipedia.org/w/index.php?oldid=1242667027\", \"text\": \"BTC-e Domain Seized by U.S. Law Enforcement\\nBTC-e was a cryptocurr"
+  }
+ ],
+ "elapsed_s": 11.4,
+ "day": "2024-11-06",
+ "asset": "BTC-USD",
+ "ret_pct": 9.05,
+ "z": 3.4,
+ "fwd5_pct": 19.75,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The provided evidence only contains historical information about the BTC-e domain seizure and does not contain any news or data related to the specific market move on 2024-11-06.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": false
+ }
+}

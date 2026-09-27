@@ -1,0 +1,114 @@
+{
+ "accession": "spike-2026-08-27_CRWD",
+ "ticker": "CRWD",
+ "as_of": "2026-08-27T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"CRWD\", \"days\": 20}) -> {\"ticker\": \"CRWD\", \"last_date\": \"2026-08-26\", \"last_close\": 189.18, \"ret_1d\": 0.0205, \"ret_5d\": -0.0617, \"ret_20d\": 0.0546, \"ret_60d\": null, \"vol_20d_annualized\": 0.512, \"closes_last_30\": [179.38, 185.22, 190.86, 202.54, 211.22, 209.86, 207.39, 214.42, 225.16, 221.9, 221.78, 225.53, 216.95, 213.9, 212.92, 201.63, 190.34, 191.95, 190.68, 185.38, 189.18]}\n  - news_as_of({\"ticker\": \"CRWD\", \"window_days\": 10}) -> ERROR: no archived news page for CRWD in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)\n\n[round 2] thought: \n  - sec_filings_as_of({\"ticker\": \"CRWD\", \"forms\": [\"8-K\"], \"limit\": 10}) -> {\"ticker\": \"CRWD\", \"cik\": 1535527, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-08-26\", \"accepted_utc_latest\": \"2026-08-27T01:07:02+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1535527/000153552726000029/crwd-20260826.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-06-22\", \"accepted_utc_latest\": \"2026-06-23T01:10:10+00:00\", \"items\": \"5.03,5.07,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1535527/000110465926076376/tm2618192d1_8k.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-06-03\", \"accepted_utc_latest\": \"2026-06-04T01:06:20+00:00\", \"items\": \"2.02,8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1535527/000153552726000022/crwd-20260603.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-04-21\", \"accepted_utc_latest\": \"2026-04-21T03:53:18+00:00\", \"items\": \"5.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1535527/000153552726000018/crwd-20260416.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-04-06\", \"accepted_utc_latest\": \"2026-04-06T17:31:22+00:00\", \"items\": \"8.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1535527/000153552726000013/crwd-20260406.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-03-03\", \"accepted_utc_latest\": \"2026-03-04T02:06:26+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1535527/000153552726000007/crwd-20260303.htm\"}, {\"form\": \"8-K\", \"filed\": \"2025-12-29\", \"accepted_utc_latest\": \"2025-12-30T03:15:53+00:00\", \"items\": \"5.02,7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1535527/000110465925124912/tm2534248d1_8k.htm\"}, {\"form\": \"8-K\", \"filed\": \"2025-12-02\", \"accepted_utc_latest\": \"2025-12-03T02:11:13+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1535527/000153552725000030/crwd-20251202.htm\"}, {\"form\": \"8-K\", \"filed\": \"2025-08-27\", \"accepted_utc_latest\": \"2025-08-28T01:11:24+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1535527/000153552725000023/crwd-20250827.htm\"}, {\"form\": \"8-K\", \"filed\": \"2025-06-20\", \"accepted_utc_latest\": \"2025-06-21T02:07:58+00:00\", \"items\": \"5.07\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1535527/000110465925061216/tm2518570d1_8k.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to check CRWD's historical price movements to determine the probability of closing higher in the next 20 trading days. First step: fetch price history data and recent news to see trends.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "CRWD",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "CRWD",
+      "window_days": 10
+     },
+     "ok": false
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check recent SEC filings to see if there are any events or announcements that could affect CRWD's stock price in the next 20 days. If there's a pending event, it might influence the probability.",
+   "calls": [
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "CRWD",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 10
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "CRWD",
+    "days": 20
+   },
+   "started": "2026-09-27T10:07:43.697+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"CRWD\", \"last_date\": \"2026-08-26\", \"last_close\": 189.18, \"ret_1d\": 0.0205, \"ret_5d\": -0.0617, \"ret_20d\": 0.0546, \"ret_60d\": null, \"vol_20d_annualized\": 0.512, \"closes_last_30\": [179.38, 185"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "CRWD",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:07:43.698+00:00",
+   "ok": false,
+   "elapsed_ms": 11760,
+   "chars": 0,
+   "error": "no archived news page for CRWD in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "CRWD",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 10
+   },
+   "started": "2026-09-27T10:07:59.876+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 2245,
+   "error": null,
+   "preview": "{\"ticker\": \"CRWD\", \"cik\": 1535527, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-08-26\", \"accepted_utc_latest\": \"2026-08-27T01:07:02+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edg"
+  }
+ ],
+ "elapsed_s": 28.4,
+ "day": "2026-08-27",
+ "asset": "CRWD",
+ "ret_pct": 20.5,
+ "z": 6.18,
+ "fwd5_pct": -6.89,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The provided evidence only contains historical price data and SEC 8-K filings from previous months, with no news or filings from the specific day of the move (2026-08-27) that would explain the 20.5% price change.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": true
+ }
+}

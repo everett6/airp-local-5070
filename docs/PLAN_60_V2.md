@@ -440,3 +440,25 @@ This replaces Tue night to Thu item 1, run in one night.
   - Pre-market releases are about half of all releases.
 - **Still manual:** refreshing the SEC XBRL history (`build_xbrl_eps.py facts`, weekly), so fact sheets see the newest filed quarters.
 - Outcomes in dry run 1 were logged for the first 4 decisions: COO, ADBE, CPRT, ORCL. Lite decided them; they are not scored for anything.
+
+### Tue 29 item 1 result: spike check (2026-09-27 03:13): FAIL. The briefs stay; no automatic response.
+
+- **Triggers:** 88 in 2024–26; 84 have a 5-day forward return.
+- **Bonsai's labels** (code-checked): 42 unexplained, 34 earnings, 4 macro, 4 company news.
+  - Code overruled 7%: 4 "earnings" labels with no release near the day, and 2 "macro" labels without a valid source.
+  - Spot checks read correctly: DPZ −13.6% on its earnings day, SPY −2.3% on 24 Jul 2024 (macro), Dover +5.7% on
+    an acquisition.
+- **Arm B − arm A:** −0.19% per trigger, 95% CI [−0.60%, +0.24%]. Halving unexplained spikes **would have cost money**.
+- Mean 5-day return after a spike:
+  - unexplained: +0.56%;
+  - earnings: −0.43%;
+  - company news: −1.19%;
+  - macro: +1.32%.
+  With 4 to 42 cases per label, none of these differs from 0.
+- **Decision:**
+  - The spike check stays as **information only**: the cause brief is written and logged, and a person reads it.
+  - No rule trades on the label.
+  - Hard limits (brakes, caps) are unchanged.
+  - Your request to "analyze why before responding" is met by the brief. The test says the book should not respond
+    automatically to an unexplained spike.
+- **Files:** `results/spike_causes.csv`, `results/spike_score.json`, `results/spike_briefs/`.

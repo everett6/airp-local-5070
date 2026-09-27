@@ -1,0 +1,137 @@
+{
+ "accession": "spike-2026-09-22_CRWD",
+ "ticker": "CRWD",
+ "as_of": "2026-09-22T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"CRWD\", \"days\": 20}) -> {\"ticker\": \"CRWD\", \"last_date\": \"2026-09-21\", \"last_close\": 249.35, \"ret_1d\": 0.0492, \"ret_5d\": 0.0594, \"ret_20d\": 0.299, \"ret_60d\": null, \"vol_20d_annualized\": 1.027, \"closes_last_30\": [191.95, 190.68, 185.38, 189.18, 227.96, 218.4, 231.0, 215.07, 203.42, 214.97, 213.1, 210.02, 207.8, 208.86, 206.74, 235.38, 242.49, 241.36, 245.7, 237.65, 249.35]}\n  - news_as_of({\"ticker\": \"CRWD\", \"window_days\": 20}) -> ERROR: timed out\n  - sec_filings_as_of({\"ticker\": \"CRWD\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"CRWD\", \"cik\": 1535527, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-08-26\", \"accepted_utc_latest\": \"2026-08-27T01:07:02+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1535527/000153552726000029/crwd-20260826.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n\n[round 2] thought: \n  - price_history_as_of({\"ticker\": \"CRWD\", \"days\": 20}) -> {\"ticker\": \"CRWD\", \"last_date\": \"2026-09-21\", \"last_close\": 249.35, \"ret_1d\": 0.0492, \"ret_5d\": 0.0594, \"ret_20d\": 0.299, \"ret_60d\": null, \"vol_20d_annualized\": 1.027, \"closes_last_30\": [191.95, 190.68, 185.38, 189.18, 227.96, 218.4, 231.0, 215.07, 203.42, 214.97, 213.1, 210.02, 207.8, 208.86, 206.74, 235.38, 242.49, 241.36, 245.7, 237.65, 249.35]}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to check CRWD's historical price movements over the last 20 trading days to estimate the probability of a higher close in the next 20 days. I'll start by retrieving the price history data.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "CRWD",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "CRWD",
+      "window_days": 20
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "CRWD",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to analyze CRWD's price history to see if there's a pattern in the last 20 trading days that suggests a higher close in the next 20 days. The price history data shows the last 20 days' closes, but I need to check if the most recent close (2026-09-21) is higher than the previous 20 days' closes. I'll use the price history to calculate the probability.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "CRWD",
+      "days": 20
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "CRWD",
+    "days": 20
+   },
+   "started": "2026-09-27T10:07:43.551+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 350,
+   "error": null,
+   "preview": "{\"ticker\": \"CRWD\", \"last_date\": \"2026-09-21\", \"last_close\": 249.35, \"ret_1d\": 0.0492, \"ret_5d\": 0.0594, \"ret_20d\": 0.299, \"ret_60d\": null, \"vol_20d_annualized\": 1.027, \"closes_last_30\": [191.95, 190.6"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "CRWD",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:07:43.552+00:00",
+   "ok": true,
+   "elapsed_ms": 119,
+   "chars": 346,
+   "error": null,
+   "preview": "{\"ticker\": \"CRWD\", \"cik\": 1535527, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-08-26\", \"accepted_utc_latest\": \"2026-08-27T01:07:02+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edg"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "CRWD",
+    "window_days": 20,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:07:43.552+00:00",
+   "ok": false,
+   "elapsed_ms": 15000,
+   "chars": 0,
+   "error": "timed out",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "CRWD",
+    "days": 20
+   },
+   "started": "2026-09-27T10:08:14.450+00:00",
+   "cached": true,
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 350,
+   "error": null,
+   "preview": "{\"ticker\": \"CRWD\", \"last_date\": \"2026-09-21\", \"last_close\": 249.35, \"ret_1d\": 0.0492, \"ret_5d\": 0.0594, \"ret_20d\": 0.299, \"ret_60d\": null, \"vol_20d_annualized\": 1.027, \"closes_last_30\": [191.95, 190.6"
+  }
+ ],
+ "elapsed_s": 35.5,
+ "day": "2026-09-22",
+ "asset": "CRWD",
+ "ret_pct": NaN,
+ "z": NaN,
+ "fwd5_pct": NaN,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The provided evidence only includes an 8-K filing from August 26, 2026, and no news or market data for September 22, 2026, is available to explain the asset's move.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": false
+ }
+}

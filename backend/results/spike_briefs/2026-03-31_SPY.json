@@ -1,0 +1,107 @@
+{
+ "accession": "spike-2026-03-31_SPY",
+ "ticker": "SPY",
+ "as_of": "2026-03-31T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"SPY\", \"days\": 20}) -> {\"ticker\": \"SPY\", \"last_date\": \"2026-03-30\", \"last_close\": 628.78, \"ret_1d\": -0.0033, \"ret_5d\": -0.0357, \"ret_20d\": -0.0768, \"ret_60d\": null, \"vol_20d_annualized\": 0.157, \"closes_last_30\": [681.06, 675.06, 679.82, 676.03, 667.17, 673.01, 671.93, 671.09, 660.9, 657.16, 663.84, 665.59, 656.3, 654.69, 645.3, 652.08, 649.89, 653.51, 641.84, 630.89, 628.78]}\n  - news_as_of({\"ticker\": \"SPY\", \"window_days\": 10}) -> ERROR: timed out\n  - sec_filings_as_of({\"ticker\": \"SPY\", \"forms\": [\"8-K\"]}) -> {\"ticker\": \"SPY\", \"cik\": 884394, \"filings\": [], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 1,
+ "parse_failures": 1,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to check the historical price movements of SPY over the last 20 trading days to estimate the probability of it closing higher next 20 days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "SPY",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "SPY",
+      "window_days": 10
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "SPY",
+      "forms": [
+       "8-K"
+      ]
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "SPY",
+    "days": 20
+   },
+   "started": "2026-09-27T10:07:00.288+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 355,
+   "error": null,
+   "preview": "{\"ticker\": \"SPY\", \"last_date\": \"2026-03-30\", \"last_close\": 628.78, \"ret_1d\": -0.0033, \"ret_5d\": -0.0357, \"ret_20d\": -0.0768, \"ret_60d\": null, \"vol_20d_annualized\": 0.157, \"closes_last_30\": [681.06, 67"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "SPY",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 8
+   },
+   "started": "2026-09-27T10:07:00.289+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 137,
+   "error": null,
+   "preview": "{\"ticker\": \"SPY\", \"cik\": 884394, \"filings\": [], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "SPY",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:07:00.288+00:00",
+   "ok": false,
+   "elapsed_ms": 15000,
+   "chars": 0,
+   "error": "timed out",
+   "preview": ""
+  }
+ ],
+ "elapsed_s": 44.9,
+ "day": "2026-03-31",
+ "asset": "SPY",
+ "ret_pct": 2.91,
+ "z": 3.54,
+ "fwd5_pct": 3.2,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The evidence provided does not contain any news, filings, or macroeconomic data that explains the significant 2.91% move in SPY.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": false
+ }
+}

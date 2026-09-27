@@ -1,0 +1,133 @@
+{
+ "accession": "spike-2026-09-22_CRM",
+ "ticker": "CRM",
+ "as_of": "2026-09-22T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"CRM\", \"days\": 20}) -> {\"ticker\": \"CRM\", \"last_date\": \"2026-09-21\", \"last_close\": 236.42, \"ret_1d\": -0.0063, \"ret_5d\": -0.0871, \"ret_20d\": 0.1323, \"ret_60d\": null, \"vol_20d_annualized\": 0.864, \"closes_last_30\": [208.8, 208.69, 205.33, 205.26, 251.61, 255.55, 257.09, 257.66, 256.48, 263.97, 258.77, 248.68, 243.73, 242.57, 247.28, 258.97, 255.2, 250.1, 242.85, 237.92, 236.42]}\n  - news_as_of({\"ticker\": \"CRM\", \"window_days\": 10}) -> ERROR: timed out\n  - sec_filings_as_of({\"ticker\": \"CRM\", \"forms\": [\"8-K\"]}) -> {\"ticker\": \"CRM\", \"cik\": 1108524, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-09-17\", \"accepted_utc_latest\": \"2026-09-17T06:02:48+00:00\", \"items\": \"7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000210/crm-20260916.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-09-04\", \"accepted_utc_latest\": \"2026-09-05T01:05:24+00:00\", \"items\": \"5.02\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000197/crm-20260902.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-08-26\", \"accepted_utc_latest\": \"2026-08-27T01:03:53+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000187/crm-20260826.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-08-05\", \"accepted_utc_latest\": \"2026-08-06T01:36:56+00:00\", \"items\": \"5.02\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000160/crm-20260805.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-06-02\", \"accepted_utc_latest\": \"2026-06-03T01:15:12+00:00\", \"items\": \"5.02\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000138/crm-20260527.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-06-01\", \"accepted_utc_latest\": \"2026-06-02T01:43:09+00:00\", \"items\": \"5.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000131/crm-20260528.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-05-27\", \"accepted_utc_latest\": \"2026-05-28T01:18:26+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000125/crm-20260527.htm\"}, {\"form\": \"8-K\", \"filed\": \"2026-03-16\", \"accepted_utc_latest\": \"2026-03-16T18:13:09+00:00\", \"items\": \"7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000119312526107403/d887663d8k.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n\n[round 2] thought: \n  - filing_documents({\"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000210/crm-20260916.htm\"}) -> {\"documents\": [{\"name\": \"0001108524-26-000210.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000210/0001108524-26-000210.txt\"}, {\"name\": \"crm-20260916.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000210/crm-20260916.htm\"}, {\"name\": \"investorday2026.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000210/investorday2026.htm\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000210/R1.htm\"}]}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to find CRM's price history and news to see if there's a pattern or event that would cause it to rise in the next 20 days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "CRM",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "CRM",
+      "window_days": 10
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "CRM",
+      "forms": [
+       "8-K"
+      ]
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1108524/000110852426000210/crm-20260916.htm"
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "CRM",
+    "days": 20
+   },
+   "started": "2026-09-27T10:07:47.865+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 354,
+   "error": null,
+   "preview": "{\"ticker\": \"CRM\", \"last_date\": \"2026-09-21\", \"last_close\": 236.42, \"ret_1d\": -0.0063, \"ret_5d\": -0.0871, \"ret_20d\": 0.1323, \"ret_60d\": null, \"vol_20d_annualized\": 0.864, \"closes_last_30\": [208.8, 208."
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "CRM",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 8
+   },
+   "started": "2026-09-27T10:07:47.866+00:00",
+   "ok": true,
+   "elapsed_ms": 5,
+   "chars": 1783,
+   "error": null,
+   "preview": "{\"ticker\": \"CRM\", \"cik\": 1108524, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-09-17\", \"accepted_utc_latest\": \"2026-09-17T06:02:48+00:00\", \"items\": \"7.01,9.01\", \"url\": \"https://www.sec.gov/Archives/edga"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "CRM",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:07:47.866+00:00",
+   "ok": false,
+   "elapsed_ms": 15000,
+   "chars": 0,
+   "error": "timed out",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1108524/000110852426000210/crm-20260916.htm"
+   },
+   "started": "2026-09-27T10:08:17.124+00:00",
+   "ok": true,
+   "elapsed_ms": 5248,
+   "chars": 513,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001108524-26-000210.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1108524/000110852426000210/0001108524-26-000210.txt\"}, {\"name\": \"crm-20260916.htm\", \"url\": \"https://"
+  }
+ ],
+ "elapsed_s": 50.8,
+ "day": "2026-09-22",
+ "asset": "CRM",
+ "ret_pct": NaN,
+ "z": NaN,
+ "fwd5_pct": NaN,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The provided evidence only includes historical price data and a list of 8-K filing URLs without the actual content of the filings, and the news query timed out, so no specific cause for the move can be identified.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": false
+ }
+}

@@ -1,0 +1,134 @@
+{
+ "accession": "spike-2026-08-27_FTNT",
+ "ticker": "FTNT",
+ "as_of": "2026-08-27T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"FTNT\", \"days\": 20}) -> {\"ticker\": \"FTNT\", \"last_date\": \"2026-08-26\", \"last_close\": 157.54, \"ret_1d\": 0.0253, \"ret_5d\": 0.0307, \"ret_20d\": 0.0282, \"ret_60d\": null, \"vol_20d_annualized\": 0.373, \"closes_last_30\": [153.22, 154.25, 161.95, 163.21, 168.29, 164.13, 160.11, 159.64, 164.21, 161.89, 160.84, 165.44, 160.01, 155.85, 158.01, 152.85, 150.79, 153.51, 151.99, 153.66, 157.54]}\n  - news_as_of({\"ticker\": \"FTNT\", \"window_days\": 30}) -> ERROR: no archived news page for FTNT in the 30 days before the decision time (tried yahoo, marketwatch, cnbc)\n  - sec_filings_as_of({\"ticker\": \"FTNT\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"FTNT\", \"cik\": 1262039, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-07-29\", \"accepted_utc_latest\": \"2026-07-30T01:08:34+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1262039/000126203926000018/ftnt-20260729.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n\n[round 2] thought: \n  - filing_documents({\"url\": \"https://www.sec.gov/Archives/edgar/data/1262039/000126203926000018/ftnt-20260729.htm\"}) -> {\"documents\": [{\"name\": \"0001262039-26-000018.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1262039/000126203926000018/0001262039-26-000018.txt\"}, {\"name\": \"ftnt-20260729.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1262039/000126203926000018/ftnt-20260729.htm\"}, {\"name\": \"ftntq2-2026ex991.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1262039/000126203926000018/ftntq2-2026ex991.htm\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1262039/000126203926000018/R1.htm\"}]}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to check FTNT's historical price movements to estimate the probability of it closing higher than its latest close over the next 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "FTNT",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "FTNT",
+      "window_days": 30
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "FTNT",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check the most recent 8-K filing to see if there's any relevant news or events that might affect FTNT's price movement in the next 20 days",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/1262039/000126203926000018/ftnt-20260729.htm"
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "FTNT",
+    "days": 20
+   },
+   "started": "2026-09-27T10:07:35.662+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 356,
+   "error": null,
+   "preview": "{\"ticker\": \"FTNT\", \"last_date\": \"2026-08-26\", \"last_close\": 157.54, \"ret_1d\": 0.0253, \"ret_5d\": 0.0307, \"ret_20d\": 0.0282, \"ret_60d\": null, \"vol_20d_annualized\": 0.373, \"closes_last_30\": [153.22, 154."
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "FTNT",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:07:35.663+00:00",
+   "ok": true,
+   "elapsed_ms": 4,
+   "chars": 346,
+   "error": null,
+   "preview": "{\"ticker\": \"FTNT\", \"cik\": 1262039, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2026-07-29\", \"accepted_utc_latest\": \"2026-07-30T01:08:34+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edg"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "FTNT",
+    "window_days": 30,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:07:35.663+00:00",
+   "ok": false,
+   "elapsed_ms": 7784,
+   "chars": 0,
+   "error": "no archived news page for FTNT in the 30 days before the decision time (tried yahoo, marketwatch, cnbc)",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1262039/000126203926000018/ftnt-20260729.htm"
+   },
+   "started": "2026-09-27T10:07:59.103+00:00",
+   "ok": true,
+   "elapsed_ms": 182,
+   "chars": 517,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0001262039-26-000018.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/1262039/000126203926000018/0001262039-26-000018.txt\"}, {\"name\": \"ftnt-20260729.htm\", \"url\": \"https:/"
+  }
+ ],
+ "elapsed_s": 31.8,
+ "day": "2026-08-27",
+ "asset": "FTNT",
+ "ret_pct": 9.67,
+ "z": 4.18,
+ "fwd5_pct": -10.36,
+ "cause": {
+  "label_model": "unexplained",
+  "reason": "The provided evidence contains no news, filings, or market data that explains the 9.67% move on 2026-08-27.",
+  "source": "",
+  "label": "unexplained",
+  "earnings_release_near": false
+ }
+}

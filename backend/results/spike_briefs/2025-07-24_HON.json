@@ -1,0 +1,156 @@
+{
+ "accession": "spike-2025-07-24_HON",
+ "ticker": "HON",
+ "as_of": "2025-07-24T21:00:00+00:00",
+ "evidence": "[round 1] thought: \n  - price_history_as_of({\"ticker\": \"HON\", \"days\": 20}) -> {\"ticker\": \"HON\", \"last_date\": \"2025-07-23\", \"last_close\": 230.77, \"ret_1d\": 0.0114, \"ret_5d\": 0.0101, \"ret_20d\": 0.0653, \"ret_60d\": null, \"vol_20d_annualized\": 0.172, \"closes_last_30\": [216.62, 213.91, 218.33, 220.72, 224.6, 230.28, 230.76, 231.86, 230.84, 231.28, 230.24, 228.35, 227.54, 229.6, 226.94, 228.46, 229.9, 228.13, 226.86, 228.17, 230.77]}\n  - news_as_of({\"ticker\": \"HON\", \"window_days\": 10}) -> ERROR: no archived news page for HON in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)\n  - sec_filings_as_of({\"ticker\": \"HON\", \"forms\": [\"8-K\"], \"limit\": 1}) -> {\"ticker\": \"HON\", \"cik\": 773840, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-07-24\", \"accepted_utc_latest\": \"2025-07-24T15:10:26+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/hon-20250724.htm\"}], \"note\": \"8-K earnings news is usually in exhibit EX-99.1: list it with filing_documents\"}\n\n[round 2] thought: \n  - filing_documents({\"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/hon-20250724.htm\"}) -> {\"documents\": [{\"name\": \"0000773840-25-000062.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/0000773840-25-000062.txt\"}, {\"name\": \"exhibit99-q22025earningsre.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/exhibit99-q22025earningsre.htm\"}, {\"name\": \"hon-20250724.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/hon-20250724.htm\"}, {\"name\": \"R1.htm\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/R1.htm\"}]}\n  - read_filing({\"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/hon-20250724.htm\", \"max_chars\": 1000}) -> {\"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/hon-20250724.htm\", \"accepted_utc_latest\": \"2025-07-24T11:10:26+00:00\", \"title\": \"hon-20250724\", \"text\": \"FALSE000077384000007738402025-07-242025-07-240000773840us-gaap:CommonStockMember2025-07-242025-07-240000773840hon:A3500SeniorNotesDue2027Member2025-07-242025-07-240000773840hon:Euro225NotesDue2028Member2025-07-242025-07-240000773840hon:Euro3.375SeniorNotesDue2030Member2025-07-242025-07-240000773840hon:Euro75TermLoanDue2032Member2025-07-242025-07-240000773840hon:A3.750SeniorNotesDue2032Member2025-07-242025-07-240000773840hon:Euro4125SeniorNotesDue2034Member2025-07-242025-07-240000773840hon:Euro3.75SeniorNotesDue2036Member2025-07-242025-07-24\\nPURSUANT TO SECTION 13 OR 15(D) OF THE SECURITIES EXCHANGE ACT OF 1934\\nHONEYWELL INTERNATIONAL INC.\\n(Exact name of Registrant as specified in its Charter)\\nincorporation)(Commission File Number)(I.R.S. Employer Identification\\n855 S. MINT STREET, CHARLOTTE, NC..................................................28202\\n......(Address of principal executive offices).................................................(Zip Code)\\nRegistrant\u2019s telephone number, in\"}",
+ "p_up": 0.5,
+ "answered": false,
+ "reason": "no valid final answer; defaulted to 0.5",
+ "sources": [],
+ "rounds": 2,
+ "parse_failures": 0,
+ "steps": [
+  {
+   "round": 1,
+   "thought": "I need to check Honeywell's (HON) recent price history and any relevant news/SEC filings to estimate the probability of closing higher after 20 trading days.",
+   "calls": [
+    {
+     "tool": "price_history_as_of",
+     "args": {
+      "ticker": "HON",
+      "days": 20
+     },
+     "ok": true
+    },
+    {
+     "tool": "news_as_of",
+     "args": {
+      "ticker": "HON",
+      "window_days": 10
+     },
+     "ok": false
+    },
+    {
+     "tool": "sec_filings_as_of",
+     "args": {
+      "ticker": "HON",
+      "forms": [
+       "8-K"
+      ],
+      "limit": 1
+     },
+     "ok": true
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "thought": "I need to check the latest 8-K filing for Honeywell to see if there's any event-driven news affecting the stock price that could influence its movement over the next 20 days.",
+   "calls": [
+    {
+     "tool": "filing_documents",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/hon-20250724.htm"
+     },
+     "ok": true
+    },
+    {
+     "tool": "read_filing",
+     "args": {
+      "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/hon-20250724.htm",
+      "max_chars": 1000
+     },
+     "ok": true
+    }
+   ]
+  }
+ ],
+ "tool_log": [
+  {
+   "id": "1.0",
+   "tool": "price_history_as_of",
+   "args": {
+    "ticker": "HON",
+    "days": 20
+   },
+   "started": "2026-09-27T10:06:14.480+00:00",
+   "ok": true,
+   "elapsed_ms": 0,
+   "chars": 352,
+   "error": null,
+   "preview": "{\"ticker\": \"HON\", \"last_date\": \"2025-07-23\", \"last_close\": 230.77, \"ret_1d\": 0.0114, \"ret_5d\": 0.0101, \"ret_20d\": 0.0653, \"ret_60d\": null, \"vol_20d_annualized\": 0.172, \"closes_last_30\": [216.62, 213.9"
+  },
+  {
+   "id": "1.2",
+   "tool": "sec_filings_as_of",
+   "args": {
+    "ticker": "HON",
+    "forms": [
+     "8-K"
+    ],
+    "limit": 1
+   },
+   "started": "2026-09-27T10:06:14.486+00:00",
+   "ok": true,
+   "elapsed_ms": 100,
+   "chars": 342,
+   "error": null,
+   "preview": "{\"ticker\": \"HON\", \"cik\": 773840, \"filings\": [{\"form\": \"8-K\", \"filed\": \"2025-07-24\", \"accepted_utc_latest\": \"2025-07-24T15:10:26+00:00\", \"items\": \"2.02,9.01\", \"url\": \"https://www.sec.gov/Archives/edgar"
+  },
+  {
+   "id": "1.1",
+   "tool": "news_as_of",
+   "args": {
+    "ticker": "HON",
+    "window_days": 10,
+    "max_chars": 4000
+   },
+   "started": "2026-09-27T10:06:14.481+00:00",
+   "ok": false,
+   "elapsed_ms": 12949,
+   "chars": 0,
+   "error": "no archived news page for HON in the 10 days before the decision time (tried yahoo, marketwatch, cnbc)",
+   "preview": ""
+  },
+  {
+   "id": "2.0",
+   "tool": "filing_documents",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/hon-20250724.htm"
+   },
+   "started": "2026-09-27T10:06:33.218+00:00",
+   "ok": true,
+   "elapsed_ms": 335,
+   "chars": 531,
+   "error": null,
+   "preview": "{\"documents\": [{\"name\": \"0000773840-25-000062.txt\", \"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/0000773840-25-000062.txt\"}, {\"name\": \"exhibit99-q22025earningsre.htm\", \"ur"
+  },
+  {
+   "id": "2.1",
+   "tool": "read_filing",
+   "args": {
+    "url": "https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/hon-20250724.htm",
+    "max_chars": 1000
+   },
+   "started": "2026-09-27T10:06:33.218+00:00",
+   "ok": true,
+   "elapsed_ms": 441,
+   "chars": 1189,
+   "error": null,
+   "preview": "{\"url\": \"https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/hon-20250724.htm\", \"accepted_utc_latest\": \"2025-07-24T11:10:26+00:00\", \"title\": \"hon-20250724\", \"text\": \"FALSE000077384000007"
+  }
+ ],
+ "elapsed_s": 25.1,
+ "day": "2025-07-24",
+ "asset": "HON",
+ "ret_pct": -6.18,
+ "z": -5.01,
+ "fwd5_pct": -2.19,
+ "cause": {
+  "label_model": "earnings",
+  "reason": "The asset moved significantly on the day an 8-K filing was accepted, which typically contains earnings news.",
+  "source": "https://www.sec.gov/Archives/edgar/data/773840/000077384025000062/hon-20250724.htm",
+  "label": "earnings",
+  "earnings_release_near": true
+ }
+}
