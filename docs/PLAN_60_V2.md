@@ -333,3 +333,20 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
 - The direction is right: +1.5 points of CAGR and 3 points less drawdown. But the gain is inside the noise, which matches Cederburg et al.
 - Exposure averaged 1.17×, and was above 1 on 71% of days.
 - **Not adopted as a rule.** It goes to Stage 4 as a lead: if the forward test agrees, it combines with the leverage table.
+
+## Tue 29 item 1: spike check score (spec fixed before any cause label exists, 2026-09-27 01:06)
+
+- **Inputs:**
+  - The 88 triggers in `results/spike_triggers.csv`, each with its 5-day forward return from the next open (`fwd5`).
+  - Bonsai's code-checked labels in `results/spike_causes.csv`.
+- **Arm A (mechanical):** no response. The position follows the book's normal rules.
+- **Arm B (analyze first), with fixed rules per label:**
+  - unexplained: halve the position at the next open, restore after 5 days.
+  - earnings, company_news, sector, macro: no change. Macro defers to the volatility target, which is not adopted, so it is no change too.
+- **Per-trigger difference B − A** (per unit of the position):
+  - unexplained: −0.5 × fwd5 − 0.5 × 2 × 10 bps.
+  - every other label: 0.
+- **Pass:**
+  - the mean of B − A over all triggers has a 95% CI above 0 (bootstrap clustered by trigger day, 2000 draws), AND
+  - at least 20 triggers are labeled unexplained. With fewer, the verdict is "untestable", not a pass.
+- **Also reported, not in the verdict:** mean fwd5 per label, and the share of labels the code overruled.
