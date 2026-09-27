@@ -77,6 +77,9 @@ The pass/fail rules for this review are written before it, by the end of October
   - the crypto-cap leads (35% cap, skfolio risk parity);
   - Bonsai asked several times and averaged (needs PrismML);
   - a bounded RD-Agent-style signal search: a fixed budget, a held-back period, every candidate registered.
+  - satellite data, free only: Sentinel-5P NO₂ (daily, ~5 km) as a factory-activity signal for industrial and
+    materials stocks or sector ETFs. One pre-registered test, low prior odds: free imagery is regional, too coarse for
+    company-level signals like parking lots (those need paid sub-meter imagery, which is ruled out).
 
 ## Decisions (the user delegated 1, 3 and 4 on 2026-09-27; my choices and why)
 
