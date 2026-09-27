@@ -57,16 +57,33 @@ real book before the 3-month review.
   heartbeat and alerts report missed runs. The kill switch, mandate, order gate and 35% drawdown limit stay in force,
   and `--halt` stops everything at any time.
 
-## Phase 3: 3-month review, early Jan 2027
+## Phase 3: 3-month review, early Jan 2027 (rules fixed 2026-09-27, before the forward test starts)
 
-The pass/fail rules for this review are written before it, by the end of October:
+Window: every decision and fill from Mon 5 Oct 2026 to Thu 31 Dec 2026, scored with outcomes known by the review
+date. Backtest baseline for the frozen 1-week pipeline: pooled IC **+0.066** (95% CI [+0.027, +0.106], 2024–26,
+3,160 releases); monthly IC spread 0.105, so 3 months pin the forward IC down only to about ±0.06.
 
-1. **Implementation check:** fills and slippage within what the backtest assumed, no rule broken, and the forward IC
-   within 2 standard errors of the backtest.
-2. **AI picks:** if the event book's IC holds up (lower bound above 0 on backtest + forward data combined), it gets a
-   small real weight (10–20%) through a pre-registered sizing rule and a mandate change that you commit.
-3. **Leverage:** stays at 1.0× (at most 30% volatility) until 6 forward months exist. The 35% drawdown limit caps it
-   at the 25–30% volatility row after that.
+**1. Implementation check (all must hold, else the forward test is fixed and restarted, nothing is promoted):**
+- the event and allocator ledgers verify (hash chains intact);
+- at least 95% of scheduled live event runs happened (heartbeat);
+- missed decisions are at most 10% of discovered releases (not counting those with no press release);
+- every allocator fill is at the first open after its decision date, within 0.5% of Yahoo's open that day, at 5 bps
+  cost;
+- there are no mandate rejections on the frozen book;
+- the forward event-book IC is not clearly below the backtest: the upper end of its 95% CI (bootstrap over weeks) is
+  at least +0.033, half the baseline.
+
+**2. AI picks (only if 1 passes):**
+- The 1-week event book becomes **eligible** for money only if its forward IC is above 0 AND the pooled
+  backtest + forward IC has a 95% lower bound above 0.
+- Eligible means a pre-registered paper satellite: 10% of the book, equal-weight top-fifth picks, held 1 week,
+  brakes on. It needs your mandate commit, since stocks are outside today's universe.
+- Otherwise it stays a shadow book.
+
+**3. The book:** returns vs SPY and 80/20 are reported, not judged; 3 months is too short. Leverage stays at 1.0×.
+
+**4. Shadow arms** (the best of arms A/B/C if one passed, the 8-K watcher if W1 passes): the same test as in 2. Any
+arm that becomes eligible counts as one more trial in the registry.
 
 ## Phase 4: month 6 on, about Apr 2027
 
