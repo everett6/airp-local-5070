@@ -4,6 +4,7 @@ ideally every weekday evening; nothing runs on its own (no service, no timer). P
     python scripts/forward_events.py              # discover new releases, decide them, log, score what matured
     python scripts/forward_events.py --no-gpu     # Bonsai-lite on CPU (the PC-off / GPU-busy fallback)
     python scripts/forward_events.py --status     # verify the ledger and print the scoreboard
+    python scripts/forward_events.py --index sp400,sp600 --dir results/forward/events_breadth   # the breadth book
 
 Each run:
   1. discovery: every S&P 500 member's 8-K with Item 2.02 accepted since the last run (SEC submissions API, free);
@@ -66,19 +67,19 @@ def entry_deadline(accepted_utc: str) -> datetime:
     return datetime.combine(d, OPEN, NY)
 
 
-def members(year: int) -> pd.DataFrame:
+def members(year: int, indexes: tuple[str, ...] = ("sp500",)) -> pd.DataFrame:
     m = pd.read_csv(BACKEND / "data" / "events" / "members_2024_2026.csv")
     y = min(year, int(m["year"].max()))
-    return m[(m["year"] == y) & (m["index"] == "sp500") & m["cik"].notna()]
+    return m[(m["year"] == y) & m["index"].isin(indexes) & m["cik"].notna()].drop_duplicates("cik")
 
 
-async def discover(since: date, now: datetime) -> pd.DataFrame:
+async def discover(since: date, now: datetime, indexes: tuple[str, ...] = ("sp500",)) -> pd.DataFrame:
     from build_events import Sec, company_events, ex99_url
     ua = _read_env_file(BACKEND / ".env").get("SEC_USER_AGENT", "")
     if not ua:
         raise SystemExit("set SEC_USER_AGENT in backend/.env")
     sec = Sec(ua)
-    mem = members(now.year)
+    mem = members(now.year, indexes)
     info = {int(r.cik): r for r in mem.itertuples()}
     try:
         found: list[dict[str, Any]] = []
@@ -90,7 +91,8 @@ async def discover(since: date, now: datetime) -> pd.DataFrame:
         urls = await asyncio.gather(*(ex99_url(sec, e) for e in found))
     finally:
         await sec.client.aclose()
-    rows = [{"cik": e["cik"], "ticker": info[e["cik"]].ticker, "index": "sp500", "sector": info[e["cik"]].sector,
+    rows = [{"cik": e["cik"], "ticker": info[e["cik"]].ticker, "index": info[e["cik"]].index,
+             "sector": info[e["cik"]].sector,
              "accession": e["accession"], "accepted_utc": e["accepted_utc"], "filed": e["filed"],
              "items": e["items"], "ex99_url": u} for e, u in zip(found, urls, strict=True)]
     return pd.DataFrame(rows, columns=["cik", "ticker", "index", "sector", "accession", "accepted_utc", "filed",
@@ -248,6 +250,7 @@ def main() -> None:
     ap.add_argument("--as-of", default="", help="replay at this UTC time (dry runs only; needs a --dir of its own)")
     ap.add_argument("--start", default="2026-10-02", help="first filing date the forward test covers")
     ap.add_argument("--no-gpu", action="store_true")
+    ap.add_argument("--index", default="sp500", help="comma list: sp500 (the shadow book), sp400,sp600 (breadth)")
     ap.add_argument("--status", action="store_true")
     args = ap.parse_args()
     d = BACKEND / args.dir
@@ -267,7 +270,7 @@ def main() -> None:
     tag = "forward" if not args.as_of else "forward_" + d.name
     print(f"run as of {now.isoformat(timespec='minutes')}; filings since {since}", flush=True)
 
-    new = asyncio.run(discover(since, now))
+    new = asyncio.run(discover(since, now, tuple(args.index.split(","))))
     new = new[~new["accession"].isin(seen)]
     ev_csv = d / "events.csv"
     allev = pd.concat([pd.read_csv(ev_csv), new]) if ev_csv.exists() else new
