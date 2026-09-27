@@ -213,3 +213,20 @@ vs the same releases' cleaned fact sheets alone (`horizons6_eval.py --with-tag j
 **Pass rule (same as Block 1, per book):** own-horizon IC with research higher than without on the same releases AND
 the with-research 95% interval above zero. Books: 1 week, 1 month, 3 months, 6 months, 1 year (2 years has no
 2025-26 outcomes). A book that passes gets research in the forward test; one that fails stays fact-sheet only.
+
+## More horizons result (2026-09-26): no new book passes
+
+Bonsai on the cleaned fact sheets (results/events/horizons6_eval.txt), monthly rank IC [95% CI]:
+
+| Book | 2025-26 | 2024 | Rule | Verdict |
+|---|---|---|---|---|
+| 1 week (5 d) | +0.103 [+0.051, +0.158] | +0.027 | (existing book) | still the lead |
+| 1 month (20 d) | +0.094 [+0.024, +0.163] | +0.027 | (existing book) | |
+| 3 months (63 d) | +0.074 [-0.006, +0.150] | +0.021 | CI > 0 and 2024 > 0 | **fails** (interval touches zero) |
+| 6 months (120 d) | -0.043 | +0.064 [+0.000, +0.120] | (existing book) | |
+| 1 year (252 d) | **-0.143 [-0.316, -0.030]** (7 months) | +0.094 [+0.040, +0.151] | CI > 0 and 2024 > 0 | **fails**: the sign flips |
+| 2 years (504 d) | no outcomes yet | +0.002 [-0.064, +0.078] | 2024 CI > 0 | **fails** |
+
+The pattern of the 6-month book repeats at 1 year: positive in 2024 (inside Bonsai's training data) and negative in
+2025-26. Long horizons are where remembered outcomes would help most, so the 2024 numbers are the least trustworthy
+there. The 3-month book is the closest miss and follows the short books' sign in both years: a lead, not a book.
