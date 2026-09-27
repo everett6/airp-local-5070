@@ -9,7 +9,6 @@ above 0. Writes results/vol_target_b0.json.
 """
 from __future__ import annotations
 
-import io
 import json
 import math
 import sys

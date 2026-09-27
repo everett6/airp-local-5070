@@ -80,7 +80,7 @@ def main() -> None:
     # triage: called releases keep Bonsai's log-odds and rank above every uncalled one
     t["triage"] = np.where(t["top_half"], 1e3 + t["logodds"], t["lite"] - 1e3)
 
-    out = {"n": int(len(t)), "features": X.shape[1], "categories": cats,
+    out = {"n": len(t), "features": X.shape[1], "categories": cats,
            "copy_rank_corr": round(float(t["lite"].rank().corr(t["logodds"].rank())), 3),
            "bonsai_calls_saved_pct": round(100 * float(1 - t["top_half"].mean()), 1)}
     arms = {"a_bonsai": "logodds", "b_lite": "lite", "c_triage": "triage"}

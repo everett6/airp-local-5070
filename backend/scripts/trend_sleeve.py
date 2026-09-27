@@ -125,6 +125,7 @@ def block_boot(cols: list[np.ndarray], fn, reps: int = 2000, block: int = 63, se
 
 def master_b0(start: str, end: str) -> pd.Series:
     from master_portfolio import load_crypto
+
     from app.portfolio.master import MasterConfig, allocate, crypto_state, simulate_weights
     from app.sandbox.events import Prices
     px = Prices.from_long(load_crypto(end))

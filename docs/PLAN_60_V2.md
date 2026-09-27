@@ -303,7 +303,7 @@ existing SPY + crypto core + the 1-week Bonsai satellite + brakes.
 - **Bonsai briefs** run at 9.3 s each on Ollama with 3 parallel slots.
   - [Benchmarks](https://particula.tech/blog/ollama-vs-vllm-comparison) show vLLM about matching Ollama at 1 request, but up to about 16–19× the throughput at high concurrency.
   - Serving Bonsai-27B on vLLM (as Jan already is) with 8–16 in flight could cut the 3 h brief phase to well under 1 h.
-  - **Needs your OK:** it needs a vLLM-loadable copy of Bonsai (a download), and a check that it fits in 16 GB VRAM at 4-bit.
+  - **Needs your OK:** it needs a vLLM-loadable copy of Bonsai (a download), and a check that it fits the 12 GB card at 4-bit.
   - Not done tonight.
 - **Spike cause briefs** (88 triggers): at about 12 s each they take about 18 min. No change needed.
 
