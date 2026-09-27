@@ -1,4 +1,108 @@
-# AIRP Local — 5070 edition
+# AIRP Local 5070: can a small local AI pick stocks?
+
+A research project that tests, honestly, whether AI models running on one home graphics card (an RTX 5070, 12 GB)
+can pick stocks better than just buying the S&P 500. It uses **paper money only** (no real trades) and **free data
+only** (SEC filings, Yahoo prices, Wikipedia, the Internet Archive). Nothing here is investment advice.
+
+## The short answer so far
+
+- **Mostly no.** Most AI stock-picking ideas tested here did no better than chance or than simply holding SPY.
+- **One lead:** a "1-week" book that reads each company's earnings release and buys the ones the AI likes, held
+  for a week. In a backtest it slightly beat the no-stock-picking version of the same portfolio, but only if
+  trading is cheap, and it is **not proven**. It still has to pass a forward test on new data.
+- Most of the money in every portfolio below comes from the **S&P 500 (SPY)** and a small **bitcoin/ether trend
+  sleeve**, not from the stock picks.
+
+## How it works
+
+Every quarter each S&P 500 company files an **earnings press release** with the SEC. For each one:
+
+1. **Read.** A small AI model reads the press release and pulls out revenue, earnings per share (EPS) and
+   guidance. Code checks every number against the release's own text and against the company's SEC filings,
+   and drops numbers it can't confirm (unit mix-ups, typos).
+2. **Fact sheet.** Code writes a one-page fact sheet: the checked numbers, growth vs a year earlier, recent
+   price moves vs the stock's sector.
+3. **Web research (being tested).** A research agent, **Jan-v1-4B**, looks things up *as of the moment the release
+   came out*: the release itself, the company's previous release (to see whether it met its own guidance),
+   archived news, price history. Every tool refuses anything published after that moment, so a backtest can't
+   peek at the future. **Bonsai-27B** then writes a short brief; code keeps only facts whose numbers really appear
+   in the cited source.
+4. **Decision.** Bonsai-27B, a 27-billion-parameter model compressed to 1 bit per weight (4 GB), reads the fact
+   sheet and answers BUY or PASS for each holding period ("book"): 1 week, 1 month, 3 months, 6 months, 1 year.
+   How sure it is comes from its token probabilities.
+5. **Portfolio.** A master agent turns those scores into positions: the top fifth of a book's picks, a crypto
+   trend sleeve (BTC/ETH, at most 20%), and the rest in SPY. Trades fill at the next day's open, with costs.
+6. **Scoring.** Every test has its pass rule written down **before** its results exist (see
+   [`docs/WEEK_PLAN.md`](docs/WEEK_PLAN.md)), and results that only show up afterwards are marked as leads, not
+   findings.
+
+Everything runs locally: Jan on vLLM (FP4 on the 5070's tensor cores), Bonsai on Ollama. Nothing runs as a
+background service; every run is started by hand.
+
+## How much money could it make?
+
+Backtest, 2024-03-01 to 2026-09-24 (about 2.5 years), **$10,000 of paper money**, trades filled at the next open:
+
+| Portfolio | Cost per trade | Ends with | A year | Sharpe |
+|---|---|---|---|---|
+| SPY only | - | $15,340 | 18.1% | 1.16 |
+| SPY + crypto sleeve, no stock picks | 10 bps | $16,100 | 20.4% | 1.18 |
+| **SPY + crypto sleeve + 1-week AI picks** | 10 bps | **$16,450** | 21.4% | 1.24 |
+| same, if trading were free | 0 bps | $17,490 | 24.3% | 1.38 |
+| same, with expensive trading | 25 bps | $14,980 | 17.1% | 1.02 |
+
+What this means in plain terms:
+
+- On $10,000 the AI picks added about **$350 over 2.5 years** at realistic costs compared with the same portfolio
+  without them, and **lost** money once costs reached ~16 bps per trade. The 1-week book trades a lot.
+- It beat 47 of 50 runs where its scores were shuffled at random (p = 0.06): suggestive, not proof.
+- Part of the backtest (2024) is inside the AI's training data, and this was one 2.5-year path. A forward test on
+  new releases is the real test.
+- The longer books (3 months, 6 months, 1 year, 2 years) **failed** their tests: good in 2024, bad in 2025-26.
+
+So the honest answer is: **so far, expect roughly what SPY + a small crypto sleeve makes; the stock picks are an
+unproven extra of about a point a year that costs can erase.**
+
+## What has been tested (and failed)
+
+| Idea | Result |
+|---|---|
+| LLMs predicting next week's price move from prices | no better than always guessing "up" (7 runs) |
+| Web research added to the fact sheet (v2) | made every book slightly worse |
+| Analyst price targets from archived Yahoo pages | 0 of 12 pre-registered tests passed |
+| 3-month / 1-year / 2-year books | failed (sign flips between years) |
+| Speed tricks: speculative decoding, bigger batches, shorter brief format | measured; kept only what helped |
+
+Details: [`docs/WEEK_PLAN.md`](docs/WEEK_PLAN.md) (this week's tests, rules and results),
+[`docs/EXECUTIVE_SUMMARY.md`](docs/EXECUTIVE_SUMMARY.md), [`docs/EXECUTIVE_PLAN.md`](docs/EXECUTIVE_PLAN.md).
+
+## Running it
+
+Needs Linux, an NVIDIA GPU with 12 GB, [Ollama](https://ollama.com) with `bonsai-27b`, and Python 3.12.
+
+```bash
+cd backend && python -m venv .venv && .venv/bin/pip install -e .
+.venv/bin/python -m pytest -q                        # 380 tests
+cd .. && scripts/research_v3_run.sh 24               # research + decisions on 24 releases
+```
+
+Main pieces:
+
+| Path | What it is |
+|---|---|
+| `backend/scripts/build_features.py` | fact sheets, with the SEC cross-check |
+| `backend/scripts/research_events.py` | Jan's as-of web research and Bonsai's source-checked briefs |
+| `backend/scripts/decide_events.py` | Bonsai's BUY/PASS per book |
+| `backend/scripts/combine_scores.py`, `master_portfolio.py` | combined score and the paper portfolio |
+| `backend/app/tools/asof.py` | the "as of" internet tools that refuse the future |
+| `scripts/*_run.sh` | the manual run scripts (one GPU job at a time) |
+
+---
+
+## Experiment history (technical)
+
+The sections below are the earlier write-ups, oldest ideas first in places; the tables above are the current state.
+
 
 > **This repo is `airp-local-5070`, a clone of `airp-local` tuned for a single
 > RTX 5070 (12 GB).** It adds a leakage-proof walk-forward test of a local LLM
