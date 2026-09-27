@@ -462,3 +462,25 @@ This replaces Tue night to Thu item 1, run in one night.
   - Your request to "analyze why before responding" is met by the brief. The test says the book should not respond
     automatically to an unexplained spike.
 - **Files:** `results/spike_causes.csv`, `results/spike_score.json`, `results/spike_briefs/`.
+
+## Thu 1 item 2: the combined book for the forward test (frozen 2026-09-27 03:15, before the breadth verdict)
+
+This is built from what passed its pre-registered rule, and nothing else.
+
+| Part | Weight | Why |
+|---|---|---|
+| SPY core | the rest | the base |
+| BTC/ETH trend sleeve | up to 20% | B0 (the 35% cap failed; lead for Stage 4) |
+| Drawdown brakes | ⅔ from −10%, ½ from −20% | passed (27 Sep) |
+| S&P 400/600 1-week extremes satellite | 2.5% per pick | **only if the breadth test passes tonight**; otherwise 0 |
+| S&P 500 1-week Bonsai book | 0 (shadow) | the signal is real (IC +0.10) but has not beaten costs in a book |
+| Bonsai-lite fallback | 0 (shadow, own score) | the PC-off rule; scored apart |
+| Spike check | information only | the cause brief is logged; no rule trades on it (the test failed) |
+| Leverage | 1.0× | shadow books at 1.5× and 2.0× are paper only (`weekly_review.py`); the 30% volatility cap holds until 6 forward months |
+
+- **Not in the book:**
+  - web research (v3 failed);
+  - the 20-day satellite; the vol target; value + quality;
+  - long-short; stat-arb; the trend, momentum and FX sleeves.
+- **Frozen:** changes before the 3-month review need a new pre-registered test. After the review, the Stage 4
+  table applies.
