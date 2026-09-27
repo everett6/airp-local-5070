@@ -72,3 +72,17 @@ so learning from them cannot leak the future.
   - **Candidate fixes, each to be tested on the 24-release benchmark (`scripts/spec_bench.sh`) before adoption:**
     - Skip `news_as_of` once the archive has timed out twice in a run.
     - Show the brief writer each number next to its source tag, so it cites the right one.
+
+## Final status at 07:55 on 2026-09-27
+
+- The breadth test (the last GPU job) failed both rules.
+  - Bonsai's IC on S&P 400/600 releases is −0.002 on 6,597 releases.
+  - The combined book stays as frozen.
+- The spike check failed its rule and is kept as information only.
+- The daily trend check failed its rule and is a lead.
+- The crypto trend rule is a plateau (Sharpe 0.85–1.07 across 30 parameter pairs).
+- Final checks:
+  - 404 tests pass;
+  - ruff and strict mypy are clean;
+  - CI is green again.
+- Then: push, stop every model server, check that nothing is left running, and shut down.

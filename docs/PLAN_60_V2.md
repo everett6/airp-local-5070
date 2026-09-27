@@ -541,3 +541,25 @@ Nothing is selected from this grid; the live rule stays at 21 × 100. Script: `s
   point a year is inside the noise of one 8.7-year path.
 - It is a lead for the 3-month review, where the forward allocator's weekly runs can be compared with a daily
   shadow.
+
+### Breadth test result (2026-09-27 07:49): FAIL on both rules
+
+- **Rule 1:** 6,597 S&P 400/600 releases (2025-01 .. 2026-09), 21 months.
+  - Bonsai's 1-week IC is **−0.002**, 95% CI [−0.044, +0.035].
+  - Top-minus-bottom fifth: −0.27% [−1.46%, +0.80%].
+- **Rule 2** (extremes-only satellite vs B0, 2025-01 .. 2026-09):
+  - 10 bps: Sharpe 0.89 vs 0.99, a difference of −0.10 [−0.57, +0.31].
+  - 25 bps: −0.24.
+- **Reading:**
+  - Bonsai's 1-week score has an IC of +0.10 on S&P 500 releases in the same months, and about 0 on mid- and
+    small-caps.
+  - The same model, prompt and fact sheets were used, with more than 5× the releases.
+  - A real skill at reading earnings releases should not stop at the S&P 500's edge. Two explanations fit:
+    - the model knows large companies far better (it has seen more about them);
+    - the S&P 500 result is partly luck.
+  - The forward test of the S&P 500 shadow book will tell these apart.
+- **The combined book is unchanged** (frozen at 03:15): the breadth satellite weight is 0.
+- The fact sheets were read by the same code-checked reader as the S&P 500 set, with similar coverage:
+  - 6,597 of 6,943 releases got a fact sheet;
+  - 4,595 have an EPS pair, 1,581 of them completed from SEC filings.
+- `results/events/breadth_eval.json`, `results/events/breadth_eval.txt`.

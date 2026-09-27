@@ -21,7 +21,15 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 3. **Web research did not help, in three tries.**
    - Research v3 got verified facts on 1,103 of 1,180 releases, and the leak audit found no leaks.
    - Bonsai's IC with the research was no higher in any book: 1 week +0.102 vs +0.103 without.
-4. **TRIALS_LINE**
+4. **16 pre-registered strategy trials are in the registry (plus one rerun of a data bug); 1 passed** (the drawdown brakes). Research v3's five
+   books also failed.
+   - Every result, including the failures, is in `backend/results/trials_registry.jsonl`, which feeds the Deflated
+     Sharpe Ratio.
+   - **New tonight:** Bonsai's score has no signal on S&P 400/600 releases (IC −0.002 on 6,597 releases), against
+     +0.10 on the S&P 500. It may know big companies better, or the S&P 500 result may be partly luck. Only the
+     forward test can tell.
+   - **The crypto trend rule is sturdy but was lucky:** across 30 parameter pairs the Sharpe is 0.85–1.07. The live
+     pair sits in the 87th percentile, so a fair forward expectation for the book is about 19–20% a year, not 21.6%.
 5. **30–40% a year needs a Sharpe of about 1.0–1.4 at 20–30% volatility.**
    - The book has a Sharpe of about 1.05 at 20.6% volatility, which is about the low end.
    - Getting more means more risk, through futures leverage (now in the simulator), not a better signal.
@@ -41,8 +49,9 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 | Long-short 1-week event book | fail | Sharpe 0.05 / 0.15 at 10 bps |
 | Stat-arb (reversal), arms A and B | fail / stopped | Sharpe −1.50 after costs |
 | Trend, momentum, FX carry sleeves | fail | Sharpe 0.12–0.42 |
-| Spike check (analyze before responding) | SPIKE_RESULT |
-| Breadth: S&P 400/600, 1-week, extremes only | BREADTH_RESULT |
+| Spike check (analyze before responding) | fail: kept as information only | halving unexplained spikes: −0.19% per trigger [−0.60, +0.24] |
+| Breadth: S&P 400/600, 1-week, extremes only | fail | IC −0.002 [−0.044, +0.035] on 6,597 releases |
+| Daily crypto trend check | fail (lead) | +1.1 pt a year, Sharpe +0.04 [−0.05, +0.16] |
 
 ## What was built this week
 
@@ -75,4 +84,5 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
   - a price calendar bug;
   - live fact sheets being dropped because the entry bar does not exist yet.
   Both are fixed; the second dry run decided 6 of 6 releases on time.
-- TESTS_LINE. No service or timer runs anything. Every run is manual.
+- 404 tests pass; ruff and strict mypy are clean; CI is green again (it had been failing on two type errors, now
+  fixed). No service or timer runs anything. Every run is manual.
