@@ -85,3 +85,21 @@ def test_live_excess_open_picks_only():
     closes = pd.DataFrame({"CTAS": [102.0, 105.0], "XLI": [50.5, 51.0]}, index=idx)
     x = P.live_excess(p, opens, closes)
     assert list(x.index) == ["a2"] and abs(x["a2"] - (0.05 - 0.02)) < 1e-12
+
+
+def test_run_log_newest_first_with_every_job(tmp_path):
+    fwd = _ledger(tmp_path)
+    recs, _ = P.load_events("events", fwd)
+    runs = [RUNS[0], {**RUNS[1], "books": {"master": {**RUNS[1]["books"]["master"],
+                                                         "rejected": ["crypto share 0.3000 above 0.20"]}}}]
+    log = P.run_log(runs, recs, {"at": "2026-10-13T00:00:00+00:00", "by": "viewer", "reason": "test"})
+    assert log[0]["job"] == "kill switch" and log[1]["job"] == "allocator"
+    assert "filled +100 SPY @ 600.00" in log[1]["what"] and "REJECTED by mandate" in log[1]["what"]
+    whats = " | ".join(x["what"] for x in log)
+    assert "MISSED" in whats and "+2.00% vs sector" in whats and "AZO score +0.50" in whats
+    assert [x["at"] for x in log] == sorted((x["at"] for x in log), reverse=True)
+
+
+def test_underwater():
+    u = P.underwater(pd.Series([100.0, 110.0, 99.0, 121.0]))
+    assert list(u.round(4)) == [0.0, 0.0, -0.1, 0.0]

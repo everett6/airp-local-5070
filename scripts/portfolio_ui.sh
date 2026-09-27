@@ -7,4 +7,6 @@ cd "$(dirname "$0")/../backend"
 addr=127.0.0.1
 [[ "${1:-}" == "--lan" ]] && addr=0.0.0.0 && echo "phone: http://$(hostname -I | awk '{print $1}'):8502"
 exec .venv/bin/streamlit run app/dashboard/portfolio.py --server.port 8502 --server.address "$addr" \
-  --server.headless true --browser.gatherUsageStats false
+  --server.headless true --browser.gatherUsageStats false \
+  --theme.base dark --theme.primaryColor "#a2e65d" --theme.backgroundColor "#0a0b0a" \
+  --theme.secondaryBackgroundColor "#101210" --theme.textColor "#d9dcd4"

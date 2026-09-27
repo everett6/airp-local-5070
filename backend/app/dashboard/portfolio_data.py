@@ -184,3 +184,53 @@ def fetch_prices(tickers: list[str], start: date) -> tuple[pd.DataFrame, pd.Data
 
 def latest(closes: pd.DataFrame) -> dict[str, float]:
     return {str(c): float(closes[c].dropna().iloc[-1]) for c in closes.columns if closes[c].notna().any()}
+
+
+# ---------- run log (newest first, like a console's job log) ----------
+
+def run_log(runs: list[dict[str, Any]], recs: list[dict[str, Any]], halt: dict[str, Any] | None = None,
+            limit: int = 40) -> list[dict[str, str]]:
+    """What each job wrote, newest first: allocator runs (fills, new targets, rejections), event runs, decisions,
+    missed releases, outcomes, and the kill switch."""
+    log: list[dict[str, str]] = []
+    for r in runs:
+        for name, b in r["books"].items():
+            msg = []
+            if b.get("fills"):
+                msg.append("filled " + ", ".join(f"{'+' if f['qty'] > 0 else ''}{f['qty']:g} {f['asset']} @ "
+                                                  f"{f['price']:,.2f}" for f in b["fills"]))
+            if b.get("new_targets"):
+                msg.append("targets " + ", ".join(f"{a} {w:.0%}" for a, w in b["new_targets"].items()))
+            for k in ("rejected", "rejected_at_fill"):
+                if b.get(k):
+                    msg.append("REJECTED by mandate: " + "; ".join(b[k]))
+            if b.get("held_by_kill_switch"):
+                msg.append("orders held: kill switch on")
+            log.append({"at": r["run_at_utc"], "job": "allocator", "what": f"{name}: equity "
+                        f"${b['equity']:,.0f}" + (" · " + " · ".join(msg) if msg else "")})
+    for r in recs:
+        t = r["type"]
+        if t == "run":
+            what = f"event run ({r.get('source', '?')}): {r.get('new', 0)} new release(s)"
+            at = r["as_of"]
+        elif t == "decision":
+            what = f"{r.get('ticker')} score {r.get('logodds', 0):+.2f} ({r.get('source')}), enters {str(r.get('entry_deadline', ''))[:10]}"
+            at = r.get("written_at", "")
+        elif t == "missed":
+            what, at = f"{r.get('ticker')} MISSED: {r.get('reason')}", r.get("written_at", "")
+        elif t == "outcome":
+            f5 = r.get("fwd5")
+            what = f"{r['accession']} closed: " + ("no price" if f5 is None else f"{f5:+.2%} vs sector over 5 days")
+            at = r.get("written_at", r.get("as_of", ""))
+        else:
+            continue
+        log.append({"at": at, "job": "events", "what": what})
+    if halt:
+        log.append({"at": str(halt.get("at", "")), "job": "kill switch", "what": f"ON by {halt.get('by', '?')}: "
+                    f"{halt.get('reason', '')}"})
+    return sorted(log, key=lambda x: x["at"], reverse=True)[:limit]
+
+
+def underwater(eq: pd.Series) -> pd.Series:
+    """Drawdown below the running peak (0 at a new high, negative below it)."""
+    return eq / eq.cummax() - 1
