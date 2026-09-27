@@ -83,7 +83,9 @@ Every step has a rule written before its run. A failed step is recorded, not dro
    - A2-style bias control: the universe comes from dated membership, and delisted names are kept where data exists.
    - **Pass:** the IC's CI is above 0, *and* the IC is still positive after 25 bps costs.
    - **GPU budget:** triage (A1) halves the calls, if it is re-tested and passes on this universe.
-4. **Combine what passes** with SPY + crypto, using the adding rule (equal-risk CAGR up; Sharpe-difference CI above
+4. **Daily statistical arbitrage** (the "slow Medallion" test): residual short-term reversal on the top-100
+   names, with a no-news variant that uses Jan and Bonsai. Full spec and pass rules: docs/PLAN_STATARB.md.
+5. **Combine what passes** with SPY + crypto, using the adding rule (equal-risk CAGR up; Sharpe-difference CI above
    0).
 
 ### Phase 2 (weeks 2–4, in parallel): protect the downside
