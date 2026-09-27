@@ -735,3 +735,17 @@ move back toward Bonsai's view?
   3. the top-minus-bottom fifth of D, net of 0.4% (20 bps each way on each leg), has a 90% monthly-bootstrap CI
      above 0.
 - **Reported, not deciding:** Bonsai alone and the reaction alone on `fwd20_ear`, and D over 60 days.
+
+### Disagreement result (2026-09-27): **FAIL, clearly**
+
+| 20 days after the reaction day | Mean IC | 95% CI |
+|---|---|---|
+| D, pooled 2024–26 (3,145 releases, 26 months) | +0.010 | [−0.046, +0.066] |
+| D, 2024 / 2025–26 | −0.000 / +0.018 | — |
+| Bonsai alone | +0.018 | [−0.034, +0.067] |
+| Reaction alone | −0.003 | [−0.068, +0.057] |
+
+- Net top-minus-bottom fifth: +0.24% per 20 days, 90% CI [−0.61, +1.07].
+- **None of the three checks passes.** Past the first week, neither Bonsai's read, the market's reaction nor their
+  disagreement predicts large-cap returns. Whatever Bonsai knows gets priced within days, which fits the 1-week IC of
+  +0.10 fading to about 0 at 20 days.
