@@ -79,5 +79,7 @@ def test_review_runs_the_monthly_loop_only_live_and_collect_follows_events():
     assert not any("monthly" in c for c in autorun.commands("review", "dry"))
     assert any("monthly" in c for c in autorun.commands("review", "live"))
     assert autorun.commands("events", "live")[-1][-1] == "collect"
+    assert autorun.commands("events", "live")[2][1] == "scripts/net_read_shadow.py"
+    assert autorun.commands("events", "dry")[2][-1] == "results/forward/events_autodry"
     assert autorun.commands("learn", "dry") == []
     assert autorun.scan("review", "x\nLEARN ALERT: signal a promoted", None) == ["signal a promoted"]

@@ -748,6 +748,38 @@ The user asked for Bonsai to use more judgement. Bonsai gets it; code still chec
   20-day returns, C against C without its judgement fields, and `net_read` alone.
 - **Runs after the current Jan → Bonsai run** (one model on the GPU at a time): `scripts/bonsai_judgement_run.sh`.
 
+### Arm C result (2026-09-28): **FAIL**
+
+Quality gate passed; 1,995 + 1,180 releases labelled. 2025–26, monthly rank IC (14 months, 1,177 releases):
+
+| | 5-day, mean IC | 95% CI | 20-day, mean IC | 95% CI |
+|---|---|---|---|---|
+| B (for reference) | +0.050 | [−0.007, +0.107] | +0.030 | [−0.039, +0.102] |
+| C | +0.029 | [−0.020, +0.087] | +0.014 | [−0.047, +0.081] |
+| **C − B (deciding)** | **−0.022** | **[−0.065, +0.025]** | −0.017 | [−0.073, +0.034] |
+| judgement fields within C | −0.024 | [−0.052, +0.005] | −0.015 | [−0.060, +0.020] |
+| `net_read` alone (reported, not deciding) | +0.067 | [+0.002, +0.136] | +0.056 | [+0.014, +0.096] |
+
+- **Neither pass check holds.** Adding the four judgement fields to the ridge made it slightly worse: the ridge fitted
+  on 2024 gives them weights that don't carry to 2025–26.
+- **Caveat:** C reused arm B's evidence, so it had the same news gap (Jan had news for 5% of 2024 releases).
+- **`net_read` alone** (Bonsai's own bullish/neutral/bearish call, unfitted) is positive at both horizons. It was one
+  of three non-deciding diagnostics, picked after seeing them, on the same 2025–26 data. So it is **not a pass** and
+  can't be tested again on that data. Its honest test is new data: see "Arm C2" below.
+
+### Arm C2: `net_read` on new data only (spec fixed 2026-09-28, after arm C, before any live `net_read` exists)
+
+- **What:** the live event runner already has Bonsai read each new release; C2 adds arm C's `PROMPT_J` fields to that
+  read (same prompt, same quote check) and records `net_read` next to the forward ledger
+  (`<events dir>/net_read.jsonl`, `scripts/net_read_shadow.py`, run after each event run). No money, a shadow only.
+  The live runner has no Jan research, so the evidence part says none was found (as for most of arm C's 2024 sample).
+  A label written at or after the release's entry deadline is kept but never scored.
+- **Score, no fitting:** bullish = +1, neutral = 0, bearish = −1 (a failed quote check = neutral).
+- **Pass (one trial, `net_read_forward`), judged at the first review with at least 150 live scored releases and
+  3 months:** the monthly rank IC vs 5-day sector-relative returns has a mean above 0.02 and an 80% one-sided
+  bootstrap bound above 0, AND it adds to the live Bonsai log-odds (the blend-gain test of the learning loop).
+- **Until then it changes nothing** in the book. It can also enter via B2 if B2 passes (B2 decides first).
+
 ### Disagreement test: Bonsai vs the market's first reaction (spec fixed 2026-09-27, before any run)
 
 **Why this form.** Plain post-earnings drift was measured before (`eval_baseline.txt`) and is absent in the S&P 500:
