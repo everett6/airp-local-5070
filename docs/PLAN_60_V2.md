@@ -659,6 +659,9 @@ judgement calls". Arm A (release only, running now) stays as specified. Arm B ad
   unparsed (`overflow: true`, every field at its default), exactly like a reply that doesn't parse. Inputs are not
   shortened differently, the window is not changed mid-run, and the 960 labels already made stand. The overflow count
   is reported with the verdict. Arm A's verdict (below) does not depend on this.
+- **Arm B verdict (27 Sep, pre-registered 5-day test): FAIL.** Full B − full A +0.007 IC [−0.037, +0.052]; full B's
+  own IC +0.050 [−0.007, +0.107]. 20-day: B − A −0.019 [−0.070, +0.025]. `vs_prior_guidance` alone +0.069
+  [−0.095, +0.228] on 342 releases (836 of 1,180 "not_stated"). Context overflows: 1 of 3,175 (2024), 0 (2025-26).
 - **Arm A verdict (27 Sep, pre-registered 5-day test): FAIL.** Full A's IC +0.043 [+0.005, +0.082], but full − base
   +0.015 [−0.035, +0.058]: Bonsai's release-only labels add nothing the code's base features don't already carry.
   20-day: full − base −0.021 [−0.066, +0.024].
