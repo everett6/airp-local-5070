@@ -86,7 +86,7 @@ def book_assets(state: dict[str, dict[str, Any]]) -> list[str]:
 
 def event_dirs(fwd: Path = FWD) -> list[str]:
     """Event ledgers: the real one first, then breadth, then dry runs."""
-    found = sorted(p.parent.name for p in fwd.glob("*/ledger.jsonl") if p.parent.name != "allocator")
+    found = sorted(p.parent.name for p in fwd.glob("*/ledger.jsonl") if not p.parent.name.startswith("allocator"))
     order = {"events": 0, "events_breadth": 1}
     return sorted(found, key=lambda n: (order.get(n, 2), n))
 
@@ -101,10 +101,10 @@ def load_events(name: str, fwd: Path = FWD) -> tuple[list[dict[str, Any]], str |
 
 def picks(recs: list[dict[str, Any]]) -> pd.DataFrame:
     """One row per decision or missed release, with its outcome when it has matured."""
-    out = {r["accession"]: r for r in recs if r["type"] == "outcome"}
+    out = {r["accession"]: r for r in recs if r.get("type") == "outcome"}
     rows = []
     for r in recs:
-        if r["type"] not in ("decision", "missed"):
+        if r.get("type") not in ("decision", "missed"):
             continue
         o = out.get(r["accession"], {})
         entry = o.get("entry") or str(r.get("entry_deadline", ""))[:10] or None

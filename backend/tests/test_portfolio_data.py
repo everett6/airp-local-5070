@@ -62,6 +62,11 @@ def test_picks_scoreboard_and_health(tmp_path):
     assert (s["decisions"], s["open"], s["closed"], s["missed"], s["bonsai_ic"]) == (2, 1, 1, 1, None)
     assert P.missed_weekdays(recs, today=date(2026, 10, 10)) == [date(2026, 10, 6), date(2026, 10, 7), date(2026, 10, 9)]
     assert P.event_dirs(fwd) == ["events"]
+    for name in ("allocator", "allocator_autodry"):  # allocator ledgers have no "type" and are not event ledgers
+        (fwd / name).mkdir()
+        (fwd / name / "ledger.jsonl").write_text('{"run_at_utc": "x", "books": {}}\n')
+    assert P.event_dirs(fwd) == ["events"]
+    assert P.picks([{"run_at_utc": "x"}]).empty
 
 
 def test_broken_ledger_is_reported(tmp_path):
