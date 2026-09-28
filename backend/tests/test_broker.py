@@ -130,3 +130,12 @@ def test_dry_sends_nothing(tmp_path: Path) -> None:
 def test_no_keys_skips(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(B, "key", lambda *a: None)
     assert B.Alpaca.from_env() is None
+
+
+def test_stale_decision_is_not_mirrored(tmp_path: Path) -> None:
+    fake = FakeAlpaca()
+    client, alloc = setup(tmp_path, fake)
+    out = tmp_path / "b"
+    broker_sync.sync(client, alloc, out, datetime(2026, 10, 12, 12, 45, tzinfo=UTC), False, tmp_path / "H")
+    o = json.loads((out / "orders.json").read_text())[DEC]
+    assert fake.posts == 0 and o["legs"] == [] and "older" in o["skipped"]

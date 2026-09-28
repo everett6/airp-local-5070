@@ -27,6 +27,7 @@ from app.portfolio.broker import Alpaca, BrokerError, leg_dict, leg_from, opg_op
 from app.portfolio.guard import HALT, state
 
 REAL_BOOK = ("master+brakes", "master")
+MAX_AGE_DAYS = 3  # an older decision fills in the simulator at a past open: mirroring it now would only make a gap
 
 
 def sim_fills(ledger: Path, book: str, decided_at: str) -> dict[str, float]:
@@ -70,7 +71,12 @@ def sync(client: Alpaca, alloc: Path, out: Path, now: datetime, dry: bool, halt_
             alerts += reconcile(leg, fills)
         o["legs"] = [leg_dict(x) for x in legs]
     dec = book.get("decided_at")
-    if book.get("pending") and dec and dec not in orders and mode != "HALTED":
+    stale = bool(dec) and (now - datetime.fromisoformat(dec)).days > MAX_AGE_DAYS
+    if book.get("pending") and dec and dec not in orders and stale:
+        orders[dec] = {"book": name, "planned_at": now.isoformat(timespec="seconds"), "legs": [],
+                       "skipped": f"decision older than {MAX_AGE_DAYS} days (the simulator fills it at a past open)"}
+        print(f"broker: skipped the decision of {dec}: older than {MAX_AGE_DAYS} days")
+    elif book.get("pending") and dec and dec not in orders and mode != "HALTED":
         acct = client.account()
         pos = client.positions()
         px = client.prices(sorted(set(book["pending"]) | set(pos)))
