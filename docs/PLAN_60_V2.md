@@ -787,5 +787,8 @@ good from bad well enough to trade the next week?
   3. long score > 0 minus short score < 0, per month, net of 0.4% (20 bps each way on each leg), has a 90%
      monthly-bootstrap CI above 0.
 - **Reported, not deciding:** IC by category, and 20-day returns.
+- **W1 verdict (27 Sep): stopped at the quality gate, as pre-registered.** On the 100 dev filings: parse rate 0.97
+  (gate 0.95) but verified-quote share 0.826 (gate 0.85). Nothing was labelled and no return was looked at, so no
+  trial is registered. The 8-K watcher does not go into the forward test.
 - **W2 (Jan's research added) runs only if arm B passes tonight.** Otherwise research has failed four times, and W2
   would be a fifth try at the same idea.
