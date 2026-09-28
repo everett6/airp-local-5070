@@ -686,6 +686,38 @@ year) and 46% of 2025-26. So arm B mostly tested "the filing twice", not web res
 - **Stop rule:** if news coverage after step 1 is below 50% in 2024, B2 is not run (the Archive, not the pacing, is
   then the limit) and a different free news source is specced instead.
 
+### Arm B3: evidence that actually reaches Bonsai (spec fixed 2026-09-28 ~12:10, BEFORE arm B2's verdict)
+
+**Why.** Looking at the evidence text (not at any returns): Bonsai's research evidence is a transcript capped at about
+5,600 characters, split evenly across every tool result, and the first-look results (the oldest round) get squeezed
+first. So each result reaches Bonsai as its first ~400 characters: for the news page that is Yahoo's page header
+("NYSE - Nasdaq Real Time Price…"), and for the previous quarter's release it is the headline, never its outlook.
+Arm B's most promising field, `vs_prior_guidance` (+0.069 on 342 releases), was "not_stated" for 71% of releases.
+Also measured: the "news" pages are Internet Archive snapshots of Yahoo's quote page, often weeks old, with 2–3
+headlines among boilerplate.
+
+B3 keeps Jan's B2 research and Bonsai's frozen `PROMPT_R` and fields, and changes only how the 6,000 evidence
+characters are filled. Code builds them from the same as-of material, in this order:
+
+1. **Previous quarter's outlook (up to 2,000 chars):** the same company's previous earnings release (30–200 days
+   earlier, `previous_releases`), full text from SEC (missing ones fetched once, free). Code keeps the paragraphs
+   whose text matches `outlook|guidance|expects?|anticipates?|forecast|full[- ]year|fiscal (year )?20\d\d` AND a
+   number (a digit), in document order, preferring those after a heading line containing "Outlook" or "Guidance".
+   None found → the line "No outlook found in the previous release (<date>)."
+2. **News headlines (up to 1,200 chars):** from the cached as-of news page: lines of 25–200 characters that are
+   not boilerplate (a fixed list: "Yahoo", "Subscribe", "Real Time Price", "Currency in", "Trade prices",
+   "Fair Value", "actionable insight", "All rights reserved", "As of "), headed by the snapshot's date and its age
+   in days before the release. None → "No news headlines found."
+3. **Jan's own research (the rest):** Jan's rounds after the first look, as in B2 (same renderer), then Jan's
+   final reason if it gave one.
+
+- **Test, one trial (`llm_fields_research_b3`):** exactly arm B's rule: the 2025–26 monthly IC of
+  (full B3 − full A) has a 95% CI above 0 (paired monthly bootstrap) AND full B3's own IC CI is above 0, 5-day vs
+  sector. Reported, not deciding: 20-day, B3 − B2, `vs_prior_guidance` coverage and its own IC, and the share of
+  releases where step 1 or 2 found something.
+- **Runs after B2's labels** (one model on the GPU at a time). If B2 passes, B3 still runs and is reported; it
+  replaces B2 only if it passes AND B3 − B2 has a 95% CI above 0.
+
 ### skfolio test (spec fixed 2026-09-27, before any run)
 
 Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capital cap?
