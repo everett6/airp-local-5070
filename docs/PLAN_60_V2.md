@@ -847,3 +847,30 @@ good from bad well enough to trade the next week?
   trial is registered. The 8-K watcher does not go into the forward test.
 - **W2 (Jan's research added) runs only if arm B passes tonight.** Otherwise research has failed four times, and W2
   would be a fifth try at the same idea.
+
+### AI-picks paper sleeve (rules fixed 2026-09-28, before the forward test's first release)
+
+The user decided on 28 Sep that Jan and Bonsai should pick specific stocks on paper from 5 Oct, whether or not a
+version has passed its backtest, as a capped sleeve, and that a passing arm replaces its score when one passes.
+**No version has passed.** The sleeve is labelled "untested" everywhere it is shown.
+
+- **Size:** 10% of the paper account. The master book (SPY + crypto trend) keeps the other 90%: the broker mirror
+  plans it on 90% of the account's equity. Simulated sleeve capital: $10,000.
+- **Score and pick rule:** the live event score (Bonsai's 1-week log-odds; `source = bonsai` only, "lite" decisions
+  are never traded). Pick when log-odds ≥ **2.873**, the top fifth of the 2025–26 history
+  (`factsheet_secchk`). History of this exact rule, 5-day return vs the sector ETF per pick:
+  2024 −0.03% (275 picks), 2025–26 +1.20% (236 picks). It did not work in 2024.
+- **Trade:** long the stock and short its sector ETF, the same dollar amount (one fifth of the sleeve's equity at
+  entry), so the sleeve earns exactly what the tests measure. Enter at the release's entry open (a market-on-open
+  order sent by the 08:45 ET run), exit at the open 5 trading days later. At most 5 pairs open; a pick that finds no
+  free slot is logged as skipped. Whole shares; a pick whose stock costs more than a slot is skipped.
+- **Costs in the simulator:** 0.20% per leg each way (0.8% per pair round trip).
+- **Brakes:** the sleeve opens no new pairs while its drawdown is 25% or more; the kill switch and REDUCING state
+  of the master book apply to it too.
+- **Replacement:** if an arm passes (B2, B3...), its score and its own top-fifth threshold (from its 2025–26 scores)
+  replace these from the next run, and the change is logged.
+- **Review:** after 3 months or 60 closed pairs, whichever is later: continue only if the mean net return per pair
+  has an 80% bootstrap bound above 0; otherwise the sleeve stops and its 10% goes back to the master book.
+- **Replay of these exact rules** (day by day, two runs a day, slots and costs included; not a test, the rules were
+  not changed after it): 2024 **−13.2%** (101 pairs, −0.74% each, max drawdown 19.8%); 2025–26 **+8.6%** (131 pairs,
+  +0.41% each, max drawdown 9.8%). In earnings season the 5 slots fill and later picks are skipped.

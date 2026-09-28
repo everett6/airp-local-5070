@@ -25,6 +25,7 @@ import httpx
 
 from app.portfolio.broker import Alpaca, BrokerError, leg_dict, leg_from, opg_open, plan, reconcile
 from app.portfolio.guard import HALT, state
+from app.portfolio.sleeve import SHARE as SLEEVE_SHARE
 
 REAL_BOOK = ("master+brakes", "master")
 MAX_AGE_DAYS = 3  # an older decision fills in the simulator at a past open: mirroring it now would only make a gap
@@ -80,10 +81,11 @@ def sync(client: Alpaca, alloc: Path, out: Path, now: datetime, dry: bool, halt_
         acct = client.account()
         pos = client.positions()
         px = client.prices(sorted(set(book["pending"]) | set(pos)))
-        legs = plan(dec, book["pending"], float(acct["equity"]), pos, px, reduce_only=mode == "REDUCING")
-        orders[dec] = {"book": name, "planned_at": now.isoformat(timespec="seconds"), "equity": float(acct["equity"]),
+        equity = float(acct["equity"]) * (1 - SLEEVE_SHARE)  # the AI-picks sleeve trades the rest (sleeve.py)
+        legs = plan(dec, book["pending"], equity, pos, px, reduce_only=mode == "REDUCING")
+        orders[dec] = {"book": name, "planned_at": now.isoformat(timespec="seconds"), "equity": equity,
                        "targets": book["pending"], "legs": [leg_dict(x) for x in legs]}
-        print(f"broker: planned {len(legs)} leg(s) for the decision of {dec} on equity {float(acct['equity']):,.0f}")
+        print(f"broker: planned {len(legs)} leg(s) for the decision of {dec} on equity {equity:,.0f}")
     for dec, o in orders.items():  # send what may go now
         legs = [leg_from(d) for d in o["legs"]]
         for leg in legs:

@@ -41,7 +41,8 @@ DRY = {"events": ["--dir", "results/forward/events_autodry", "--start", "2026-09
        "allocator": ["--dir", "results/forward/allocator_autodry"],
        "broker": ["--dry", "--dir", "results/forward/allocator_autodry", "--out", "results/forward/broker_autodry"],
        "learn": ["--dir", "results/forward/events_autodry", "--out", "results/forward/signals_autodry"],
-       "net_read": ["--dir", "results/forward/events_autodry"]}
+       "net_read": ["--dir", "results/forward/events_autodry"],
+       "ai_picks": ["--dry", "--events", "results/forward/events_autodry", "--dir", "results/forward/ai_picks_autodry"]}
 GO_LIVE_ON = date(2026, 10, 2)   # the dry run (from Mon 28 Sep) is judged from this day on, at the 21:00 ET check
 DRY_FROM = date(2026, 9, 28)
 MIN_GOOD_EVENT_RUNS = 8          # of the 10 scheduled Mon-Fri
@@ -90,7 +91,8 @@ def commands(job: str, m: str) -> list[list[str]]:
     largs = DRY["learn"] if dry else []
     if job == "events":  # broker first: the 08:45 ET run is inside Alpaca's market-on-open window
         net_read = [PY, "scripts/net_read_shadow.py", *(DRY["net_read"] if dry else [])]  # arm C2, a shadow
-        return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], net_read,
+        picks = [PY, "scripts/ai_picks.py", *(DRY["ai_picks"] if dry else [])]  # the untested AI-picks sleeve
+        return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], net_read, picks,
                 [*learn, "collect", *largs]]
     if job == "allocator":
         return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])], broker]
