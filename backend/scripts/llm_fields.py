@@ -119,6 +119,22 @@ PROMPT_J = (_HEAD + _DEFS + _DEF_R + _DEF_J + _RULES_R
             + "\nWrite \"reason\" first: weigh the evidence before you label.\nJSON: " + _SCHEMA_J)
 J_GATE = {"parse_rate": 0.95, "verified_share": 0.85}
 
+# Long-term picks track (docs/PLAN_60_V2.md "Long-term picks track", fixed 2026-09-28): a 3-to-6-month view of one
+# company from a code-built card. Forward-only.
+FIELDS_LT: dict[str, tuple[tuple[str, ...], str]] = {"outlook_6m": (("1", "2", "3", "4", "5"), "3")}
+PROMPT_LT = """You are a long-term investor choosing S&P 500 stocks to hold for the next 3 to 6 months.
+You read one company card: its latest quarterly earnings release, the outlook it gave the quarter before, and its
+recent returns against the S&P 500. Judge the business, not the last week's price move: growth and its direction,
+margins, the outlook versus what was promised before, balance-sheet or accounting risks, and how durable the demand
+is. Weigh the good against the bad.
+- outlook_6m: 5 = likely to do much better than the S&P 500 over the next 3 to 6 months; 4 = better; 3 = about the
+  same, or unclear; 2 = worse; 1 = much worse. For any rating other than 3, copy the ONE sentence from the card
+  that matters most, word for word, as "quote" (at most 30 words). Never guess.
+Reply with ONLY one JSON object on one line.
+Write "reason" first.
+JSON: {"reason": "at most 40 words: the main good and bad points, weighed", "outlook_6m": {"label": "1|2|3|4|5", "quote": "..."}}"""
+
+
 # Arm D (docs/PLAN_60_V2.md "Arm D", fixed 2026-09-28): the AI-build-out lens the user asked for, after Leopold
 # Aschenbrenner's 2024 essay "Situational Awareness". Forward-only: the thesis is known to have worked in 2024-26, so
 # a backtest on those years would be flattered.

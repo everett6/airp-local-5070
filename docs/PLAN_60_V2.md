@@ -966,6 +966,20 @@ capital. Two published rules, each tested only on data AFTER its publication, ea
 - **Then:** a passing rule goes to paper as "untested" (the planner's 10% rung) only after 1 month of clean dry runs,
   and earns more weight only by the evidence ladder (3 months of forward paper results).
 
+### Day-trading result (2026-09-28): **both rules FAIL**
+
+| Rule, test window (after publication) | Sharpe at 2 bps | 95% CI | CAGR | at 10 bps | hit rate |
+|---|---|---|---|---|---|
+| D1 intraday momentum, 2019-01 to 2026-09 (1,939 days) | **−1.00** | [−2.22, −0.08] | −5.3% | −4.79 | 44% |
+| D2 5-minute ORB, 2023-07 to 2026-09 (812 days) | **−0.24** | [−1.40, +0.62] | −1.8% | −3.26 | 28% |
+
+- Reported: D1 before its window (2016–18) Sharpe −1.42; D2 before its window (2016–23) +0.05. Correlation with the
+  core book: 0.01 and 0.06.
+- Checked for a bug: the raw edge (the sign of the morning return times the last half hour) is about 0 bp a day in
+  every period and both symbols (−0.6 to +0.7 bp), against 2 bp of costs. The published effects are gone after
+  publication. D1's CI is entirely below 0.
+- The day-trading track stays at 0%. Any next rule needs its own pre-registration; the planner shows it as failed.
+
 ### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
 
 Jan and Bonsai pick S&P 500 stocks to hold for 3 months. **Forward-only:** Bonsai was trained on text that covers

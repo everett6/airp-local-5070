@@ -7,7 +7,7 @@ The user's rule (28 Sep 2026): show the gap; a track's money grows only after it
   - what the stock-picking tracks would have to earn, at the most weight the evidence ladder could ever give them,
     for the goal to be a coin flip;
   - each track's status and what unlocks its next step.
-Evidence ladder (fixed 2026-09-28, before any track moved up): not built 0% -> built, untested, paper only 10% ->
+Evidence ladder (fixed 2026-09-28, before any track moved up): not built / failed / shadow (first month, machinery check) 0% -> untested, paper only 10% ->
 passed its pre-registered test AND 3 months of forward paper results 25% -> 12 months forward, still passing 40%.
 All picking tracks together at most 60%; the core book always keeps at least 40%.
 """
@@ -20,7 +20,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-LADDER = {"not_built": 0.0, "untested": 0.10, "passed": 0.25, "proven": 0.40}
+LADDER = {"not_built": 0.0, "failed": 0.0, "shadow": 0.0, "untested": 0.10, "passed": 0.25, "proven": 0.40}
 PICKING_CAP = 0.60
 MAX_DD = 0.35
 PDT_MIN = 25_000.0  # FINRA pattern-day-trader rule: margin accounts under $25k get 3 day trades per 5 business days
@@ -41,9 +41,12 @@ TRACKS = [
     Track("event", "Short-term event picks (5-day, Jan + Bonsai)", "untested",
           "a research arm passes its test, then 3 months of forward paper results",
           "B2 failed (closest so far); B3 running; sleeve replay 2024-26: -2.2%/yr"),
-    Track("long_term", "Long-term stock picks (months)", "not_built", "build it, pre-register, then forward-test"),
-    Track("day_trading", "Day trading (intraday, Alpaca data)", "not_built",
-          "build it on free intraday data, pre-register, then paper-test"),
+    Track("long_term", "Long-term stock picks (3 months, Bonsai)", "shadow",
+          "first cohort 1 Oct 2026; one clean month -> 10% paper; judged after 12 cohorts",
+          "forward-only: Bonsai knows 2024-26, so no backtest"),
+    Track("day_trading", "Day trading (intraday, SPY/QQQ)", "failed",
+          "a new rule, pre-registered and tested after its publication date",
+          "D1 intraday momentum Sharpe -1.00, D2 opening-range breakout -0.24 (both after publication)"),
     Track("private", "Private companies", "not_built",
           "later stage: needs accredited-investor access and a data source; not available yet"),
 ]

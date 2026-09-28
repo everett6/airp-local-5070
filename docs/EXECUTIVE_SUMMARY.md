@@ -56,6 +56,8 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 | Disagreement: Bonsai vs the earnings-day reaction, 20 days | fail | IC +0.010 [−0.046, +0.066] |
 | LLM extracts, code scores: arm A (Bonsai labels from the release only) | fail | adds +0.015 IC over code features [−0.035, +0.058] |
 | LLM extracts, code scores: arm B (Jan's web research + Bonsai) | fail | adds +0.007 IC over arm A [−0.037, +0.052] |
+| Day trading D1: intraday momentum (SPY+QQQ, 2019–26, after publication) | fail | Sharpe −1.00 [−2.22, −0.08] at 2 bps |
+| Day trading D2: 5-minute opening-range breakout (2023–26, after publication) | fail | Sharpe −0.24 [−1.40, +0.62] |
 | Arm B2 (arm B with the news actually gathered) | fail | +0.011 IC over arm A [−0.035, +0.062]; own IC +0.054 [−0.004, +0.114] |
 | Arm C (arm B + Bonsai judgement fields) | fail | −0.022 IC vs arm B [−0.065, +0.025]; `net_read` alone +0.067, to be tested on live data only (C2) |
 | 8-K breaking-news watcher (W1) | stopped at quality gate | verified quotes 82.6% (needs 85%); no returns looked at |
