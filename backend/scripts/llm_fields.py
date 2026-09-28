@@ -117,7 +117,30 @@ _SCHEMA_J = ('{"reason": "at most 40 words: the main good and bad points, weighe
                          if k not in FIELDS_R) + "}")
 PROMPT_J = (_HEAD + _DEFS + _DEF_R + _DEF_J + _RULES_R
             + "\nWrite \"reason\" first: weigh the evidence before you label.\nJSON: " + _SCHEMA_J)
-J_GATE = {"parse_rate": 0.95, "verified_share": 0.85}  # fixed before the dev run; quality only, never returns
+J_GATE = {"parse_rate": 0.95, "verified_share": 0.85}
+
+# Arm D (docs/PLAN_60_V2.md "Arm D", fixed 2026-09-28): the AI-build-out lens the user asked for, after Leopold
+# Aschenbrenner's 2024 essay "Situational Awareness". Forward-only: the thesis is known to have worked in 2024-26, so
+# a backtest on those years would be flattered.
+FIELDS_AI: dict[str, tuple[tuple[str, ...], str]] = {
+    "ai_exposure": (("beneficiary", "neutral", "hurt"), "neutral"),
+    "ai_read": (("bullish", "neutral", "bearish"), "neutral"),
+}
+_DEF_AI = """You hold the AI-scaling view (Leopold Aschenbrenner, "Situational Awareness", 2024): AI capability keeps
+scaling with compute, so spending on AI chips, datacenters, networking, electric power, cooling and the grid grows
+far faster than most investors expect; companies that sell into that build-out gain for years, and businesses that
+AI automates or undercuts lose. You still judge THIS release on its facts.
+- ai_exposure: beneficiary = the release shows the company selling into the AI build-out (AI or datacenter demand,
+  chips, servers, networking, power, cooling, grid, or AI products that customers pay for); hurt = the release shows
+  AI competition, automation or substitution hurting its business; neutral otherwise. Quote the sentence.
+- ai_read: under this view, does this release make the next few weeks better (bullish) or worse (bearish) for the
+  stock than a typical earnings release? neutral if it is ordinary or unrelated to the build-out. Quote the ONE
+  sentence that matters most.
+"""
+_SCHEMA_AI = ('{"reason": "at most 40 words, through the AI-build-out lens", '
+              + ", ".join(f'"{k}": {{"label": "{"|".join(v[0])}", "quote": "..."}}' for k, v in FIELDS_AI.items()) + "}")
+PROMPT_AI = (_HEAD + _DEF_AI + _RULES_R + "\nWrite \"reason\" first.\nJSON: " + _SCHEMA_AI)
+  # fixed before the dev run; quality only, never returns
 
 SILVER = {  # code-only keyword labels, the quality yardstick: does the model flag a field when the words are there?
     "one_off": r"impairment|restructuring (charge|cost|expense)|goodwill write|litigation (charge|settlement)|write-?down",

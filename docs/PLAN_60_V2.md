@@ -686,6 +686,25 @@ year) and 46% of 2025-26. So arm B mostly tested "the filing twice", not web res
 - **Stop rule:** if news coverage after step 1 is below 50% in 2024, B2 is not run (the Archive, not the pacing, is
   then the limit) and a different free news source is specced instead.
 
+### Arm B2 result (2026-09-28): **FAIL**, the closest so far
+
+News coverage after the warm-up: 80% of 2024 releases (1,596 of 1,995; arm B 5%) and 81% of 2025-26.
+2025-26, monthly rank IC, 5-day vs sector (14 months, 1,177 releases):
+
+| | Mean IC | 95% CI |
+|---|---|---|
+| full A | +0.043 | [+0.005, +0.082] |
+| full B2 | +0.054 | [−0.004, +0.114] |
+| **B2 − A (deciding)** | **+0.011** | **[−0.035, +0.062]** |
+| B2 − B | +0.004 | [−0.033, +0.041] |
+| B2 on releases with news (953) | +0.064 | [+0.001, +0.125] |
+| 20-day: B2 − B (reported, not deciding) | +0.029 | [+0.009, +0.050] |
+
+- Neither pass check holds. Gathering the news made the research labels a little better than arm B (clearly so at
+  20 days), but not better than the release alone at 5 days.
+- `vs_prior_guidance` is still "not_stated" for 859 of 1,180 releases: the evidence doesn't carry last quarter's
+  guidance to Bonsai, as found before this verdict (arm B3 below was fixed before it).
+
 ### Arm B3: evidence that actually reaches Bonsai (spec fixed 2026-09-28 ~12:10, BEFORE arm B2's verdict)
 
 **Why.** Looking at the evidence text (not at any returns): Bonsai's research evidence is a transcript capped at about
@@ -906,3 +925,22 @@ version has passed its backtest, as a capped sleeve, and that a passing arm repl
 - **Replay of these exact rules** (day by day, two runs a day, slots and costs included; not a test, the rules were
   not changed after it): 2024 **−13.2%** (101 pairs, −0.74% each, max drawdown 19.8%); 2025–26 **+8.6%** (131 pairs,
   +0.41% each, max drawdown 9.8%). In earnings season the 5 slots fill and later picks are skipped.
+
+### Arm D: the AI-build-out lens (spec fixed 2026-09-28, before any live release is read with it)
+
+The user asked for the AIs to think like Leopold Aschenbrenner ("Situational Awareness", 2024): AI capability scales
+with compute, so spending on chips, datacenters, networking, power and the grid grows far faster than expected, and
+companies selling into that build-out gain for years.
+
+- **Prompt `PROMPT_AI`** (scripts/llm_fields.py, fixed): the view in five lines, then two fields with the same quote
+  check as every other arm: `ai_exposure` (beneficiary / neutral / hurt) and `ai_read` (bullish / neutral / bearish
+  for the next few weeks under this view). Score: bullish +1, neutral 0, bearish −1.
+- **Forward only, never backtested on 2024–26.** The thesis is famous because it worked in exactly those years
+  (Nvidia, power producers), and Bonsai may have learned those outcomes; a backtest would be flattered. It is judged
+  only on live releases, like C2: `scripts/net_read_shadow.py` labels each live decision before its entry deadline
+  into `<events dir>/ai_lens.jsonl`, no money.
+- **Pass (one trial, `ai_lens_forward`), at the first review with at least 150 scored releases and 3 months:** the
+  monthly rank IC of `ai_read` vs 5-day sector-relative returns has a mean above 0.02 and an 80% one-sided bootstrap
+  bound above 0, AND it adds to the live Bonsai log-odds (the learning loop's blend-gain test).
+- Note: this lens is about next-week earnings reactions. The view itself is a multi-year theme; a thematic sleeve
+  would need its own design and test.

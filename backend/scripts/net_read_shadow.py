@@ -1,4 +1,5 @@
-"""Arm C2 (docs/PLAN_60_V2.md "Arm C2"): Bonsai's `net_read` on live releases only, a shadow with no money.
+"""Arm C2 and arm D (docs/PLAN_60_V2.md): Bonsai's `net_read`, and its call through the AI-build-out lens (`ai_read`,
+the Aschenbrenner view the user asked for), on live releases only: shadows with no money.
 
     python scripts/net_read_shadow.py --dir results/forward/events      # label new decisions, then print the score
     python scripts/net_read_shadow.py --dir results/forward/events --status
@@ -26,13 +27,17 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 import numpy as np
 import pandas as pd
 from forward_events import Ollama, wait_gpu_free
-from llm_fields import FIELDS_J, PROMPT_J, ask, parse, text_of, verify
+from llm_fields import FIELDS_AI, FIELDS_J, PROMPT_AI, PROMPT_J, ask, parse, text_of, verify
 
 from app.forward.ledger import Ledger
 from app.sandbox.gpu_lock import gpu_priority
 
 PORT = 11440
 SCORE = {"bullish": 1, "neutral": 0, "bearish": -1}
+# lens -> (prompt, fields, the scored field, its file): C2 (net_read) and arm D (the AI-build-out lens), both live-only
+LENSES: dict[str, tuple[str, dict[str, tuple[tuple[str, ...], str]], str, str]] = {
+    "net_read": (PROMPT_J, FIELDS_J, "net_read", "net_read.jsonl"),
+    "ai_lens": (PROMPT_AI, FIELDS_AI, "ai_read", "ai_lens.jsonl")}
 PASS = {"min_events": 150, "min_months": 3, "min_ic": 0.02}  # judged with learn_loop's blend-gain test as well
 
 
@@ -47,34 +52,35 @@ def todo(recs: list[dict[str, Any]], done: set[str]) -> list[dict[str, Any]]:
     return [r for r in recs if r.get("type") == "decision" and r["accession"] not in done]
 
 
-async def label(llm: Any, r: dict[str, Any]) -> dict[str, Any]:
+async def label(llm: Any, r: dict[str, Any], lens: str = "net_read") -> dict[str, Any]:
+    prompt, fields, key, _ = LENSES[lens]
     u = user_text(r["accession"])
     rec: dict[str, Any] = {"accession": r["accession"], "ticker": r["ticker"], "entry_deadline": r["entry_deadline"]}
     if u is None:
-        return rec | {"net_read": "neutral", "parsed": False, "note": "no release text"}
+        return rec | {key: "neutral", "parsed": False, "note": "no release text"}
     user, source = u
-    reply, overflow = await ask(llm, PROMPT_J, user)
-    v = verify(parse(reply), source, FIELDS_J)
-    return rec | {"net_read": v["net_read"], "parsed": v["parsed"], "overflow": overflow,
-                  "fields": {f: v[f] for f in FIELDS_J}}
+    reply, overflow = await ask(llm, prompt, user)
+    v = verify(parse(reply), source, fields)
+    return rec | {key: v[key], "parsed": v["parsed"], "overflow": overflow, "fields": {f: v[f] for f in fields}}
 
 
-def scored(d: Path) -> pd.DataFrame:
+def scored(d: Path, lens: str = "net_read") -> pd.DataFrame:
     """On-time labels joined with matured outcomes: accession, month, net, fwd5."""
-    p = d / "net_read.jsonl"
+    _, _, key, fname = LENSES[lens]
+    p = d / fname
     if not p.exists() or not (d / "ledger.jsonl").exists():
         return pd.DataFrame(columns=["accession", "month", "net", "fwd5"])
     lab = [json.loads(x) for x in p.read_text().splitlines()]
     lab = [x for x in lab if datetime.fromisoformat(x["written_at"]) < datetime.fromisoformat(x["entry_deadline"])]
     out = {r["accession"]: r for r in Ledger(d / "ledger.jsonl").records() if r.get("type") == "outcome"}
-    rows = [{"accession": x["accession"], "month": out[x["accession"]]["entry"][:7], "net": SCORE[x["net_read"]],
+    rows = [{"accession": x["accession"], "month": out[x["accession"]]["entry"][:7], "net": SCORE[x[key]],
              "fwd5": out[x["accession"]]["fwd5"]} for x in lab
             if x["accession"] in out and out[x["accession"]].get("fwd5") is not None]
     return pd.DataFrame(rows, columns=["accession", "month", "net", "fwd5"])
 
 
-def status(d: Path) -> dict[str, Any]:
-    df = scored(d)
+def status(d: Path, lens: str = "net_read") -> dict[str, Any]:
+    df = scored(d, lens)
     raw = [g["net"].rank().corr(g["fwd5"].rank()) for _, g in df.groupby("month")
            if len(g) >= 10 and g["net"].nunique() > 1]
     ics = np.array([x for x in raw if not np.isnan(x)])
@@ -88,40 +94,47 @@ def status(d: Path) -> dict[str, Any]:
             "counts": df["net"].map({1: "bullish", 0: "neutral", -1: "bearish"}).value_counts().to_dict()}
 
 
-def run(d: Path, use_gpu: bool) -> int:
+def run(d: Path, use_gpu: bool) -> dict[str, int]:
+    """Label every unlabelled decision whose entry deadline is still ahead, with each lens, in one GPU session."""
     ledger = d / "ledger.jsonl"
     if not ledger.exists():
-        return 0
-    p = d / "net_read.jsonl"
-    done = {json.loads(x)["accession"] for x in p.read_text().splitlines()} if p.exists() else set()
-    rows = todo(Ledger(ledger).records(), done)
+        return {}
+    recs_all = Ledger(ledger).records()
     now = datetime.now(UTC)
-    rows = [r for r in rows if datetime.fromisoformat(r["entry_deadline"]) > now]  # too late to be scored: skip
-    if not rows or not use_gpu:
-        return 0
+    todo_by: dict[str, list[dict[str, Any]]] = {}
+    for lens, (_, _, _, fname) in LENSES.items():
+        p = d / fname
+        done = {json.loads(x)["accession"] for x in p.read_text().splitlines()} if p.exists() else set()
+        rows = [r for r in todo(recs_all, done) if datetime.fromisoformat(r["entry_deadline"]) > now]
+        if rows:
+            todo_by[lens] = rows
+    if not todo_by or not use_gpu:
+        return {}
     from app.sandbox.walkforward import OllamaLLM
     with gpu_priority("net_read_shadow"):
         if not wait_gpu_free(900):
             print("LEARN ALERT: net_read shadow: the GPU stayed busy; releases left unlabelled")
-            return 0
+            return {}
         srv = Ollama(PORT, str(Path.home() / ".ollama" / "models"), 3, d / "ollama_net_read.log")
         try:
             llm = OllamaLLM("bonsai-27b:latest", base_url=f"http://127.0.0.1:{PORT}", concurrency=3, num_ctx=8192,
                             num_predict=1000, cache=False, require_gpu=True)
 
-            async def go() -> list[dict[str, Any]]:
+            async def go() -> dict[str, list[dict[str, Any]]]:
                 try:
-                    return list(await asyncio.gather(*(label(llm, r) for r in rows)))
+                    return {lens: list(await asyncio.gather(*(label(llm, r, lens) for r in rows)))
+                            for lens, rows in todo_by.items()}
                 finally:
                     await llm.unload()
-            recs = asyncio.run(go())
+            out = asyncio.run(go())
         finally:
             srv.stop()
     at = datetime.now(UTC).isoformat(timespec="seconds")
-    with p.open("a") as f:
-        for r in recs:
-            f.write(json.dumps(r | {"written_at": at}) + "\n")
-    return len(recs)
+    for lens, recs in out.items():
+        with (d / LENSES[lens][3]).open("a") as f:
+            for r in recs:
+                f.write(json.dumps(r | {"written_at": at}) + "\n")
+    return {lens: len(recs) for lens, recs in out.items()}
 
 
 def main() -> None:
@@ -134,8 +147,8 @@ def main() -> None:
     try:
         if not a.status:
             n = run(d, not a.no_gpu)
-            print(f"net_read shadow: {n} release(s) labelled")
-        print(json.dumps(status(d)))
+            print(f"live-only shadows labelled: {json.dumps(n)}")
+        print(json.dumps({lens: status(d, lens) for lens in LENSES}))
     except Exception as e:  # noqa: BLE001 - a shadow: never fail the events job
         print(f"LEARN ALERT: net_read shadow failed: {type(e).__name__}: {e}"[:300])
 

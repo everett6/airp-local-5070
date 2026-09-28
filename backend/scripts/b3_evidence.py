@@ -34,8 +34,8 @@ ALL_EVENTS = BACKEND / "data" / "events" / "events_2024-01-01_2026-09-24.csv"
 SAMPLES = (("2024", "data/events/events_sp500_2024.csv", "features_sp500_2024_secchk.csv"),
            ("2025", "data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv"))
 BUDGET, OUTLOOK_MAX, NEWS_MAX = 6000, 2000, 1200
-OUTLOOK_RE = re.compile(r"outlook|guidance|expects?|anticipates?|forecast|full[- ]year|fiscal (year )?20\d\d", re.I)
-HEADING_RE = re.compile(r"outlook|guidance", re.I)
+OUTLOOK_RE = re.compile(r"outlook|guidance|expects?|anticipates?|forecast|full[- ]year|fiscal (year )?20\d\d", re.IGNORECASE)
+HEADING_RE = re.compile(r"outlook|guidance", re.IGNORECASE)
 BOILERPLATE = ("Yahoo", "Subscribe", "Real Time Price", "Currency in", "Trade prices", "Fair Value",
                "actionable insight", "All rights reserved", "As of ")
 
@@ -85,7 +85,7 @@ def news_page(ticker: str, as_of: datetime) -> dict[str, Any] | None:
     try:
         page = json.loads(rec["result"]) if rec.get("ok") else None
     except json.JSONDecodeError:  # a result cut at 5,000 characters: not valid JSON any more
-        m = re.search(r'"captured_utc": "([^"]+)".*?"text": "(.*)', rec["result"], re.S)
+        m = re.search(r'"captured_utc": "([^"]+)".*?"text": "(.*)', rec["result"], re.DOTALL)
         page = {"captured_utc": m.group(1), "text": m.group(2).encode().decode("unicode_escape", "ignore")} if m else None
     return page if isinstance(page, dict) else None
 
