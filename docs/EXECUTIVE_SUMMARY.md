@@ -54,6 +54,7 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 | Daily crypto trend check | fail (lead) | +1.1 pt a year, Sharpe +0.04 [−0.05, +0.16] |
 | skfolio CVaR risk parity instead of the 20% crypto cap | fail (lead) | Sharpe +0.12, 90% CI [−0.01, +0.23] |
 | Disagreement: Bonsai vs the earnings-day reaction, 20 days | fail | IC +0.010 [−0.046, +0.066] |
+| LLM extracts, code scores: arm A (Bonsai labels from the release only) | fail | adds +0.015 IC over code features [−0.035, +0.058] |
 
 ## What was built this week
 

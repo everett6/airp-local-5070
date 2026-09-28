@@ -9,6 +9,7 @@ Started by the systemd user timers in deploy/systemd/ (scripts/autonomy.sh insta
 Mode: results/forward/AUTORUN_MODE holds "dry" or "live"; missing means dry. Dry runs write to their own folders
 (results/forward/events_autodry, allocator_autodry) and never touch the real ledgers or git. Live runs use the real
 ledgers and commit and push them (the push gives the hash chain an outside timestamp).
+Events and allocator jobs also run scripts/broker_sync.py (the Alpaca paper mirror; a no-op without keys).
 Every run: one job at a time (a lock), a heartbeat line (results/forward/heartbeat.jsonl) with its exit code and log,
 and an alert (results/forward/alerts.jsonl + a desktop notification) on a failure, a drawdown flag, or missed
 decisions. The kill switch, mandate, order gate and drawdown limit stay in force: this only starts the same scripts.
@@ -34,7 +35,8 @@ PY = str(BACKEND / ".venv" / "bin" / "python")
 NY = ZoneInfo("America/New_York")
 # dry runs cover the prep week (real releases from Mon 28 Sep); live runs keep the forward test's own start
 DRY = {"events": ["--dir", "results/forward/events_autodry", "--start", "2026-09-28"],
-       "allocator": ["--dir", "results/forward/allocator_autodry"]}
+       "allocator": ["--dir", "results/forward/allocator_autodry"],
+       "broker": ["--dry", "--dir", "results/forward/allocator_autodry", "--out", "results/forward/broker_autodry"]}
 EXPECTED = {"events": 2, "allocator_weekday": 0}  # event runs per weekday; the allocator runs Mondays
 
 
@@ -75,10 +77,11 @@ def alert(job: str, msg: str) -> None:
 
 def commands(job: str, m: str) -> list[list[str]]:
     dry = m == "dry"
-    if job == "events":
-        return [[PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])]]
+    broker = [PY, "scripts/broker_sync.py", *(DRY["broker"] if dry else [])]  # paper broker mirror (skips without keys)
+    if job == "events":  # broker first: the 08:45 ET run is inside Alpaca's market-on-open window
+        return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])]]
     if job == "allocator":
-        return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])]]
+        return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])], broker]
     if job == "review":
         return [[PY, "scripts/weekly_review.py"], [PY, "scripts/failure_review.py"]]
     raise SystemExit(f"unknown job {job}")
@@ -107,6 +110,7 @@ def scan(job: str, out: str, prev_missed: int | None) -> list[str]:
     flags = []
     if job == "allocator" and "DRAWDOWN" in out:
         flags.append("drawdown flag: " + next(x for x in out.splitlines() if "DRAWDOWN" in x)[:200])
+    flags += [x.split("BROKER ALERT:", 1)[1].strip()[:200] for x in out.splitlines() if "BROKER ALERT:" in x]
     n = missed_total(out) if job == "events" else None
     if n is not None and n > (prev_missed or 0):
         flags.append(f"{n - (prev_missed or 0)} new missed decision(s) ({n} in total)")

@@ -30,6 +30,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 sys.path.insert(0, str(BACKEND / "scripts"))
 
+import httpx
 import numpy as np
 import pandas as pd
 
@@ -137,6 +138,18 @@ def parse(reply: str) -> dict[str, Any] | None:
     except ValueError:
         return None
     return o if isinstance(o, dict) else None
+
+
+async def ask(llm: Any, system: str, user: str) -> tuple[str, bool]:
+    """The reply, and whether the input overflowed the context window. Ollama refuses a prompt longer than num_ctx
+    with HTTP 400 ("exceeds the available context size"); such a release counts as unparsed, so every field keeps its
+    default (PLAN_60_V2 "Context overflow", fixed 2026-09-27 before arm B resumed). Other errors still stop the run."""
+    try:
+        return await llm(system, user), False
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 400 and "context" in e.response.text:
+            return "", True
+        raise
 
 
 def verify(raw: dict[str, Any] | None, text: str, fields: dict[str, tuple[tuple[str, ...], str]] = FIELDS
@@ -262,8 +275,8 @@ async def extract_research() -> None:
                 ev = (json.loads(rp.read_text()).get("evidence") or "")[:6000] if rp.exists() else ""
                 user = (text[:6000] + "\n\n=== Research evidence (web, as of the release) ===\n"
                         + (ev or "No research evidence was found."))
-                reply = await llm(PROMPT_R, user)
-                return {"accession": r.accession, "has_research": bool(ev),
+                reply, overflow = await ask(llm, PROMPT_R, user)
+                return {"accession": r.accession, "has_research": bool(ev), "overflow": overflow,
                         **verify(parse(reply), text[:6000] + "\n" + ev, FIELDS_R)}
             for i in range(0, len(rows), 60):
                 recs = [x for x in await asyncio.gather(*(one(r) for r in rows[i:i + 60])) if x is not None]
@@ -297,9 +310,10 @@ async def _label_j(llm: Any, acc: str, tag: str) -> dict[str, Any] | None:
         return None
     user, source, has = u
     t0 = time.monotonic()
-    raw = parse(await llm(PROMPT_J, user))
+    reply, overflow = await ask(llm, PROMPT_J, user)
+    raw = parse(reply)
     reason = str((raw or {}).get("reason", ""))[:400]
-    return {"accession": acc, "has_research": has, "s": time.monotonic() - t0, "reason": reason,
+    return {"accession": acc, "has_research": has, "overflow": overflow, "s": time.monotonic() - t0, "reason": reason,
             **verify(raw, source, FIELDS_J)}
 
 

@@ -60,7 +60,7 @@ from app.sandbox import anomalies as anom
 from app.sandbox import ohlcv
 from app.sandbox import provenance as prov
 from app.sandbox.clock import enforce_point_in_time, sandbox_scope
-from app.sandbox.gpu_lock import gpu_job
+from app.sandbox.gpu_lock import gpu_job, priority_wanted
 from app.sandbox.jail import AgentJail
 from app.sandbox.pit_data import PriceTable
 from app.sandbox.scoring import cross_sectional, overlap_block, periods_per_year
@@ -122,6 +122,9 @@ class OllamaLLM:
         self.use_cache = cache
         self.base_url = (base_url or os.environ.get("AIRP_OLLAMA_URL") or DEFAULT_OLLAMA_URL).rstrip("/")
         self._sem = asyncio.Semaphore(concurrency)
+        self._concurrency = concurrency
+        self._yield_lock = asyncio.Lock()
+        self.yields = 0
         self._client = httpx.AsyncClient(timeout=300)
         RESULTS.mkdir(exist_ok=True)
         self._cache_path = RESULTS / f"llm_cache_{model.replace(':', '_').replace('/', '_')}.jsonl"
@@ -210,6 +213,7 @@ class OllamaLLM:
             body |= {"logprobs": True, "top_logprobs": 20}
         elif mode is not None:
             raise ValueError(f"unknown LLM mode {mode!r}")
+        await self._yield_to_priority()
         async with self._sem:
             for attempt in range(3):
                 try:
@@ -249,6 +253,27 @@ class OllamaLLM:
             self._cache[key] = text
             _append_line(self._cache_path, json.dumps({"k": key, "v": text}))
         return text
+
+    async def _yield_to_priority(self, poll_s: float = 15.0) -> None:
+        """The forward runner wants the GPU (app/sandbox/gpu_lock.py): let the requests in flight finish, unload the
+        model, and wait until it is done. Answers are unchanged; only their timing moves."""
+        if not priority_wanted():
+            return
+        async with self._yield_lock:
+            if not priority_wanted():
+                return
+            for _ in range(self._concurrency):
+                await self._sem.acquire()
+            try:
+                await self.unload()
+                self.yields += 1
+                print(f"[gpu-priority] {self.model}: unloaded for the forward runner; waiting", flush=True)
+                while priority_wanted():
+                    await asyncio.sleep(poll_s)
+                print(f"[gpu-priority] {self.model}: resuming", flush=True)
+            finally:
+                for _ in range(self._concurrency):
+                    self._sem.release()
 
     async def unload(self) -> None:
         """Free the GPU now instead of after Ollama's 5-minute keep-alive, so the next job's model (possibly on

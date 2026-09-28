@@ -51,12 +51,17 @@ agent; every new signal passes a pre-registered test before it gets money.
 - `app/portfolio/{master,forward,guard,futures}.py`, `bars.py`, `autorun.py`;
 - the viewer, the trials registry and the DSR.
 
+**Built 27 Sep (no GPU needed):**
+- the broker adapter: `app/portfolio/broker.py` + `scripts/broker_sync.py`, run by autorun around the events and
+  allocator jobs (a no-op until the Alpaca paper keys are in `backend/.env`; `--dry` in the dry-run week);
+- GPU priority: the forward runner raises a flag and every other Bonsai/qwen job unloads and waits
+  (`app/sandbox/gpu_lock.py`), so research never pushes a live decision onto the CPU fallback;
+- phone alerts (ntfy.sh).
+
 **Missing:**
-- the broker adapter;
 - a signal registry that combines passed signals;
 - the bounded learning loop;
-- futures-based leverage in the forward book;
-- phone alerts.
+- futures-based leverage in the forward book.
 
 ## 3. Phases
 

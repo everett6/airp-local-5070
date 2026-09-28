@@ -35,6 +35,7 @@ import signal
 import subprocess
 import sys
 import time
+from contextlib import ExitStack
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -50,6 +51,7 @@ from event_eval import SECTOR_ETF
 from app.forward.ledger import Ledger
 from app.forward.schedule import NY, OPEN
 from app.sandbox.events import Prices, entry_index, fwd_excess
+from app.sandbox.gpu_lock import gpu_priority
 from app.tools.gateway import _read_env_file
 
 PY = str(BACKEND / ".venv" / "bin" / "python")
@@ -106,6 +108,16 @@ def gpu_free() -> bool:
     except (OSError, subprocess.TimeoutExpired):
         return False
     return out.returncode == 0 and not out.stdout.strip()
+
+
+def wait_gpu_free(timeout_s: float, poll_s: float = 15.0) -> bool:
+    """gpu_free(), waiting up to `timeout_s` for research jobs to yield (they unload within one request)."""
+    end = time.monotonic() + timeout_s
+    while not gpu_free():
+        if time.monotonic() >= end:
+            return False
+        time.sleep(poll_s)
+    return True
 
 
 class Ollama:
@@ -277,7 +289,10 @@ def main() -> None:
     allev.drop_duplicates("accession").to_csv(ev_csv, index=False)
     print(f"{len(new)} new releases", flush=True)
 
-    use_gpu = not args.no_gpu and gpu_free()
+    prio = ExitStack()  # forward decisions can't be made later: research jobs yield the GPU (app/sandbox/gpu_lock.py)
+    if len(new) and not args.no_gpu:
+        prio.enter_context(gpu_priority("forward_events"))
+    use_gpu = not args.no_gpu and wait_gpu_free(900 if len(new) else 0)
     logodds: dict[str, float] = {}
     source = "bonsai" if use_gpu else "lite"
     tickers = {str(t).replace(".", "-") for t in allev["ticker"]} | set(SECTOR_ETF.values()) | {"SPY"}
@@ -291,6 +306,7 @@ def main() -> None:
             logodds = bonsai(new_csv, d / "extract.jsonl", feats, tag, since, d, px_file)
         else:
             logodds = lite(feats, new_csv, p)
+    prio.close()
     for r in new.itertuples():
         dl = entry_deadline(str(r.accepted_utc))
         base = {"accession": r.accession, "ticker": r.ticker, "sector": r.sector, "accepted_utc": r.accepted_utc,

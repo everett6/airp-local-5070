@@ -653,6 +653,15 @@ judgement calls". Arm A (release only, running now) stays as specified. Arm B ad
   - full B's own IC CI is above 0 (5-day return vs sector).
   - So research must add something beyond what Bonsai reads in the release alone.
 - **Registry:** one more trial. Also reported: the 20-day horizon, and the `vs_prior_guidance` field alone.
+- **Context overflow (fixed 2026-09-27 ~18:40, after 960 of 1,995 2024 labels and before any arm B return was
+  looked at):** one release plus its evidence came to 8,436 tokens, over Bonsai's 8,192-token window. Ollama refused it
+  (HTTP 400) and the run stopped. Rule from now on, for arms B and C: a release whose input does not fit is recorded as
+  unparsed (`overflow: true`, every field at its default), exactly like a reply that doesn't parse. Inputs are not
+  shortened differently, the window is not changed mid-run, and the 960 labels already made stand. The overflow count
+  is reported with the verdict. Arm A's verdict (below) does not depend on this.
+- **Arm A verdict (27 Sep, pre-registered 5-day test): FAIL.** Full A's IC +0.043 [+0.005, +0.082], but full − base
+  +0.015 [−0.035, +0.058]: Bonsai's release-only labels add nothing the code's base features don't already carry.
+  20-day: full − base −0.021 [−0.066, +0.024].
 
 ### skfolio test (spec fixed 2026-09-27, before any run)
 
