@@ -58,10 +58,31 @@ agent; every new signal passes a pre-registered test before it gets money.
   (`app/sandbox/gpu_lock.py`), so research never pushes a live decision onto the CPU fallback;
 - phone alerts (ntfy.sh).
 
+- the bounded learning loop and signal registry (below);
+- the automatic dry → live switch: from Fri 2 Oct the 21:00 ET check switches to live if the dry run was clean
+  (≥ 8 good event runs, at most 1 failed run, the last two event runs good, a good allocator run, an intact dry
+  ledger); otherwise it stays dry and sends a phone alert with the reasons, every evening until fixed.
+
 **Missing:**
-- a signal registry that combines passed signals;
-- the bounded learning loop;
 - futures-based leverage in the forward book.
+
+### The learning loop (rules fixed 2026-09-27, before any candidate was proposed)
+
+Code: `app/signals/registry.py` (rules and budget), `scripts/learn_loop.py` (collect / monthly / review / status).
+
+| Step | When | Rule |
+|---|---|---|
+| Collect | after every event run | the live releases' fields as they were at decision time → `results/forward/signals/live_features.csv` |
+| Propose | first Saturday review of each month (live mode only) | Bonsai proposes 5 recipes from the fixed menu (EPS and revenue growth, momentum, Bonsai's log-odds, guidance, tone; optional sector filter; ≤ 3 terms, ±1 each, no fitted weights). GPU busy or bad reply → seeded draw of untried recipes. A recipe tried before is refused |
+| Train test | same run | 2024 only: mean monthly IC ≥ 0.02 and its 95% CI above 0 |
+| Holdout test | same run | 2025-26, once per recipe: mean IC ≥ 0.02, one-sided p < 0.05 / (holdout tests ever run), and blending it with Bonsai's score beats the score alone (paired 95% CI above 0) |
+| Shadow | weekly review | scored on live releases, no money. Promoted after ≥ 90 days and ≥ 100 scored releases if the live blend gain's 80% lower bound is above 0 and its IC is positive; retired at 180 days otherwise |
+| Promoted | weekly review | a 10% paper sleeve (long the top fifth of live releases by the blended score, 5-day holds, 0.4% costs); at most 2 signals (20%). Retired if its live blend gain since promotion turns negative (≥ 100 releases) |
+
+Every train and holdout test is registered in `results/trials_registry.jsonl`. The loop can add or retire signals
+only; it can't change the master book, the mandate, the kill switch, these thresholds or its budget. Promotions and
+retirements send a phone alert. The sleeve is reported next to the master book in the weekly review; folding it
+into the broker-mirrored book stays a rule for the 3-month review.
 
 ## 3. Phases
 

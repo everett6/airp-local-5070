@@ -44,3 +44,40 @@ def test_check_finds_missing_weekday_runs(tmp_path, monkeypatch):
     (tmp_path / "heartbeat.jsonl").write_text("\n".join(json.dumps(r) for r in hb) + "\n")
     gaps = autorun.check(today=date(2026, 10, 8))
     assert gaps == ["2026-10-07: 0 of 2 event runs", "2026-10-06: 1 of 2 event runs"]
+
+
+def _hb(job, day, hour, rc=0):
+    return {"job": job, "mode": "dry", "start": f"2026-{day}T{hour}:00:00+00:00", "rc": rc}
+
+
+def test_go_live_switches_only_after_a_clean_dry_run(tmp_path, monkeypatch):
+    monkeypatch.setattr(autorun, "FWD", tmp_path)
+    monkeypatch.setattr(autorun, "alert", lambda *a: None)
+    days = ["09-28", "09-29", "09-30", "10-01", "10-02"]
+    clean = [_hb("allocator", "09-28", "22")] + [_hb("events", d, h) for d in days for h in ("12", "22")]
+    (tmp_path / "heartbeat.jsonl").write_text("\n".join(json.dumps(r) for r in clean) + "\n")
+    assert autorun.go_live(date(2026, 10, 1)) is None            # too early: nothing happens
+    assert autorun.mode() == "dry"
+    assert autorun.go_live_reasons(clean, tmp_path / "none.jsonl") == []
+    msg = autorun.go_live(date(2026, 10, 2))
+    assert msg.startswith("switched to LIVE") and autorun.mode() == "live"
+    assert autorun.go_live(date(2026, 10, 3)) is None            # already live: nothing to do
+
+
+def test_go_live_stays_dry_with_reasons(tmp_path, monkeypatch):
+    monkeypatch.setattr(autorun, "FWD", tmp_path)
+    bad = [_hb("events", d, h, rc=1 if d == "10-02" else 0) for d in ["09-29", "09-30", "10-01", "10-02"]
+           for h in ("12", "22")]
+    (tmp_path / "heartbeat.jsonl").write_text("\n".join(json.dumps(r) for r in bad) + "\n")
+    msg = autorun.go_live(date(2026, 10, 2))
+    assert msg.startswith("still in DRY mode") and autorun.mode() == "dry"
+    for part in ("good dry event runs", "2 failed dry runs", "last two", "no good dry allocator run"):
+        assert part in msg
+
+
+def test_review_runs_the_monthly_loop_only_live_and_collect_follows_events():
+    assert not any("monthly" in c for c in autorun.commands("review", "dry"))
+    assert any("monthly" in c for c in autorun.commands("review", "live"))
+    assert autorun.commands("events", "live")[-1][-1] == "collect"
+    assert autorun.commands("learn", "dry") == []
+    assert autorun.scan("review", "x\nLEARN ALERT: signal a promoted", None) == ["signal a promoted"]

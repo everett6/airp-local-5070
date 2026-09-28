@@ -4,7 +4,9 @@ Started by the systemd user timers in deploy/systemd/ (scripts/autonomy.sh insta
     python scripts/autorun.py events       # the event runner (forward_events.py)
     python scripts/autorun.py allocator    # the weekly allocator (forward_allocator.py)
     python scripts/autorun.py review       # weekly_review.py + failure_review.py
-    python scripts/autorun.py check        # heartbeat check: alerts on expected runs that did not happen
+    python scripts/autorun.py check        # heartbeat check: alerts on expected runs that did not happen; on and
+                                           # after 2 Oct also the automatic dry -> live switch (go_live_reasons)
+    python scripts/autorun.py learn        # the monthly learning loop by hand (the Saturday review also runs it)
 
 Mode: results/forward/AUTORUN_MODE holds "dry" or "live"; missing means dry. Dry runs write to their own folders
 (results/forward/events_autodry, allocator_autodry) and never touch the real ledgers or git. Live runs use the real
@@ -29,6 +31,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 BACKEND = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND))
 REPO = BACKEND.parent
 FWD = BACKEND / "results" / "forward"
 PY = str(BACKEND / ".venv" / "bin" / "python")
@@ -36,7 +39,11 @@ NY = ZoneInfo("America/New_York")
 # dry runs cover the prep week (real releases from Mon 28 Sep); live runs keep the forward test's own start
 DRY = {"events": ["--dir", "results/forward/events_autodry", "--start", "2026-09-28"],
        "allocator": ["--dir", "results/forward/allocator_autodry"],
-       "broker": ["--dry", "--dir", "results/forward/allocator_autodry", "--out", "results/forward/broker_autodry"]}
+       "broker": ["--dry", "--dir", "results/forward/allocator_autodry", "--out", "results/forward/broker_autodry"],
+       "learn": ["--dir", "results/forward/events_autodry", "--out", "results/forward/signals_autodry"]}
+GO_LIVE_ON = date(2026, 10, 2)   # the dry run (from Mon 28 Sep) is judged from this day on, at the 21:00 ET check
+DRY_FROM = date(2026, 9, 28)
+MIN_GOOD_EVENT_RUNS = 8          # of the 10 scheduled Mon-Fri
 EXPECTED = {"events": 2, "allocator_weekday": 0}  # event runs per weekday; the allocator runs Mondays
 
 
@@ -78,12 +85,20 @@ def alert(job: str, msg: str) -> None:
 def commands(job: str, m: str) -> list[list[str]]:
     dry = m == "dry"
     broker = [PY, "scripts/broker_sync.py", *(DRY["broker"] if dry else [])]  # paper broker mirror (skips without keys)
+    learn = [PY, "scripts/learn_loop.py"]
+    largs = DRY["learn"] if dry else []
     if job == "events":  # broker first: the 08:45 ET run is inside Alpaca's market-on-open window
-        return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])]]
+        return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], [*learn, "collect", *largs]]
     if job == "allocator":
         return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])], broker]
     if job == "review":
-        return [[PY, "scripts/weekly_review.py"], [PY, "scripts/failure_review.py"]]
+        # the monthly loop rides on the Saturday review (it runs once per calendar month); never in dry mode, because
+        # its proposals register trials
+        monthly = [] if dry else [[*learn, "monthly"]]
+        return [[PY, "scripts/weekly_review.py"], [PY, "scripts/failure_review.py"], *monthly,
+                [*learn, "review", *largs]]
+    if job == "learn":  # proposals register trials: never in dry mode
+        return [] if dry else [[*learn, "monthly"]]
     raise SystemExit(f"unknown job {job}")
 
 
@@ -110,7 +125,8 @@ def scan(job: str, out: str, prev_missed: int | None) -> list[str]:
     flags = []
     if job == "allocator" and "DRAWDOWN" in out:
         flags.append("drawdown flag: " + next(x for x in out.splitlines() if "DRAWDOWN" in x)[:200])
-    flags += [x.split("BROKER ALERT:", 1)[1].strip()[:200] for x in out.splitlines() if "BROKER ALERT:" in x]
+    for tag in ("BROKER ALERT:", "LEARN ALERT:"):
+        flags += [x.split(tag, 1)[1].strip()[:200] for x in out.splitlines() if tag in x]
     n = missed_total(out) if job == "events" else None
     if n is not None and n > (prev_missed or 0):
         flags.append(f"{n - (prev_missed or 0)} new missed decision(s) ({n} in total)")
@@ -168,7 +184,7 @@ def run(job: str) -> int:
         alert(job, f"failed (exit {rc}); log {log.name}: {out.strip().splitlines()[-1][:200] if out.strip() else ''}")
     for f in scan(job, out, prev):
         alert(job, f)
-    if m == "live" and rc == 0 and job in ("events", "allocator", "review"):
+    if m == "live" and rc == 0 and job in ("events", "allocator", "review", "learn"):
         push(job)
     return rc
 
@@ -197,15 +213,63 @@ def check(today: date | None = None) -> list[str]:
     return gaps
 
 
+def go_live_reasons(recs: list[dict[str, Any]], ledger: Path) -> list[str]:
+    """Why the dry run is not good enough to switch to live ([] = switch). Judged on the dry heartbeats since DRY_FROM:
+    enough good event runs, at most one failed run, the last two event runs good, a good allocator run, and an intact
+    dry event ledger (its hash chain)."""
+    from app.forward.ledger import Ledger, LedgerError
+    d = [r for r in recs if r.get("mode") == "dry" and r.get("job") in ("events", "allocator")
+         and datetime.fromisoformat(r["start"]).astimezone(NY).date() >= DRY_FROM]
+    ev = [r for r in d if r["job"] == "events"]
+    out = []
+    good = sum(r.get("rc") == 0 for r in ev)
+    if good < MIN_GOOD_EVENT_RUNS:
+        out.append(f"only {good} good dry event runs (need {MIN_GOOD_EVENT_RUNS})")
+    bad = sum(r.get("rc") != 0 for r in d)
+    if bad > 1:
+        out.append(f"{bad} failed dry runs")
+    if len(ev) >= 2 and any(r.get("rc") != 0 for r in ev[-2:]):
+        out.append("one of the last two dry event runs failed")
+    if not any(r["job"] == "allocator" and r.get("rc") == 0 for r in d):
+        out.append("no good dry allocator run")
+    if ledger.exists():
+        try:
+            Ledger(ledger).verify()
+        except LedgerError as e:
+            out.append(f"dry event ledger broken: {e}")
+    return out
+
+
+def go_live(today: date | None = None) -> str | None:
+    """From GO_LIVE_ON, while still dry: switch to live if the dry run was clean (user-delegated 27 Sep: "autonomy live
+    on 5 Oct after the dry run"), else stay dry and say why. Returns the alert text, or None when nothing to do."""
+    today = today or datetime.now(NY).date()
+    if mode() != "dry" or today < GO_LIVE_ON:
+        return None
+    hb = FWD / "heartbeat.jsonl"
+    recs = [json.loads(x) for x in hb.read_text().splitlines()] if hb.exists() else []
+    reasons = go_live_reasons(recs, FWD / "events_autodry" / "ledger.jsonl")
+    if reasons:
+        return "still in DRY mode: " + "; ".join(reasons) + ". Fix, or switch by hand: scripts/autonomy.sh live"
+    (FWD / "AUTORUN_MODE").write_text("live\n")
+    append("go_live.jsonl", {"at": datetime.now(UTC).isoformat(timespec="seconds"), "switched": "live",
+                             "rule": "go_live_reasons() empty"})
+    return "switched to LIVE: the dry run was clean. The forward test runs for real from the next scheduled job."
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("job", choices=("events", "allocator", "review", "check"))
+    ap.add_argument("job", choices=("events", "allocator", "review", "check", "learn"))
     args = ap.parse_args()
     if args.job == "check":
         gaps = check()
         for g in gaps:
             alert("check", "missed run: " + g)
         print("\n".join(gaps) or "no missed runs")
+        msg = go_live()
+        if msg:
+            alert("go-live", msg)
+            print(msg)
         append("heartbeat.jsonl", {"job": "check", "mode": mode(), "start": datetime.now(UTC).isoformat(timespec="seconds"),
                                    "rc": 0, "gaps": len(gaps)})
         return
