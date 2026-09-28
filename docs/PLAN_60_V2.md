@@ -944,3 +944,40 @@ companies selling into that build-out gain for years.
   bound above 0, AND it adds to the live Bonsai log-odds (the learning loop's blend-gain test).
 - Note: this lens is about next-week earnings reactions. The view itself is a multi-year theme; a thematic sleeve
   would need its own design and test.
+
+### Day-trading track (spec fixed 2026-09-28, before any intraday data was downloaded)
+
+Data: Alpaca's free historical SIP 1-minute bars (full market, 2016 onward), regular hours only, cached once.
+Universe: SPY and QQQ (the most liquid; one trade a day per symbol fits the pattern-day-trader rule's spirit).
+Costs: 1 bp per side (2 bps a round trip); also reported at 5 bps a side. No leverage: each trade is 1× the track's
+capital. Two published rules, each tested only on data AFTER its publication, each its own trial:
+
+- **D1, intraday momentum** (Gao, Han, Li and Zhou, *Journal of Financial Economics* 2018): the return from the
+  previous close to 10:00 ET predicts the last half hour. Rule: at 15:30 ET, go long if that return is positive,
+  short if negative; exit at the 15:59 bar's close. Test window: 2019-01-02 to 2026-09-25 (after publication).
+  Trial `daytrade_intraday_momentum`.
+- **D2, 5-minute opening-range breakout** (Zarattini and Aziz, SSRN 2023): after the first 5-minute bar, go long
+  if it closed up, short if down, at 09:35; stop at the other end of that first bar; otherwise exit at 15:59. No
+  trade if the first bar is flat. Test window: 2023-07-01 to 2026-09-25 (after publication); 2016–2023 is
+  reported only. Trial `daytrade_orb5`.
+- **Pass (each):** on its test window, at 2 bps a round trip, the annualized Sharpe of the daily P&L (SPY and QQQ,
+  equal capital) is at least 0.5 AND its 95% block-bootstrap CI (21-day blocks) is above 0. Reported, not deciding:
+  5 bps costs, each symbol alone, correlation with the core book, worst month.
+- **Then:** a passing rule goes to paper as "untested" (the planner's 10% rung) only after 1 month of clean dry runs,
+  and earns more weight only by the evidence ladder (3 months of forward paper results).
+
+### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
+
+Jan and Bonsai pick S&P 500 stocks to hold for 3 months. **Forward-only:** Bonsai was trained on text that covers
+2024–26, so a backtest of its stock picks on those years would be flattered.
+
+- **Candidates:** every S&P 500 company with an earnings release in the last 100 days (its latest release on disk).
+- **Company card, built by code:** the latest release's first 4,000 characters, the previous quarter's outlook
+  (arm B3's extractor), 12-month and 1-month returns vs SPY, and (once they exist) the live lens labels.
+- **Bonsai reads each card** with a fixed prompt (`PROMPT_LT`): a 3-to-6-month view, `outlook_6m` from 1 (much
+  worse than the market) to 5 (much better), with a quoted reason; an unverified quote counts as 3.
+- **Picks:** on the first trading day of each month, the 10 highest ratings (ties: better 12-month return vs SPY
+  first), equal weight, held 3 months (three overlapping monthly cohorts). Scored vs SPY, costs 0.2% per side.
+- **Machinery gate:** a shadow at 0% for its first month. Then the planner's 10% "untested" rung.
+- **Pass (trial `longterm_picks_forward`), judged after 12 monthly cohorts have closed:** the mean cohort excess
+  return vs SPY after costs is positive with an 80% one-sided bootstrap bound above 0.
