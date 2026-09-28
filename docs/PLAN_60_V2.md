@@ -666,6 +666,26 @@ judgement calls". Arm A (release only, running now) stays as specified. Arm B ad
   +0.015 [−0.035, +0.058]: Bonsai's release-only labels add nothing the code's base features don't already carry.
   20-day: full − base −0.021 [−0.066, +0.024].
 
+### Arm B2: the same research with its news actually gathered (spec fixed 2026-09-27 ~23:30, after arm B's verdict)
+
+**Why a second arm B.** Arm B's gather ran 16 research workers behind the Internet Archive's pacing (one request per
+4 s); 75% of news calls hit their 15 s timeout. Jan had a news page for only **5% of 2024 releases** (the training
+year) and 46% of 2025-26. So arm B mostly tested "the filing twice", not web research. B2 changes only that.
+
+- **Step 1, news (network only):** `scripts/warm_news.py` makes the exact call Jan's prefetch makes
+  (`news_as_of` for the ticker at the release's acceptance time), one at a time with a long timeout, into the same
+  tool cache. The as-of rule and page parsing are unchanged. Coverage is reported per sample.
+- **Step 2, Jan (GPU, after arm C):** Jan-v1-4B re-gathers both samples with arm B's exact settings (model, prefetch v3,
+  rounds, tools, audit) into new folders (`_v3b2_2024`, `_v3b2`). Tool results come from the cache where present,
+  so the only intended difference is news being there.
+- **Step 3, Bonsai:** arm B's frozen prompt `PROMPT_R` and fields on the new evidence (same 6,000 + 6,000 characters,
+  same overflow rule), into `llm_fields_research_b2_<tag>.jsonl`.
+- **Step 4, the one test (trial `llm_fields_research_b2`):** exactly arm B's rule: the 2025-26 monthly IC of
+  (full B2 − full A) has a 95% CI above 0 (paired monthly bootstrap) AND full B2's own IC CI is above 0, 5-day vs
+  sector. Reported, not deciding: 20-day, B2 − B, and B2 on the releases where news was found.
+- **Stop rule:** if news coverage after step 1 is below 50% in 2024, B2 is not run (the Archive, not the pacing, is
+  then the limit) and a different free news source is specced instead.
+
 ### skfolio test (spec fixed 2026-09-27, before any run)
 
 Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capital cap?
