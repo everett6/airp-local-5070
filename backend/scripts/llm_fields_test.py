@@ -98,7 +98,9 @@ def research_main(variant: str = "") -> None:
         b = b[["accession", "has_research", *FIELDS_R]].rename(columns={f: f"{f}_r" for f in FIELDS_R})
         a = a.merge(b, on="accession")
         if variant:  # arm B2: also carry arm B's labels (reported: B2 - B) and whether Jan's evidence had news
-            ob = pd.DataFrame([json.loads(x) for x in (EV / f"llm_fields_research_{tag}.jsonl").read_text().splitlines()])
+            prev = {"b2": "", "b3": "_b2"}[variant]  # the arm each variant is compared with: B2 vs B, B3 vs B2
+            ob = pd.DataFrame([json.loads(x) for x in
+                               (EV / f"llm_fields_research{prev}_{tag}.jsonl").read_text().splitlines()])
             a = a.merge(ob[["accession", *FIELDS_R]].rename(columns={f: f"{f}_ob" for f in FIELDS_R}), on="accession")
             from llm_fields import research_folder
             a["has_news"] = [_has_news(research_folder(tag, variant) / f"{x}.json") for x in a["accession"]]
@@ -124,8 +126,9 @@ def research_main(variant: str = "") -> None:
                   "B_minus_A": paired_diff(test, f"A_{h}", f"B_{h}", h),
                   "vs_prior_guidance_alone": monthly_ic(test, f"guid_{h}", h, min_n=10)}
         if variant:
-            out[h]["B2_minus_B"] = paired_diff(test, f"OB_{h}", f"B_{h}", h)
-            out[h]["full_B2_with_news"] = monthly_ic(test[test["has_news"]], f"B_{h}", h, min_n=10)
+            name = {"b2": ("B2_minus_B", "full_B2_with_news"), "b3": ("B3_minus_B2", "full_B3_with_news")}[variant]
+            out[h][name[0]] = paired_diff(test, f"OB_{h}", f"B_{h}", h)
+            out[h][name[1]] = monthly_ic(test[test["has_news"]], f"B_{h}", h, min_n=10)
     if variant:
         out["with_news"] = {"2024": float(train["has_news"].mean()), "2025": float(test["has_news"].mean())}
     out["vs_prior_guidance_counts"] = test["vs_prior_guidance_r"].value_counts().to_dict()
@@ -133,7 +136,7 @@ def research_main(variant: str = "") -> None:
     out["pass"] = bool(r5["B_minus_A"]["ci_lo"] > 0 and (r5["full_B"]["ci_lo"] or 0) > 0)
     v = f"_{variant}" if variant else ""
     (EV / f"llm_fields_research{v}_test.json").write_text(json.dumps(out, indent=1, default=str) + "\n")
-    register({"trial": "llm_fields_research_b2" if variant else "jan_research_bonsai_fields_code", "date": time.strftime("%Y-%m-%d"), "kind": "signal_ic",
+    register({"trial": f"llm_fields_research_{variant}" if variant else "jan_research_bonsai_fields_code", "date": time.strftime("%Y-%m-%d"), "kind": "signal_ic",
               "ic": r5["full_B"]["mean_ic"], "result": "pass" if out["pass"] else "fail"})
     print(json.dumps(out, indent=1, default=str))
     print("verdict (pre-registered, 5-day):", "PASS" if out["pass"] else "FAIL")

@@ -23,6 +23,7 @@ import streamlit as st
 
 from app.dashboard import portfolio_data as P
 from app.portfolio import guard
+from app.portfolio import sleeve as S
 
 st.set_page_config(page_title="Paper Book", page_icon="◆", layout="wide")
 
@@ -310,9 +311,34 @@ def console() -> None:
                       {"side": lambda x: "pos" if x == "buy" else "neg"})
 
     elif surface == "AI PICKS":
-        st.markdown('<div class="q-note">1-week Bonsai book on new S&P 500 earnings releases · shadow book at 0 weight '
-                    '(scored, never traded) · score = 1-week log-odds, higher is more bullish · returns vs the '
-                    'sector ETF</div>', unsafe_allow_html=True)
+        st.markdown('<div class="q-note">1-week Bonsai scores on new S&P 500 earnings releases · every pick is scored '
+                    'here; picks scoring 2.87 or more also trade in the paper sleeve below · score = 1-week log-odds, '
+                    'higher is more bullish · returns vs the sector ETF</div>', unsafe_allow_html=True)
+        sb = P.sleeve_book()
+        with st.container(border=True):
+            title("paper sleeve · UNTESTED · 10% of the account · long stock / short sector ETF, 5 days")
+            if sb is None:
+                empty("The sleeve starts with the first event run that has a qualifying pick.")
+            else:
+                sname, sst = sb
+                sm = S.summary(sst)
+                strip([("equity", money(sm["equity"]), "of $10,000" + (" · dry run" if sname.endswith("dry") else ""),
+                        ""), ("return", pct(sm["return"]), "since start", tone(sm["return"])),
+                       ("drawdown", pct(sm["drawdown"], sign=False), "brake at 25%", "warn" if sm["drawdown"] > .15
+                        else ""), ("open", str(sm["open"] + sm["planned"]), "of 5 slots", ""),
+                       ("closed", str(sm["closed"]), "pairs", ""),
+                       ("per pair", pct(sm["mean_ret"]) if sm["mean_ret"] is not None else "—", "after costs",
+                        tone(sm["mean_ret"]))])
+                rows = P.sleeve_rows(sst)
+                if rows:
+                    table(rows[:30], [("ticker", "ticker", s2, False), ("etf", "hedge", s2, False),
+                                      ("status", "status", s2, False), ("entry", "entry", s2, False),
+                                      ("score", "score", lambda x: "—" if x is None else f"{x:+.2f}", True),
+                                      ("qty", "shares", lambda x: "—" if not x else str(x), True),
+                                      ("ret", "return", p2, True), ("note", "note", s2, False)], {"ret": tone})
+                st.markdown('<div class="q-note">No research version has passed its backtest; these rules were fixed '
+                            'before the forward test (docs/PLAN_60_V2.md). Replay of the same rules: 2024 −13.2%, '
+                            '2025–26 +8.6%.</div>', unsafe_allow_html=True)
         if ledger_err:
             st.markdown(f'<div class="q-note neg">ledger check failed: {esc(ledger_err)}</div>', unsafe_allow_html=True)
         if picks.empty or s is None:

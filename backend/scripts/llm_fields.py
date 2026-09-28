@@ -252,7 +252,8 @@ async def extract(prompt: str) -> None:
 
 
 def research_folder(tag: str, variant: str = "") -> Path:
-    """Jan's evidence folder. variant "b2": arm B2's re-gather with the news actually fetched (PLAN_60_V2 "Arm B2")."""
+    """Jan's evidence folder. variant "b2": arm B2's re-gather with the news actually fetched (PLAN_60_V2 "Arm B2");
+    "b3": B2's research with the evidence rebuilt by code (scripts/b3_evidence.py, "Arm B3")."""
     return EVIDENCE / (f"events_research_Jan-v1-4B-GGUF_Q4_K_M_v3{variant}" + ("_2024" if tag == "2024" else ""))
 
 
@@ -368,7 +369,7 @@ async def extract_judgement() -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=("dev", "extract", "extract-research", "test", "test-research", "extract-research-b2",
-                                    "test-research-b2", "dev-judgement",
+                                    "test-research-b2", "extract-research-b3", "test-research-b3", "dev-judgement",
                                     "extract-judgement", "test-judgement"))
     ap.add_argument("--prompt", default="")
     args = ap.parse_args()
@@ -380,8 +381,8 @@ def main() -> None:
         asyncio.run(extract(args.prompt))
     elif args.cmd == "extract-research":
         asyncio.run(extract_research())
-    elif args.cmd == "extract-research-b2":
-        asyncio.run(extract_research("b2"))
+    elif args.cmd in ("extract-research-b2", "extract-research-b3"):
+        asyncio.run(extract_research(args.cmd[-2:]))
     elif args.cmd == "dev-judgement":
         raise SystemExit(0 if asyncio.run(dev_judgement()) else 3)
     elif args.cmd == "extract-judgement":
@@ -392,9 +393,9 @@ def main() -> None:
     elif args.cmd == "test-research":
         from llm_fields_test import research_main
         research_main()
-    elif args.cmd == "test-research-b2":
+    elif args.cmd in ("test-research-b2", "test-research-b3"):
         from llm_fields_test import research_main
-        research_main("b2")
+        research_main(args.cmd[-2:])
     else:
         from llm_fields_test import main as test_main
         test_main()

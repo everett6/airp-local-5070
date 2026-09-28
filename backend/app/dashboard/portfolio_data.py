@@ -99,6 +99,21 @@ def load_events(name: str, fwd: Path = FWD) -> tuple[list[dict[str, Any]], str |
         return Ledger(fwd / name / "ledger.jsonl").records(), str(e)
 
 
+def sleeve_book(fwd: Path = FWD) -> tuple[str, dict[str, Any]] | None:
+    """The AI-picks sleeve's state (scripts/ai_picks.py): the real one, else the dry run's."""
+    for name in ("ai_picks", "ai_picks_autodry"):
+        f = fwd / name / "book.json"
+        if f.exists():
+            return name, json.loads(f.read_text())
+    return None
+
+
+def sleeve_rows(st: dict[str, Any]) -> list[dict[str, Any]]:
+    return [{"ticker": p["ticker"], "etf": p.get("etf") or "—", "status": p["status"], "entry": p.get("entry_day"),
+             "score": p.get("logodds"), "qty": p.get("qty"), "ret": p.get("ret"), "note": p.get("note", "")}
+            for p in reversed(st.get("pairs", []))]
+
+
 def picks(recs: list[dict[str, Any]]) -> pd.DataFrame:
     """One row per decision or missed release, with its outcome when it has matured."""
     out = {r["accession"]: r for r in recs if r.get("type") == "outcome"}
