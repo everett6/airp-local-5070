@@ -189,11 +189,57 @@ stage = (f'<span class="q-pill halt">{tstate}: {"NOTHING TRADES" if tstate == "H
          f'<span class="q-pill {"on" if live else ""}">STAGE: FORWARD · {"LIVE" if live else "PAUSED"}</span>')
 st.markdown(f'<div class="q-head"><span class="q-mark">◆</span><b>PAPER BOOK</b> / forward test · paper money · '
             f'{esc(P.BOOK_LABELS.get(book or "", book or "no book"))}{stage}</div>', unsafe_allow_html=True)
-surface = st.segmented_control("Surface", ["BOOK", "TRADES", "AI PICKS", "HEALTH"], default="BOOK",
+surface = st.segmented_control("Surface", ["BOOK", "TRADES", "AI PICKS", "GOAL", "HEALTH"], default="BOOK",
                                label_visibility="collapsed") or "BOOK"
 
 
 @st.fragment(run_every=timedelta(seconds=60) if live else None)
+def goal_panel() -> None:
+    """A dollar goal by a date, broken into what each track must earn, with the odds on today's evidence."""
+    import json as _json
+    from datetime import date as _date
+
+    from app.portfolio.planner import Goal, plan
+    pdir = P.FWD.parent / "planner"
+    rets_file = pdir / "track_returns.parquet"
+    if not rets_file.exists():
+        empty("Run `python scripts/track_returns.py` once to build the tracks' return histories.")
+        return
+    saved = _json.loads((pdir / "goal.json").read_text()) if (pdir / "goal.json").exists() else {}
+    c1, c2, c3 = st.columns(3)
+    start = c1.number_input("Start ($)", min_value=100.0, value=float(saved.get("start", 10_000)), step=1000.0)
+    target = c2.number_input("Target ($)", min_value=100.0, value=float(saved.get("target", 25_000)), step=1000.0)
+    by = c3.date_input("By", value=_date.fromisoformat(saved.get("by", "2029-12-31")),
+                       min_value=datetime.now(UTC).date())
+    res = plan(Goal(start, target, by, datetime.now(UTC).date()), pd.read_parquet(rets_file))
+    q, n, c = res["goal"], res["with_current_evidence"], res["core_only"]
+    strip([("needs", pct(q["required_cagr"]), f"a year for {q['years']} years", ""),
+           ("odds now", f"{100 * n['p_goal']:.0f}%", "with today's evidence", "pos" if n["p_goal"] >= .5 else "warn"),
+           ("median", money(n["median_end"]), f"{pct(n['median_cagr'])}/yr", tone(n["median_end"] - target)),
+           ("bad case", money(n["p5_end"]), "1 in 20 paths", ""),
+           ("gap", pct(res["gap_cagr"]), "points a year", "neg" if res["gap_cagr"] > 0 else "pos"),
+           ("core only", f"{100 * c['p_goal']:.0f}%", "odds", "")])
+    with st.container(border=True):
+        title("tracks · money moves only after a track passes its test")
+        table([{"track": t["label"], "status": t["status"].replace("_", " "), "weight": t["weight"],
+                "hist": t["history_cagr"], "next": t["unlock"]} for t in res["tracks"]],
+              [("track", "track", s2, False), ("status", "status", s2, False), ("weight", "weight now",
+               lambda x: f"{100 * x:.0f}%", True), ("hist", "history /yr", p2, True), ("next", "next step", s2, False)],
+              {"hist": tone})
+    need = res["picking_needs_cagr"]
+    st.markdown('<div class="q-note">For the goal to be a coin flip, the stock-picking tracks together would need to '
+                'earn, per year: ' + " · ".join(f"{pct(v)} at {k} of the book" for k, v in need.items())
+                + ". Evidence ladder: untested 10% → passed its test + 3 months forward 25% → 12 months forward 40%; "
+                  "picks at most 60%, max drawdown 35%.</div>", unsafe_allow_html=True)
+    for f in res["flags"]:
+        st.markdown(f'<div class="q-note warn">{esc(f)}</div>', unsafe_allow_html=True)
+    if st.button("Save this goal"):
+        pdir.mkdir(parents=True, exist_ok=True)
+        (pdir / "goal.json").write_text(_json.dumps({"start": start, "target": target, "by": by.isoformat()}) + "\n")
+        st.markdown('<div class="q-note">Saved: the weekly review reports progress against it.</div>',
+                    unsafe_allow_html=True)
+
+
 def console() -> None:
     first = date.fromisoformat(runs[0]["data_through"]) if runs else datetime.now(UTC).date()
     ents = pd.to_datetime(open_picks["entry"], errors="coerce").dropna()
@@ -386,6 +432,9 @@ def console() -> None:
                     title(f"missed releases ({len(miss)})")
                     table(miss.to_dict("records"), [("ticker", "ticker", s2, False), ("entry", "entry", s2, False),
                                                     ("reason", "reason", s2, False)])
+
+    elif surface == "GOAL":
+        goal_panel()
 
     else:  # HEALTH
         lt = P.last_run_times(runs, recs)

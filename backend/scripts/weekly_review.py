@@ -47,6 +47,26 @@ def shadows(eq: pd.Series, rf: pd.Series) -> dict[float, float]:
     return out
 
 
+def goal_lines() -> list[str]:
+    """Progress against the user's saved goal (results/planner/goal.json), on today's evidence (app/portfolio/planner.py)."""
+    import json
+
+    from app.portfolio.planner import Goal, plan
+    d = BACKEND / "results" / "planner"
+    if not (d / "goal.json").exists() or not (d / "track_returns.parquet").exists():
+        return []
+    g = json.loads((d / "goal.json").read_text())
+    res = plan(Goal(float(g["start"]), float(g["target"]), date.fromisoformat(g["by"]),
+                    datetime.now(UTC).date()),
+               pd.read_parquet(d / "track_returns.parquet"))
+    q, n = res["goal"], res["with_current_evidence"]
+    return ["", "## Goal", "",
+            f"- ${q['start']:,.0f} -> ${q['target']:,.0f} by {q['by']}: needs {q['required_cagr']:.1%} a year",
+            (f"- Odds on today's evidence: {n['p_goal']:.0%} (median ${n['median_end']:,.0f}; gap "
+             f"{res['gap_cagr']:+.1%} a year)"),
+            *[f"- {t['label']}: {t['status'].replace('_', ' ')}, {t['weight']:.0%}" for t in res["tracks"]]]
+
+
 def main() -> None:
     lines = [f"# Forward test review, {datetime.now(UTC).date().isoformat()}", ""]
     alloc = FWD / "allocator" / "ledger.jsonl"
@@ -96,6 +116,7 @@ def main() -> None:
     lines.append(f"- Missed decisions: {len(missed)}")
     reasons = pd.Series([r["reason"] for r in missed]).value_counts() if missed else pd.Series(dtype=int)
     lines += [f"  - {n} × {why}" for why, n in reasons.items()]
+    lines += goal_lines()
     out = FWD / f"review_{datetime.now(UTC).date().isoformat()}.md"
     out.write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
