@@ -251,17 +251,18 @@ async def extract(prompt: str) -> None:
         await llm.unload()
 
 
-def research_folder(tag: str) -> Path:
-    return EVIDENCE / ("events_research_Jan-v1-4B-GGUF_Q4_K_M_v3" + ("_2024" if tag == "2024" else ""))
+def research_folder(tag: str, variant: str = "") -> Path:
+    """Jan's evidence folder. variant "b2": arm B2's re-gather with the news actually fetched (PLAN_60_V2 "Arm B2")."""
+    return EVIDENCE / (f"events_research_Jan-v1-4B-GGUF_Q4_K_M_v3{variant}" + ("_2024" if tag == "2024" else ""))
 
 
-async def extract_research() -> None:
+async def extract_research(variant: str = "") -> None:
     """Arm B: the release plus Jan's as-of evidence; quotes may come from either."""
     llm = llm_client()
     try:
         for tag, events, feats in (("2024", "data/events/events_sp500_2024.csv", "features_sp500_2024_secchk.csv"),
                                    ("2025", "data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv")):
-            out = OUT / f"llm_fields_research_{tag}.jsonl"
+            out = OUT / f"llm_fields_research{('_' + variant) if variant else ''}_{tag}.jsonl"
             done = {json.loads(x)["accession"] for x in out.read_text().splitlines()} if out.exists() else set()
             keep = set(pd.read_csv(OUT / feats)["accession"])
             rows = [r for r in pd.read_csv(BACKEND / events).itertuples() if r.accession in keep and r.accession not in done]
@@ -269,7 +270,7 @@ async def extract_research() -> None:
             t0 = time.monotonic()
 
             async def one(r: Any, tag: str = tag) -> dict[str, Any] | None:
-                text, rp = text_of(r.accession), research_folder(tag) / f"{r.accession}.json"
+                text, rp = text_of(r.accession), research_folder(tag, variant) / f"{r.accession}.json"
                 if text is None:
                     return None
                 ev = (json.loads(rp.read_text()).get("evidence") or "")[:6000] if rp.exists() else ""
@@ -366,7 +367,8 @@ async def extract_judgement() -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=("dev", "extract", "extract-research", "test", "test-research", "dev-judgement",
+    ap.add_argument("cmd", choices=("dev", "extract", "extract-research", "test", "test-research", "extract-research-b2",
+                                    "test-research-b2", "dev-judgement",
                                     "extract-judgement", "test-judgement"))
     ap.add_argument("--prompt", default="")
     args = ap.parse_args()
@@ -378,6 +380,8 @@ def main() -> None:
         asyncio.run(extract(args.prompt))
     elif args.cmd == "extract-research":
         asyncio.run(extract_research())
+    elif args.cmd == "extract-research-b2":
+        asyncio.run(extract_research("b2"))
     elif args.cmd == "dev-judgement":
         raise SystemExit(0 if asyncio.run(dev_judgement()) else 3)
     elif args.cmd == "extract-judgement":
@@ -388,6 +392,9 @@ def main() -> None:
     elif args.cmd == "test-research":
         from llm_fields_test import research_main
         research_main()
+    elif args.cmd == "test-research-b2":
+        from llm_fields_test import research_main
+        research_main("b2")
     else:
         from llm_fields_test import main as test_main
         test_main()
