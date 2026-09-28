@@ -21,6 +21,7 @@ import json
 import subprocess
 import sys
 import time
+import urllib.request
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -48,10 +49,28 @@ def append(name: str, rec: dict[str, Any]) -> None:
         f.write(json.dumps(rec) + "\n")
 
 
+def ntfy_topic() -> str:
+    for line in (BACKEND / ".env").read_text().splitlines() if (BACKEND / ".env").exists() else []:
+        if line.startswith("NTFY_TOPIC="):
+            return line.split("=", 1)[1].strip()
+    return ""
+
+
 def alert(job: str, msg: str) -> None:
+    """alerts.jsonl + a desktop notification + a phone push via ntfy.sh (user-approved 2026-09-27) when a topic is set
+    in backend/.env. The push carries only the job name and the message."""
     append("alerts.jsonl", {"at": datetime.now(UTC).isoformat(timespec="seconds"), "job": job, "msg": msg})
     subprocess.run(["notify-send", "-u", "critical", f"Paper book: {job}", msg], check=False,
                    capture_output=True, timeout=10)
+    topic = ntfy_topic()
+    if topic:
+        try:
+            req = urllib.request.Request(f"https://ntfy.sh/{topic}", data=msg.encode()[:3000], method="POST",
+                                         headers={"Title": f"Paper book: {job}", "Priority": "high"})
+            urllib.request.urlopen(req, timeout=15).read()
+        except OSError:
+            append("alerts.jsonl", {"at": datetime.now(UTC).isoformat(timespec="seconds"), "job": "ntfy",
+                                    "msg": "phone push failed"})
 
 
 def commands(job: str, m: str) -> list[list[str]]:

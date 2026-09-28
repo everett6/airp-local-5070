@@ -157,10 +157,10 @@ The LLMs judge what news means; code decides what to do with money.
 
 | Decision | When | Default if you don't decide |
 |---|---|---|
-| Raise the drawdown limit toward 50% (needed for the 60% row) | before Phase D, not earlier | stays 35%: the book tops out around 20–30% a year |
-| Alpaca paper keys in `backend/.env` (regenerated) | Phase A | the broker adapter is skipped; simulator fills only |
-| Phone alerts via ntfy.sh | Phase A | desktop alerts only |
-| PrismML build permission | Phase B | Bonsai stays on Ollama; no multi-sample averaging |
+| Raise the drawdown limit toward 50% (needed for the 60% row) | **approved 27 Sep**; applied only when Phase D unlocks the 42% row | — |
+| Alpaca paper keys in `backend/.env` (regenerated) | Phase A (you add them) | the broker adapter is skipped; simulator fills only |
+| Phone alerts via ntfy.sh | **approved and connected 27 Sep** | — |
+| PrismML build | **approved 27 Sep**; benchmarked after the GPU runs | — |
 | Real money | never, in this plan | — |
 
 ## 7. Milestones
