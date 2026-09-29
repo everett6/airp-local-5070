@@ -58,7 +58,15 @@ def test_go_live_switches_only_after_a_clean_dry_run(tmp_path, monkeypatch):
     (tmp_path / "heartbeat.jsonl").write_text("\n".join(json.dumps(r) for r in clean) + "\n")
     assert autorun.go_live(date(2026, 10, 1)) is None            # too early: nothing happens
     assert autorun.mode() == "dry"
-    assert autorun.go_live_reasons(clean, tmp_path / "none.jsonl") == []
+    from app.forward.ledger import Ledger
+
+    events = tmp_path / "events_autodry" / "ledger.jsonl"
+    events.parent.mkdir()
+    Ledger(events).append("run", as_of="2026-10-02T22:30:00+00:00", new=0)
+    allocator = tmp_path / "allocator_autodry" / "ledger.jsonl"
+    allocator.parent.mkdir()
+    allocator.write_text(json.dumps({"books": {"master": {}}, "price_sources": {"SPY": "yahoo"}}) + "\n")
+    assert autorun.go_live_reasons(clean, events) == []
     msg = autorun.go_live(date(2026, 10, 2))
     assert msg.startswith("switched to LIVE") and autorun.mode() == "live"
     assert autorun.go_live(date(2026, 10, 3)) is None            # already live: nothing to do
@@ -71,6 +79,7 @@ def test_go_live_stays_dry_with_reasons(tmp_path, monkeypatch):
     (tmp_path / "heartbeat.jsonl").write_text("\n".join(json.dumps(r) for r in bad) + "\n")
     msg = autorun.go_live(date(2026, 10, 2))
     assert msg.startswith("still in DRY mode") and autorun.mode() == "dry"
+    assert "dry event ledger missing" in msg and "dry allocator ledger missing" in msg
     for part in ("good dry event runs", "2 failed dry runs", "last two", "no good dry allocator run"):
         assert part in msg
 
@@ -104,6 +113,24 @@ def test_step_runs_without_the_inhibitor_when_logind_refuses(monkeypatch):
     assert r.returncode == 0 and "ran without it" in r.stdout and calls[-1] == ["python", "x.py"]
 
 
+def test_step_retries_only_a_denied_inhibitor(monkeypatch):
+    import subprocess
+
+    calls = []
+
+    def fake(args, **kw):
+        calls.append(args)
+        if args[0] == "systemd-inhibit":
+            return subprocess.CompletedProcess(args, 1, "", autorun.INHIBIT_DENIED + "\n")
+        return subprocess.CompletedProcess(args, 0, "child ran\n", "")
+
+    monkeypatch.setattr(autorun.subprocess, "run", fake)
+    r = autorun.step(["python", "x.py"], inhibit=True)
+    assert r.returncode == 0 and "child ran" in r.stdout
+    assert "LEARN ALERT: sleep inhibitor refused" in r.stdout
+    assert len(calls) == 2 and calls[-1] == ["python", "x.py"]
+
+
 def test_step_keeps_a_real_failure(monkeypatch):
     import subprocess
 
@@ -115,3 +142,22 @@ def test_step_keeps_a_real_failure(monkeypatch):
         return subprocess.CompletedProcess(args, 1, "", "Failed to inhibit: looks similar but is the job's own error")
     monkeypatch.setattr(autorun.subprocess, "run", fake)
     assert autorun.step(["python", "x.py"], inhibit=True).returncode == 1 and len(calls) == 1  # never re-run
+
+
+def test_wait_online_retries_until_the_network_is_up(monkeypatch):
+    calls = []
+
+    class Sock:
+        def close(self):
+            pass
+
+    def conn(addr, timeout):
+        calls.append(addr)
+        if len(calls) < 3:
+            raise OSError("network unreachable")
+        return Sock()
+    monkeypatch.setattr(autorun.socket, "create_connection", conn)
+    assert autorun.wait_online(tries=5, pause=0) and len(calls) == 3
+    calls.clear()
+    monkeypatch.setattr(autorun.socket, "create_connection", lambda *a, **k: (_ for _ in ()).throw(OSError()))
+    assert not autorun.wait_online(tries=2, pause=0)

@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import socket
 import subprocess
 import sys
 import time
@@ -69,6 +70,19 @@ def ntfy_topic() -> str:
     return ""
 
 
+def wait_online(host: str = "www.sec.gov", tries: int = 24, pause: float = 5.0) -> bool:
+    """True once `host` accepts a connection. A catch-up run fired at boot can start before the network is up
+    (29 Sep 2026: the network came up 7 s after the run started), so jobs wait up to about 2 minutes for it."""
+    for i in range(tries):
+        try:
+            socket.create_connection((host, 443), timeout=5).close()
+            return True
+        except OSError:
+            if i < tries - 1:
+                time.sleep(pause)
+    return False
+
+
 def alert(job: str, msg: str) -> None:
     """alerts.jsonl + a desktop notification + a phone push via ntfy.sh (user-approved 2026-09-27) when a topic is set
     in backend/.env. The push carries only the job name and the message."""
@@ -81,9 +95,9 @@ def alert(job: str, msg: str) -> None:
             req = urllib.request.Request(f"https://ntfy.sh/{topic}", data=msg.encode()[:3000], method="POST",
                                          headers={"Title": f"Paper book: {job}", "Priority": "high"})
             urllib.request.urlopen(req, timeout=15).read()
-        except OSError:
+        except OSError as e:
             append("alerts.jsonl", {"at": datetime.now(UTC).isoformat(timespec="seconds"), "job": "ntfy",
-                                    "msg": "phone push failed"})
+                                    "msg": f"phone push failed ({type(e).__name__})"})
 
 
 def commands(job: str, m: str) -> list[list[str]]:
@@ -168,12 +182,19 @@ def can_inhibit() -> bool:
         return False
 
 
+INHIBIT_DENIED = ("Failed to inhibit: Access denied as the requested operation requires interactive "
+                  "authentication. However, interactive authentication has not been enabled by the calling program.")
+
+
 def step(cmd: list[str], inhibit: bool = True) -> subprocess.CompletedProcess[str]:
-    """One command, holding off idle sleep while it runs when `inhibit` (else noted in its output)."""
+    """Run once; retry bare only when logind proves the child never started."""
     pre = ["systemd-inhibit", "--what=idle:sleep", "--why=paper book run"] if inhibit else []
     r = subprocess.run([*pre, *cmd], cwd=BACKEND, capture_output=True, text=True, check=False, timeout=6 * 3600)
-    if not inhibit:
-        r.stdout = "(sleep inhibitor refused; ran without it)\n" + r.stdout
+    refused = inhibit and r.returncode != 0 and not r.stdout and r.stderr.strip() == INHIBIT_DENIED
+    if refused:
+        r = subprocess.run(cmd, cwd=BACKEND, capture_output=True, text=True, check=False, timeout=6 * 3600)
+    if not inhibit or refused:
+        r.stdout = "LEARN ALERT: sleep inhibitor refused; ran without it\n" + r.stdout
     return r
 
 
@@ -195,7 +216,7 @@ def run(job: str) -> int:
             append("heartbeat.jsonl", {"job": job, "mode": m, "start": start.isoformat(timespec="seconds"), "rc": -1,
                                        "skipped": "lock"})
             return 1
-        rc, out = 0, ""
+        rc, out = 0, "" if wait_online() else "(network still down after 2 minutes; ran anyway)\n"
         inhibit = can_inhibit()
         for cmd in commands(job, m):
             r = step(cmd, inhibit)
@@ -262,11 +283,23 @@ def go_live_reasons(recs: list[dict[str, Any]], ledger: Path) -> list[str]:
         out.append("one of the last two dry event runs failed")
     if not any(r["job"] == "allocator" and r.get("rc") == 0 for r in d):
         out.append("no good dry allocator run")
-    if ledger.exists():
+    if not ledger.exists():
+        out.append("dry event ledger missing")
+    else:
         try:
             Ledger(ledger).verify()
         except LedgerError as e:
             out.append(f"dry event ledger broken: {e}")
+    allocator = FWD / "allocator_autodry" / "ledger.jsonl"
+    if not allocator.exists():
+        out.append("dry allocator ledger missing")
+    else:
+        try:
+            runs = [json.loads(line) for line in allocator.read_text().splitlines()]
+            if not runs or not all(r.get("books") and r.get("price_sources") for r in runs):
+                out.append("dry allocator ledger incomplete")
+        except (OSError, json.JSONDecodeError):
+            out.append("dry allocator ledger unreadable")
     return out
 
 
