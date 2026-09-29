@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -23,6 +24,7 @@ from app.data_ingestion import bars
 from app.data_ingestion.tickers import trading_symbol
 
 OUT = BACKEND / "data" / "intraday" / "sp500_30min.parquet"
+PARTS = OUT.parent / "sp500_30min_parts"  # one file per batch, so a rerun resumes
 HISTORY = BACKEND / "data" / "events" / "events_2024-01-01_2026-09-24.csv"
 
 
@@ -33,8 +35,8 @@ def universe() -> list[str]:
 
 
 def fetch(client: httpx.Client, symbols: list[str], start: str, end: str) -> pd.DataFrame:
-    rows: list[dict] = []
-    params = {"symbols": ",".join(symbols), "timeframe": "30Min", "start": f"{start}T00:00:00Z",
+    rows: list[dict[str, object]] = []
+    params: dict[str, str | int] = {"symbols": ",".join(s.replace("-", ".") for s in symbols),  # Alpaca spells BRK.B with a dot "timeframe": "30Min", "start": f"{start}T00:00:00Z",
               "end": f"{end}T23:59:00Z", "feed": "sip", "adjustment": "split", "limit": 10000}
     while True:
         for attempt in range(6):
@@ -42,6 +44,12 @@ def fetch(client: httpx.Client, symbols: list[str], start: str, end: str) -> pd.
             if r.status_code == 429:
                 time.sleep(3 + 5 * attempt)
                 continue
+            if r.status_code == 400 and len(symbols) > 1:  # an unknown symbol: split the batch
+                h = len(symbols) // 2
+                return pd.concat([fetch(client, symbols[:h], start, end), fetch(client, symbols[h:], start, end)])
+            if r.status_code == 400:
+                print(f"  {symbols[0]}: no data ({r.text[:80]})", flush=True)
+                return pd.DataFrame(rows, columns=["ts", "symbol", "open", "close"])
             r.raise_for_status()
             break
         data = r.json()
@@ -49,7 +57,7 @@ def fetch(client: httpx.Client, symbols: list[str], start: str, end: str) -> pd.
             for b in bs:
                 t = pd.Timestamp(b["t"]).tz_convert("America/New_York")
                 if (t.hour, t.minute) in ((14, 30), (15, 30)):
-                    rows.append({"ts": t, "symbol": sym, "open": b["o"], "close": b["c"]})
+                    rows.append({"ts": t, "symbol": sym.replace(".", "-"), "open": b["o"], "close": b["c"]})
         tok = data.get("next_page_token")
         if not tok:
             break
@@ -66,11 +74,19 @@ def main() -> None:
     if not kid or not sec:
         raise SystemExit("no Alpaca keys in backend/.env")
     syms = universe()
-    parts = []
-    with httpx.Client(headers={"APCA-API-KEY-ID": kid, "APCA-API-SECRET-KEY": sec}, timeout=90) as c:
-        for i in range(0, len(syms), 25):
-            parts.append(fetch(c, syms[i:i + 25], a.start, a.end))
-            print(f"  {min(i + 25, len(syms))}/{len(syms)} symbols, {sum(len(p) for p in parts):,} bars", flush=True)
+    batches = [syms[i:i + 25] for i in range(0, len(syms), 25)]
+    PARTS.mkdir(parents=True, exist_ok=True)
+
+    def one(k: int) -> None:
+        f = PARTS / f"{k:03d}.parquet"
+        if f.exists():
+            return
+        with httpx.Client(headers={"APCA-API-KEY-ID": kid, "APCA-API-SECRET-KEY": sec}, timeout=90) as c:
+            fetch(c, batches[k], a.start, a.end).to_parquet(f)
+        print(f"  batch {k + 1}/{len(batches)} done", flush=True)
+    with ThreadPoolExecutor(4) as ex:
+        list(ex.map(one, range(len(batches))))
+    parts = [pd.read_parquet(PARTS / f"{k:03d}.parquet") for k in range(len(batches))]
     df = pd.concat(parts, ignore_index=True)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(OUT)
