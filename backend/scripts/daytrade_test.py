@@ -5,6 +5,7 @@
     python scripts/daytrade_test.py --rules D9   # round 5 (then --check-d9)
     python scripts/daytrade_test.py --rules D10  # round 6; needs scripts/premarket_stocks.py, daily_alpaca.py split
     python scripts/daytrade_test.py --rules P1   # pairs trading (GGR), daily closes
+    python scripts/daytrade_test.py --rules C1   # crypto funding carry; needs scripts/funding_data.py
 Each rule is one registered trial: run a rule once. Results merge into results/daytrade_test.json.
 
 Pass (each rule): on its post-publication window, at 1 bp a side, the annualized Sharpe of the daily P&L (SPY and
@@ -194,6 +195,37 @@ def run_p1(core: pd.Series) -> dict:
                   f"0 bps {res['0bp']['sharpe']}, 20 bps {res['20bp']['sharpe']}, invested {res['invested_share']:.0%}")
 
 
+C1_START, C1_END, C1_TRIAL = "2023-05-01", "2026-09-24", "crypto_funding_carry"
+
+
+def run_c1(core: pd.Series) -> dict:
+    """C1 crypto funding carry (Deribit funding; excess over the 3-month T-bill): one trial, 95% CI."""
+    from vol_target_b0 import tbill
+
+    from app.sandbox.carry import funding_carry
+    r = funding_carry(pd.read_parquet(BACKEND / "data" / "crypto" / "funding_deribit.parquet"))
+    rf = tbill().reindex(r.index, method="ffill").fillna(0.0) / 365  # crypto trades every day
+    ex = (r["ret"] - rf).rename("ex")
+    test, full = ex.loc[C1_START:C1_END], r.loc[C1_START:C1_END]
+    k = (365 / 252) ** 0.5  # stats() annualizes with 252 trading days; crypto earns all 365
+
+    def st365(x: pd.Series) -> dict:
+        d = stats(x)
+        return d | {"sharpe": round(d["sharpe"] * k, 3), "ci": [round(c * k, 3) for c in d["ci"]]}
+    res: dict = {"window": [C1_START, C1_END], "excess": st365(test), "raw": st365(full["ret"]),
+                 "gross_cagr": round(float((1 + full["gross"]).prod() ** (365 / len(full)) - 1), 4),
+                 "held_share": {a: round(float(full[f"held_{a}"].mean()), 3) for a in ("btc", "eth")},
+                 "by_year_excess_sharpe": {str(y): round(sharpe(g) * k, 2) for y, g in test.groupby(test.index.year)},
+                 "by_asset_cagr": {a: round(float((1 + full[a]).prod() ** (365 / len(full)) - 1), 4)
+                                   for a in ("btc", "eth")},
+                 "before_window_excess": st365(ex.loc[:C1_START].iloc[:-1]) if len(ex.loc[:C1_START]) > 60 else None,
+                 "corr_with_core": round(float(test.corr(core.reindex(test.index))), 3),
+                 "note": "Sharpe annualized with sqrt(365): daily returns on every calendar day"}
+    return finish("C1", C1_TRIAL, C1_START, C1_END, res, res["excess"],
+                  f"raw CAGR {res['raw']['cagr']:.1%}, held BTC {res['held_share']['btc']:.0%} ETH "
+                  f"{res['held_share']['eth']:.0%}")
+
+
 def check_d9() -> dict:
     """D9's pre-stated validity check: the same rule on Alpaca's SIP daily bars (scripts/daily_alpaca.py)."""
     from intraday_stocks import universe
@@ -235,7 +267,7 @@ def main() -> None:
         return
     rules = a.rules.split(",")
     bars = ({s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")}
-            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "P1"} else {})
+            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "P1", "C1"} else {})
     core = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")["core"]
     f = BACKEND / "results" / "daytrade_test.json"
     out: dict = json.loads(f.read_text()) if f.exists() else {}
@@ -246,8 +278,8 @@ def main() -> None:
             out[name] = run_d5(core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
-        if name in ("D7", "D8", "D9", "D10", "P1"):
-            out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10, "P1": run_p1}[name](core)
+        if name in ("D7", "D8", "D9", "D10", "P1", "C1"):
+            out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10, "P1": run_p1, "C1": run_c1}[name](core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
         fn, start, trial = RULES[name]

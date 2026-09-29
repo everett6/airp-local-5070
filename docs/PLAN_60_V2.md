@@ -1320,6 +1320,8 @@ negative in 2025. Market-neutral, so it is judged against cash, not SPY.
 - **Tradability (stated now):** Deribit does not serve US residents; a pass would be a paper shadow first, and a real
   version would need a US venue (e.g. Coinbase's US perpetual-style futures) and a mandate change by the user.
   **If it fails:** no variant.
+- **Clarification (2026-09-29 ~15:25 PDT, before any funding data was downloaded):** "annualized" uses √365, since the
+  carry earns on every calendar day (stock tests use √252 trading days); CAGR uses 365 days a year.
 
 ### Core leads, forward check (spec fixed 2026-09-29 ~12:05 PDT, before any forward data)
 
