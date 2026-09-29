@@ -3,7 +3,7 @@
 # news warm-up runs -> stop rule (news coverage >= 50%) -> Jan gather (vLLM) -> audit -> Bonsai PROMPT_R labels ->
 # the one test. GPU stages never overlap the live runs: they stop before each quiet window and resume after it.
 # Resumable. Manual run, not a service:  systemd-inhibit --what=idle:sleep scripts/arm_b4_run.sh
-set -u
+set -u -o pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT/backend"
 PY=.venv/bin/python
@@ -31,15 +31,17 @@ start_ollama() {
   OLLAMA_MODELS=$HOME/.ollama/models OLLAMA_NOPRUNE=1 OLLAMA_HOST=127.0.0.1:11435 OLLAMA_NUM_PARALLEL=3 \
     OLLAMA_MAX_LOADED_MODELS=1 OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 \
     setsid ollama serve >> results/events/ollama_b4.log 2>&1 &
-  SRV=$!; until curl -s -m 2 127.0.0.1:11435/api/tags > /dev/null; do sleep 2; done; }
+  SRV=$!; until curl -s -m 2 127.0.0.1:11435/api/tags > /dev/null; do
+    kill -0 "$SRV" 2>/dev/null || { LOG "ollama exited"; tail -20 results/events/ollama_b4.log; SRV=""; return 1; }; sleep 2; done; }
 start_vllm() {
   MAX_SEQS=${MAX_SEQS:-16} GPU_UTIL=${GPU_UTIL:-0.85} setsid "$ROOT/scripts/vllm_serve.sh" >> results/events/vllm_b4.log 2>&1 &
   SRV=$!; until curl -s -m 2 127.0.0.1:8000/v1/models > /dev/null; do
-    kill -0 "$SRV" 2>/dev/null || { LOG "vLLM exited"; tail -20 results/events/vllm_b4.log; return 1; }; sleep 5; done; }
+    kill -0 "$SRV" 2>/dev/null || { LOG "vLLM exited"; tail -20 results/events/vllm_b4.log; SRV=""; return 1; }; sleep 5; done; }
 # a stage stopped mid-write can leave a half line at the end of a label file: drop it before resuming
 trim() { for f in results/events/llm_fields_b4.jsonl results/events/llm_fields_research_b4_b4.jsonl; do [ -f "$f" ] && $PY -c "
 import json, sys; p = sys.argv[1]; L = open(p).read().splitlines(True)
-try: L and json.loads(L[-1])
+try:
+    if L and json.loads(L[-1]) is not None and not L[-1].endswith(chr(10)): open(p, 'a').write(chr(10))
 except ValueError: open(p, 'w').writelines(L[:-1]); print('dropped a half line in', p)" "$f"; done; }
 # gpu_stage NAME SERVER CMD...: run CMD with SERVER up, stopping before each quiet window; resume until it exits 0
 gpu_stage() {
@@ -48,6 +50,7 @@ gpu_stage() {
     quiet_wait; gpu_idle
     LOG "$name: start"
     $server || { fails=$((fails + 1)); [ $fails -ge 2 ] && return 1; continue; }
+    [ "$($PY -c "$QUIET" wait)" -gt 0 ] && { stop_srv; continue; }  # a window began while waiting or starting
     timeout --signal=TERM "$(until_quiet)" "$@"; rc=$?
     stop_srv; sleep 5; trim
     [ $rc -eq 0 ] && { LOG "$name: done"; return 0; }
@@ -58,6 +61,10 @@ gpu_stage() {
 
 [ -f data/events/events_b4_2026.csv ] || $PY scripts/b4_prep.py
 gpu_stage "Bonsai arm A labels (P2)" start_ollama $PY scripts/llm_fields.py extract-b4 || { LOG "arm A labels failed"; exit 1; }
+N=$(grep -c '"sample": "b4"' results/events/warm_news.jsonl 2>/dev/null || echo 0)
+if ! pgrep -f "[w]arm_news.py b4" > /dev/null && [ "$N" -lt 2851 ]; then
+  LOG "starting the news warm-up ($N of 2851 done)"; setsid $PY scripts/warm_news.py b4 >> results/events/warm_news_b4.log 2>&1 &
+  sleep 5; fi
 LOG "waiting for the news warm-up"
 while pgrep -f "[w]arm_news.py b4" > /dev/null; do sleep 60; done
 COV=$($PY -c "
