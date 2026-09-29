@@ -1006,6 +1006,33 @@ capital. Two published rules, each tested only on data AFTER its publication, ea
 - **Then:** a passing rule goes to paper as "untested" (the planner's 10% rung) only after 1 month of clean dry runs,
   and earns more weight only by the evidence ladder (3 months of forward paper results).
 
+### Day-trading round 2: D3 and D4 (spec fixed 2026-09-28 ~19:30, after D1/D2 failed, before any D3/D4 code ran)
+
+Why round 1 failed: before costs both rules earned about 0 a day (D1 was already negative in 2016–18, before its
+test window), so any cost made them lose. Round 2 tests two newer published rules that trade only on stronger
+signals. Same data, universe, costs, pass rule and windows-after-publication discipline as D1/D2; each its own trial.
+
+- **D3, "noise area" breakout with a VWAP stop** (Zarattini, Aziz and Barbon, "Beat the Market", SSRN May 2024),
+  as we read it, at 1× (the paper's volatility-sized leverage is left out, as in D1/D2):
+  - For each minute of the day, σ(minute) = mean over the previous 14 trading days of |price at that minute / that
+    day's open − 1|.
+  - Upper bound = max(today's open, yesterday's close) × (1 + σ); lower bound = min(today's open, yesterday's
+    close) × (1 − σ).
+  - Checks at 10:00, 10:30, …, 15:30 (the price is the close of the minute before). Flat: above the upper bound →
+    long, below the lower bound → short, at the next bar's open. Long: exit if price is below max(upper bound,
+    VWAP since 09:30); short: exit if above min(lower bound, VWAP). A position can be re-opened at a later check.
+    Everything is closed at the 15:59 close. Cost: 1 bp per side per entry and per exit.
+  - Test window: 2024-06-01 to 2026-09-25 (about 580 days; short, so its CI will be wide). Trial `daytrade_noise_vwap`.
+- **D4, market intraday momentum, rest-of-day signal** (Baltussen, Da, Lammers and Martens, *Journal of Financial
+  Economics*, October 2021): the return from yesterday's close to 15:30 (the close of the 15:29 bar) predicts the
+  last half hour. Rule: at 15:30 go long if positive, short if negative; exit at the 15:59 close. Test window:
+  2021-11-01 to 2026-09-25. Trial `daytrade_rod_momentum`.
+- **Pass (each):** as D1/D2 (Sharpe ≥ 0.5 and 95% block-bootstrap CI above 0 at 1 bp a side, SPY and QQQ equal
+  capital). Reported: 5 bps, each symbol, trades per week (the pattern-day-trader rule allows 3 per 5 days under
+  $25k), and the before-window.
+- **If one passes:** it would trade micro index futures (MES/MNQ, not subject to the pattern-day-trader rule) in
+  the simulator, after a month of clean dry runs, then by the evidence ladder.
+
 ### Day-trading result (2026-09-28): **both rules FAIL**
 
 | Rule, test window (after publication) | Sharpe at 2 bps | 95% CI | CAGR | at 10 bps | hit rate |
