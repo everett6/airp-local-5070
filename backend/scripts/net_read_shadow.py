@@ -1,5 +1,6 @@
-"""Arm C2 and arm D (docs/PLAN_60_V2.md): Bonsai's `net_read`, and its call through the AI-build-out lens (`ai_read`,
-the Aschenbrenner view the user asked for), on live releases only: shadows with no money.
+"""Arms C2, D and E (docs/PLAN_60_V2.md): Bonsai's `net_read`, its call through the AI-build-out lens (`ai_read`, the
+Aschenbrenner view the user asked for) and its bull/bear thesis (`bb_read`, with the quoted points of each side), on
+live releases only: shadows with no money.
 
     python scripts/net_read_shadow.py --dir results/forward/events      # label new decisions, then print the score
     python scripts/net_read_shadow.py --dir results/forward/events --status
@@ -27,17 +28,31 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 import numpy as np
 import pandas as pd
 from forward_events import Ollama, wait_gpu_free
-from llm_fields import FIELDS_AI, FIELDS_J, PROMPT_AI, PROMPT_J, ask, parse, text_of, verify
+from llm_fields import (
+    FIELDS_AI,
+    FIELDS_BB,
+    FIELDS_J,
+    PROMPT_AI,
+    PROMPT_BB,
+    PROMPT_J,
+    ask,
+    parse,
+    text_of,
+    theses,
+    verify,
+)
 
 from app.forward.ledger import Ledger
 from app.sandbox.gpu_lock import gpu_priority
 
 PORT = 11440
 SCORE = {"bullish": 1, "neutral": 0, "bearish": -1}
-# lens -> (prompt, fields, the scored field, its file): C2 (net_read) and arm D (the AI-build-out lens), both live-only
+# lens -> (prompt, fields, the scored field, its file): C2 (net_read), arm D (the AI-build-out lens) and arm E (the
+# bull/bear thesis), all live-only
 LENSES: dict[str, tuple[str, dict[str, tuple[tuple[str, ...], str]], str, str]] = {
     "net_read": (PROMPT_J, FIELDS_J, "net_read", "net_read.jsonl"),
-    "ai_lens": (PROMPT_AI, FIELDS_AI, "ai_read", "ai_lens.jsonl")}
+    "ai_lens": (PROMPT_AI, FIELDS_AI, "ai_read", "ai_lens.jsonl"),
+    "bull_bear": (PROMPT_BB, FIELDS_BB, "bb_read", "bull_bear.jsonl")}
 PASS = {"min_events": 150, "min_months": 3, "min_ic": 0.02}  # judged with learn_loop's blend-gain test as well
 
 
@@ -60,8 +75,12 @@ async def label(llm: Any, r: dict[str, Any], lens: str = "net_read") -> dict[str
         return rec | {key: "neutral", "parsed": False, "note": "no release text"}
     user, source = u
     reply, overflow = await ask(llm, prompt, user)
-    v = verify(parse(reply), source, fields)
-    return rec | {key: v[key], "parsed": v["parsed"], "overflow": overflow, "fields": {f: v[f] for f in fields}}
+    raw = parse(reply)
+    v = verify(raw, source, fields)
+    rec |= {key: v[key], "parsed": v["parsed"], "overflow": overflow, "fields": {f: v[f] for f in fields}}
+    if lens == "bull_bear":
+        rec |= theses(raw, source) | {"reason": str((raw or {}).get("reason", ""))[:300]}
+    return rec
 
 
 def scored(d: Path, lens: str = "net_read") -> pd.DataFrame:
@@ -118,7 +137,7 @@ def run(d: Path, use_gpu: bool) -> dict[str, int]:
         srv = Ollama(PORT, str(Path.home() / ".ollama" / "models"), 3, d / "ollama_net_read.log")
         try:
             llm = OllamaLLM("bonsai-27b:latest", base_url=f"http://127.0.0.1:{PORT}", concurrency=3, num_ctx=8192,
-                            num_predict=1000, cache=False, require_gpu=True)
+                            num_predict=1200, cache=False, require_gpu=True)
 
             async def go() -> dict[str, list[dict[str, Any]]]:
                 try:

@@ -967,6 +967,24 @@ companies selling into that build-out gain for years.
 - Note: this lens is about next-week earnings reactions. The view itself is a multi-year theme; a thematic sleeve
   would need its own design and test.
 
+### Arm E: bull/bear thesis (spec fixed 2026-09-28 ~18:00, before any live release is read with it)
+
+The user asked for a bull/bear thesis. Bonsai argues both sides of each live release before it decides.
+
+- **Prompt `PROMPT_BB`** (scripts/llm_fields.py, fixed): up to 3 bull points and up to 3 bear points, each a short
+  point with a quote copied word for word. The prompt says to make each case in earnest, even when the release
+  clearly favours the other side. Then a weighed `reason` and `bb_read` (bullish / neutral / bearish), with the usual
+  quote check. Score: bullish +1, neutral 0, bearish −1. Each point is stored with `verified` (quote found in the
+  text or not); unverified points are shown, marked, and never scored.
+- **Forward only**, like C2 and D (a judgement Bonsai could flatter with hindsight on 2024–26):
+  `scripts/net_read_shadow.py` labels each live decision before its entry deadline into
+  `<events dir>/bull_bear.jsonl`, no money. The dashboard's AI PICKS tab shows each pick's thesis.
+- **Pass (one trial, `bull_bear_forward`):** C2's and D's rule. At the first review with at least 150 scored releases
+  and 3 months, the monthly rank IC of `bb_read` vs 5-day sector-relative returns has a mean above 0.02 and an 80%
+  one-sided bootstrap bound above 0, AND it adds to the live Bonsai log-odds (the learning loop's blend-gain test).
+- **Quality check before going live** (10 random releases, quality only, no returns): parsed 10/10, every release has
+  both sides, 53 of 60 point quotes verified; about 8 seconds per release.
+
 ### Day-trading track (spec fixed 2026-09-28, before any intraday data was downloaded)
 
 Data: Alpaca's free historical SIP 1-minute bars (full market, 2016 onward), regular hours only, cached once.
@@ -1017,3 +1035,10 @@ Jan and Bonsai pick S&P 500 stocks to hold for 3 months. **Forward-only:** Bonsa
 - **Machinery gate:** a shadow at 0% for its first month. Then the planner's 10% "untested" rung.
 - **Pass (trial `longterm_picks_forward`), judged after 12 monthly cohorts have closed:** the mean cohort excess
   return vs SPY after costs is positive with an 80% one-sided bootstrap bound above 0.
+
+**Change before the first cohort (2026-09-28 ~18:00, no pick made yet):** at the user's request, `PROMPT_LT` now
+has Bonsai write a bull case and a bear case (up to 3 quoted points each, same form as arm E) before it weighs
+them and rates. The rating field, the quote check, the pick rule and the pass rule are unchanged; the theses are
+stored with each rating and shown on the dashboard. Quality check (10 random cards, quality only): parsed 10/10,
+both sides on every card, 54 of 60 quotes verified; 9 of 10 cards rated 4. Time: about 8 seconds per card (was 3),
+so a monthly cohort of about 490 cards takes about 70 minutes of GPU time.

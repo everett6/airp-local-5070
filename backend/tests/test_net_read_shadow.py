@@ -81,3 +81,32 @@ def test_ai_lens_uses_its_own_prompt_and_file(monkeypatch, tmp_path):
     d = _dir(tmp_path)
     (d / "ai_lens.jsonl").write_text((d / "net_read.jsonl").read_text().replace('"net_read"', '"ai_read"'))
     assert N.status(d, "ai_lens")["events"] == 11
+
+
+def test_bull_bear_keeps_points_and_marks_quotes(monkeypatch):
+    text = "Revenue rose 12%. We raise our full-year outlook on strong demand. Costs were higher than planned."
+    monkeypatch.setattr(N, "text_of", lambda acc: text)
+    r = {"accession": "a", "ticker": "T", "entry_deadline": "2026-10-06T09:30:00-04:00"}
+
+    async def fake(system, user):
+        assert system == N.PROMPT_BB
+        return json.dumps({
+            "bull": [{"point": "Guidance raised", "quote": "We raise our full-year outlook on strong demand."},
+                     {"point": "Invented", "quote": "Margins hit a record high this quarter."},
+                     {"point": "", "quote": "x"}, {"point": "a"}, {"point": "b"}],
+            "bear": [{"point": "Costs up", "quote": "Costs were higher than planned."}],
+            "reason": "bull wins", "bb_read": {"label": "bullish", "quote": "We raise our full-year outlook on strong demand."}})
+    out = asyncio.run(N.label(fake, r, "bull_bear"))
+    assert out["bb_read"] == "bullish" and out["reason"] == "bull wins"
+    assert [(p["point"], p["verified"]) for p in out["bull"]] == [("Guidance raised", True), ("Invented", False)]
+    assert out["bear"][0]["verified"] and len(out["bear"]) == 1
+
+
+def test_bull_bear_survives_garbage(monkeypatch):
+    monkeypatch.setattr(N, "text_of", lambda acc: "Some release text here.")
+    r = {"accession": "a", "ticker": "T", "entry_deadline": "2026-10-06T09:30:00-04:00"}
+
+    async def fake(system, user):
+        return '{"bull": "not a list", "bear": null}'
+    out = asyncio.run(N.label(fake, r, "bull_bear"))
+    assert out["bb_read"] == "neutral" and out["bull"] == [] and out["bear"] == []

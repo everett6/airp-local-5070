@@ -114,6 +114,27 @@ def sleeve_rows(st: dict[str, Any]) -> list[dict[str, Any]]:
             for p in reversed(st.get("pairs", []))]
 
 
+def theses(name: str, fwd: Path = FWD) -> dict[str, dict[str, Any]]:
+    """Bonsai's bull/bear thesis per release (arm E, scripts/net_read_shadow.py), by accession."""
+    f = fwd / name / "bull_bear.jsonl"
+    rows = [json.loads(x) for x in f.read_text().splitlines() if x.strip()] if f.exists() else []
+    return {r["accession"]: r for r in rows}
+
+
+def longterm_cohort(fwd: Path = FWD) -> tuple[dict[str, Any], list[dict[str, Any]]] | None:
+    """The latest long-term cohort and its picks' ratings (with their bull/bear theses), or None before the first."""
+    d = fwd / "longterm"
+    if not (d / "ledger.jsonl").exists():
+        return None
+    cohorts = [r for r in Ledger(d / "ledger.jsonl").records() if r.get("type") == "cohort"]
+    if not cohorts:
+        return None
+    c = cohorts[-1]
+    f = d / f"ratings_{c['month']}.jsonl"
+    rated = {r["ticker"]: r for r in map(json.loads, f.read_text().splitlines())} if f.exists() else {}
+    return c, [rated.get(t, {"ticker": t}) for t in c["tickers"]]
+
+
 def picks(recs: list[dict[str, Any]]) -> pd.DataFrame:
     """One row per decision or missed release, with its outcome when it has matured."""
     out = {r["accession"]: r for r in recs if r.get("type") == "outcome"}

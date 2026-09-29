@@ -108,3 +108,21 @@ def test_run_log_newest_first_with_every_job(tmp_path):
 def test_underwater():
     u = P.underwater(pd.Series([100.0, 110.0, 99.0, 121.0]))
     assert list(u.round(4)) == [0.0, 0.0, -0.1, 0.0]
+
+
+def test_theses_and_longterm_cohort(tmp_path):
+    import json
+
+    from app.dashboard import portfolio_data as PD
+    from app.forward.ledger import Ledger
+    (tmp_path / "events").mkdir()
+    (tmp_path / "events" / "bull_bear.jsonl").write_text(json.dumps({"accession": "a1", "bb_read": "bullish"}) + "\n")
+    assert PD.theses("events", tmp_path)["a1"]["bb_read"] == "bullish" and PD.theses("none", tmp_path) == {}
+    assert PD.longterm_cohort(tmp_path) is None
+    d = tmp_path / "longterm"
+    d.mkdir()
+    Ledger(d / "ledger.jsonl").append("cohort", month="2026-10", made_on="2026-10-01", tickers=["AAA", "BBB"],
+                                      candidates=2)
+    (d / "ratings_2026-10.jsonl").write_text(json.dumps({"ticker": "AAA", "rating": 5, "bull": [], "bear": []}) + "\n")
+    c, rows = PD.longterm_cohort(tmp_path)
+    assert c["month"] == "2026-10" and rows[0]["rating"] == 5 and rows[1] == {"ticker": "BBB"}

@@ -194,6 +194,18 @@ surface = st.segmented_control("Surface", ["BOOK", "TRADES", "AI PICKS", "GOAL",
 
 
 @st.fragment(run_every=timedelta(seconds=60) if live else None)
+def thesis(r: dict[str, Any]) -> None:
+    """One bull/bear thesis: each side's quoted points (an unverified quote is marked), then the verdict's reason."""
+    for side, cls in (("bull", "pos"), ("bear", "neg")):
+        pts = r.get(side) or []
+        items = "".join(f"<li>{esc(p['point'])}" + ("" if p.get("verified") else ' <span class="q-note">(quote not '
+                                                    "found in the text)</span>") + "</li>" for p in pts)
+        st.markdown(f'<div class="{cls}"><b>{side.upper()}</b></div><ul>{items or "<li>none given</li>"}</ul>',
+                    unsafe_allow_html=True)
+    if r.get("reason"):
+        st.markdown(f'<div class="q-note">weighed: {esc(r["reason"])}</div>', unsafe_allow_html=True)
+
+
 def goal_panel() -> None:
     """A dollar goal by a date, broken into what each track must earn, with the odds on today's evidence."""
     import json as _json
@@ -385,6 +397,27 @@ def console() -> None:
                 st.markdown('<div class="q-note">No research version has passed its backtest; these rules were fixed '
                             'before the forward test (docs/PLAN_60_V2.md). Replay of the same rules: 2024 −13.2%, '
                             '2025–26 +8.6%.</div>', unsafe_allow_html=True)
+        th = P.theses(ev_dir) if ev_dir else {}
+        if th and not picks.empty:
+            with st.container(border=True):
+                title("bull / bear thesis · newest releases · shadow (arm E, not traded on)")
+                recent = picks[picks["accession"].isin(th)].sort_values("entry", ascending=False).head(12)
+                for pk in recent.to_dict("records"):
+                    bb = th[str(pk["accession"])]
+                    with st.expander(f"{pk['ticker']} · {bb.get('bb_read', 'neutral')} · score {pk['score']:+.2f}"):
+                        thesis(bb)
+        lc = P.longterm_cohort()
+        with st.container(border=True):
+            title("long-term picks · SHADOW · top 10 of the S&P 500, held 3 months vs SPY")
+            if lc is None:
+                empty("The first cohort is made on Thu 1 Oct after the close.")
+            else:
+                coh, lrows = lc
+                st.markdown(f'<div class="q-note">cohort {esc(coh["month"])} · made {esc(coh["made_on"])} from '
+                            f'{coh["candidates"]} company cards · ratings 1–5</div>', unsafe_allow_html=True)
+                for lr in lrows:
+                    with st.expander(f"{lr['ticker']} · rating {lr.get('rating', '—')}"):
+                        thesis(lr)
         if ledger_err:
             st.markdown(f'<div class="q-note neg">ledger check failed: {esc(ledger_err)}</div>', unsafe_allow_html=True)
         if picks.empty or s is None:

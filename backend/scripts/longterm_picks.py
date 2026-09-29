@@ -29,7 +29,7 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 import numpy as np
 import pandas as pd
 from b3_evidence import outlook
-from llm_fields import FIELDS_LT, PROMPT_LT, ask, parse, verify
+from llm_fields import FIELDS_LT, PROMPT_LT, ask, parse, theses, verify
 
 from app.forward.ledger import Ledger
 from app.forward.schedule import NY
@@ -96,7 +96,8 @@ async def rate(llm: Any, cs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         raw = parse(reply)
         v = verify(raw, c["source"], FIELDS_LT)
         return {"ticker": c["ticker"], "accession": c["accession"], "r12": c["r12"], "rating": int(v["outlook_6m"]),
-                "parsed": v["parsed"], "overflow": overflow, "reason": str((raw or {}).get("reason", ""))[:300]}
+                "parsed": v["parsed"], "overflow": overflow, "reason": str((raw or {}).get("reason", ""))[:300],
+                **theses(raw, c["source"])}
     return list(await asyncio.gather(*(one(c) for c in cs)))
 
 
@@ -190,7 +191,7 @@ def run(events_dir: Path, out: Path, now: datetime, use_gpu: bool) -> None:
         srv = Ollama(PORT, str(Path.home() / ".ollama" / "models"), 3, out / "ollama.log")
         try:
             llm = OllamaLLM("bonsai-27b:latest", base_url=f"http://127.0.0.1:{PORT}", concurrency=3, num_ctx=8192,
-                            num_predict=600, cache=False, require_gpu=True)
+                            num_predict=1000, cache=False, require_gpu=True)
 
             async def go() -> list[dict[str, Any]]:
                 try:

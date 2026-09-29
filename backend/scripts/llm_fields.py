@@ -131,8 +131,13 @@ is. Weigh the good against the bad.
   same, or unclear; 2 = worse; 1 = much worse. For any rating other than 3, copy the ONE sentence from the card
   that matters most, word for word, as "quote" (at most 30 words). Never guess.
 Reply with ONLY one JSON object on one line.
-Write "reason" first.
-JSON: {"reason": "at most 40 words: the main good and bad points, weighed", "outlook_6m": {"label": "1|2|3|4|5", "quote": "..."}}"""
+Before you rate, argue BOTH sides:
+- "bull": up to 3 of the strongest reasons it beats the S&P 500, each a short "point" (at most 20 words) with a
+  supporting "quote" copied word for word from the card.
+- "bear": up to 3 of the strongest reasons it lags, same form. Make the bear case in earnest even for a strong card,
+  and the bull case even for a weak one.
+Then weigh the two cases in "reason" and rate.
+JSON: {"bull": [{"point": "...", "quote": "..."}], "bear": [{"point": "...", "quote": "..."}], "reason": "at most 40 words: which case wins and why", "outlook_6m": {"label": "1|2|3|4|5", "quote": "..."}}"""
 
 
 # Arm D (docs/PLAN_60_V2.md "Arm D", fixed 2026-09-28): the AI-build-out lens the user asked for, after Leopold
@@ -156,7 +161,41 @@ AI automates or undercuts lose. You still judge THIS release on its facts.
 _SCHEMA_AI = ('{"reason": "at most 40 words, through the AI-build-out lens", '
               + ", ".join(f'"{k}": {{"label": "{"|".join(v[0])}", "quote": "..."}}' for k, v in FIELDS_AI.items()) + "}")
 PROMPT_AI = (_HEAD + _DEF_AI + _RULES_R + "\nWrite \"reason\" first.\nJSON: " + _SCHEMA_AI)
-  # fixed before the dev run; quality only, never returns
+
+# Arm E (docs/PLAN_60_V2.md "Arm E", fixed 2026-09-28): a bull/bear thesis the user asked for. Bonsai argues both
+# sides of the release with quoted points, then weighs them. Live-only like C2 and D (a judgement Bonsai could
+# flatter with hindsight on 2024-26).
+FIELDS_BB: dict[str, tuple[tuple[str, ...], str]] = {"bb_read": (("bullish", "neutral", "bearish"), "neutral")}
+_DEF_BB = """Argue both sides before you decide:
+- "bull": up to 3 of the strongest reasons this release makes the next few weeks BETTER for the stock than a typical
+  earnings release, each a short "point" (at most 20 words) with a supporting "quote" copied word for word.
+- "bear": up to 3 of the strongest reasons it makes them WORSE, same form. Make the bear case in earnest even for a
+  strong release, and the bull case even for a weak one.
+- bb_read: after weighing the two cases, bullish if the bull case clearly wins, bearish if the bear case clearly
+  wins, neutral if they balance or the release is ordinary. Quote the ONE sentence that decides it.
+"""
+_SCHEMA_BB = ('{"bull": [{"point": "...", "quote": "..."}], "bear": [{"point": "...", "quote": "..."}], '
+              '"reason": "at most 40 words: which case wins and why", "bb_read": {"label": "bullish|neutral|bearish", '
+              '"quote": "..."}}')
+PROMPT_BB = (_HEAD + _DEF_BB + _RULES_R + "\nWrite \"bull\", \"bear\" and \"reason\" first.\nJSON: " + _SCHEMA_BB)
+
+
+def theses(raw: dict[str, Any] | None, text: str) -> dict[str, list[dict[str, Any]]]:
+    """The bull and bear points (at most 3 each), each marked verified if its quote is word for word in the source."""
+    body = _norm(text)
+    out: dict[str, list[dict[str, Any]]] = {}
+    for side in ("bull", "bear"):
+        pts = (raw or {}).get(side)
+        keep = []
+        for p in pts[:3] if isinstance(pts, list) else []:
+            if not isinstance(p, dict) or not str(p.get("point", "")).strip():
+                continue
+            q = str(p.get("quote", "")).strip()
+            keep.append({"point": str(p["point"]).strip()[:200], "quote": q[:300],
+                         "verified": len(q) >= 12 and _norm(q).strip('"') in body})
+        out[side] = keep
+    return out
+
 
 SILVER = {  # code-only keyword labels, the quality yardstick: does the model flag a field when the words are there?
     "one_off": r"impairment|restructuring (charge|cost|expense)|goodwill write|litigation (charge|settlement)|write-?down",
