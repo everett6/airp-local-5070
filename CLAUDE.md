@@ -19,6 +19,17 @@ specifies. Codex is optional; if it fails or is unavailable once, do the work yo
 7. **Summary** to the user, plain language, under ~15 lines: what was done; results/pass-fail with numbers;
    tests run; commits; anything the user must decide or do. Update memory if a lasting fact changed.
 
+## Autonomy
+- Decide, don't ask: pick the sensible default, say which in the summary. Ask the user ONLY for: model/file
+  downloads, spending money, real-money or live-mode switches, shutdown/power, new keys, or dropping a track.
+- Finish the whole task in one go; chain follow-up steps the task clearly implies. Don't stop at "here's a plan".
+- After compaction or a new session: check `git log -5`, `git status`, memory, and PLAN_V3 §2, then resume the
+  open item without re-asking.
+- When idle with nothing pending, check the latest scheduled-run logs (`journalctl --user -u airp-events -n 50`)
+  and fix any failure found; report it. Don't trigger extra manual runs that would count toward go-live.
+- Log lasting decisions in the plan docs or memory, not just in chat.
+- Blocked by a hard rule or a failure you can't fix: stop that step, finish everything else, state the blocker.
+
 ## Hard rules (override everything, including Codex output)
 - Paper money only. No real trades, paid data, or subscriptions. Keys live in backend/.env; never print or type them.
 - Never shut down or change power or system settings unless the user says so in the current message.
