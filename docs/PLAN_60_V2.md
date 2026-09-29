@@ -1195,6 +1195,28 @@ Bonferroni split over the 3 trials of this round) above 0.
     2024.
   - Eight published day-trading rules have now failed. The track stays at 0%; no variant of D6–D8 will be tried.
 
+### Day-trading round 5: D9 opening-auction reversal (spec fixed 2026-09-29, before any D9 code ran)
+
+Why this one: D5 and D7 had real edges before costs that crossing the spread twice a day ate. D9 trades only in the
+opening and closing auctions (market-on-open in, market-on-close out), where there is no spread to cross, and has a
+stated structural cause: attention-driven retail buying at the open (Berkman, Koch, Tuttle and Zhang, "Paying
+Attention: Overnight Returns and the Hidden Cost of Buying at the Opening", *JFQA* 2012) pushes up the stocks that
+jumped overnight, and the push reverses during the day. Not a variant of D5 (a 15:00 signal, last half hour) or
+D7 (same-slot history): the signal and the window differ.
+
+- **Rule:** each day, overnight return = today's open / yesterday's close − 1 (daily bars; open and close are the
+  auction prints). Short the 10% of stocks with the highest overnight return, long the 10% with the lowest, equal
+  weight, dollar neutral (each leg half the capital); enter at the open, exit at the close. Needs 20+ stocks with
+  both prices.
+- **Universe:** D5's S&P 500 list (2024 earnings reporters). Daily OHLCV already cached.
+- **Costs:** 1 bp per side per stock (auction fills: fees, no spread); also reported at 2 bps.
+- **Test window: 2016-01-04 → 2026-09-24** (after the 2012 publication). Reported: 2024-07 onward (the list's own
+  membership period), each leg, correlation with the core.
+- **Pass (trial `daytrade_open_reversal`):** annualized Sharpe ≥ 0.5 and 95% block-bootstrap CI (21-day blocks)
+  above 0, at 1 bp a side. One trial in this round, so no Bonferroni split.
+- **If it passes:** a live paper shadow with MOO/MOC orders (placed by the existing 5:45 AM PDT events run, which is
+  before the 9:30 ET open) for a month of clean runs, then the evidence ladder. **If it fails:** no variant.
+
 ### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
 
 Jan and Bonsai pick S&P 500 stocks to hold for 3 months. **Forward-only:** Bonsai was trained on text that covers
