@@ -1429,6 +1429,13 @@ above 0. This is the track's usual rule.
 day unless the intraday leg is ≤ 0. A pass makes it a candidate for the leverage ladder (higher Sharpe per unit of
 risk), proposed to the user, not adopted.
 
+**Result (run once, 2026-09-29 evening): FAIL.** At 1 bp a side, net excess Sharpe was +0.25, CI [−0.28, +0.81],
+CAGR 2.1%; at 3 bp it was −0.70. Before costs the overnight leg is real, +0.73 [+0.15, +1.36] (7.4% a year).
+The intraday leg was +0.35 and buy-and-hold +0.84. Two trades a night (5% a year at 1 bp a side) eat most of it.
+Since 2020: +0.14. By year the sign flips (2022 −1.5, 2024 +1.4). The data check passed: 99.3% of 2,689 days
+matched the minute bars. Correlation with the core book: 0.54. Built by Codex (6 Luna) from this spec; Claude
+reviewed and ran it.
+
 ### Core leads, forward check (spec fixed 2026-09-29, midday PDT, before any forward data)
 
 The user asked to raise the book's Sharpe. The two known ways were already tested on 2018–26 and failed narrowly,
