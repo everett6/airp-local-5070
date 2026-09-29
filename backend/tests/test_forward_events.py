@@ -59,3 +59,12 @@ def test_lite_features_use_only_bars_before_the_entry():
 
     assert out.loc["a", "momentum"] == pytest.approx(np.exp(0.001 * 231) - 1)
     assert out.loc["b", "momentum"] == pytest.approx(np.exp(0.001 * 231) - 1)
+
+
+def test_gpu_busy_ignores_desktop_apps():
+    from forward_events import gpu_busy
+    assert not gpu_busy("")
+    assert not gpu_busy("/usr/bin/nautilus, 61\n/usr/lib/firefox/firefox, 150\n")
+    assert gpu_busy("/usr/bin/nautilus, 61\n/home/u/.venv/bin/python, 900\n")
+    assert gpu_busy("/usr/local/bin/ollama, 20000\n") and gpu_busy("some-game, 4096\n")
+    assert gpu_busy("weird line without memory\n")

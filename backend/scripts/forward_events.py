@@ -102,13 +102,31 @@ async def discover(since: date, now: datetime, indexes: tuple[str, ...] = ("sp50
                                        "items", "ex99_url"])
 
 
+HEAVY = ("python", "ollama", "vllm")  # compute jobs; desktop apps (file manager, browser) hold a few MiB and don't count
+HEAVY_MIB = 1024
+
+
+def gpu_busy(listing: str) -> bool:
+    """From `nvidia-smi --query-compute-apps=process_name,used_memory --format=csv,noheader,nounits`: busy if any
+    compute job (python, ollama, vllm) or any process with 1 GiB or more is on the GPU."""
+    for line in listing.strip().splitlines():
+        name, _, mem = line.rpartition(",")
+        try:
+            mib = float(mem)
+        except ValueError:
+            mib = HEAVY_MIB
+        if any(h in name.lower() for h in HEAVY) or mib >= HEAVY_MIB:
+            return True
+    return False
+
+
 def gpu_free() -> bool:
     try:
-        out = subprocess.run(["nvidia-smi", "--query-compute-apps=pid", "--format=csv,noheader"], capture_output=True,
-                             text=True, timeout=20, check=False)
+        out = subprocess.run(["nvidia-smi", "--query-compute-apps=process_name,used_memory",
+                              "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=20, check=False)
     except (OSError, subprocess.TimeoutExpired):
         return False
-    return out.returncode == 0 and not out.stdout.strip()
+    return out.returncode == 0 and not gpu_busy(out.stdout)
 
 
 def wait_gpu_free(timeout_s: float, poll_s: float = 15.0) -> bool:
