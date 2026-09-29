@@ -1033,6 +1033,54 @@ signals. Same data, universe, costs, pass rule and windows-after-publication dis
 - **If one passes:** it would trade micro index futures (MES/MNQ, not subject to the pattern-day-trader rule) in
   the simulator, after a month of clean dry runs, then by the evidence ladder.
 
+### Day-trading round 3: D5 end-of-day reversal (spec fixed 2026-09-28 ~20:00, before any stock-level intraday data was downloaded)
+
+Why this one: every failed rule (D1–D4) bet on the index's direction. D5 is market-neutral and cross-sectional,
+with a stated structural cause the authors test (attention-driven retail buying of the day's losers and short-sellers
+cutting risk before the close), which arbitrage does not easily remove.
+
+- **Rule** (Baltussen, Da and Soebhag, "End-of-Day Reversal", EFMA 2024; April 2025 version), on 30-minute bars
+  (Alpaca's free SIP feed, split-adjusted), for S&P 500 stocks:
+  - Signal ROD3 = yesterday's close to the 15:00 price (the close of the 14:30 bar). The 15:00–15:30 half hour is
+    skipped, as in the paper.
+  - At 15:30: long the 10% of stocks with the lowest ROD3, short the 10% with the highest, equal weight, dollar
+    neutral (each side = the track's capital × 0.5). Entry at the 15:30 bar's open, exit at its close (the last
+    trade before 16:00).
+  - Universe: the S&P 500 companies with an earnings release in 2024 in our event history (the membership near the
+    start of the test window). Needs 20 or more stocks with both prices that day; days without a 15:30 bar (half
+    days) are skipped.
+  - Costs: 1 bp per side per stock (large caps near the close); also reported at 3 bps.
+- **Test window: 2024-07-01 to 2026-09-25** (after the EFMA 2024 presentation). Reported, not deciding: 2016-01 to
+  2024-06 (inside the paper's sample; survivorship-biased because the universe is the 2024 list).
+- **Pass (trial `daytrade_eod_reversal`):** as D1–D4 (annualized Sharpe of the daily P&L ≥ 0.5 and its 95%
+  block-bootstrap CI above 0, at 1 bp a side). Reported: 3 bps, long and short legs apart, correlation with the core.
+- **If it passes:** a live paper shadow first (orders at 15:30, market-on-close exits) for 1 month of clean dry
+  runs, then the evidence ladder.
+
+### Arm F: a self-improving Bonsai (spec fixed 2026-09-28 ~20:00, before any code)
+
+The user asked for Bonsai's decision-making to improve itself. The honest version is a champion/challenger loop on
+the live bull/bear lens (arm E), where fast 5-day outcomes give feedback every week, and where only matured outcomes
+are ever shown to Bonsai.
+
+- **Champion:** starts as arm E's frozen prompt (`PROMPT_BB`, version 0). Arm E's own pass test always uses version
+  0 and is never changed by this loop.
+- **Reflection (monthly, with the long-term schedule):** code collects the champion's matured labels (5-day
+  sector-relative outcome known), up to the 80 most recent, and writes a summary: each label's count and average
+  outcome, then the 15 worst misses (bullish calls with the most negative outcomes, bearish with the most positive)
+  with their bull/bear points and reason. Bonsai reads it and writes at most 5 general lessons (each at most 30
+  words). Code drops any lesson naming a company or ticker in the universe. The challenger's prompt is the
+  champion's prompt plus "Lessons from your past calls:" and the lessons. Needs at least 40 matured labels;
+  otherwise no challenger that month.
+- **Challenger:** runs beside the champion on every live release after it was made (one more Bonsai call per
+  release, no money). One challenger at a time; each is its own registered trial (`bb_selfimprove_v<n>`).
+- **Promotion:** once the challenger has 100 or more paired scored releases over at least 2 months: the paired
+  monthly IC of (challenger − champion) has a mean above 0 and an 80% one-sided bootstrap bound above 0 → the
+  challenger becomes the champion. A challenger with 200 paired releases and no promotion is retired. The next
+  reflection makes a new one from the current champion.
+- **What it can change:** only the shadow champion. It reaches the event score only through the same test as any
+  lens (150 releases, 3 months, IC > 0.02, blend gain). Every version, lesson and decision is logged.
+
 ### Day-trading result (2026-09-28): **both rules FAIL**
 
 | Rule, test window (after publication) | Sharpe at 2 bps | 95% CI | CAGR | at 10 bps | hit rate |
