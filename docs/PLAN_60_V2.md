@@ -1095,6 +1095,38 @@ are ever shown to Bonsai.
 - **What it can change:** only the shadow champion. It reaches the event score only through the same test as any
   lens (150 releases, 3 months, IC > 0.02, blend gain). Every version, lesson and decision is logged.
 
+
+### Arm F v2: research-grade self-improvement (spec change 2026-09-29, before any arm F reflection, challenger or data)
+
+Arm F has produced nothing yet (its first reflection needs 40 matured labels, ~early November), so its design can
+change without touching any result. v2 replaces v1's reflection and promotion rules; everything else stays (arm E's
+v0 is frozen for its own test; lessons never name companies; shadow only; every step logged).
+
+1. **Fix: anytime-valid promotion.** v1 re-ran a fixed 80% bootstrap bound on every events run; checking a fixed
+   test repeatedly ("peeking") inflates false promotions. v2 uses a betting e-process (Shafer 2021; Waudby-Smith and
+   Ramdas, JRSS-B 2024), valid at every look:
+   - Per release: x = (challenger call − champion call) × clip(5-day sector-relative return / 5%, −1, 1) / 2, in
+     [−1, 1] (calls: bullish +1, neutral 0, bearish −1). Releases are averaged by entry week (cross-sectional and
+     overlapping-window dependence; weeks are processed in order once all their outcomes are known).
+   - Wealth W = Π(1 + λ·x_week), λ predictable from past weeks only (aGRAPA: clip(mean / (var + mean²), 0, 0.5); 0
+     until 2 weeks exist). **Promote when W ≥ 20** (5% false-promotion bound, whenever it is checked), with at least
+     60 paired releases over 2+ months as a guard against a single-season fluke.
+   - The mirror process on −x: **retire early when it reaches 20** (the challenger is reliably worse); otherwise
+     retire at 200 paired releases.
+2. **Held-out reflection.** Matured calls are split by time: the older 2/3 are shown to Bonsai, the newer 1/3 are
+   kept back (validation). The summary is contrastive: per-label base rates, the 10 worst misses and the 10 best hits
+   (so lessons do not over-correct). Needs 60 matured calls (40 shown, 20 held back).
+3. **Several candidates, chosen offline.** Bonsai writes 3 lesson sets from the same summary with 3 fixed framings
+   (errors to avoid; what separated hits from misses; when it was over-confident). Each candidate prompt re-labels
+   the held-back releases (replay, same release text and quote check as arm E). The candidate with the best rank IC
+   on the held-back set becomes the challenger, only if that IC beats the champion's own IC on the same releases;
+   otherwise no challenger that month. Selection only picks what to test; the forward e-process still decides.
+4. **Lesson memory:** lessons are de-duplicated (case and punctuation ignored), at most 8 kept (newest win), each
+   stored with the version and month it came from.
+5. **Rollback guard:** once a champion above v0 exists, the same e-process runs champion vs v0 (arm E, always
+   labelled); if v0 is reliably better (W ≥ 20 on the mirror), the champion is demoted back to v0.
+6. **Audit log:** the reflection summary, the 3 candidates, their held-back ICs, the choice, and the e-values are
+   stored in bb_versions.jsonl. Each challenger is still its own registered trial (`bb_selfimprove_v<n>`).
 ### Day-trading result (2026-09-28): **both rules FAIL**
 
 | Rule, test window (after publication) | Sharpe at 2 bps | 95% CI | CAGR | at 10 bps | hit rate |
