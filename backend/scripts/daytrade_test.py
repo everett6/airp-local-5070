@@ -6,6 +6,7 @@
     python scripts/daytrade_test.py --rules D10  # round 6; needs scripts/premarket_stocks.py, daily_alpaca.py split
     python scripts/daytrade_test.py --rules P1   # pairs trading (GGR), daily closes
     python scripts/daytrade_test.py --rules C1   # crypto funding carry; needs scripts/funding_data.py
+    python scripts/daytrade_test.py --rules T1   # turn-of-the-month on SPY, daily closes
 Each rule is one registered trial: run a rule once. Results merge into results/daytrade_test.json.
 
 Pass (each rule): on its post-publication window, at 1 bp a side, the annualized Sharpe of the daily P&L (SPY and
@@ -226,6 +227,49 @@ def run_c1(core: pd.Series) -> dict:
                   f"{res['held_share']['eth']:.0%}")
 
 
+T1_START, T1_END, T1_TRIAL = "2008-01-02", "2026-09-25", "turn_of_month"
+
+
+def run_t1(core: pd.Series) -> dict:
+    """T1 turn-of-the-month on SPY (excess over the 3-month T-bill): overlay rule + TOM-minus-other difference."""
+    from vol_target_b0 import tbill
+
+    from app.sandbox.calendar_fx import diff_ci, tom_overlay
+    spy = pd.read_parquet(BACKEND / "data" / "trend" / "etf_closes.parquet")["SPY"].dropna()
+    rf = tbill().reindex(spy.index, method="ffill").fillna(0.0) / 252
+    ex = (spy.pct_change() - rf).dropna()
+    res: dict = {"window": [T1_START, T1_END]}
+    for bp in (1, 3):
+        o = tom_overlay(ex, bp / 1e4).loc[T1_START:T1_END]
+        res[f"{bp}bp"] = stats(o["ret"])
+    o = tom_overlay(ex, 1e-4).loc[T1_START:T1_END]
+    x, tom = ex.loc[T1_START:T1_END], o["tom"]
+    point, lo, hi = diff_ci(x, tom)
+    res["diff_bp_per_day"] = {"point": round(point * 1e4, 2), "ci": [round(lo * 1e4, 2), round(hi * 1e4, 2)],
+                              "tom_mean": round(float(x[tom].mean()) * 1e4, 2),
+                              "other_mean": round(float(x[~tom].mean()) * 1e4, 2), "tom_days": int(tom.sum())}
+    res["by_year"] = {str(y): {"sharpe": round(sharpe(g["ret"]), 2),
+                               "diff_bp": round(float(x.loc[g.index][g["tom"]].mean()
+                                                      - x.loc[g.index][~g["tom"]].mean()) * 1e4, 1)}
+                      for y, g in o.groupby(o.index.year)}
+    late = o.loc["2020-07-01":]
+    lp, llo, lhi = diff_ci(x.loc[late.index], late["tom"])
+    res["since_2020_07"] = {"overlay": stats(late["ret"]),
+                            "diff_bp": [round(lp * 1e4, 2), round(llo * 1e4, 2), round(lhi * 1e4, 2)]}
+    timed = o["ret"] + rf.reindex(o.index)  # SPY on TOM days, T-bills otherwise (1 bp a side)
+    spy_r = spy.pct_change().loc[T1_START:T1_END]
+    res["timed_vs_spy"] = {"timed": stats(timed), "spy": stats(spy_r)}
+    res["corr_with_core"] = round(float(o["ret"].corr(core.reindex(o.index))), 3)
+    t = res["1bp"]
+    res["pass"] = bool(t["sharpe"] >= 0.5 and t["ci"][0] > 0 and lo > 0)
+    register({"trial": T1_TRIAL, "date": time.strftime("%Y-%m-%d"), "kind": "calendar", "sharpe_ann": t["sharpe"],
+              "window": f"{T1_START}..{T1_END}", "result": "pass" if res["pass"] else "fail"})
+    d = res["diff_bp_per_day"]
+    print(f"T1 {T1_TRIAL}: overlay Sharpe {t['sharpe']} CI {t['ci']} CAGR {t['cagr']:.1%}; TOM-minus-other "
+          f"{d['point']} bp/day CI {d['ci']} -> {'PASS' if res['pass'] else 'FAIL'}", flush=True)
+    return res
+
+
 def check_d9() -> dict:
     """D9's pre-stated validity check: the same rule on Alpaca's SIP daily bars (scripts/daily_alpaca.py)."""
     from intraday_stocks import universe
@@ -267,7 +311,7 @@ def main() -> None:
         return
     rules = a.rules.split(",")
     bars = ({s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")}
-            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "P1", "C1"} else {})
+            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "P1", "C1", "T1"} else {})
     core = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")["core"]
     f = BACKEND / "results" / "daytrade_test.json"
     out: dict = json.loads(f.read_text()) if f.exists() else {}
@@ -278,8 +322,9 @@ def main() -> None:
             out[name] = run_d5(core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
-        if name in ("D7", "D8", "D9", "D10", "P1", "C1"):
-            out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10, "P1": run_p1, "C1": run_c1}[name](core)
+        if name in ("D7", "D8", "D9", "D10", "P1", "C1", "T1"):
+            out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10, "P1": run_p1, "C1": run_c1,
+                         "T1": run_t1}[name](core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
         fn, start, trial = RULES[name]

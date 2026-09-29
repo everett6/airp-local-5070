@@ -1329,7 +1329,7 @@ negative in 2025. Market-neutral, so it is judged against cash, not SPY.
   (2024) → 5.4% (2025) → 2.1% (2026); ETH 8.4% → 1.0% → 1.3%. The premium the BIS paper documented has been
   arbitraged down to below cash since the spot ETFs and basis funds arrived, as the paper itself reports for 2025.
 
-### Turn-of-the-month T1 (spec fixed 2026-09-29 ~15:18 PDT, before any turn-of-month code or number)
+### Turn-of-the-month T1 (spec fixed 2026-09-29 ~15:17 PDT, before any turn-of-month code or number)
 
 **Idea.** US stocks earn much of their return over the four trading days around the month change (Lakonishok and
 Smidt 1988; Ariel 1987; McConnell and Xu, FAJ 2008, data through 2005). **Stated cause:** month-end cash needs.
@@ -1360,6 +1360,14 @@ exposure. A pass makes it a candidate for timing extra exposure once the leverag
 
 **Reported, not deciding:** Sharpe and difference by year and for 2020-07+ (after Etula et al.); the timed book
 (SPY on TOM days, T-bills otherwise) against SPY; 3 bp costs; correlation with the core book.
+
+**Result (run once, 2026-09-29 ~15:18 PDT): FAIL.** Overlay Sharpe +0.30, CI [−0.10, +0.74], CAGR 2.1% (3 bp:
++0.24). TOM days averaged 5.5 bp of excess against 4.2 bp on other days: a difference of +1.3 bp a day, CI
+[−6.6, +9.4], over 899 TOM days. Both rules miss. The overlay's Sharpe is about what plain SPY exposure on 1 day in
+5 would give. The difference changes sign from year to year (+31 bp in 2010 and 2026, −23 bp in 2024). Since
+2020-07: overlay +0.47 [−0.28, +1.09], difference +2.4 bp [−10.4, +13.2]. Timed book (SPY on TOM days, T-bills
+otherwise): Sharpe 0.47 and CAGR 3.5%, against SPY's 0.64 and 11.3%. Correlation with the core book: 0.36. Read: the
+classic turn-of-month premium has not been there in SPY since its 2008 publication.
 
 ### Core leads, forward check (spec fixed 2026-09-29, midday PDT, before any forward data)
 
