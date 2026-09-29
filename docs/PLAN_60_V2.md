@@ -1127,6 +1127,13 @@ v0 is frozen for its own test; lessons never name companies; shadow only; every 
    labelled); if v0 is reliably better (W ≥ 20 on the mirror), the champion is demoted back to v0.
 6. **Audit log:** the reflection summary, the 3 candidates, their held-back ICs, the choice, and the e-values are
    stored in bb_versions.jsonl. Each challenger is still its own registered trial (`bb_selfimprove_v<n>`).
+7. **Amendment (2026-09-29, found on synthetic unit-test data, before any arm F data):** weekly means of x are
+   small (|x| ≈ 0.1), so with bets capped at 0.5 even a challenger that is always right could not reach W = 20
+   before the 200-release retirement: the test was valid but powerless. Fix: the bet is on y = clip(week mean of x /
+   0.2, −1, 1) (H0: E[y | past] ≤ 0), and a challenger is retired after 26 scored weeks without promotion (instead of
+   200 releases), or early when the mirror process reaches 20. The 5% bound, the 60-release / 2-month guard and
+   everything else are unchanged. Consequence, stated up front: only a clearly better challenger gets promoted
+   (roughly a weekly edge of half the scale for ~3 months); small gains will not be detectable with this much data.
 ### Day-trading result (2026-09-28): **both rules FAIL**
 
 | Rule, test window (after publication) | Sharpe at 2 bps | 95% CI | CAGR | at 10 bps | hit rate |
