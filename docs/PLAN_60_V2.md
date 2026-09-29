@@ -1047,6 +1047,28 @@ signals. Same data, universe, costs, pass rule and windows-after-publication dis
   publication. D1's CI is entirely below 0.
 - The day-trading track stays at 0%. Any next rule needs its own pre-registration; the planner shows it as failed.
 
+### Day-trading round 2 result (2026-09-28): **both FAIL**
+
+| Rule | Test window | Sharpe (1 bp a side) | 95% CI | CAGR | Trade days / week | 5 bps Sharpe |
+|---|---|---|---|---|---|---|
+| D3 noise area + VWAP stop | 2024-06 → 2026-09 (581 days) | +0.20 | [−1.24, +1.20] | +1.2% | 3.4 | −2.46 |
+| D4 rest-of-day momentum | 2021-11 → 2026-09 (1,227 days) | −1.21 | [−2.13, −0.33] | −5.1% | 5.0 | −5.98 |
+
+- D3 worked before its publication: 2016 to May 2024, Sharpe +0.75 [+0.20, +1.31] (reported, not deciding). After
+  publication it fell to +0.20 (QQQ +0.72, SPY −0.62), well short of the pass bar. That is the pattern of a
+  published edge being traded away, the same as D1. Its window is short, so this is weak evidence either way.
+- D4, the hedging-demand version of intraday momentum, loses as D1 did (−1.21), and was already below 0 before its
+  publication (−0.26).
+- Four published day-trading rules have now failed after publication. The track stays at 0%. A fifth rule would
+  need a reason to expect it to survive publication (e.g. a structural cause that cannot be arbitraged), stated
+  before it is tested.
+
+**Correction (2026-09-28):** the pattern-day-trader rule mentioned above no longer applies. The SEC approved
+FINRA's Rule 4210 amendments on 14 Apr 2026, effective 4 Jun 2026: no $25k minimum and no day-trade count;
+intraday margin is checked in real time, and a margin account needs $2,000. Alpaca adopted the new framework on
+4 Jun 2026. The account-size limit on this track is gone; the results above are unchanged, since they never
+depended on it.
+
 ### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
 
 Jan and Bonsai pick S&P 500 stocks to hold for 3 months. **Forward-only:** Bonsai was trained on text that covers

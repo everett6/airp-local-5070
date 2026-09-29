@@ -30,7 +30,9 @@ def test_plan_odds_move_with_the_goal_and_never_change_weights():
     assert easy["with_current_evidence"]["p_goal"] > 0.8 > hard["with_current_evidence"]["p_goal"]
     assert easy["weights"] == hard["weights"]  # the goal never moves money
     assert hard["gap_cagr"] > 0.5 and any("doubling" in f for f in hard["flags"])
-    assert any("pattern-day-trader" in f for f in hard["flags"])
+    assert not any("margin" in f for f in hard["flags"])  # $10k is above the $2,000 margin minimum
+    tiny = PL.plan(PL.Goal(1_000, 2_000, date(2030, 1, 1), date(2025, 1, 1)), r)
+    assert any("$2,000" in f for f in tiny["flags"])
 
 
 def test_picking_need_is_consistent():

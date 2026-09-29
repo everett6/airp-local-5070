@@ -8,6 +8,9 @@ one trade (or none) per day and symbol, returned as that day's return on 1x capi
   D2 5-minute opening-range breakout: the 09:30-09:34 bars form the first 5-minute bar; up -> long, down -> short at
      the 09:35 bar's open; stop at the first bar's low (long) or high (short): the first later bar that trades through
      it exits at the stop, or at that bar's open if it opened beyond the stop; otherwise exit at the day's last close.
+  D3 noise area + VWAP stop (round 2): checks at 10:00..15:30 against bounds built from the previous 14 days' average
+     absolute move from the open at that minute; see d3_noise_vwap.
+  D4 rest-of-day momentum (round 2): like D1, but the signal is yesterday's close to the 15:29 bar's close.
 Nothing looks ahead: every decision uses bars that have closed before the order's bar opens.
 """
 from __future__ import annotations
@@ -58,6 +61,66 @@ def d2_orb5(df: pd.DataFrame, cost: float) -> pd.Series:
                 exit_px = max(bo, stop)
                 break
         out[pd.Timestamp(day)] = float(side * (exit_px / entry - 1) - 2 * cost)
+    return pd.Series(out, dtype=float)
+
+
+def d4_rod_momentum(df: pd.DataFrame, cost: float) -> pd.Series:
+    """Daily net return of D4 (cost per side): sign(15:29 close / previous close - 1), 15:30 open to 15:59 close."""
+    out = {}
+    prev_close = None
+    for day, g in _days(df).items():
+        if prev_close is not None and 1529 in g.index and 1530 in g.index and 1559 in g.index:
+            sig = np.sign(g.at[1529, "close"] / prev_close - 1)
+            if sig != 0:
+                out[pd.Timestamp(day)] = float(sig * (g.at[1559, "close"] / g.at[1530, "open"] - 1) - 2 * cost)
+        prev_close = float(g["close"].iloc[-1])
+    return pd.Series(out, dtype=float)
+
+
+CHECKS = [h * 100 + m for h in range(10, 16) for m in (0, 30)]  # 10:00 .. 15:30
+
+
+def _hm_minus_1(hm: int) -> int:
+    return hm - 41 if hm % 100 == 0 else hm - 1  # 1000 -> 959, 1030 -> 1029
+
+
+def d3_noise_vwap(df: pd.DataFrame, cost: float, lookback: int = 14) -> pd.Series:
+    """Daily net return of D3 (cost per side per entry and exit); days before `lookback` history are skipped."""
+    days = _days(df)
+    keys = list(days)
+    moves: dict[object, pd.Series] = {}  # |close / open - 1| by minute, per day
+    out = {}
+    prev_close = None
+    for i, k in enumerate(keys):
+        g = days[k]
+        o = float(g["open"].iloc[0])
+        moves[k] = (g["close"] / o - 1).abs()
+        hist = [moves[x] for x in keys[max(0, i - lookback): i]]
+        if prev_close is None or len(hist) < lookback or 930 not in g.index or 1559 not in g.index:
+            prev_close = float(g["close"].iloc[-1])
+            continue
+        sigma = pd.concat(hist, axis=1).mean(axis=1)
+        vwap = ((g["high"] + g["low"] + g["close"]) / 3 * g["volume"]).cumsum() / g["volume"].cumsum()
+        hi_ref, lo_ref = max(o, prev_close), min(o, prev_close)
+        pos, entry, ret = 0, 0.0, 0.0
+        for hm in CHECKS:
+            t = _hm_minus_1(hm)
+            if t not in g.index or hm not in g.index or t not in sigma.index or pd.isna(sigma[t]):
+                continue
+            px, sg, vw = float(g.at[t, "close"]), float(sigma[t]), float(vwap[t])
+            ub, lb = hi_ref * (1 + sg), lo_ref * (1 - sg)
+            if (pos > 0 and px < max(ub, vw)) or (pos < 0 and px > min(lb, vw)):
+                ret += pos * (float(g.at[hm, "open"]) / entry - 1) - cost
+                pos = 0
+            if pos == 0:
+                new = 1 if px > ub else -1 if px < lb else 0
+                if new:
+                    pos, entry = new, float(g.at[hm, "open"])
+                    ret -= cost
+        if pos:
+            ret += pos * (float(g.at[1559, "close"]) / entry - 1) - cost
+        out[pd.Timestamp(k)] = ret
+        prev_close = float(g["close"].iloc[-1])
     return pd.Series(out, dtype=float)
 
 

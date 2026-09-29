@@ -54,3 +54,19 @@ def test_sharpe_ci_brackets_the_estimate():
     r = pd.Series([0.001, -0.0005, 0.0008, 0.0002] * 200)
     lo, hi = I.block_ci(r)
     assert lo < I.sharpe(r) < hi
+
+
+def test_d4_uses_the_rest_of_day_return():
+    d0 = day("2024-03-04", {1559: 100.0})
+    d1 = day("2024-03-05", {959: 99.0, 1529: 102.0, 1559: 104.04})  # down at 10:00 but up by 15:29 -> long
+    r = I.d4_rod_momentum(pd.concat([d0, d1]), cost=0.0001)
+    assert abs(r.iloc[0] - (0.02 - 0.0002)) < 1e-9
+
+
+def test_d3_breakout_then_vwap_stop():
+    quiet = [day(str(d.date()), {931: 100.5}) for d in pd.bdate_range("2024-02-01", periods=15)]
+    test = day("2024-02-22", {931: 100.5, 959: 102.0, 1159: 103.0, 1229: 100.5})
+    r = I.d3_noise_vwap(pd.concat([*quiet, test]), cost=0.0001)
+    assert list(r.index.strftime("%Y-%m-%d"))[-1] == "2024-02-22" and (r.iloc[:-1] == 0).all()
+    # long at the 10:00 open (102) after 102 > 100.5 * 1.005; out at the 12:30 open (100.5), below the VWAP stop
+    assert abs(r.iloc[-1] - (100.5 / 102.0 - 1 - 0.0002)) < 1e-9

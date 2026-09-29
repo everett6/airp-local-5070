@@ -23,7 +23,9 @@ import pandas as pd
 LADDER = {"not_built": 0.0, "failed": 0.0, "shadow": 0.0, "untested": 0.10, "passed": 0.25, "proven": 0.40}
 PICKING_CAP = 0.60
 MAX_DD = 0.35
-PDT_MIN = 25_000.0  # FINRA pattern-day-trader rule: margin accounts under $25k get 3 day trades per 5 business days
+# FINRA retired the pattern-day-trader rule on 4 Jun 2026 (Rule 4210 amendments; Alpaca adopted them that day): no
+# $25k minimum or trade count; intraday margin is checked in real time, and a margin account needs $2,000.
+MARGIN_MIN = 2_000.0
 
 
 @dataclass
@@ -49,7 +51,7 @@ TRACKS = [
           "forward-only; judged against SPY and a code-only momentum pick of the same themes"),
     Track("day_trading", "Day trading (intraday, SPY/QQQ)", "failed",
           "a new rule, pre-registered and tested after its publication date",
-          "D1 intraday momentum Sharpe -1.00, D2 opening-range breakout -0.24 (both after publication)"),
+          "4 published rules failed after publication: D1 -1.00, D2 -0.24, D3 +0.20, D4 -1.21 (Sharpe)"),
     Track("private", "Private companies", "not_built",
           "later stage: needs accredited-investor access and a data source; not available yet"),
 ]
@@ -121,9 +123,9 @@ def plan(goal: Goal, returns: pd.DataFrame, tracks: list[Track] | None = None) -
     for share in (LADDER["passed"], LADDER["proven"], PICKING_CAP):
         need[f"{int(share * 100)}%"] = round((goal.required_cagr - (1 - share) * core_cagr) / share, 4)
     flags = []
-    if goal.start < PDT_MIN:
-        flags.append(f"Day trading: accounts under ${PDT_MIN:,.0f} are limited to 3 day trades per 5 business days "
-                     "(FINRA pattern-day-trader rule), so that track can't trade freely at this size.")
+    if goal.start < MARGIN_MIN:
+        flags.append(f"Day trading needs a margin account, which needs at least ${MARGIN_MIN:,.0f} (FINRA's intraday "
+                     "margin rule, which replaced the pattern-day-trader rule on 4 June 2026).")
     if goal.required_cagr > 1.0:
         flags.append("The goal needs more than doubling every year: no track here has evidence anywhere near that.")
     if now["p_dd_over_limit"] > 0.10:

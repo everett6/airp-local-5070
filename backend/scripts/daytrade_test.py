@@ -1,12 +1,14 @@
 """The day-trading track's pre-registered test (docs/PLAN_60_V2.md "Day-trading track"): D1 and D2, one trial each.
 
-    python scripts/daytrade_test.py      # needs data/intraday/{SPY,QQQ}_1min.parquet (scripts/intraday_data.py)
+    python scripts/daytrade_test.py --rules D3,D4   # round 2; needs data/intraday/{SPY,QQQ}_1min.parquet
+Each rule is one registered trial: run a rule once. Results merge into results/daytrade_test.json.
 
 Pass (each rule): on its post-publication window, at 1 bp a side, the annualized Sharpe of the daily P&L (SPY and
 QQQ, equal capital) is >= 0.5 AND its 95% block-bootstrap CI is above 0. Writes results/daytrade_test.json.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import time
@@ -19,11 +21,20 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 import pandas as pd
 
 from app.sandbox.dsr import register
-from app.sandbox.intraday import block_ci, d1_intraday_momentum, d2_orb5, sharpe
+from app.sandbox.intraday import (
+    block_ci,
+    d1_intraday_momentum,
+    d2_orb5,
+    d3_noise_vwap,
+    d4_rod_momentum,
+    sharpe,
+)
 
 DATA = BACKEND / "data" / "intraday"
 RULES = {"D1": (d1_intraday_momentum, "2019-01-02", "daytrade_intraday_momentum"),
-         "D2": (d2_orb5, "2023-07-01", "daytrade_orb5")}
+         "D2": (d2_orb5, "2023-07-01", "daytrade_orb5"),
+         "D3": (d3_noise_vwap, "2024-06-01", "daytrade_noise_vwap"),
+         "D4": (d4_rod_momentum, "2021-11-01", "daytrade_rod_momentum")}
 END = "2026-09-25"
 
 
@@ -32,14 +43,22 @@ def stats(r: pd.Series) -> dict:
     m = (1 + r).groupby(r.index.to_period("M")).prod() - 1
     return {"days": len(r), "cagr": round(float((1 + r).prod() ** (252 / len(r)) - 1), 4),
             "sharpe": round(sharpe(r), 3), "ci": [round(lo, 3), round(hi, 3)],
-            "hit_rate": round(float((r > 0).mean()), 3), "worst_month": round(float(m.min()), 4)}
+            "hit_rate": round(float((r > 0).mean()), 3), "worst_month": round(float(m.min()), 4),
+            "trade_days_per_week": round(float((r != 0).mean() * 5), 2)}
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--rules", required=True, help="e.g. D3,D4")
+    rules = ap.parse_args().rules.split(",")
     bars = {s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")}
     core = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")["core"]
-    out: dict = {}
-    for name, (fn, start, trial) in RULES.items():
+    f = BACKEND / "results" / "daytrade_test.json"
+    out: dict = json.loads(f.read_text()) if f.exists() else {}
+    for name in rules:
+        if name in out:
+            raise SystemExit(f"{name} was already run (one trial each); see {f.name}")
+        fn, start, trial = RULES[name]
         res: dict = {"window": [start, END]}
         for cost_bp in (1, 5):
             per = {s: fn(b, cost_bp / 1e4) for s, b in bars.items()}
@@ -56,7 +75,7 @@ def main() -> None:
         out[name] = res
         print(f"{name} {trial}: Sharpe {t['sharpe']} CI {t['ci']} CAGR {t['cagr']:.1%} hit {t['hit_rate']:.0%} "
               f"(5 bps: Sharpe {res['5bp']['both']['sharpe']}) -> {'PASS' if res['pass'] else 'FAIL'}", flush=True)
-    (BACKEND / "results" / "daytrade_test.json").write_text(json.dumps(out, indent=1) + "\n")
+        f.write_text(json.dumps(out, indent=1) + "\n")
 
 
 if __name__ == "__main__":
