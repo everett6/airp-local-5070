@@ -231,14 +231,18 @@ def d7_periodicity(df: pd.DataFrame, cost: float, frac: float = 0.10, lookback: 
 
 
 def d9_open_reversal(daily: pd.DataFrame, symbols: list[str], cost: float, frac: float = 0.10,
-                     min_names: int = 20) -> pd.DataFrame:
+                     min_names: int = 20, trim: float = 0.0) -> pd.DataFrame:
     """D9, opening-auction reversal (daily bars Date/Ticker/Open/Close): short the stocks with the highest overnight
     return (open / previous close - 1), long the lowest, open to close, dollar neutral. Returns by day: ret (net),
-    long, short (each leg's gross return), names."""
+    long, short (each leg's gross return), names. `trim` drops the top and bottom quantile of open-to-close
+    returns before ranking."""
     d = daily[daily["Ticker"].isin(symbols)]
     o = d.pivot_table(index="Date", columns="Ticker", values="Open").sort_index()
     c = d.pivot_table(index="Date", columns="Ticker", values="Close").sort_index()
     sig, r = (o / c.shift(1) - 1).to_numpy(float), (c / o - 1).to_numpy(float)
+    if trim:  # drop the most extreme stock-day open-to-close returns (a bad-print check)
+        lo_q, hi_q = np.nanquantile(r, [trim, 1 - trim])
+        r = np.where((r < lo_q) | (r > hi_q), np.nan, r)
     out = {}
     for i, day in enumerate(o.index):
         ok = np.isfinite(sig[i]) & np.isfinite(r[i])

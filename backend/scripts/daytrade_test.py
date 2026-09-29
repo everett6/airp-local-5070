@@ -144,6 +144,23 @@ def run_d9(core: pd.Series) -> dict:
                   f"2 bps: Sharpe {res['2bp']['both']['sharpe']}")
 
 
+def check_d9() -> dict:
+    """D9's pre-stated validity check: the same rule on Alpaca's SIP daily bars (scripts/daily_alpaca.py)."""
+    from intraday_stocks import universe
+
+    daily = pd.read_parquet(DATA / "sp500_daily_alpaca.parquet")
+    names = universe()
+    test = d9_open_reversal(daily, names, 1e-4).loc[D9_START:D9_END]
+    trimmed = d9_open_reversal(daily, names, 1e-4, trim=0.01).loc[D9_START:D9_END]
+    t = stats(test["ret"])
+    res = {"source": "alpaca_sip_daily_adjusted", "1bp": t, "long_leg_gross": round(float(test["long"].mean()) * 1e4, 2),
+           "short_leg_gross": round(float(test["short"].mean()) * 1e4, 2), "trimmed_1pct": stats(trimmed["ret"]),
+           "since_2024_07": stats(test.loc["2024-07-01":, "ret"]), "pass": bool(t["sharpe"] >= 0.5 and t["ci"][0] > 0)}
+    print(f"D9 validity (Alpaca): Sharpe {t['sharpe']} CI {t['ci']} CAGR {t['cagr']:.1%}; trimmed "
+          f"{res['trimmed_1pct']['sharpe']} -> {'HOLDS' if res['pass'] else 'FAILS'}", flush=True)
+    return res
+
+
 def finish(name: str, trial: str, start: str, end: str, res: dict, t: dict, note: str) -> dict:
     res["pass"] = bool(t["sharpe"] >= 0.5 and t["ci"][0] > 0)
     register({"trial": trial, "date": time.strftime("%Y-%m-%d"), "kind": "daytrade", "sharpe_ann": t["sharpe"],
@@ -155,8 +172,18 @@ def finish(name: str, trial: str, start: str, end: str, res: dict, t: dict, note
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--rules", required=True, help="e.g. D3,D4")
-    rules = ap.parse_args().rules.split(",")
+    ap.add_argument("--rules", default="", help="e.g. D3,D4")
+    ap.add_argument("--check-d9", action="store_true", help="D9's pre-stated validity check (run once)")
+    a = ap.parse_args()
+    if a.check_d9:
+        f = BACKEND / "results" / "daytrade_test.json"
+        out = json.loads(f.read_text())
+        if "validity" in out["D9"]:
+            raise SystemExit("the D9 validity check was already run")
+        out["D9"]["validity"] = check_d9()
+        f.write_text(json.dumps(out, indent=1) + "\n")
+        return
+    rules = a.rules.split(",")
     bars = ({s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")}
             if set(rules) - {"D5", "D7", "D8", "D9"} else {})
     core = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")["core"]
