@@ -128,7 +128,13 @@ def d5_eod_reversal(df: pd.DataFrame, cost: float, frac: float = 0.10, min_names
     """D5, end-of-day reversal (cross-section): daily net return of long the lowest-ROD3 decile / short the highest,
     dollar neutral (each leg half the capital). `df`: ts (New York), symbol, open, close for the 14:30 and 15:30
     30-minute bars. ROD3 = previous day's 15:30-bar close to today's 14:30-bar close; trade = today's 15:30-bar open
-    to its close. Returns a frame by day: ret (net), long, short (each leg's gross return), names."""
+    to its close. Half days are dropped first: with a trade-count column `n`, a day whose median 15:30-bar count is
+    under 100 (after-hours prints only; regular days have thousands). Returns a frame by day: ret (net), long, short
+    (each leg's gross return), names."""
+    if "n" in df:
+        last = df[(df["ts"].dt.hour == 15) & (df["ts"].dt.minute == 30)]
+        med = last.groupby(last["ts"].dt.normalize())["n"].median()
+        df = df[~df["ts"].dt.normalize().isin(med.index[med < 100])]
     d = df.assign(day=df["ts"].dt.normalize().dt.tz_localize(None), hm=df["ts"].dt.hour * 100 + df["ts"].dt.minute)
     c1430 = d[d["hm"] == 1430].pivot_table(index="day", columns="symbol", values="close")
     b = d[d["hm"] == 1530]

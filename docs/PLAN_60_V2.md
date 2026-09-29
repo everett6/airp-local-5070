@@ -1056,6 +1056,12 @@ cutting risk before the close), which arbitrage does not easily remove.
   block-bootstrap CI above 0, at 1 bp a side). Reported: 3 bps, long and short legs apart, correlation with the core.
 - **If it passes:** a live paper shadow first (orders at 15:30, market-on-close exits) for 1 month of clean dry
   runs, then the evidence ladder.
+- **Clarification (2026-09-28 ~21:30, before the full download and before any D5 result):** Alpaca returns
+  after-hours prints in the 14:30 and 15:30 slots of half days (e.g. 3 Jul 2024: 115 stocks, median 6 trades per
+  bar, vs 5,000-7,000 on regular days), so "days without a 15:30 bar are skipped" is implemented as: a day whose
+  median 15:30-bar trade count is under 100 is a half day and is dropped before anything is computed (it is also not
+  used as "yesterday's close"). Checked only on three known half-day weeks (Jul 2024, Thanksgiving 2024 and 2016).
+  The download fetches each trading day's 14:30-16:00 window for all stocks at once.
 
 ### Arm F: a self-improving Bonsai (spec fixed 2026-09-28 ~20:00, before any code)
 

@@ -87,3 +87,16 @@ def test_d5_longs_losers_shorts_winners():
     r = I.d5_eod_reversal(pd.DataFrame(rows), cost=0.0001)
     assert len(r) == 1 and r["names"].iloc[0] == 20
     assert abs(r["ret"].iloc[0] - (0.5 * 0.01 + 0.5 * 0.01 - 0.0002)) < 1e-9
+
+
+def test_d5_skips_half_days_by_trade_count():
+    rows = []
+    for day, n in (("2024-07-02", 5000), ("2024-07-03", 6)):  # 3 Jul: after-hours prints only
+        for i in range(20):
+            rows += [{"ts": pd.Timestamp(f"{day} 14:30", tz="America/New_York"), "symbol": f"S{i}", "open": 100.0,
+                      "close": 100.0 + i, "n": n},
+                     {"ts": pd.Timestamp(f"{day} 15:30", tz="America/New_York"), "symbol": f"S{i}", "open": 100.0,
+                      "close": 101.0, "n": n}]
+    df = pd.DataFrame(rows)
+    assert len(I.d5_eod_reversal(df.drop(columns="n"), cost=0.0)) == 1  # without counts the half day would trade
+    assert len(I.d5_eod_reversal(df, cost=0.0)) == 0
