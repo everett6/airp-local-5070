@@ -161,9 +161,10 @@ class Ollama:
             self.proc.wait(timeout=60)
 
 
-def run(cmd: list[str]) -> bool:
+def run(cmd: list[str]) -> None:
+    """Stop the event run if a child fails, before recording a missed decision or a clean heartbeat."""
     print("  $", " ".join(cmd[1:]), flush=True)
-    return subprocess.run(cmd, cwd=BACKEND, check=False).returncode == 0
+    subprocess.run(cmd, cwd=BACKEND, check=True)
 
 
 def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str, prices: Path) -> Path:
@@ -279,7 +280,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dir", default="results/forward/events")
     ap.add_argument("--as-of", default="", help="replay at this UTC time (dry runs only; needs a --dir of its own)")
-    ap.add_argument("--start", default="2026-10-02", help="first filing date the forward test covers")
+    ap.add_argument("--start", default="2026-09-30", help="first filing date the forward test covers")
     ap.add_argument("--no-gpu", action="store_true")
     ap.add_argument("--index", default="sp500", help="comma list: sp500 (the shadow book), sp400,sp600 (breadth)")
     ap.add_argument("--status", action="store_true")

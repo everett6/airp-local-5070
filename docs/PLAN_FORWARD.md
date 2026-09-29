@@ -125,3 +125,12 @@ arm that becomes eligible counts as one more trial in the registry.
 - Never shut the PC down unless you say so.
 - Research uses Jan and Bonsai. Stock picking is never dropped without your say.
 - Failed tests are not re-proposed as new ideas; leads wait for a new pre-registered test.
+
+## Early go-live (user's call, 2026-09-29 ~15:50 PDT)
+The user asked to go live at once ("GO LIVE RIGHT NOW"). Autorun mode switched dry → live by hand
+(`scripts/autonomy.sh live`) on Tue 29 Sep, before the Friday check. Its record at the switch: 3 good dry event runs
+and 1 failed (the boot catch-up, fixed). The dry run caught the extract-date bug (fixed in 2ab2774).
+- Live event decisions cover filings from **Wed 30 Sep 2026** (was Fri 2 Oct; no 30 Sep filing existed at the
+  change). Same frozen pipeline, git tag `forward-v1-live`.
+- Allocator unchanged: weekly on Mondays, so the first live decision is Mon 5 Oct as planned (paper orders fill Tue).
+- Paper money only; the broker mirror sends orders to the Alpaca PAPER account only.
