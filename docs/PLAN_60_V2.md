@@ -1293,12 +1293,12 @@ D7 (same-slot history): the signal and the window differ.
   +0.8, short −1.8. Since 2024-07 −0.92. D9's edge exists only against the official opening auction price itself,
   which cannot be known when a market-on-open order must be placed: the pre-market price does not predict the
   day's reversal. D9 stays an untradable finding; no variant.
-- **Stress report (2026-09-29 ~11:40 PDT; reported, not deciding; Alpaca data):** D9 at 1/2/3 bps a side: Sharpe
+- **Stress report (2026-09-29 late morning PDT; reported, not deciding; Alpaca data):** D9 at 1/2/3 bps a side: Sharpe
   +1.08 / +0.53 / −0.03; positive in every year 2016–2025 (+0.26 in 2019 to +3.16 in 2017), +0.06 in 2026 so far.
   D10 at 1/2/3 bps: −0.63 / −1.15 / −1.66; negative in 8 of 11 years. The effect lives in the auction print and needs
   near-zero costs; neither changes the verdicts above.
 
-### Crypto funding carry C1 (spec fixed 2026-09-29 ~14:55 PDT, before any funding data was downloaded or viewed)
+### Crypto funding carry C1 (spec fixed 2026-09-29 ~14:40 PDT, before any funding data was downloaded or viewed)
 
 The user asked for research on making more money. Not yet tested here: the crypto cash-and-carry (long BTC/ETH spot,
 short the perpetual future, collect the funding that leveraged longs pay). Published: Schmeling, Schrimpf and Todorov,
@@ -1320,16 +1320,16 @@ negative in 2025. Market-neutral, so it is judged against cash, not SPY.
 - **Tradability (stated now):** Deribit does not serve US residents; a pass would be a paper shadow first, and a real
   version would need a US venue (e.g. Coinbase's US perpetual-style futures) and a mandate change by the user.
   **If it fails:** no variant.
-- **Clarification (2026-09-29 ~15:25 PDT, before any funding data was downloaded):** "annualized" uses √365, since the
+- **Clarification (2026-09-29 ~14:53 PDT, before any funding data was downloaded):** "annualized" uses √365, since the
   carry earns on every calendar day (stock tests use √252 trading days); CAGR uses 365 days a year.
-- **Result (run once, 2026-09-29 ~15:35 PDT): FAIL.** 2023-05-01 → 2026-09-24 (1,243 days): Sharpe in excess of
+- **Result (run once, 2026-09-29 ~14:55 PDT): FAIL.** 2023-05-01 → 2026-09-24 (1,243 days): Sharpe in excess of
   T-bills **−1.63** [−4.73, +1.37], excess CAGR −0.6%; raw carry +2.5% a year after costs (+5.0% before costs),
   below the T-bill rate. By year (excess Sharpe): 2023 +1.96, 2024 +3.43, 2025 −7.20, 2026 −8.56. Held 86% of days
   (BTC), 72% (ETH). Before the window (2019-04 → 2023-04): +4.06 [+1.53, +6.59]. Mean funding, annualized: BTC 10.3%
   (2024) → 5.4% (2025) → 2.1% (2026); ETH 8.4% → 1.0% → 1.3%. The premium the BIS paper documented has been
   arbitraged down to below cash since the spot ETFs and basis funds arrived, as the paper itself reports for 2025.
 
-### Core leads, forward check (spec fixed 2026-09-29 ~12:05 PDT, before any forward data)
+### Core leads, forward check (spec fixed 2026-09-29, midday PDT, before any forward data)
 
 The user asked to raise the book's Sharpe. The two known ways were already tested on 2018–26 and failed narrowly,
 recorded as leads for a forward test: the 20% volatility target on B0 (Sharpe +0.06 [−0.14, +0.25]) and CVaR risk
