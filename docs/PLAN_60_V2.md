@@ -1329,6 +1329,38 @@ negative in 2025. Market-neutral, so it is judged against cash, not SPY.
   (2024) → 5.4% (2025) → 2.1% (2026); ETH 8.4% → 1.0% → 1.3%. The premium the BIS paper documented has been
   arbitraged down to below cash since the spot ETFs and basis funds arrived, as the paper itself reports for 2025.
 
+### Turn-of-the-month T1 (spec fixed 2026-09-29 ~15:18 PDT, before any turn-of-month code or number)
+
+**Idea.** US stocks earn much of their return over the four trading days around the month change (Lakonishok and
+Smidt 1988; Ariel 1987; McConnell and Xu, FAJ 2008, data through 2005). **Stated cause:** month-end cash needs.
+Institutions sell near the month end to meet payments, and salaries, pensions and fund inflows are invested at the
+start of the month (Ogden 1990; Etula, Rinne, Suominen and Vaittinen, RFS 2020 "Dash for cash"). The dates are
+known in advance, so there is no look-ahead. Nothing about this effect has been computed in this repo before. The
+SPY and BIL closes in `data/trend/etf_closes.parquet` were seen before, in the trend test.
+
+**Use if it passes.** None now: the mandate caps gross exposure at 1.0, so timing can only lower the book's
+exposure. A pass makes it a candidate for timing extra exposure once the leverage ladder
+(DEV_PLAN_AUTONOMOUS Phase D) unlocks gross above 1. That change would be proposed to the user, not made.
+
+**Rule (one trial, `turn_of_month`).**
+- Data: SPY adjusted closes, `data/trend/etf_closes.parquet`. Risk-free: 3-month T-bill (`vol_target_b0.tbill()`)
+  / 252 per trading day. x_t = SPY close-to-close return minus rf.
+- Turn-of-month (TOM) days: the last trading day of a month and the first 3 trading days of the next, i.e. hold
+  from the close of the 2nd-last trading day to the close of the 3rd trading day. Trading days come from the data's
+  own index.
+- Overlay stream o_t = x_t on TOM days, 0 otherwise. Cost: 1 bp a side, taken on the entry day (the first TOM
+  day) and the exit day (the 3rd trading day).
+- Window: 2008-01-02 .. 2026-09-25 (after McConnell and Xu's sample and publication).
+
+**Pass (both needed, 95% level, one trial):**
+1. The overlay's annualized Sharpe (sqrt 252, `stats()`) is >= 0.5 AND its 21-day block-bootstrap CI is above 0.
+   This is the track's usual rule.
+2. The TOM effect itself: the mean excess on TOM days minus the mean on other days has a 95% block-bootstrap CI
+   (21-day blocks, 5000 draws, seed 0) above 0. Rule 1 alone can pass on the plain equity premium.
+
+**Reported, not deciding:** Sharpe and difference by year and for 2020-07+ (after Etula et al.); the timed book
+(SPY on TOM days, T-bills otherwise) against SPY; 3 bp costs; correlation with the core book.
+
 ### Core leads, forward check (spec fixed 2026-09-29, midday PDT, before any forward data)
 
 The user asked to raise the book's Sharpe. The two known ways were already tested on 2018–26 and failed narrowly,
