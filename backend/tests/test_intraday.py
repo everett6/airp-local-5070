@@ -184,3 +184,18 @@ def test_d9_longs_overnight_losers_shorts_winners():
     r = I.d9_open_reversal(pd.DataFrame(rows), [f"S{i}" for i in range(20)], cost=0.0001)
     assert len(r) == 1 and r["names"].iloc[0] == 20
     assert abs(r["ret"].iloc[0] - (0.5 * 0.02 + 0.5 * 0.02 - 0.0002)) < 1e-9
+
+
+def test_d10_uses_the_premarket_price_not_the_open():
+    rows, pre = [], []
+    for i in range(20):
+        rows.append({"Date": pd.Timestamp("2024-07-01"), "Ticker": f"S{i}", "Open": 100.0, "Close": 100.0})
+        # the official opens are all 100 (no D9 signal); pre-market prices rank S19 highest
+        rows.append({"Date": pd.Timestamp("2024-07-02"), "Ticker": f"S{i}", "Open": 100.0,
+                     "Close": 102.0 if i < 2 else 98.0 if i >= 18 else 100.0})
+        pre.append({"Date": pd.Timestamp("2024-07-02"), "Ticker": f"S{i}", "pre": 100.0 + i})
+    syms = [f"S{i}" for i in range(21)]
+    pre.append({"Date": pd.Timestamp("2024-07-02"), "Ticker": "S20", "pre": 50.0})  # no daily bars: ignored
+    r = I.d10_premarket_reversal(pd.DataFrame(rows), pd.DataFrame(pre), syms, cost=0.0001)
+    assert len(r) == 1 and r["names"].iloc[0] == 20
+    assert abs(r["ret"].iloc[0] - (0.02 - 0.0002)) < 1e-9

@@ -243,18 +243,37 @@ def d9_open_reversal(daily: pd.DataFrame, symbols: list[str], cost: float, frac:
     if trim:  # drop the most extreme stock-day open-to-close returns (a bad-print check)
         lo_q, hi_q = np.nanquantile(r, [trim, 1 - trim])
         r = np.where((r < lo_q) | (r > hi_q), np.nan, r)
+    return _short_top_long_bottom(sig, r, o.index, cost, frac, min_names)
+
+
+def _short_top_long_bottom(sig: np.ndarray, r: np.ndarray, days: pd.Index, cost: float, frac: float,
+                           min_names: int) -> pd.DataFrame:
+    """Each day (row): long the lowest-signal decile, short the highest, dollar neutral, returns r."""
     out = {}
-    for i, day in enumerate(o.index):
+    for i, day in enumerate(days):
         ok = np.isfinite(sig[i]) & np.isfinite(r[i])
         n = int(ok.sum())
         if n < min_names:
             continue
         k = max(1, int(n * frac))
-        order = np.argsort(sig[i][ok], kind="stable")
-        rr = r[i][ok][order]
+        rr = r[i][ok][np.argsort(sig[i][ok], kind="stable")]
         lo, hi = float(rr[:k].mean()), float(rr[-k:].mean())
         out[pd.Timestamp(day)] = {"ret": 0.5 * lo - 0.5 * hi - 2 * cost, "long": lo, "short": -hi, "names": n}
     return pd.DataFrame.from_dict(out, orient="index")
+
+
+def d10_premarket_reversal(daily: pd.DataFrame, pre: pd.DataFrame, symbols: list[str], cost: float,
+                           frac: float = 0.10, min_names: int = 20) -> pd.DataFrame:
+    """D10, tradable opening reversal: as D9, but the signal is the pre-market last trade (`pre`: Date, Ticker, pre)
+    over yesterday's close; trade open to close (market-on-open / market-on-close). Stocks without a pre-market
+    price that day are left out."""
+    d = daily[daily["Ticker"].isin(symbols)]
+    o = d.pivot_table(index="Date", columns="Ticker", values="Open").sort_index()
+    c = d.pivot_table(index="Date", columns="Ticker", values="Close").sort_index()
+    p = pre[pre["Ticker"].isin(symbols)].pivot_table(index="Date", columns="Ticker", values="pre")
+    p = p.reindex(index=o.index, columns=o.columns)
+    sig, r = (p / c.shift(1) - 1).to_numpy(float), (c / o - 1).to_numpy(float)
+    return _short_top_long_bottom(sig, r, o.index, cost, frac, min_names)
 
 
 def darvas_signals(h: np.ndarray, lo: np.ndarray, c: np.ndarray, confirm: int = 3, year: int = 252
