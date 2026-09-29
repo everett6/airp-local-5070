@@ -57,6 +57,47 @@ def due_legs(p: dict[str, Any], days: pd.DatetimeIndex, now: datetime) -> list[L
     return [x for x in legs if x.client_order_id not in have]
 
 
+def audit_pair(p: dict[str, Any], legs: list[Leg]) -> list[str]:
+    """Record both-leg status and fill slippage for one paper pair; alert on a broken hedge."""
+    if p["status"] == "skipped":
+        return []
+    flags: list[str] = []
+    by_phase: dict[str, list[Leg]] = {phase: [x for x in legs if f"-{phase}-" in x.client_order_id]
+                                            for phase in ("in", "out")}
+    for phase, required in (("in", p["status"] in ("open", "closed")),
+                            ("out", p["status"] == "closed")):
+        pair = by_phase[phase]
+        assets = {x.asset for x in pair}
+        if required or pair:
+            missing = {p["ticker"], p["etf"]} - assets
+            if missing:
+                flags.append(f"{phase} hedge missing {', '.join(sorted(missing))}")
+            bad = [x.asset for x in pair if x.status in ("rejected", "canceled", "expired")]
+            if bad:
+                flags.append(f"{phase} hedge rejected/canceled: {', '.join(sorted(bad))}")
+            if required and len([x for x in pair if x.status == "filled"]) < 2:
+                flags.append(f"{phase} hedge not fully filled")
+    current = set(flags)
+    old = set(p.get("audit_flags", []))
+    p["audit_flags"] = sorted(current)
+    p["broker_audit"] = {"entry": {x.asset: x.status for x in by_phase["in"]},
+                         "exit": {x.asset: x.status for x in by_phase["out"]}}
+    if p["status"] == "closed" and all(len(by_phase[k]) == 2 and
+                                        all(x.status == "filled" and x.filled_price for x in by_phase[k])
+                                        for k in ("in", "out")):
+        entry = {x.asset: float(x.filled_price) for x in by_phase["in"] if x.filled_price}
+        exit_ = {x.asset: float(x.filled_price) for x in by_phase["out"] if x.filled_price}
+        q, h = p["qty"], p["etf_qty"]
+        broker_gross = q * (exit_[p["ticker"]] - entry[p["ticker"]]) - h * (exit_[p["etf"]] - entry[p["etf"]])
+        sim_cost = sleeve.COST * (q * (p["entry_open"] + p["exit_open"]) +
+                                  h * (p["etf_entry_open"] + p["etf_exit_open"]))
+        sim_gross = p["pnl"] + sim_cost
+        p["broker_audit"].update(broker_gross_pnl=round(broker_gross, 2),
+                                 simulator_net_pnl=p["pnl"], assumed_sim_cost=round(sim_cost, 2),
+                                 fill_slippage=round(broker_gross - sim_gross, 2))
+    return [f"ai picks {p['ticker']} {flag}" for flag in sorted(current - old)]
+
+
 def mirror(st: dict[str, Any], client: Alpaca, days: pd.DatetimeIndex, now: datetime, dry: bool, mode: str
            ) -> list[str]:
     alerts: list[str] = []
@@ -66,7 +107,10 @@ def mirror(st: dict[str, Any], client: Alpaca, days: pd.DatetimeIndex, now: date
                 "out": {p["ticker"]: p.get("exit_open"), p["etf"]: p.get("etf_exit_open")}}
         for leg in legs:
             if leg.status == "submitted" and not dry:
-                client.refresh(leg)
+                try:
+                    client.refresh(leg)
+                except (BrokerError, httpx.HTTPError) as e:
+                    alerts.append(f"ai picks {p['ticker']} order refresh uncertain: {type(e).__name__}: {e}")
             when = "in" if "-in-" in leg.client_order_id else "out"
             alerts += reconcile(leg, {k: v for k, v in sims[when].items() if v})
         if mode != "HALTED":
@@ -77,7 +121,12 @@ def mirror(st: dict[str, Any], client: Alpaca, days: pd.DatetimeIndex, now: date
                     print(f"ai picks (dry): would send {leg.side} {leg.qty} {leg.symbol} opg")
                     leg.status = "dry"
                 else:
-                    client.submit(leg)
+                    try:
+                        client.submit(leg)
+                    except (BrokerError, httpx.HTTPError) as e:
+                        leg.status = "submitted"  # may have reached the broker; refresh by id next run
+                        leg.note = f"submission uncertain: {type(e).__name__}: {e}"[:160]
+                        alerts.append(f"ai picks {p['ticker']} {leg.asset} {leg.note}")
                     alerts += reconcile(leg, {})
                 legs.append(leg)
         if not dry and p["status"] in ("open", "closed") and not any("-in-" in x.client_order_id for x in legs) \
@@ -85,6 +134,8 @@ def mirror(st: dict[str, Any], client: Alpaca, days: pd.DatetimeIndex, now: date
             alerts.append(f"ai picks: {p['ticker']} entered in the simulator but its orders were never sent")
             p["unsent_alerted"] = True
         p["legs"] = [leg_dict(x) for x in legs if x.status != "dry"]
+        if not dry:
+            alerts += audit_pair(p, legs)
     return alerts
 
 
@@ -100,6 +151,7 @@ def run(events: Path, out: Path, now: datetime, dry: bool, client: Alpaca | None
     for n in sleeve.step(st, recs, p.open, p.close, SECTOR_ETF, now, mode):
         print("ai picks:", n)
     alerts = mirror(st, client, pd.DatetimeIndex(p.open.index), now, dry, mode) if client else []
+    st["broker_audit_status"] = "dry" if dry else "no_keys" if client is None else "checked"
     out.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(st, indent=1) + "\n")
@@ -130,6 +182,8 @@ def main() -> None:
         alerts = [f"ai picks failed: {type(e).__name__}: {e}"[:300]]
     for x in alerts:
         print("BROKER ALERT:", x)
+    if alerts:
+        raise SystemExit(1)  # never mark a broken paper hedge as a clean event run
 
 
 if __name__ == "__main__":

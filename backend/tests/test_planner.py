@@ -35,6 +35,25 @@ def test_plan_odds_move_with_the_goal_and_never_change_weights():
     assert any("$2,000" in f for f in tiny["flags"])
 
 
+def test_joint_bootstrap_preserves_perfectly_correlated_tracks():
+    idx = pd.bdate_range("2020-01-01", periods=100)
+    x = np.linspace(-0.02, 0.02, len(idx))
+    r = pd.DataFrame({"core": x, "event": x}, index=idx)
+    both = PL.simulate(r, {"core": 0.5, "event": 0.5}, 80, n=20)
+    core = PL.simulate(r, {"core": 1.0}, 80, n=20)
+    np.testing.assert_array_equal(both, core)
+
+
+def test_plan_compares_on_the_same_history():
+    idx = pd.bdate_range("2020-01-01", periods=100)
+    x = np.r_[np.full(50, 0.02), np.full(50, -0.01)]
+    r = pd.DataFrame({"core": x, "event": np.r_[np.full(50, np.nan), x[50:]]}, index=idx)
+    goal = PL.Goal(10_000, 20_000, date(2030, 1, 1), date(2025, 1, 1))
+    result = PL.plan(goal, r)
+    assert result["history"]["days"] == 50
+    assert result["with_current_evidence"] == result["core_only"]
+
+
 def test_picking_need_is_consistent():
     r = _returns()
     res = PL.plan(PL.Goal(100_000, 300_000, date(2031, 1, 1), date(2026, 1, 1)), r)

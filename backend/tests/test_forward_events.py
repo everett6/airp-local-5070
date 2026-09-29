@@ -1,6 +1,8 @@
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -70,6 +72,20 @@ def test_gpu_busy_ignores_desktop_apps():
     assert gpu_busy("weird line without memory\n")
 
 
+def test_failed_child_stops_event_pipeline(monkeypatch):
+    import subprocess
+
+    import forward_events as fe
+
+    def failed(cmd, **kw):
+        assert kw["check"] is True
+        raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(fe.subprocess, "run", failed)
+    with pytest.raises(subprocess.CalledProcessError):
+        fe.run(["python", "scripts/build_features.py"])
+
+
 def test_live_extract_has_no_backtest_end_date(tmp_path, monkeypatch):
     """29 Sep 2026: the extract step kept extract_events.py's backtest default --to 2026-09-24, so every new
     release was dropped and missed. Both GPU steps must read to the far future."""
@@ -85,6 +101,6 @@ def test_live_extract_has_no_backtest_end_date(tmp_path, monkeypatch):
             pass
     monkeypatch.setattr(fe, "Ollama", NoServer)
     monkeypatch.setattr(fe, "BACKEND", tmp_path)  # the extract path is written relative to BACKEND
-    fe.fact_sheets(tmp_path, tmp_path / "ev.csv", datetime(2026, 9, 28).date(), True, "t", tmp_path / "p")
+    fe.fact_sheets(tmp_path, tmp_path / "ev.csv", date(2026, 9, 28), True, "t", tmp_path / "p")
     ext = next(c for c in cmds if "extract" in c)
     assert ext[ext.index("--to") + 1] == "2099-12-31"

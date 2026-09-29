@@ -91,6 +91,13 @@ def shadow_lines(fwd: Path = FWD) -> list[str]:
                 break
     except Exception as e:  # noqa: BLE001
         out.append(f"- AI-picks sleeve: could not read ({type(e).__name__}: {e})")
+    try:
+        import guidance_shadow as G
+        f = fwd / "guidance_shadow" / "ledger.jsonl"
+        recs = Ledger(f).verify() if f.exists() else []
+        out.append(f"- guidance shadow: {json.dumps(G.status(recs))}")
+    except Exception as e:  # noqa: BLE001
+        out.append(f"- guidance shadow: could not read ({type(e).__name__}: {e})")
     for name, mod in (("longterm", "longterm_picks"), ("themes", "themes")):
         try:
             m = __import__(mod)

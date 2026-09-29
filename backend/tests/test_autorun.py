@@ -46,6 +46,12 @@ def test_check_finds_missing_weekday_runs(tmp_path, monkeypatch):
     assert gaps == ["2026-10-07: 0 of 2 event runs", "2026-10-06: 1 of 2 event runs"]
 
 
+def test_live_check_finds_missing_first_day_without_heartbeats(tmp_path, monkeypatch):
+    monkeypatch.setattr(autorun, "FWD", tmp_path)
+    (tmp_path / "AUTORUN_MODE").write_text("live\n")
+    assert autorun.check(today=date(2026, 10, 1)) == ["2026-09-30: 0 of 2 event runs"]
+
+
 def _hb(job, day, hour, rc=0):
     return {"job": job, "mode": "dry", "start": f"2026-{day}T{hour}:00:00+00:00", "rc": rc}
 
@@ -88,10 +94,14 @@ def test_review_runs_the_monthly_loop_only_live_and_collect_follows_events():
     assert not any("monthly" in c for c in autorun.commands("review", "dry"))
     assert any("monthly" in c for c in autorun.commands("review", "live"))
     assert autorun.commands("events", "live")[-1][-1] == "collect"
-    assert autorun.commands("events", "live")[2][1] == "scripts/net_read_shadow.py"
+    assert autorun.commands("events", "live")[2][1] == "scripts/ai_picks.py"
+    assert autorun.commands("events", "live")[3][1] == "scripts/guidance_shadow.py"
+    assert autorun.commands("events", "live")[4][1] == "scripts/net_read_shadow.py"
     ev = [c[1] for c in autorun.commands("events", "dry")]
     assert ev.index("scripts/themes.py") == ev.index("scripts/longterm_picks.py") + 1
-    assert autorun.commands("events", "dry")[2][-1] == "results/forward/events_autodry"
+    assert autorun.commands("events", "dry")[2][-1] == "results/forward/ai_picks_autodry"
+    assert autorun.commands("events", "dry")[3][-1] == "results/forward/guidance_shadow_autodry"
+    assert autorun.commands("events", "dry")[4][-1] == "results/forward/events_autodry"
     assert autorun.commands("learn", "dry") == []
     assert autorun.scan("review", "x\nLEARN ALERT: signal a promoted", None) == ["signal a promoted"]
 
@@ -161,3 +171,28 @@ def test_wait_online_retries_until_the_network_is_up(monkeypatch):
     calls.clear()
     monkeypatch.setattr(autorun.socket, "create_connection", lambda *a, **k: (_ for _ in ()).throw(OSError()))
     assert not autorun.wait_online(tries=2, pause=0)
+
+
+def test_failed_required_step_stops_following_steps(tmp_path, monkeypatch):
+    import subprocess
+
+    monkeypatch.setattr(autorun, "FWD", tmp_path)
+    monkeypatch.setattr(autorun, "BACKEND", tmp_path)
+    monkeypatch.setattr(autorun, "wait_online", lambda: True)
+    monkeypatch.setattr(autorun, "can_inhibit", lambda: False)
+    steps = [["py", "scripts/broker_sync.py"], ["py", "scripts/forward_events.py"], ["py", "scripts/ai_picks.py"],
+             ["py", "scripts/longterm_picks.py"], ["py", "scripts/themes.py"], ["py", "scripts/learn_loop.py"]]
+    monkeypatch.setattr(autorun, "commands", lambda job, mode: steps)
+    monkeypatch.setattr(autorun, "alert", lambda *a: None)
+    called = []
+    failing = {"scripts/broker_sync.py", "scripts/forward_events.py"}
+
+    def fake_step(cmd, inhibit):
+        called.append(cmd[1])
+        return subprocess.CompletedProcess(cmd, 1 if cmd[1] in failing else 0, "", "")
+
+    monkeypatch.setattr(autorun, "step", fake_step)
+    assert autorun.run("events") == 1
+    # a broker failure blocks nothing; an event-runner failure skips only its readers
+    assert called == ["scripts/broker_sync.py", "scripts/forward_events.py", "scripts/longterm_picks.py",
+                      "scripts/themes.py"]

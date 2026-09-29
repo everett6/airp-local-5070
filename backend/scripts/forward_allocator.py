@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import subprocess
 import sys
 from datetime import UTC, date, datetime, timedelta
@@ -30,7 +31,7 @@ import pandas as pd
 import yfinance as yf
 
 from app.data_ingestion import bars
-from app.portfolio.forward import books_from_json, books_to_json, new_books, step
+from app.portfolio.forward import COST_BPS, Book, books_from_json, books_to_json, new_books, step
 from app.portfolio.guard import HALT, apply_drawdown_limit, halt, halt_info, state
 from app.portfolio.master import MasterConfig
 from app.sandbox.events import Prices
@@ -76,6 +77,37 @@ def fetch(now: datetime) -> Prices:
     long = pd.concat(frames).rename_axis("Date").reset_index()
     long["Date"] = pd.to_datetime(long["Date"]).dt.date.astype(str)
     return Prices.from_long(long)
+
+
+def validate_prices(p: Prices, now: datetime) -> None:
+    """Reject missing, nonpositive or stale closes before making allocator decisions."""
+    complete = p.close[pd.DatetimeIndex(p.close.index).date < now.date()]
+    if complete.empty:
+        raise ValueError("allocator data check: no completed price bars")
+    for asset in ASSETS:
+        if asset not in complete:
+            raise ValueError(f"allocator data check: {asset} price column absent")
+        s = complete[asset].dropna()
+        if s.empty or not math.isfinite(float(s.iloc[-1])) or float(s.iloc[-1]) <= 0:
+            raise ValueError(f"allocator data check: {asset} close missing or invalid")
+        last = pd.Timestamp(s.index[-1]).date()
+        if (now.date() - last).days > 5:
+            raise ValueError(f"allocator data check: {asset} close stale ({last})")
+
+
+def validate_result(rec: dict, books: dict[str, Book]) -> None:
+    """Reject invalid book output before persisting state or a clean ledger line."""
+    if not rec.get("books") or not rec.get("price_sources"):
+        raise ValueError("allocator result check: book or price sources absent")
+    for name, result in rec["books"].items():
+        if "rejected" in result or "rejected_at_fill" in result:
+            raise ValueError(f"allocator result check: {name} target weights rejected")
+        equity = result.get("equity")
+        if not isinstance(equity, (int, float)) or not math.isfinite(equity) or equity <= 0:
+            raise ValueError(f"allocator result check: {name} equity invalid")
+        cost = books[name].costs
+        if not math.isfinite(cost) or cost < 0:
+            raise ValueError(f"allocator result check: {name} trading cost invalid")
 
 
 def status() -> None:
@@ -127,16 +159,22 @@ def main() -> None:
     books = books_from_json(json.loads(state_path.read_text())) if state_path.exists() else new_books()
     now = datetime.now(UTC)
     if ledger.exists():
-        last = json.loads(ledger.read_text().splitlines()[-1])
+        history = [json.loads(line) for line in ledger.read_text().splitlines()]
+        if not history:
+            raise ValueError("allocator ledger check: empty ledger")
+        last = history[-1]
         if last["run_at_utc"][:10] == now.date().isoformat():
             raise SystemExit(f"already ran today ({last['run_at_utc']}); run again on a later day")
     p = fetch(now)
+    validate_prices(p, now)
     mode = state()
     if mode != "ACTIVE":
         print(f"trading state {mode}:", "marking only, nothing fills or is decided." if mode == "HALTED" else
               "orders may only shrink positions.", halt_info())
     rec = step(books, p.open, p.close, now, MasterConfig(), halted=mode == "HALTED", reducing=mode == "REDUCING")
     rec["price_sources"] = dict(SOURCES)
+    rec["assumed_cost_bps"] = COST_BPS
+    validate_result(rec, books)
     name = next((n for n in REAL_BOOK if n in rec["books"]), None)
     if name is not None:
         rec["drawdown"] = apply_drawdown_limit(name, rec["books"][name]["equity"], books[name].peak,

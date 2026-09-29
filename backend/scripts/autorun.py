@@ -46,9 +46,13 @@ DRY = {"events": ["--dir", "results/forward/events_autodry", "--start", "2026-09
        "ai_picks": ["--dry", "--events", "results/forward/events_autodry", "--dir", "results/forward/ai_picks_autodry"],
        "longterm": ["--events", "results/forward/events_autodry"],
        "self_improve": ["--dir", "results/forward/events_autodry"]}
-GO_LIVE_ON = date(2026, 10, 2)   # the dry run (from Mon 28 Sep) is judged from this day on, at the 21:00 ET check
+GO_LIVE_ON = date(2026, 10, 2)   # automatic switch date; the user explicitly selected live paper mode on 29 Sep
+LIVE_FROM = date(2026, 9, 30)    # first eligible live filing date after the user-directed early switch
 DRY_FROM = date(2026, 9, 28)
 MIN_GOOD_EVENT_RUNS = 8          # of the 10 scheduled Mon-Fri
+# steps that read the event runner's ledger; the broker, long-term and theme steps are independent and always run
+EVENT_READERS = {"scripts/ai_picks.py", "scripts/guidance_shadow.py", "scripts/net_read_shadow.py",
+                 "scripts/self_improve.py", "scripts/learn_loop.py"}
 EXPECTED = {"events": 2, "allocator_weekday": 0}  # event runs per weekday; the allocator runs Mondays
 
 
@@ -108,11 +112,14 @@ def commands(job: str, m: str) -> list[list[str]]:
     if job == "events":  # broker first: the 08:45 ET run is inside Alpaca's market-on-open window
         net_read = [PY, "scripts/net_read_shadow.py", *(DRY["net_read"] if dry else [])]  # arm C2, a shadow
         picks = [PY, "scripts/ai_picks.py", *(DRY["ai_picks"] if dry else [])]  # the untested AI-picks sleeve
+        guide = [PY, "scripts/guidance_shadow.py",
+                 "--events", "results/forward/events_autodry" if dry else "results/forward/events",
+                 "--out", "results/forward/guidance_shadow_autodry" if dry else "results/forward/guidance_shadow"]
         # long-term picks: a no-money shadow, one ledger in both modes (its first cohort, 1 Oct, falls in the dry run)
         longterm = [PY, "scripts/longterm_picks.py", *(DRY["longterm"] if dry else [])]
         themes = [PY, "scripts/themes.py"]  # the theme track and AI-bubble gauge: a shadow, one ledger in both modes
         improve = [PY, "scripts/self_improve.py", *(DRY["self_improve"] if dry else [])]  # arm F, a shadow
-        return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], net_read, picks, longterm,
+        return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], picks, guide, net_read, longterm,
                 themes, improve, [*learn, "collect", *largs]]
     if job == "allocator":
         return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])], broker]
@@ -218,10 +225,16 @@ def run(job: str) -> int:
             return 1
         rc, out = 0, "" if wait_online() else "(network still down after 2 minutes; ran anyway)\n"
         inhibit = can_inhibit()
+        skip_dependents = False  # a failed event runner: its readers must not run on a half-written ledger
         for cmd in commands(job, m):
+            if skip_dependents and cmd[1:2] and cmd[1] in EVENT_READERS:
+                out += f"(skipped {cmd[1]}: the event runner failed)\n"
+                continue
             r = step(cmd, inhibit)
             out += r.stdout + r.stderr
             rc = rc or r.returncode
+            if r.returncode != 0 and cmd[1:2] == ["scripts/forward_events.py"]:
+                skip_dependents = True
         log.write_text(out)
     # the allocator refuses a second run on the same day with a clear message: not a failure
     if job == "allocator" and rc != 0 and "already ran today" in out:
@@ -246,9 +259,12 @@ def check(today: date | None = None) -> list[str]:
     hb = FWD / "heartbeat.jsonl"
     recs = [json.loads(x) for x in hb.read_text().splitlines()] if hb.exists() else []
     recs = [r for r in recs if r.get("mode") == m and r.get("rc") == 0]
-    if not recs:
+    if m == "live":
+        first = LIVE_FROM  # detect a missing first live run even when no live heartbeat exists
+    elif recs:
+        first = min(datetime.fromisoformat(r["start"]).astimezone(NY).date() for r in recs)
+    else:
         return []
-    first = min(datetime.fromisoformat(r["start"]).astimezone(NY).date() for r in recs)
     today = today or datetime.now(NY).date()
     gaps = []
     for i in range(1, 8):

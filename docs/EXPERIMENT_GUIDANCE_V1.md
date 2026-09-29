@@ -1,0 +1,11 @@
+# Prospective guidance signal V1 — frozen 2026-09-29
+
+**Hypothesis:** Among on-time Bonsai earnings picks that already clear the fixed 2.873 log-odds threshold, a *verified raised-guidance* label predicts a better five-trading-day return against the company's sector than the full set of qualifying picks. The label comes from the earnings release and is code-checked against an exact quote. No model prompt, score threshold, sleeve weight, or trading rule changes for this experiment.
+
+**Eligible future data:** SEC earnings releases accepted on or after 2026-09-30. Use only on-time forward-ledger decisions with `source=bonsai` and `logodds >= 2.873`. Exclude the code-only lite fallback. Classification is `guidance == "raised"`; all other or unverified guidance stays in the control. Never backfill an unrecorded release or change this rule after viewing outcomes.
+
+**Outcome:** Existing forward-ledger five-trading-day stock-minus-sector-ETF open-to-open return. Subtract a fixed 0.8% round-trip paper cost (0.2% on each of two legs at entry and exit). Compare the mean net outcome of raised-guidance picks with the mean net outcome of all eligible picks; report both, counts, and the incremental difference. Cluster-bootstrap complete entry weeks (3,000 seeded resamples) for a 95% interval, preserving releases that occurred together.
+
+**Evaluation gate:** Wait for at least 30 matured control picks, 10 matured raised-guidance picks, and three distinct entry months. Call it `promising_shadow_only` only when the incremental mean is at least +0.5 percentage point and the interval's lower bound is above zero. If the upper bound is below zero, call it `not_supported`; otherwise `inconclusive`. A promising result does **not** authorize capital or promotion: portfolio-level replay, broker-cost comparison, and the existing mandate/evidence ladder still apply.
+
+**Implementation:** `backend/scripts/guidance_shadow.py` reads the event ledger and writes an independent hash-chained shadow ledger. `backend/scripts/autorun.py` schedules collection after the event runner. No broker orders are sent. This file was written before the first eligible 30 Sep filing outcome. No historical optimization or registered test was run.

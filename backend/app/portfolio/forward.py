@@ -27,6 +27,7 @@ from app.portfolio.guard import reduce_only as cap_to_current
 from app.portfolio.master import MasterConfig, allocate, crypto_state
 
 FRACTIONAL = ("BTC-USD", "ETH-USD")
+COST_BPS = 5.0  # assumed one-way simulator trading cost
 
 
 @dataclass
@@ -48,7 +49,7 @@ def fill_day(days: pd.DatetimeIndex, decided_at: str) -> pd.Timestamp | None:
     return later[0] if len(later) else None
 
 
-def execute(book: Book, opens: pd.Series, cost_bps: float = 5.0, reduce_only: bool = False) -> dict[str, Any]:
+def execute(book: Book, opens: pd.Series, cost_bps: float = COST_BPS, reduce_only: bool = False) -> dict[str, Any]:
     """Trade the pending targets at these opens: sells first, whole shares except crypto, cash never negative.
     `reduce_only` (trading state REDUCING): no quantity may grow, so only sells happen."""
     assert book.pending is not None
