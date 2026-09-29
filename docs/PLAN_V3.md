@@ -123,6 +123,10 @@ the weight the goal needs (see §6).
   drawdown brakes leave idle in SGOV (only when 5% or more is idle; the 2% buffer stays cash). 2018–26 backtest
   arithmetic: parked on 38% of days, about 35% of the book when on, +0.4% a year to the core (17.7% → 18.2%); nearer
   +0.5–0.6% at today's T-bill rate. Not a strategy test (it moves no risk), so no trial.
+- **2026-09-29, by the user:** QQQ and TLT allowed ("widen the allowed holdings, add QQQ and TLT"). Allowed only:
+  the frozen book does not hold them, and a strategy may use them only after a pre-registered test passes. Past tests
+  that already used them (21-ETF trend sleeve, CVaR risk parity) failed and are not re-run. The broker mirror sells them
+  if a decision drops them.
 
 ## 8. Decision rules that never change
 
