@@ -1,6 +1,7 @@
 """Arm B2, step 1 (docs/PLAN_60_V2.md "Arm B2"): fetch each release's as-of news page ONCE, slowly, into the tool cache.
 
     python scripts/warm_news.py            # 2024 then 2025-26 samples; resumable; network only, no GPU
+    python scripts/warm_news.py b4         # arm B4's sample (scripts/b4_prep.py)
 
 Why: in arm B, 16 research workers queued behind the Internet Archive's pacing (one request per 4 s) and 75% of news
 calls hit their 15 s timeout, so Jan had news for 5% of 2024 releases (46% in 2025-26). This makes exactly the
@@ -29,17 +30,18 @@ from app.tools.netguard import FetchError, SafeFetcher
 
 SAMPLES = (("2024", "data/events/events_sp500_2024.csv", "features_sp500_2024_secchk.csv"),
            ("2025-26", "data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv"))
+SAMPLES_B4 = (("b4", "data/events/events_b4_2026.csv", "features_b4_2026.csv"),)
 LOG = BACKEND / "results" / "events" / "warm_news.jsonl"
 
 
-async def main() -> None:
+async def main(samples: tuple[tuple[str, str, str], ...] = SAMPLES) -> None:
     base = ToolGateway.from_env("as_of", as_of=datetime(2000, 1, 1, tzinfo=UTC))
     fetcher = SafeFetcher(base.fetcher.user_agent, timeout_s=90.0, total_timeout_s=180.0)
     await base.aclose()
     spec = TOOLS["news_as_of"]
     done = {json.loads(x)["accession"] for x in LOG.read_text().splitlines()} if LOG.exists() else set()
     try:
-        for tag, events, feats in SAMPLES:
+        for tag, events, feats in samples:
             keep = set(pd.read_csv(BACKEND / "results" / "events" / feats)["accession"])
             rows = [r for r in pd.read_csv(BACKEND / events).itertuples()
                     if r.accession in keep and r.accession not in done]
@@ -80,4 +82,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main(SAMPLES_B4 if sys.argv[1:] == ["b4"] else SAMPLES))
