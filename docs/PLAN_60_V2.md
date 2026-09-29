@@ -1042,3 +1042,44 @@ them and rates. The rating field, the quote check, the pick rule and the pass ru
 stored with each rating and shown on the dashboard. Quality check (10 random cards, quality only): parsed 10/10,
 both sides on every card, 54 of 60 quotes verified; 9 of 10 cards rated 4. Time: about 8 seconds per card (was 3),
 so a monthly cohort of about 490 cards takes about 70 minutes of GPU time.
+
+### Theme track and AI-bubble gauge (spec fixed 2026-09-28 ~18:45, before any cohort was made)
+
+The user asked for the AI to weigh investment directions by horizon (long-term: biotech, quantum computing;
+medium: hyperscalers) and risks such as an AI bubble. **Forward-only:** Bonsai knows how these themes did in 2024–26.
+
+- **Themes (fixed, `app/portfolio/themes.py`):**
+  - Medium, held 6 months (126 trading days): hyperscalers (equal-weight MSFT, AMZN, GOOGL, META, ORCL), semis
+    (SMH), power and grid (GRID), software (IGV), cybersecurity (CIBR), utilities (XLU).
+  - Long, held 12 months (252 trading days): biotech (XBI), quantum computing (QTUM), nuclear (NLR), robotics
+    (BOTZ), space (UFO), solar (TAN), batteries and lithium (LIT).
+  - AI-linked: hyperscalers, semis, power and grid.
+- **Cards, all numbers computed by code** from data dated before the run: 1/3/12-month return vs SPY, drawdown from
+  the 12-month high, price vs its 200-day average, 12-month volatility, and the market risk register:
+  - hyperscaler capex over the last 4 quarters and its growth vs a year earlier, and capex as a share of operating
+    cash flow (SEC filings);
+  - market concentration: SPY minus RSP over 12 months;
+  - SMH vs its trend;
+  - high-yield spread and its 3-month change, and VIX (FRED).
+- **Bonsai (`PROMPT_RISK`, `PROMPT_TH`):** for the register and for each theme it argues bull and bear first (up to
+  3 quoted points each), then rates. The register gets `bubble_risk` (low / elevated / high); each theme gets
+  `theme_outlook` (1–5). The usual quote check applies; an unverified quote counts as the middle answer.
+- **Picks, monthly** (the long-term picks' schedule):
+  - Per horizon, up to 2 themes rated 4 or 5 (ties: better 12-1 month momentum vs SPY).
+  - When `bubble_risk` is high, AI-linked themes are left out.
+  - No theme qualifies → that horizon stays in SPY (0 excess, no cost).
+  - Equal weight; ETF cost 0.1% per side.
+- **Code-only yardstick, recorded beside each cohort:** the 2 themes per horizon with the best 12-1 month momentum.
+- **Pass (trial `themes_forward`), judged after 12 medium cohorts have closed (about 18 months):**
+  - the mean excess vs SPY after costs is above 0 with an 80% one-sided bootstrap bound above 0;
+  - AND it is above the momentum yardstick's mean.
+  - Long cohorts are judged the same way after 12 have closed.
+  - Cohorts overlap, so the bootstrap overstates certainty; the result is read with that caveat.
+- **The bubble cap itself is not proven.** Bubbles are rare, so a few years of data can't test the gauge. It stays
+  a shadow rule, reported on the dashboard. It changes no money in the master book, whose drawdown brakes stay the
+  tested risk control.
+- **Quality check** (today's cards; quality only, no returns):
+  - Replies read: 14/14. Point quotes verified: 69 of 84. Run time: 95 seconds.
+  - `bubble_risk`: high ("capex growth is extreme and semiconductor prices are stretched").
+  - Picks today would be: medium none (the AI-linked themes were capped; the rest were rated 3 or lower), long
+    biotech and quantum.

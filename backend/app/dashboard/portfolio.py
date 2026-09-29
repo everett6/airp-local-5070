@@ -418,6 +418,29 @@ def console() -> None:
                 for lr in lrows:
                     with st.expander(f"{lr['ticker']} · rating {lr.get('rating', '—')}"):
                         thesis(lr)
+        tl = P.themes_latest()
+        with st.container(border=True):
+            title("themes · SHADOW · 2 medium (6 months) + 2 long (12 months), rated 4+ · AI-bubble gauge")
+            if tl is None:
+                empty("The first theme cohort is made on Thu 1 Oct after the close.")
+            else:
+                tc, tf = tl
+                risk = tf.get("risk", {})
+                strip([("ai-bubble risk", str(tc["bubble_risk"]).upper(), "high = AI-linked themes left out",
+                        "neg" if tc["bubble_risk"] == "high" else "warn" if tc["bubble_risk"] == "elevated" else "pos"),
+                       ("medium picks", ", ".join(tc["picks"]["medium"]) or "none", "held 6 months", ""),
+                       ("long picks", ", ".join(tc["picks"]["long"]) or "none", "held 12 months", ""),
+                       ("momentum baseline", " / ".join(", ".join(v) for v in tc["baseline"].values()), "code only",
+                        "")])
+                if risk:
+                    with st.expander(f"AI-bubble risk: {risk.get('bubble_risk', '—')} · the register and both cases"):
+                        st.markdown("<br>".join(esc(x) for x in tf.get("register", "").splitlines()[1:]),
+                                    unsafe_allow_html=True)
+                        thesis(risk)
+                for th in sorted(tf.get("themes", []), key=lambda x: (x["horizon"], -x["rating"])):
+                    with st.expander(f"{th['label']} · {th['horizon']} · rating {th['rating']}"
+                                     + (" · AI-linked" if th.get("ai_linked") else "")):
+                        thesis(th)
         if ledger_err:
             st.markdown(f'<div class="q-note neg">ledger check failed: {esc(ledger_err)}</div>', unsafe_allow_html=True)
         if picks.empty or s is None:

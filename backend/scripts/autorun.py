@@ -95,8 +95,9 @@ def commands(job: str, m: str) -> list[list[str]]:
         picks = [PY, "scripts/ai_picks.py", *(DRY["ai_picks"] if dry else [])]  # the untested AI-picks sleeve
         # long-term picks: a no-money shadow, one ledger in both modes (its first cohort, 1 Oct, falls in the dry run)
         longterm = [PY, "scripts/longterm_picks.py", *(DRY["longterm"] if dry else [])]
+        themes = [PY, "scripts/themes.py"]  # the theme track and AI-bubble gauge: a shadow, one ledger in both modes
         return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], net_read, picks, longterm,
-                [*learn, "collect", *largs]]
+                themes, [*learn, "collect", *largs]]
     if job == "allocator":
         return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])], broker]
     if job == "review":

@@ -180,6 +180,40 @@ _SCHEMA_BB = ('{"bull": [{"point": "...", "quote": "..."}], "bear": [{"point": "
 PROMPT_BB = (_HEAD + _DEF_BB + _RULES_R + "\nWrite \"bull\", \"bear\" and \"reason\" first.\nJSON: " + _SCHEMA_BB)
 
 
+_BOTH = """Before you rate, argue BOTH sides:
+- "bull": up to 3 of the strongest reasons for, each a short "point" (at most 20 words) with a supporting "quote"
+  copied word for word from the card.
+- "bear": up to 3 of the strongest reasons against, same form. Make each case in earnest, even when the card clearly
+  favours the other side.
+Then weigh the two cases in "reason" and rate. For any rating other than the middle one, copy the ONE card line that
+matters most, word for word, as "quote". Never guess.
+Reply with ONLY one JSON object on one line.
+"""
+
+# Theme track (docs/PLAN_60_V2.md "Theme track", fixed 2026-09-28): investment directions by horizon, and the
+# market-risk register (the AI-bubble gauge). Forward-only.
+FIELDS_TH: dict[str, tuple[tuple[str, ...], str]] = {"theme_outlook": (("1", "2", "3", "4", "5"), "3")}
+PROMPT_TH = """You are a portfolio strategist choosing investment themes (a group of related stocks, held through an
+ETF or a basket) for the holding period on the card: 6 months for medium-term themes, 12 months for long-term ones.
+You read one theme card: the theme, its recent returns, trend and volatility against the S&P 500, and the market
+risk register (AI spending, market concentration, credit and volatility). Judge where the theme is heading over its
+holding period: the demand and technology behind it, how much of that is already in the price, and what could go
+wrong, including a bubble in AI-linked stocks. Long-term themes can be early and volatile; weigh that honestly.
+- theme_outlook: 5 = likely to do much better than the S&P 500 over its holding period; 4 = better; 3 = about the
+  same, or unclear; 2 = worse; 1 = much worse.
+""" + _BOTH + """JSON: {"bull": [{"point": "...", "quote": "..."}], "bear": [{"point": "...", "quote": "..."}], "reason": "at most 40 words: which case wins and why", "theme_outlook": {"label": "1|2|3|4|5", "quote": "..."}}"""
+
+FIELDS_RISK: dict[str, tuple[tuple[str, ...], str]] = {"bubble_risk": (("low", "elevated", "high"), "elevated")}
+PROMPT_RISK = """You are a risk officer. You read the market risk register: hyperscaler AI spending and how it
+compares with their cash flow, market concentration, semiconductor prices against their trend, credit spreads and
+volatility. Judge the risk that AI-linked stocks (chips, hyperscalers, power and grid) fall hard over the next 6 to
+12 months because spending or prices ran ahead of the returns AI earns.
+- "bull" here means reasons the risk is LOW (spending is funded, prices are not stretched, credit is calm);
+  "bear" means reasons the risk is HIGH.
+- bubble_risk: low, elevated or high. "elevated" is the middle answer.
+""" + _BOTH.replace("reasons for", "reasons the risk is low").replace("reasons against", "reasons the risk is high") + (
+    """JSON: {"bull": [{"point": "...", "quote": "..."}], "bear": [{"point": "...", "quote": "..."}], "reason": "at most 40 words: which case wins and why", "bubble_risk": {"label": "low|elevated|high", "quote": "..."}}""")
+
 def theses(raw: dict[str, Any] | None, text: str) -> dict[str, list[dict[str, Any]]]:
     """The bull and bear points (at most 3 each), each marked verified if its quote is word for word in the source."""
     body = _norm(text)

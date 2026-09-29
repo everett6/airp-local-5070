@@ -135,6 +135,18 @@ def longterm_cohort(fwd: Path = FWD) -> tuple[dict[str, Any], list[dict[str, Any
     return c, [rated.get(t, {"ticker": t}) for t in c["tickers"]]
 
 
+def themes_latest(fwd: Path = FWD) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    """The latest theme cohort (scripts/themes.py) and its ratings file (risk register, bubble gauge, themes)."""
+    d = fwd / "themes"
+    if not (d / "ledger.jsonl").exists():
+        return None
+    cohorts = [r for r in Ledger(d / "ledger.jsonl").records() if r.get("type") == "cohort"]
+    if not cohorts:
+        return None
+    f = d / f"ratings_{cohorts[-1]['month']}.json"
+    return cohorts[-1], (json.loads(f.read_text()) if f.exists() else {})
+
+
 def picks(recs: list[dict[str, Any]]) -> pd.DataFrame:
     """One row per decision or missed release, with its outcome when it has matured."""
     out = {r["accession"]: r for r in recs if r.get("type") == "outcome"}
