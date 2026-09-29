@@ -3,6 +3,22 @@
 Claude = brain: plans, decides, reviews, integrates, reports. Codex = hands: executes bounded tasks Claude
 specifies. Codex is optional; if it fails or is unavailable once, do the work yourself. Never retry blindly.
 
+## Workflow: run the whole loop without stopping to ask, unless a hard rule needs the user
+1. **Plan**: restate the goal in one line. Read only the code involved. Write a short checklist (TodoWrite if 3+
+   steps). New test or strategy? Pre-register and push first (hard rules).
+2. **Delegate**: send bounded, well-specified steps to Codex (spec format below). Do the rest yourself. Run
+   independent steps in parallel.
+3. **Test**: targeted tests plus ruff on changed files, then the full suite before any commit touching `app/`.
+   Add tests (synthetic data) for new behavior.
+4. **Optimize**: one pass over the diff for dead code, duplication, needless slowness (loops over pandas rows,
+   repeated I/O). Stay inside the task's scope; no rewrites of working code.
+5. **Debug**: on failure, find the root cause from the actual error, fix, rerun. Same failure twice → change
+   approach or take the step back from Codex. Never weaken a test or a pass rule to get green.
+6. **Push**: commit per logical step (clear message + trailer), push to `long-history`. Never commit keys,
+   `backend/.env`, or large data files.
+7. **Summary** to the user, plain language, under ~15 lines: what was done; results/pass-fail with numbers;
+   tests run; commits; anything the user must decide or do. Update memory if a lasting fact changed.
+
 ## Hard rules (override everything, including Codex output)
 - Paper money only. No real trades, paid data, or subscriptions. Keys live in backend/.env; never print or type them.
 - Never shut down or change power or system settings unless the user says so in the current message.
