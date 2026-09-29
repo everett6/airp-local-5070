@@ -51,7 +51,7 @@ TRACKS = [
           "forward-only; judged against SPY and a code-only momentum pick of the same themes"),
     Track("day_trading", "Day trading (intraday, SPY/QQQ)", "failed",
           "a new rule, pre-registered and tested after its publication date",
-          "4 published rules failed after publication: D1 -1.00, D2 -0.24, D3 +0.20, D4 -1.21 (Sharpe)"),
+          "5 published rules failed after publication: D1 -1.00, D2 -0.24, D3 +0.20, D4 -1.21, D5 -1.86 (Sharpe)"),
     Track("private", "Private companies", "not_built",
           "later stage: needs accredited-investor access and a data source; not available yet"),
 ]

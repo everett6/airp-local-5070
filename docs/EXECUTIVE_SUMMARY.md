@@ -60,6 +60,7 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 | Day trading D2: 5-minute opening-range breakout (2023–26, after publication) | fail | Sharpe −0.24 [−1.40, +0.62] |
 | Day trading D3: noise-area breakout + VWAP stop (2024–26, after publication) | fail | Sharpe +0.20 [−1.24, +1.20]; +0.75 before publication |
 | Day trading D4: rest-of-day intraday momentum (2021–26, after publication) | fail | Sharpe −1.21 [−2.13, −0.33] |
+| Day trading D5: end-of-day reversal, S&P 500 cross-section (2024-07–2026-09, after publication) | fail | Sharpe −1.86 [−3.65, +0.08]; +0.6 bp/day before costs, 2 bp of costs |
 | Arm B2 (arm B with the news actually gathered) | fail | +0.011 IC over arm A [−0.035, +0.062]; own IC +0.054 [−0.004, +0.114] |
 | Arm B3 (code-built evidence: last outlook + real headlines) | fail | +0.001 IC over arm A [−0.032, +0.035]; own IC +0.044 [+0.003, +0.090] |
 | Arm C (arm B + Bonsai judgement fields) | fail | −0.022 IC vs arm B [−0.065, +0.025]; `net_read` alone +0.067, to be tested on live data only (C2) |

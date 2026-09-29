@@ -1063,6 +1063,14 @@ cutting risk before the close), which arbitrage does not easily remove.
   used as "yesterday's close"). Checked only on three known half-day weeks (Jul 2024, Thanksgiving 2024 and 2016).
   The download fetches each trading day's 14:30-16:00 window for all stocks at once.
 
+- **Result (run once, 2026-09-28 ~23:00): FAIL.** Test window 2024-07-01..2026-09-25, 556 days, median 490 stocks:
+  Sharpe **−1.86** [−3.65, +0.08] at 1 bp a side, CAGR −3.4%, hit rate 44%; at 3 bps Sharpe −7.28. Before the
+  window (2016-01..2024-06, reported only): Sharpe −1.75 at 1 bp. Legs (gross, bp a day): long −0.13, short +1.39.
+  Correlation with the core −0.04. Diagnostic, not deciding: before costs the reversal is there but small, +0.99 bp
+  a day in 2016-24 (gross Sharpe 1.73) and +0.63 bp after publication (0.85 [−0.77, 2.76]); a round trip on both
+  legs costs 2 bp a day at 1 bp a side, so costs take all of it. In S&P 500 names at a 30-minute resolution the
+  effect is about a tenth of the paper's all-stock size. Day trading stays paused; no variant of D5 will be tried.
+
 ### Arm F: a self-improving Bonsai (spec fixed 2026-09-28 ~20:00, before any code)
 
 The user asked for Bonsai's decision-making to improve itself. The honest version is a champion/challenger loop on

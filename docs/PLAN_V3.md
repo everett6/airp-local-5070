@@ -22,7 +22,7 @@ test and result; nothing here changes a registered rule. Paper money only; no pa
 | Live AI reads: net_read (C2), AI build-out lens (D), bull/bear (E) | shadow, no money | forward-only; judged at 150 releases + 3 months |
 | Long-term picks (top 10 of the S&P 500, 3 months) | shadow; first cohort Thu 1 Oct | forward-only; judged after 12 cohorts |
 | Themes by horizon + AI-bubble gauge | shadow; first cohort Thu 1 Oct | forward-only; judged after 12 six-month cohorts |
-| Day trading | **failed** (4 published rules) | D1 −1.00, D2 −0.24, D3 +0.20, D4 −1.21 Sharpe after publication |
+| Day trading | **failed** (5 published rules) | D1 −1.00, D2 −0.24, D3 +0.20, D4 −1.21, D5 −1.86 Sharpe after publication |
 | Private companies | not built | later stage |
 
 **The honest reading:** the system is well built and tests itself honestly, but so far only the core has an edge.
@@ -87,8 +87,9 @@ the weight the goal needs (see §6).
 4. **Optional, needs your OK (a download, and it is Qwen-based):** *Kev 4B* speed test: a local decision model
    scores all ~490 cards in minutes; Bonsai writes bull/bear only for the top 30. Adopted only if its ratings
    match Bonsai's closely.
-5. Day trading: **paused.** Four published rules died after publication. A fifth only with a stated reason it
-   can't be traded away. (The $25k rule is gone since 4 Jun 2026; it was never the reason they failed.)
+5. Day trading: **paused.** Five published rules died after publication. D5 (end-of-day reversal, market-neutral,
+   with a stated structural cause) was the one with a reason it can't be traded away; the effect is real before
+   costs but about 0.6 bp a day, a third of its trading costs. (The $25k rule is gone since 4 Jun 2026; it was never the reason they failed.)
 6. Private companies: later stage (needs access and a data source).
 
 ## 6. The goal, honestly
