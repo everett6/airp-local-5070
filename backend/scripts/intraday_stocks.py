@@ -36,18 +36,21 @@ def universe() -> list[str]:
 
 def fetch(client: httpx.Client, symbols: list[str], start: str, end: str) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
-    params: dict[str, str | int] = {"symbols": ",".join(s.replace("-", ".") for s in symbols),  # Alpaca spells BRK.B with a dot "timeframe": "30Min", "start": f"{start}T00:00:00Z",
-              "end": f"{end}T23:59:00Z", "feed": "sip", "adjustment": "split", "limit": 10000}
+    # Alpaca spells class shares with a dot (BRK.B)
+    params: dict[str, str | int] = {"symbols": ",".join(s.replace("-", ".") for s in symbols), "timeframe": "30Min",
+                                    "start": f"{start}T00:00:00Z", "end": f"{end}T23:59:00Z", "feed": "sip",
+                                    "adjustment": "split", "limit": 10000}
     while True:
         for attempt in range(6):
             r = client.get(bars.ALPACA, params=params)
             if r.status_code == 429:
                 time.sleep(3 + 5 * attempt)
                 continue
-            if r.status_code == 400 and len(symbols) > 1:  # an unknown symbol: split the batch
+            first = "page_token" not in params
+            if r.status_code == 400 and first and len(symbols) > 1:  # an unknown symbol: split the batch
                 h = len(symbols) // 2
                 return pd.concat([fetch(client, symbols[:h], start, end), fetch(client, symbols[h:], start, end)])
-            if r.status_code == 400:
+            if r.status_code == 400 and first:
                 print(f"  {symbols[0]}: no data ({r.text[:80]})", flush=True)
                 return pd.DataFrame(rows, columns=["ts", "symbol", "open", "close"])
             r.raise_for_status()
