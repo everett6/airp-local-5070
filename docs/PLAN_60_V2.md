@@ -1216,6 +1216,16 @@ D7 (same-slot history): the signal and the window differ.
   above 0, at 1 bp a side. One trial in this round, so no Bonferroni split.
 - **If it passes:** a live paper shadow with MOO/MOC orders (placed by the existing 5:45 AM PDT events run, which is
   before the 9:30 ET open) for a month of clean runs, then the evidence ladder. **If it fails:** no variant.
+- **Result (run once, 2026-09-29): PASS on the registered data.** 2016-01 → 2026-09, 2,697 days, median 474 stocks:
+  Sharpe **+0.81** [+0.21, +1.34] at 1 bp a side, CAGR +7.0%, hit rate 53%, worst month −7.9%; at 2 bps Sharpe
+  +0.24. Legs (gross, bp a day): long +7.2, short +2.5. Since 2024-07: +0.53 [−0.99, +1.82]. Correlation with the
+  core −0.04.
+- **Validity check (stated 2026-09-29 after the pass, before running it):** a bad opening print in the free daily
+  data would fake exactly this pattern (a false jump overnight that "reverses" by the close), and the 2024 list
+  flatters the long leg before 2024. So D9 goes to paper only if the same rule, on Alpaca's SIP daily bars (official
+  regular-session open and close, split- and dividend-adjusted; an independent source), also has Sharpe ≥ 0.5 and a
+  95% CI above 0 at 1 bp a side over the same window. Reported: the result with the top and bottom 1% of stock-day
+  open-to-close returns removed from both legs. If the check fails, the pass is treated as a data artifact.
 
 ### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
 
