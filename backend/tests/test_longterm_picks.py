@@ -6,6 +6,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
+import llm_fields as F
 import longterm_picks as L
 
 
@@ -37,3 +38,24 @@ def test_score_after_63_days_net_of_costs():
     assert abs(res["excess_net"] - (0.05 - 0.02 - 0.004)) < 1e-9
     assert L.score(recs + [{"type": "result", "month": "2026-10"}], opens) == []
     assert L.score(recs, opens.iloc[:60]) == []  # not matured
+
+
+def test_score_breaks_rating_ties_with_bonsai_probabilities():
+    import asyncio
+    import json as _j
+    card = "Company: AAA\nRevenue grew 20% and we raised guidance for the full year."
+
+    class Fake:
+        async def __call__(self, system, user):
+            return _j.dumps({"bull": [], "bear": [], "reason": "r", "outlook_6m": {
+                "label": "4", "quote": "Revenue grew 20% and we raised guidance for the full year."}})
+
+        async def next_token_probs(self, system, user, prefix, words):
+            assert prefix.endswith('"label": "') and words == F.DIGITS
+            return {"1": 0.0, "2": 0.0, "3": 0.2, "4": 0.6, "5": 0.2}
+    out = asyncio.run(L.rate(Fake(), [{"ticker": "AAA", "accession": "a", "r12": 0.1, "card": card, "source": card}]))
+    assert out[0]["rating"] == 4 and abs(out[0]["score"] - 4.0) < 1e-9
+    rated = [{"ticker": "A", "rating": 4, "score": 4.3, "r12": -0.5}, {"ticker": "B", "rating": 4, "score": 3.9,
+                                                                        "r12": 0.9}, {"ticker": "C", "rating": 5, "r12": 0.0}]
+    assert [r["ticker"] for r in L.choose(rated, 3)] == ["C", "A", "B"]
+    assert F.expected({"4": 0.5, "5": 0.5}) == 4.5 and F.expected(dict.fromkeys(F.DIGITS, 0.0)) is None

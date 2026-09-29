@@ -14,6 +14,7 @@ from typing import Any
 
 import pandas as pd
 
+from app.data_ingestion.tickers import trading_symbol
 from app.forward.schedule import NY
 
 CAPITAL = 10_000.0
@@ -105,7 +106,7 @@ def pick(st: dict[str, Any], decisions: list[dict[str, Any]], closes: pd.DataFra
         seen.add(acc)
         if r.get("source") != "bonsai" or float(r.get("logodds") or -99) < st["threshold"]:
             continue
-        t, etf = str(r["ticker"]).replace(".", "-"), etf_of.get(str(r.get("sector")))
+        t, etf = trading_symbol(r["ticker"]), etf_of.get(str(r.get("sector")))
         deadline = datetime.fromisoformat(r["entry_deadline"])
         p: dict[str, Any] = {"accession": acc, "ticker": t, "etf": etf, "logodds": r["logodds"],
                              "entry_day": deadline.astimezone(NY).date().isoformat(),

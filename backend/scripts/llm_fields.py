@@ -214,6 +214,28 @@ volatility. Judge the risk that AI-linked stocks (chips, hyperscalers, power and
 """ + _BOTH.replace("reasons for", "reasons the risk is low").replace("reasons against", "reasons the risk is high") + (
     """JSON: {"bull": [{"point": "...", "quote": "..."}], "bear": [{"point": "...", "quote": "..."}], "reason": "at most 40 words: which case wins and why", "bubble_risk": {"label": "low|elevated|high", "quote": "..."}}""")
 
+DIGITS = ("1", "2", "3", "4", "5")
+
+
+def expected(probs: dict[str, float]) -> float | None:
+    """Probability-weighted rating from the digits' next-token probabilities; None without any mass."""
+    m = sum(probs.values())
+    return None if m <= 0 else sum(int(k) * v for k, v in probs.items()) / m
+
+
+async def rating_score(llm: Any, system: str, user: str, reply: str, field: str, raw: dict[str, Any] | None,
+                       rating: int) -> tuple[float, dict[str, float] | None]:
+    """The score behind a 1-5 rating: Bonsai's own probabilities for each digit at the point it wrote the rating
+    (its reply up to the label, continued), so ties between equal ratings are broken by how sure it was. A rating
+    the quote check sent back to the middle keeps its value; so does a model without next_token_probs."""
+    m = re.search(rf'"{field}"\s*:\s*\{{\s*"label"\s*:\s*"', reply)
+    label = (raw or {}).get(field)
+    if not m or not hasattr(llm, "next_token_probs") or not isinstance(label, dict) or label.get("label") != str(rating):
+        return float(rating), None
+    probs = await llm.next_token_probs(system, user, reply[:m.end()], DIGITS)
+    return (expected(probs) or float(rating)), {k: round(v, 4) for k, v in probs.items()}
+
+
 def theses(raw: dict[str, Any] | None, text: str) -> dict[str, list[dict[str, Any]]]:
     """The bull and bear points (at most 3 each), each marked verified if its quote is word for word in the source."""
     body = _norm(text)

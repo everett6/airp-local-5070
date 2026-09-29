@@ -29,7 +29,17 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 
 import numpy as np
 import pandas as pd
-from llm_fields import FIELDS_RISK, FIELDS_TH, PROMPT_RISK, PROMPT_TH, ask, parse, theses, verify
+from llm_fields import (
+    FIELDS_RISK,
+    FIELDS_TH,
+    PROMPT_RISK,
+    PROMPT_TH,
+    ask,
+    parse,
+    rating_score,
+    theses,
+    verify,
+)
 from longterm_picks import due
 
 from app.forward.ledger import Ledger
@@ -104,8 +114,10 @@ async def rate(llm: Any, register: str, cards: list[dict[str, Any]]) -> tuple[di
         reply, _ = await ask(llm, PROMPT_TH, c["card"])
         raw = parse(reply)
         v = verify(raw, c["card"], FIELDS_TH)
+        rating = int(v["theme_outlook"])
+        ev, probs = await rating_score(llm, PROMPT_TH, c["card"], reply, "theme_outlook", raw, rating)
         return {k: c[k] for k in ("key", "label", "horizon", "ai_linked", "mom", "stats")} | {
-            "rating": int(v["theme_outlook"]), "parsed": v["parsed"],
+            "rating": rating, "score": round(ev, 4), "probs": probs, "parsed": v["parsed"],
             "reason": str((raw or {}).get("reason", ""))[:300], **theses(raw, c["card"])}
     r, rated = await asyncio.gather(risk(), asyncio.gather(*(one(c) for c in cards)))
     return r, list(rated)
@@ -175,7 +187,7 @@ def run(out: Path, now: datetime, use_gpu: bool) -> None:
     base = {h: T.momentum_baseline(rated, h) for h in T.HOLD}
     led.append("cohort", month=month, made_on=now.astimezone(NY).date().isoformat(),
                made_at=now.isoformat(timespec="seconds"), bubble_risk=risk["bubble_risk"], picks=picks, baseline=base,
-               ratings={r["key"]: r["rating"] for r in rated})
+               ratings={r["key"]: r["rating"] for r in rated}, scores={r["key"]: r["score"] for r in rated})
     print(f"themes: cohort {month}, AI-bubble risk {risk['bubble_risk']}; medium {picks['medium'] or 'none'}, "
           f"long {picks['long'] or 'none'} (momentum baseline {base['medium']} / {base['long']})")
 

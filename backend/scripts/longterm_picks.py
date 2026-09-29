@@ -29,8 +29,17 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 import numpy as np
 import pandas as pd
 from b3_evidence import outlook
-from llm_fields import FIELDS_LT, PROMPT_LT, ask, parse, theses, verify
+from llm_fields import (
+    FIELDS_LT,
+    PROMPT_LT,
+    ask,
+    parse,
+    rating_score,
+    theses,
+    verify,
+)
 
+from app.data_ingestion.tickers import trading_symbol
 from app.forward.ledger import Ledger
 from app.forward.schedule import NY
 from app.sandbox.gpu_lock import gpu_priority
@@ -73,7 +82,7 @@ def cards(ev: pd.DataFrame, now: datetime, closes: pd.DataFrame) -> list[dict[st
         before = ev[(ev["cik"] == cik) & (ev["t"] < last["t"] - timedelta(days=30))
                     & (ev["t"] >= last["t"] - timedelta(days=200))]
         prev = _text(before.iloc[-1]["accession"]) if len(before) else None
-        t = str(last["ticker"]).replace(".", "-")
+        t = trading_symbol(last["ticker"])
         r12 = r1 = None
         if t in px and "SPY" in px and px[t].notna().sum() > 253:
             s, m = px[t].dropna(), px["SPY"].reindex(px[t].dropna().index)
@@ -95,14 +104,17 @@ async def rate(llm: Any, cs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         reply, overflow = await ask(llm, PROMPT_LT, c["card"])
         raw = parse(reply)
         v = verify(raw, c["source"], FIELDS_LT)
-        return {"ticker": c["ticker"], "accession": c["accession"], "r12": c["r12"], "rating": int(v["outlook_6m"]),
+        rating = int(v["outlook_6m"])
+        ev, probs = await rating_score(llm, PROMPT_LT, c["card"], reply, "outlook_6m", raw, rating)
+        return {"ticker": c["ticker"], "accession": c["accession"], "r12": c["r12"], "rating": rating,
+                "score": round(ev, 4), "probs": probs,
                 "parsed": v["parsed"], "overflow": overflow, "reason": str((raw or {}).get("reason", ""))[:300],
                 **theses(raw, c["source"])}
     return list(await asyncio.gather(*(one(c) for c in cs)))
 
 
 def choose(rated: list[dict[str, Any]], n: int = N_PICKS) -> list[dict[str, Any]]:
-    return sorted(rated, key=lambda x: (-x["rating"], -(x["r12"] if x["r12"] is not None else -9)))[:n]
+    return sorted(rated, key=lambda x: (-x.get("score", x["rating"]), -(x["r12"] if x["r12"] is not None else -9)))[:n]
 
 
 def due(recs: list[dict[str, Any]], now: datetime) -> bool:
@@ -173,7 +185,7 @@ def run(events_dir: Path, out: Path, now: datetime, use_gpu: bool) -> None:
         return
     ev = releases(events_dir)
     recent = ev[ev["t"] >= now - timedelta(days=LOOKBACK_DAYS)]
-    tickers = {str(t).replace(".", "-") for t in recent["ticker"]} if make else set()
+    tickers = {trading_symbol(t) for t in recent["ticker"]} if make else set()
     opens, closes = prices(tickers | cohort_tickers, now)
     for r in score(recs, opens):
         led.append("result", **r)
@@ -206,7 +218,7 @@ def run(events_dir: Path, out: Path, now: datetime, use_gpu: bool) -> None:
         "".join(json.dumps(r) + "\n" for r in rated))
     led.append("cohort", month=now.astimezone(NY).strftime("%Y-%m"), made_on=now.astimezone(NY).date().isoformat(),
                made_at=now.isoformat(timespec="seconds"), tickers=[p["ticker"] for p in picks],
-               ratings=[p["rating"] for p in picks], candidates=len(cs),
+               ratings=[p["rating"] for p in picks], scores=[p.get("score") for p in picks], candidates=len(cs),
                rating_counts={str(k): int(v) for k, v in pd.Series([r["rating"] for r in rated]).value_counts().items()})
     print(f"long-term picks: cohort {now.astimezone(NY).strftime('%Y-%m')} from {len(cs)} cards: "
           + ", ".join(f"{p['ticker']}({p['rating']})" for p in picks))

@@ -139,11 +139,11 @@ def risk_lines(capex_now: float | None, capex_ago: float | None, ocf_now: float 
 
 
 def choose(rated: list[dict[str, Any]], horizon: str, bubble: str) -> list[str]:
-    """Up to 2 themes of the horizon rated 4 or 5 (ties: better 12-1 momentum); AI-linked themes are left out when
-    the bubble gauge reads high."""
+    """Up to 2 themes of the horizon rated 4 or 5, best score first (Bonsai's probability-weighted rating; then
+    better 12-1 momentum); AI-linked themes are left out when the bubble gauge reads high."""
     ok = [r for r in rated if r["horizon"] == horizon and r["rating"] >= MIN_RATING
           and not (bubble == "high" and r["ai_linked"])]
-    ok.sort(key=lambda r: (-r["rating"], -(r["mom"] if r["mom"] is not None else -9)))
+    ok.sort(key=lambda r: (-r.get("score", r["rating"]), -(r["mom"] if r["mom"] is not None else -9)))
     return [r["key"] for r in ok[:N_PICKS]]
 
 

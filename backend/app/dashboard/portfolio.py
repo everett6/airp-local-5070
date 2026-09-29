@@ -416,7 +416,9 @@ def console() -> None:
                 st.markdown(f'<div class="q-note">cohort {esc(coh["month"])} · made {esc(coh["made_on"])} from '
                             f'{coh["candidates"]} company cards · ratings 1–5</div>', unsafe_allow_html=True)
                 for lr in lrows:
-                    with st.expander(f"{lr['ticker']} · rating {lr.get('rating', '—')}"):
+                    sc = lr.get("score")
+                    with st.expander(f"{lr['ticker']} · rating {lr.get('rating', '—')}"
+                                     + ("" if sc is None else f" · score {sc:.2f}")):
                         thesis(lr)
         tl = P.themes_latest()
         with st.container(border=True):
@@ -437,8 +439,9 @@ def console() -> None:
                         st.markdown("<br>".join(esc(x) for x in tf.get("register", "").splitlines()[1:]),
                                     unsafe_allow_html=True)
                         thesis(risk)
-                for th in sorted(tf.get("themes", []), key=lambda x: (x["horizon"], -x["rating"])):
+                for th in sorted(tf.get("themes", []), key=lambda x: (x["horizon"], -x.get("score", x["rating"]))):
                     with st.expander(f"{th['label']} · {th['horizon']} · rating {th['rating']}"
+                                     + ("" if th.get("score") is None else f" · score {th['score']:.2f}")
                                      + (" · AI-linked" if th.get("ai_linked") else "")):
                         thesis(th)
         if ledger_err:

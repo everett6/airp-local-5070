@@ -48,6 +48,7 @@ import numpy as np
 import pandas as pd
 from event_eval import SECTOR_ETF
 
+from app.data_ingestion.tickers import trading_symbol
 from app.forward.ledger import Ledger
 from app.forward.schedule import NY, OPEN
 from app.sandbox.events import Prices, entry_index, fwd_excess
@@ -188,7 +189,7 @@ def pre_entry(ev: pd.DataFrame, p: Prices) -> pd.DataFrame:
     entry day's bar does not exist yet, so build() would mark every new release unscorable."""
     rows = []
     for r in ev.itertuples():
-        t, etf = str(r.ticker).replace(".", "-"), SECTOR_ETF.get(str(r.sector))
+        t, etf = trading_symbol(r.ticker), SECTOR_ETF.get(str(r.sector))
         if etf is None or t not in p.close.columns or etf not in p.close.columns:
             continue
         acc = datetime.fromisoformat(str(r.accepted_utc)).replace(tzinfo=UTC).astimezone(NY)
@@ -295,7 +296,7 @@ def main() -> None:
     use_gpu = not args.no_gpu and wait_gpu_free(900 if len(new) else 0)
     logodds: dict[str, float] = {}
     source = "bonsai" if use_gpu else "lite"
-    tickers = {str(t).replace(".", "-") for t in allev["ticker"]} | set(SECTOR_ETF.values()) | {"SPY"}
+    tickers = {trading_symbol(t) for t in allev["ticker"]} | set(SECTOR_ETF.values()) | {"SPY"}
     px_file = d / "prices.parquet"
     p = prices_for(tickers, now.date() - timedelta(days=420), now.date(), px_file)
     if len(new):
@@ -326,7 +327,7 @@ def main() -> None:
     for r in ledger.records():
         if r["type"] != "decision" or r["accession"] in have:
             continue
-        t, etf = str(r["ticker"]).replace(".", "-"), SECTOR_ETF.get(str(r["sector"]))
+        t, etf = trading_symbol(r["ticker"]), SECTOR_ETF.get(str(r["sector"]))
         i = entry_index(days, datetime.fromisoformat(r["accepted_utc"]))
         if etf is None or i is None or i + H >= len(days) or t not in p.open.columns:
             continue

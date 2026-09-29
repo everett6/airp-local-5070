@@ -254,6 +254,21 @@ class OllamaLLM:
             _append_line(self._cache_path, json.dumps({"k": key, "v": text}))
         return text
 
+    async def next_token_probs(self, system: str, user: str, prefix: str, words: tuple[str, ...]) -> dict[str, float]:
+        """Probability of each word as the next token after the model's own reply `prefix` (continued as the last
+        assistant message): e.g. the digits of a rating it has just started to write. One token, never cached."""
+        body: dict[str, Any] = {
+            "model": self.model, "stream": False, "think": False, "logprobs": True, "top_logprobs": 20,
+            "messages": ([{"role": "system", "content": system}] if system else [])
+            + [{"role": "user", "content": user}, {"role": "assistant", "content": prefix}],
+            "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": 1},
+        }
+        await self._yield_to_priority()
+        async with self._sem:
+            r = await self._client.post(f"{self.base_url}/api/chat", json=body)
+            r.raise_for_status()
+        return word_probabilities(r.json().get("logprobs") or [], words)
+
     async def _yield_to_priority(self, poll_s: float = 15.0) -> None:
         """The forward runner wants the GPU (app/sandbox/gpu_lock.py): let the requests in flight finish, unload the
         model, and wait until it is done. Answers are unchanged; only their timing moves."""
