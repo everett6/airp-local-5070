@@ -85,3 +85,28 @@ def test_review_runs_the_monthly_loop_only_live_and_collect_follows_events():
     assert autorun.commands("events", "dry")[2][-1] == "results/forward/events_autodry"
     assert autorun.commands("learn", "dry") == []
     assert autorun.scan("review", "x\nLEARN ALERT: signal a promoted", None) == ["signal a promoted"]
+
+
+def test_step_runs_without_the_inhibitor_when_logind_refuses(monkeypatch):
+    import subprocess
+
+    import autorun
+    calls = []
+
+    def fake(args, **kw):
+        calls.append(args)
+        if args[0] == "systemd-inhibit":
+            return subprocess.CompletedProcess(args, 1, "", "Failed to inhibit: Access denied as the requested ...")
+        return subprocess.CompletedProcess(args, 0, "ok\n", "")
+    monkeypatch.setattr(autorun.subprocess, "run", fake)
+    r = autorun.step(["python", "x.py"])
+    assert r.returncode == 0 and "ran without it" in r.stdout and calls[-1] == ["python", "x.py"]
+
+
+def test_step_keeps_a_real_failure(monkeypatch):
+    import subprocess
+
+    import autorun
+    monkeypatch.setattr(autorun.subprocess, "run",
+                        lambda args, **kw: subprocess.CompletedProcess(args, 2, "", "Traceback: boom"))
+    assert autorun.step(["python", "x.py"]).returncode == 2

@@ -158,6 +158,17 @@ def push(job: str) -> None:
         alert(job, f"git push failed: {p.stderr.strip()[:200]}")
 
 
+def step(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+    """One command, holding off idle sleep while it runs. Right after boot, before the desktop session is active,
+    logind refuses the inhibitor ("Failed to inhibit: Access denied"); the command then runs without it."""
+    r = subprocess.run(["systemd-inhibit", "--what=idle:sleep", "--why=paper book run", *cmd], cwd=BACKEND,
+                       capture_output=True, text=True, check=False, timeout=6 * 3600)
+    if r.returncode != 0 and r.stderr.startswith("Failed to inhibit"):
+        r = subprocess.run(cmd, cwd=BACKEND, capture_output=True, text=True, check=False, timeout=6 * 3600)
+        r.stdout = "(sleep inhibitor refused; ran without it)\n" + r.stdout
+    return r
+
+
 def run(job: str) -> int:
     m = mode()
     logs = FWD / "logs"
@@ -178,8 +189,7 @@ def run(job: str) -> int:
             return 1
         rc, out = 0, ""
         for cmd in commands(job, m):
-            r = subprocess.run(["systemd-inhibit", "--what=idle:sleep", "--why=paper book run", *cmd], cwd=BACKEND,
-                               capture_output=True, text=True, check=False, timeout=6 * 3600)
+            r = step(cmd)
             out += r.stdout + r.stderr
             rc = rc or r.returncode
         log.write_text(out)
