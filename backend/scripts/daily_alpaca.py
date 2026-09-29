@@ -1,7 +1,8 @@
 """Alpaca SIP daily bars (official regular-session open and close, split- and dividend-adjusted) for D5's S&P 500
 list and SPY: the independent source for D9's validity check (docs/PLAN_60_V2.md, round 5).
 
-    python scripts/daily_alpaca.py        # writes data/intraday/sp500_daily_alpaca.parquet (Date, Ticker, Open, Close)
+    python scripts/daily_alpaca.py            # writes data/intraday/sp500_daily_alpaca.parquet (Date, Ticker, Open, Close)
+    python scripts/daily_alpaca.py split      # split-adjusted only (D10's signal): sp500_daily_alpaca_split.parquet
 """
 from __future__ import annotations
 
@@ -22,9 +23,9 @@ from app.data_ingestion import bars
 OUT = BACKEND / "data" / "intraday" / "sp500_daily_alpaca.parquet"
 
 
-def fetch(c: httpx.Client, syms: list[str], start: str, end: str) -> list[dict[str, object]]:
+def fetch(c: httpx.Client, syms: list[str], start: str, end: str, adj: str = "all") -> list[dict[str, object]]:
     params: dict[str, str | int] = {"symbols": ",".join(s.replace("-", ".") for s in syms), "timeframe": "1Day",
-                                    "start": start, "end": end, "feed": "sip", "adjustment": "all", "limit": 10000}
+                                    "start": start, "end": end, "feed": "sip", "adjustment": adj, "limit": 10000}
     rows: list[dict[str, object]] = []
     while True:
         for attempt in range(8):
@@ -46,13 +47,15 @@ def main() -> None:
     kid, sec = bars.key("ALPACA_API_KEY_ID", "APCA_API_KEY_ID"), bars.key("ALPACA_API_SECRET_KEY", "APCA_API_SECRET_KEY")
     if not kid or not sec:
         raise SystemExit("no Alpaca keys in backend/.env")
+    adj = sys.argv[1] if len(sys.argv) > 1 else "all"
+    out = OUT if adj == "all" else OUT.with_name(f"sp500_daily_alpaca_{adj}.parquet")
     syms = universe() + ["SPY"]
     rows: list[dict[str, object]] = []
     with httpx.Client(headers={"APCA-API-KEY-ID": kid, "APCA-API-SECRET-KEY": sec}, timeout=90) as c:
         for i in range(0, len(syms), 50):
-            rows += fetch(c, syms[i:i + 50], "2015-12-01", "2026-09-25")
+            rows += fetch(c, syms[i:i + 50], "2015-12-01", "2026-09-25", adj)
             print(f"  {min(i + 50, len(syms))}/{len(syms)} symbols, {len(rows):,} bars", flush=True)
-    pd.DataFrame(rows).to_parquet(OUT)
+    pd.DataFrame(rows).to_parquet(out)
 
 
 if __name__ == "__main__":
