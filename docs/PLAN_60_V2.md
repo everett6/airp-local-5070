@@ -1322,6 +1322,12 @@ negative in 2025. Market-neutral, so it is judged against cash, not SPY.
   **If it fails:** no variant.
 - **Clarification (2026-09-29 ~15:25 PDT, before any funding data was downloaded):** "annualized" uses √365, since the
   carry earns on every calendar day (stock tests use √252 trading days); CAGR uses 365 days a year.
+- **Result (run once, 2026-09-29 ~15:35 PDT): FAIL.** 2023-05-01 → 2026-09-24 (1,243 days): Sharpe in excess of
+  T-bills **−1.63** [−4.73, +1.37], excess CAGR −0.6%; raw carry +2.5% a year after costs (+5.0% before costs),
+  below the T-bill rate. By year (excess Sharpe): 2023 +1.96, 2024 +3.43, 2025 −7.20, 2026 −8.56. Held 86% of days
+  (BTC), 72% (ETH). Before the window (2019-04 → 2023-04): +4.06 [+1.53, +6.59]. Mean funding, annualized: BTC 10.3%
+  (2024) → 5.4% (2025) → 2.1% (2026); ETH 8.4% → 1.0% → 1.3%. The premium the BIS paper documented has been
+  arbitraged down to below cash since the spot ETFs and basis funds arrived, as the paper itself reports for 2025.
 
 ### Core leads, forward check (spec fixed 2026-09-29 ~12:05 PDT, before any forward data)
 

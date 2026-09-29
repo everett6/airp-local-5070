@@ -67,6 +67,7 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 | Day trading D9: opening-auction reversal, S&P 500 (2016–2026) | pass, untradable | Sharpe +0.81 [+0.21, +1.34]; Alpaca check +1.08; the signal needs the official open, unknown before the auction |
 | Day trading D10: D9 with a 09:25 pre-market signal (tradable) | fail | Sharpe −0.64 [−1.28, −0.06] |
 | Pairs trading P1 (Gatev–Goetzmann–Rouwenhorst, within sectors, 2024-07–2026-09) | fail | Sharpe −0.61 [−1.92, +0.91] at 10 bps; −0.24 before costs |
+| Crypto funding carry C1 (long spot, short perpetual; 2023-05–2026-09, vs T-bills) | fail | Sharpe −1.63; +4.06 before 2023, below cash since 2025 |
 | Arm B2 (arm B with the news actually gathered) | fail | +0.011 IC over arm A [−0.035, +0.062]; own IC +0.054 [−0.004, +0.114] |
 | Arm B3 (code-built evidence: last outlook + real headlines) | fail | +0.001 IC over arm A [−0.032, +0.035]; own IC +0.044 [+0.003, +0.090] |
 | Arm C (arm B + Bonsai judgement fields) | fail | −0.022 IC vs arm B [−0.065, +0.025]; `net_read` alone +0.067, to be tested on live data only (C2) |
