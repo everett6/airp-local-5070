@@ -1296,6 +1296,22 @@ D7 (same-slot history): the signal and the window differ.
   D10 at 1/2/3 bps: −0.63 / −1.15 / −1.66; negative in 8 of 11 years. The effect lives in the auction print and needs
   near-zero costs; neither changes the verdicts above.
 
+### Core leads, forward check (spec fixed 2026-09-29 ~12:05 PDT, before any forward data)
+
+The user asked to raise the book's Sharpe. The two known ways were already tested on 2018–26 and failed narrowly,
+recorded as leads for a forward test: the 20% volatility target on B0 (Sharpe +0.06 [−0.14, +0.25]) and CVaR risk
+parity (+0.12 [−0.01, +0.23]). They are not re-tested on old data. Both break the mandate (1.0× gross, 20% crypto;
+only the user changes it), so they cannot be paper books; they are tracked as computed shadows instead.
+
+- **What:** `scripts/core_leads.py` recomputes, with the frozen code of each trial (`vol_target_b0.managed`,
+  `skfolio_test.arm_s`), the daily returns of B0, B0 + vol target and arm S, and keeps only days **from
+  2026-09-30** (the forward window; both rules use trailing data only). Reported in the Saturday review.
+- **Verdict** at the first review on or after **2027-09-30** (about 250 forward days), each lead alone, with its own
+  trial's rule: vol-matched CAGR above B0's AND the 90% block-bootstrap CI of the Sharpe difference above 0.
+  Interim numbers are reported, never judged. Trials `core_lead_voltarget_fwd`, `core_lead_riskparity_fwd`.
+- **If one passes:** it is proposed to the user as a mandate change (the only way it can trade); nothing changes on
+  its own.
+
 ### Pairs trading P1 (spec fixed 2026-09-29 ~00:20 PDT, before any pairs code or data view)
 
 The user asked for pairs trading (stat-arb failed; trend following is the core; market making needs co-location and
