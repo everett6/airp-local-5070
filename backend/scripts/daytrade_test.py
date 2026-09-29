@@ -27,6 +27,7 @@ from app.sandbox.intraday import (
     d2_orb5,
     d3_noise_vwap,
     d4_rod_momentum,
+    d5_eod_reversal,
     sharpe,
 )
 
@@ -47,17 +48,46 @@ def stats(r: pd.Series) -> dict:
             "trade_days_per_week": round(float((r != 0).mean() * 5), 2)}
 
 
+D5_START, D5_TRIAL = "2024-07-01", "daytrade_eod_reversal"
+
+
+def run_d5(core: pd.Series) -> dict:
+    """D5 (cross-section, 30-minute bars of the S&P 500 list): one trial, same pass rule."""
+    df = pd.read_parquet(DATA / "sp500_30min.parquet")
+    res: dict = {"window": [D5_START, END]}
+    for bp in (1, 3):
+        r = d5_eod_reversal(df, bp / 1e4)
+        test = r.loc[D5_START:END]
+        res[f"{bp}bp"] = {"both": stats(test["ret"]), "long_leg_gross": round(float(test["long"].mean()) * 1e4, 2),
+                          "short_leg_gross": round(float(test["short"].mean()) * 1e4, 2),
+                          "names_median": int(test["names"].median())}
+        if bp == 1:
+            res["before_window"] = stats(r.loc[:D5_START, "ret"].iloc[:-1])
+            res["corr_with_core"] = round(float(test["ret"].corr(core.reindex(test.index))), 3)
+    t = res["1bp"]["both"]
+    res["pass"] = bool(t["sharpe"] >= 0.5 and t["ci"][0] > 0)
+    register({"trial": D5_TRIAL, "date": time.strftime("%Y-%m-%d"), "kind": "daytrade", "sharpe_ann": t["sharpe"],
+              "window": f"{D5_START}..{END}", "result": "pass" if res["pass"] else "fail"})
+    print(f"D5 {D5_TRIAL}: Sharpe {t['sharpe']} CI {t['ci']} CAGR {t['cagr']:.1%} hit {t['hit_rate']:.0%} "
+          f"(3 bps: Sharpe {res['3bp']['both']['sharpe']}) -> {'PASS' if res['pass'] else 'FAIL'}", flush=True)
+    return res
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--rules", required=True, help="e.g. D3,D4")
     rules = ap.parse_args().rules.split(",")
-    bars = {s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")}
+    bars = {s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")} if set(rules) - {"D5"} else {}
     core = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")["core"]
     f = BACKEND / "results" / "daytrade_test.json"
     out: dict = json.loads(f.read_text()) if f.exists() else {}
     for name in rules:
         if name in out:
             raise SystemExit(f"{name} was already run (one trial each); see {f.name}")
+        if name == "D5":
+            out[name] = run_d5(core)
+            f.write_text(json.dumps(out, indent=1) + "\n")
+            continue
         fn, start, trial = RULES[name]
         res: dict = {"window": [start, END]}
         for cost_bp in (1, 5):

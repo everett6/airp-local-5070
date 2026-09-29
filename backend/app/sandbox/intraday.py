@@ -124,6 +124,32 @@ def d3_noise_vwap(df: pd.DataFrame, cost: float, lookback: int = 14) -> pd.Serie
     return pd.Series(out, dtype=float)
 
 
+def d5_eod_reversal(df: pd.DataFrame, cost: float, frac: float = 0.10, min_names: int = 20) -> pd.DataFrame:
+    """D5, end-of-day reversal (cross-section): daily net return of long the lowest-ROD3 decile / short the highest,
+    dollar neutral (each leg half the capital). `df`: ts (New York), symbol, open, close for the 14:30 and 15:30
+    30-minute bars. ROD3 = previous day's 15:30-bar close to today's 14:30-bar close; trade = today's 15:30-bar open
+    to its close. Returns a frame by day: ret (net), long, short (each leg's gross return), names."""
+    d = df.assign(day=df["ts"].dt.normalize().dt.tz_localize(None), hm=df["ts"].dt.hour * 100 + df["ts"].dt.minute)
+    c1430 = d[d["hm"] == 1430].pivot_table(index="day", columns="symbol", values="close")
+    b = d[d["hm"] == 1530]
+    o1530 = b.pivot_table(index="day", columns="symbol", values="open")
+    c1530 = b.pivot_table(index="day", columns="symbol", values="close")
+    days = o1530.index.intersection(c1430.index)
+    prev = c1530.shift(1).reindex(days)  # yesterday's last close (the previous row with a 15:30 bar)
+    rod3 = c1430.reindex(days) / prev - 1
+    lh = c1530.reindex(days) / o1530.reindex(days) - 1
+    out = {}
+    for day in days:
+        x = pd.concat([rod3.loc[day], lh.loc[day]], axis=1, keys=["s", "r"]).dropna()
+        if len(x) < min_names:
+            continue
+        k = max(1, int(len(x) * frac))
+        x = x.sort_values("s")
+        lo, hi = float(x["r"].iloc[:k].mean()), float(x["r"].iloc[-k:].mean())
+        out[day] = {"ret": 0.5 * lo - 0.5 * hi - 2 * cost, "long": lo, "short": -hi, "names": len(x)}
+    return pd.DataFrame.from_dict(out, orient="index")
+
+
 def sharpe(r: pd.Series) -> float:
     return float(r.mean() / r.std() * np.sqrt(252)) if len(r) > 1 and r.std() > 0 else float("nan")
 

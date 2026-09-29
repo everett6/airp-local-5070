@@ -53,6 +53,14 @@ LENSES: dict[str, tuple[str, dict[str, tuple[tuple[str, ...], str]], str, str]] 
     "net_read": (PROMPT_J, FIELDS_J, "net_read", "net_read.jsonl"),
     "ai_lens": (PROMPT_AI, FIELDS_AI, "ai_read", "ai_lens.jsonl"),
     "bull_bear": (PROMPT_BB, FIELDS_BB, "bb_read", "bull_bear.jsonl")}
+
+
+def lenses(d: Path) -> dict[str, tuple[str, dict[str, tuple[tuple[str, ...], str]], str, str]]:
+    """The fixed lenses plus arm F's self-improving versions (scripts/self_improve.py), if any."""
+    from self_improve import active_lenses
+    return LENSES | active_lenses(d)
+
+
 PASS = {"min_events": 150, "min_months": 3, "min_ic": 0.02}  # judged with learn_loop's blend-gain test as well
 
 
@@ -67,8 +75,9 @@ def todo(recs: list[dict[str, Any]], done: set[str]) -> list[dict[str, Any]]:
     return [r for r in recs if r.get("type") == "decision" and r["accession"] not in done]
 
 
-async def label(llm: Any, r: dict[str, Any], lens: str = "net_read") -> dict[str, Any]:
-    prompt, fields, key, _ = LENSES[lens]
+async def label(llm: Any, r: dict[str, Any], lens: str = "net_read",
+                spec: tuple[str, dict[str, tuple[tuple[str, ...], str]], str, str] | None = None) -> dict[str, Any]:
+    prompt, fields, key, _ = spec or LENSES[lens]
     u = user_text(r["accession"])
     rec: dict[str, Any] = {"accession": r["accession"], "ticker": r["ticker"], "entry_deadline": r["entry_deadline"]}
     if u is None:
@@ -78,14 +87,14 @@ async def label(llm: Any, r: dict[str, Any], lens: str = "net_read") -> dict[str
     raw = parse(reply)
     v = verify(raw, source, fields)
     rec |= {key: v[key], "parsed": v["parsed"], "overflow": overflow, "fields": {f: v[f] for f in fields}}
-    if lens == "bull_bear":
+    if key == "bb_read":
         rec |= theses(raw, source) | {"reason": str((raw or {}).get("reason", ""))[:300]}
     return rec
 
 
 def scored(d: Path, lens: str = "net_read") -> pd.DataFrame:
     """On-time labels joined with matured outcomes: accession, month, net, fwd5."""
-    _, _, key, fname = LENSES[lens]
+    _, _, key, fname = lenses(d)[lens]
     p = d / fname
     if not p.exists() or not (d / "ledger.jsonl").exists():
         return pd.DataFrame(columns=["accession", "month", "net", "fwd5"])
@@ -121,7 +130,8 @@ def run(d: Path, use_gpu: bool) -> dict[str, int]:
     recs_all = Ledger(ledger).records()
     now = datetime.now(UTC)
     todo_by: dict[str, list[dict[str, Any]]] = {}
-    for lens, (_, _, _, fname) in LENSES.items():
+    specs = lenses(d)
+    for lens, (_, _, _, fname) in specs.items():
         p = d / fname
         done = {json.loads(x)["accession"] for x in p.read_text().splitlines()} if p.exists() else set()
         rows = [r for r in todo(recs_all, done) if datetime.fromisoformat(r["entry_deadline"]) > now]
@@ -141,7 +151,7 @@ def run(d: Path, use_gpu: bool) -> dict[str, int]:
 
             async def go() -> dict[str, list[dict[str, Any]]]:
                 try:
-                    return {lens: list(await asyncio.gather(*(label(llm, r, lens) for r in rows)))
+                    return {lens: list(await asyncio.gather(*(label(llm, r, lens, specs[lens]) for r in rows)))
                             for lens, rows in todo_by.items()}
                 finally:
                     await llm.unload()
@@ -150,7 +160,7 @@ def run(d: Path, use_gpu: bool) -> dict[str, int]:
             srv.stop()
     at = datetime.now(UTC).isoformat(timespec="seconds")
     for lens, recs in out.items():
-        with (d / LENSES[lens][3]).open("a") as f:
+        with (d / specs[lens][3]).open("a") as f:
             for r in recs:
                 f.write(json.dumps(r | {"written_at": at}) + "\n")
     return {lens: len(recs) for lens, recs in out.items()}
@@ -167,7 +177,7 @@ def main() -> None:
         if not a.status:
             n = run(d, not a.no_gpu)
             print(f"live-only shadows labelled: {json.dumps(n)}")
-        print(json.dumps({lens: status(d, lens) for lens in LENSES}))
+        print(json.dumps({lens: status(d, lens) for lens in lenses(d)}))
     except Exception as e:  # noqa: BLE001 - a shadow: never fail the events job
         print(f"LEARN ALERT: net_read shadow failed: {type(e).__name__}: {e}"[:300])
 

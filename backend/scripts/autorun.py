@@ -43,7 +43,8 @@ DRY = {"events": ["--dir", "results/forward/events_autodry", "--start", "2026-09
        "learn": ["--dir", "results/forward/events_autodry", "--out", "results/forward/signals_autodry"],
        "net_read": ["--dir", "results/forward/events_autodry"],
        "ai_picks": ["--dry", "--events", "results/forward/events_autodry", "--dir", "results/forward/ai_picks_autodry"],
-       "longterm": ["--events", "results/forward/events_autodry"]}
+       "longterm": ["--events", "results/forward/events_autodry"],
+       "self_improve": ["--dir", "results/forward/events_autodry"]}
 GO_LIVE_ON = date(2026, 10, 2)   # the dry run (from Mon 28 Sep) is judged from this day on, at the 21:00 ET check
 DRY_FROM = date(2026, 9, 28)
 MIN_GOOD_EVENT_RUNS = 8          # of the 10 scheduled Mon-Fri
@@ -96,8 +97,9 @@ def commands(job: str, m: str) -> list[list[str]]:
         # long-term picks: a no-money shadow, one ledger in both modes (its first cohort, 1 Oct, falls in the dry run)
         longterm = [PY, "scripts/longterm_picks.py", *(DRY["longterm"] if dry else [])]
         themes = [PY, "scripts/themes.py"]  # the theme track and AI-bubble gauge: a shadow, one ledger in both modes
+        improve = [PY, "scripts/self_improve.py", *(DRY["self_improve"] if dry else [])]  # arm F, a shadow
         return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], net_read, picks, longterm,
-                themes, [*learn, "collect", *largs]]
+                themes, improve, [*learn, "collect", *largs]]
     if job == "allocator":
         return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])], broker]
     if job == "review":

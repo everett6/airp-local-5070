@@ -70,3 +70,20 @@ def test_d3_breakout_then_vwap_stop():
     assert list(r.index.strftime("%Y-%m-%d"))[-1] == "2024-02-22" and (r.iloc[:-1] == 0).all()
     # long at the 10:00 open (102) after 102 > 100.5 * 1.005; out at the 12:30 open (100.5), below the VWAP stop
     assert abs(r.iloc[-1] - (100.5 / 102.0 - 1 - 0.0002)) < 1e-9
+
+
+def test_d5_longs_losers_shorts_winners():
+    rows = []
+    for i in range(20):  # day 1 sets yesterday's close = 100 for all
+        rows.append({"ts": pd.Timestamp("2024-07-01 15:30", tz="America/New_York"), "symbol": f"S{i}", "open": 100.0,
+                     "close": 100.0})
+    for i in range(20):  # day 2: ROD3 = i% (S0 worst); the losers rise 1% in the last half hour, the winners fall 1%
+        rod = 100.0 * (1 + i / 100)
+        lh = 1.01 if i < 2 else 0.99 if i >= 18 else 1.0
+        rows += [{"ts": pd.Timestamp("2024-07-02 14:30", tz="America/New_York"), "symbol": f"S{i}", "open": 100.0,
+                  "close": rod},
+                 {"ts": pd.Timestamp("2024-07-02 15:30", tz="America/New_York"), "symbol": f"S{i}", "open": rod,
+                  "close": rod * lh}]
+    r = I.d5_eod_reversal(pd.DataFrame(rows), cost=0.0001)
+    assert len(r) == 1 and r["names"].iloc[0] == 20
+    assert abs(r["ret"].iloc[0] - (0.5 * 0.01 + 0.5 * 0.01 - 0.0002)) < 1e-9
