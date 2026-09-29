@@ -1399,6 +1399,36 @@ exposure. A pass makes it a candidate for timing extra exposure once the leverag
 otherwise): Sharpe 0.47 and CAGR 3.5%, against SPY's 0.64 and 11.3%. Correlation with the core book: 0.36. Read: the
 classic turn-of-month premium has not been there in SPY since its 2008 publication.
 
+### SPY overnight premium O1 (spec fixed 2026-09-29, evening PDT, before any O1 code or number)
+
+**Idea.** Most of the US market's return has come outside trading hours, from the close to the next open. Sources:
+Cooper, Cliff and Gulen 2008; Kelly and Clark, *J. Asset Management* 2011 (SPY overnight Sharpe about 1.27 a year
+before costs, data to 2008); Boyarchenko, Larsen and Whelan (NY Fed SR 917) on the overnight drift. **Stated cause,
+as proposed by the authors, not established:** active traders cut positions before the close because they see
+overnight risk as higher, which pushes closing prices down. Found by Codex's screen (29 Sep, papers checked on the
+web). Nothing about SPY's overnight/intraday split has been computed in this repo. D9/D10 were cross-sectional
+opening-gap reversals, a different rule.
+
+**Rule (one trial, `spy_overnight`).**
+- Data: `data/statarb/sector_etfs.parquet`, SPY Open/Close (Yahoo, adjusted for dividends and splits, so a hold over
+  an ex-date is credited with the dividend). Risk-free: `vol_target_b0.tbill()` / 252 per trading day.
+- Every trading day t with a previous close: return o_t = Open_t / Close_{t−1} − 1. Held through weekends and holidays.
+  Buy at the close (market-on-close), sell at the next open (market-on-open); dates and orders are fixed in advance.
+- Cost: 1 bp a side, 2 bp per night. Net excess x_t = o_t − 2 bp − rf_t.
+- Window: 2012-01-03 .. 2026-09-25 (after Kelly and Clark's publication).
+- Check before the test counts: on 2016+ the daily Open/Close must match `data/intraday/SPY_1min.parquet`'s first
+  09:30 open and 15:59 close to within 0.5% on 99% of days (after the adjustment ratio). If not, stop and fix the data
+  first, then run once.
+
+**Pass (95%):** the annualized Sharpe of x_t (sqrt 252, `stats()`) is ≥ 0.5 AND its 21-day block-bootstrap CI is
+above 0. This is the track's usual rule.
+
+**Reported, not deciding:** gross Sharpe; 3 bp costs; the intraday leg (open to close); buy-and-hold SPY; by year;
+2020+; correlation with the core book.
+**Use if it passes:** nothing now. Under the mandate (gross ≤ 1.0), overnight-only SPY earns less than holding SPY all
+day unless the intraday leg is ≤ 0. A pass makes it a candidate for the leverage ladder (higher Sharpe per unit of
+risk), proposed to the user, not adopted.
+
 ### Core leads, forward check (spec fixed 2026-09-29, midday PDT, before any forward data)
 
 The user asked to raise the book's Sharpe. The two known ways were already tested on 2018–26 and failed narrowly,
