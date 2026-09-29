@@ -1286,6 +1286,11 @@ D7 (same-slot history): the signal and the window differ.
 - **If it passes:** a live paper shadow: the existing 5:45 AM PDT events run waits until 09:25 ET, reads the
   pre-market prices, places MOO/MOC orders on the paper account (no new timer), for a month of clean runs, then
   the evidence ladder. **If it fails:** no variant; D9 stays an untradable finding.
+- **Result (run once, 2026-09-29 ~02:30): FAIL.** 2016-01 → 2026-09, 2,696 days, median 231 stocks with a pre-market
+  price: Sharpe **−0.64** [−1.28, −0.06] at 1 bp a side, CAGR −6.5%; at 2 bps −1.15. Legs (gross, bp a day): long
+  +0.8, short −1.8. Since 2024-07 −0.92. D9's edge exists only against the official opening auction price itself,
+  which cannot be known when a market-on-open order must be placed: the pre-market price does not predict the
+  day's reversal. D9 stays an untradable finding; no variant.
 
 ### Pairs trading P1 (spec fixed 2026-09-29 ~01:45, before any pairs code or data view)
 
@@ -1307,6 +1312,10 @@ paid order-book data, so it is not attempted). PLAN_STATARB left pairs as a sepa
   only: 2016-01 → 2024-06). Reported: correlation with the core, share of days invested, 0 and 20 bps costs.
 - **If it passes:** paper sleeve after a month of clean dry runs, then the evidence ladder. **If it fails:** no
   variant (other thresholds, cointegration tests or universes would each be a new, separately justified trial).
+- **Result (run once, 2026-09-29 ~02:15): FAIL.** 2024-07 → 2026-09 (561 days): Sharpe **−0.61** [−1.92, +0.91] at
+  10 bps, CAGR −1.7%; at 0 bps −0.24, at 20 bps −0.98; half the pairs open on a typical day. Before the window
+  (2016–2024-06, survivorship-biased): −0.37. Correlation with the core +0.08. Pairs trading in large caps has no
+  edge left even before costs, as later studies of GGR found (Do and Faff 2010).
 
 ### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
 

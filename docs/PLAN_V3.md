@@ -22,7 +22,8 @@ test and result; nothing here changes a registered rule. Paper money only; no pa
 | Live AI reads: net_read (C2), AI build-out lens (D), bull/bear (E) | shadow, no money | forward-only; judged at 150 releases + 3 months |
 | Long-term picks (top 10 of the S&P 500, 3 months) | shadow; first cohort Thu 1 Oct | forward-only; judged after 12 cohorts |
 | Themes by horizon + AI-bubble gauge | shadow; first cohort Thu 1 Oct | forward-only; judged after 12 six-month cohorts |
-| Day trading | **failed** (8 published rules) | D1 −1.00, D2 −0.24, D3 +0.20, D4 −1.21, D5 −1.86, D6 box theory −0.91, D7 periodicity −0.07, D8 Darvas box −0.30 (Sharpe) |
+| Day trading | **failed** (9 tradable rules) | D1 −1.00, D2 −0.24, D3 +0.20, D4 −1.21, D5 −1.86, D6 box −0.91, D7 −0.07, D8 Darvas −0.30, D10 −0.64; D9 passed (+0.81) but can't be traded (needs the auction's own open price) |
+| Pairs trading | **failed** | P1 (GGR) −0.61 at 10 bps, −0.24 before costs |
 | Private companies | not built | later stage |
 
 **The honest reading:** the system is well built and tests itself honestly, but so far only the core has an edge.
