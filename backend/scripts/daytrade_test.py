@@ -4,6 +4,7 @@
     python scripts/daytrade_test.py --rules D6,D7,D8   # round 4 (98.3% CI: Bonferroni over its 3 trials)
     python scripts/daytrade_test.py --rules D9   # round 5 (then --check-d9)
     python scripts/daytrade_test.py --rules D10  # round 6; needs scripts/premarket_stocks.py, daily_alpaca.py split
+    python scripts/daytrade_test.py --rules P1   # pairs trading (GGR), daily closes
 Each rule is one registered trial: run a rule once. Results merge into results/daytrade_test.json.
 
 Pass (each rule): on its post-publication window, at 1 bp a side, the annualized Sharpe of the daily P&L (SPY and
@@ -169,6 +170,30 @@ def run_d10(core: pd.Series) -> dict:
                   f"2 bps: Sharpe {res['2bp']['both']['sharpe']}, median {res['1bp']['names_median']} stocks")
 
 
+P1_START, P1_END, P1_TRIAL = "2024-07-01", "2026-09-24", "pairs_ggr"
+
+
+def run_p1(core: pd.Series) -> dict:
+    """Pairs trading P1 (GGR within sectors, daily closes of D5's list): one trial, 95% CI."""
+    from app.sandbox.pairs import pairs_ggr
+
+    daily, names = daily_list()
+    closes = daily.pivot_table(index="Date", columns="Ticker", values="Close")[[n for n in names if n in set(daily["Ticker"])]]
+    ev = pd.read_csv(BACKEND / "data" / "events" / "events_2024-01-01_2026-09-24.csv")
+    sectors = ev.drop_duplicates("ticker").set_index("ticker")["sector"].dropna().to_dict()
+    res: dict = {"window": [P1_START, P1_END]}
+    for bp in (10, 0, 20):
+        r = pairs_ggr(closes.loc["2015-01-01":], sectors, cost=bp / 1e4)
+        test = r.loc[P1_START:P1_END]
+        res[f"{bp}bp"] = stats(test["ret"])
+        if bp == 10:
+            res["before_window"] = stats(r.loc["2016-01-01":P1_START, "ret"].iloc[:-1])
+            res["invested_share"] = round(float(test["invested"].mean()), 3)
+            res["corr_with_core"] = round(float(test["ret"].corr(core.reindex(test.index))), 3)
+    return finish("P1", P1_TRIAL, P1_START, P1_END, res, res["10bp"],
+                  f"0 bps {res['0bp']['sharpe']}, 20 bps {res['20bp']['sharpe']}, invested {res['invested_share']:.0%}")
+
+
 def check_d9() -> dict:
     """D9's pre-stated validity check: the same rule on Alpaca's SIP daily bars (scripts/daily_alpaca.py)."""
     from intraday_stocks import universe
@@ -210,7 +235,7 @@ def main() -> None:
         return
     rules = a.rules.split(",")
     bars = ({s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")}
-            if set(rules) - {"D5", "D7", "D8", "D9", "D10"} else {})
+            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "P1"} else {})
     core = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")["core"]
     f = BACKEND / "results" / "daytrade_test.json"
     out: dict = json.loads(f.read_text()) if f.exists() else {}
@@ -221,8 +246,8 @@ def main() -> None:
             out[name] = run_d5(core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
-        if name in ("D7", "D8", "D9", "D10"):
-            out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10}[name](core)
+        if name in ("D7", "D8", "D9", "D10", "P1"):
+            out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10, "P1": run_p1}[name](core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
         fn, start, trial = RULES[name]
