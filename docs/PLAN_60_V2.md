@@ -1291,6 +1291,10 @@ D7 (same-slot history): the signal and the window differ.
   +0.8, short −1.8. Since 2024-07 −0.92. D9's edge exists only against the official opening auction price itself,
   which cannot be known when a market-on-open order must be placed: the pre-market price does not predict the
   day's reversal. D9 stays an untradable finding; no variant.
+- **Stress report (2026-09-29 ~11:40 PDT; reported, not deciding; Alpaca data):** D9 at 1/2/3 bps a side: Sharpe
+  +1.08 / +0.53 / −0.03; positive in every year 2016–2025 (+0.26 in 2019 to +3.16 in 2017), +0.06 in 2026 so far.
+  D10 at 1/2/3 bps: −0.63 / −1.15 / −1.66; negative in 8 of 11 years. The effect lives in the auction print and needs
+  near-zero costs; neither changes the verdicts above.
 
 ### Pairs trading P1 (spec fixed 2026-09-29 ~00:20 PDT, before any pairs code or data view)
 
