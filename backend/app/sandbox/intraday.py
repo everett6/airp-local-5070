@@ -230,6 +230,29 @@ def d7_periodicity(df: pd.DataFrame, cost: float, frac: float = 0.10, lookback: 
     return pd.DataFrame.from_dict(out, orient="index")
 
 
+def d9_open_reversal(daily: pd.DataFrame, symbols: list[str], cost: float, frac: float = 0.10,
+                     min_names: int = 20) -> pd.DataFrame:
+    """D9, opening-auction reversal (daily bars Date/Ticker/Open/Close): short the stocks with the highest overnight
+    return (open / previous close - 1), long the lowest, open to close, dollar neutral. Returns by day: ret (net),
+    long, short (each leg's gross return), names."""
+    d = daily[daily["Ticker"].isin(symbols)]
+    o = d.pivot_table(index="Date", columns="Ticker", values="Open").sort_index()
+    c = d.pivot_table(index="Date", columns="Ticker", values="Close").sort_index()
+    sig, r = (o / c.shift(1) - 1).to_numpy(float), (c / o - 1).to_numpy(float)
+    out = {}
+    for i, day in enumerate(o.index):
+        ok = np.isfinite(sig[i]) & np.isfinite(r[i])
+        n = int(ok.sum())
+        if n < min_names:
+            continue
+        k = max(1, int(n * frac))
+        order = np.argsort(sig[i][ok], kind="stable")
+        rr = r[i][ok][order]
+        lo, hi = float(rr[:k].mean()), float(rr[-k:].mean())
+        out[pd.Timestamp(day)] = {"ret": 0.5 * lo - 0.5 * hi - 2 * cost, "long": lo, "short": -hi, "names": n}
+    return pd.DataFrame.from_dict(out, orient="index")
+
+
 def darvas_signals(h: np.ndarray, lo: np.ndarray, c: np.ndarray, confirm: int = 3, year: int = 252
                    ) -> tuple[dict[int, tuple[float, float]], dict[int, float]]:
     """Darvas boxes of one stock's daily bars. Returns ({day: (top, bottom)} for breakout days (close above a

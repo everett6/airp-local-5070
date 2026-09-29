@@ -2,6 +2,7 @@
 
     python scripts/daytrade_test.py --rules D3,D4   # round 2; needs data/intraday/{SPY,QQQ}_1min.parquet
     python scripts/daytrade_test.py --rules D6,D7,D8   # round 4 (98.3% CI: Bonferroni over its 3 trials)
+    python scripts/daytrade_test.py --rules D9   # round 5
 Each rule is one registered trial: run a rule once. Results merge into results/daytrade_test.json.
 
 Pass (each rule): on its post-publication window, at 1 bp a side, the annualized Sharpe of the daily P&L (SPY and
@@ -32,6 +33,7 @@ from app.sandbox.intraday import (
     d6_box_theory,
     d7_periodicity,
     d8_darvas,
+    d9_open_reversal,
     sharpe,
 )
 
@@ -102,12 +104,7 @@ def run_d7(core: pd.Series) -> dict:
 
 def run_d8(core: pd.Series) -> dict:
     """D8 (Darvas box book on daily bars of D5's list, excess over SPY): one trial, round-4 pass rule."""
-    from intraday_stocks import universe
-
-    daily = pd.read_parquet(BACKEND / "data" / "events" / "ohlcv_2009-01-01_2026-09-25.parquet")
-    daily = daily[daily["Date"] >= "2014-01-01"]
-    names = universe()
-    daily = daily[daily["Ticker"].isin(set(names) | {"SPY"})].assign(Date=lambda d: pd.to_datetime(d["Date"]))
+    daily, names = daily_list()
     r = d8_darvas(daily, names, cost=0.001)
     test = r.loc[D8_START:D8_END]
     res: dict = {"window": [D8_START, D8_END], "excess": stats(test["excess"], LEVEL4),
@@ -117,6 +114,34 @@ def run_d8(core: pd.Series) -> dict:
                  "corr_with_core": round(float(test["excess"].corr(core.reindex(test.index))), 3)}
     return finish("D8", D8_TRIAL, D8_START, D8_END, res, res["excess"], f"book CAGR {res['book']['cagr']:.1%}, "
                   f"SPY {res['spy']['cagr']:.1%}, median held {res['held_median']}")
+
+
+D9_START, D9_END, D9_TRIAL = "2016-01-04", "2026-09-24", "daytrade_open_reversal"
+
+
+def daily_list() -> tuple[pd.DataFrame, list[str]]:
+    from intraday_stocks import universe
+
+    daily = pd.read_parquet(BACKEND / "data" / "events" / "ohlcv_2009-01-01_2026-09-25.parquet")
+    names = universe()
+    daily = daily[(daily["Date"] >= "2014-01-01") & daily["Ticker"].isin(set(names) | {"SPY"})]
+    return daily.assign(Date=lambda d: pd.to_datetime(d["Date"])), names
+
+
+def run_d9(core: pd.Series) -> dict:
+    """D9 (opening-auction reversal, daily bars of D5's list): one trial, 95% CI (single trial in round 5)."""
+    daily, names = daily_list()
+    res: dict = {"window": [D9_START, D9_END]}
+    for bp in (1, 2):
+        test = d9_open_reversal(daily, names, bp / 1e4).loc[D9_START:D9_END]
+        res[f"{bp}bp"] = {"both": stats(test["ret"]), "long_leg_gross": round(float(test["long"].mean()) * 1e4, 2),
+                          "short_leg_gross": round(float(test["short"].mean()) * 1e4, 2),
+                          "names_median": int(test["names"].median())}
+        if bp == 1:
+            res["since_2024_07"] = stats(test.loc["2024-07-01":, "ret"])
+            res["corr_with_core"] = round(float(test["ret"].corr(core.reindex(test.index))), 3)
+    return finish("D9", D9_TRIAL, D9_START, D9_END, res, res["1bp"]["both"],
+                  f"2 bps: Sharpe {res['2bp']['both']['sharpe']}")
 
 
 def finish(name: str, trial: str, start: str, end: str, res: dict, t: dict, note: str) -> dict:
@@ -133,7 +158,7 @@ def main() -> None:
     ap.add_argument("--rules", required=True, help="e.g. D3,D4")
     rules = ap.parse_args().rules.split(",")
     bars = ({s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")}
-            if set(rules) - {"D5", "D7", "D8"} else {})
+            if set(rules) - {"D5", "D7", "D8", "D9"} else {})
     core = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")["core"]
     f = BACKEND / "results" / "daytrade_test.json"
     out: dict = json.loads(f.read_text()) if f.exists() else {}
@@ -144,8 +169,8 @@ def main() -> None:
             out[name] = run_d5(core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
-        if name in ("D7", "D8"):
-            out[name] = run_d7(core) if name == "D7" else run_d8(core)
+        if name in ("D7", "D8", "D9"):
+            out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9}[name](core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
         fn, start, trial = RULES[name]
@@ -153,7 +178,7 @@ def main() -> None:
         res: dict = {"window": [start, END]}
         for cost_bp in (1, 5):
             per = {s: fn(b, cost_bp / 1e4) for s, b in bars.items()}
-            both = pd.concat(per, axis=1).fillna(0.0).mean(axis=1)  # equal capital; a symbol with no trade earns 0
+            both = pd.concat(per, axis=1, sort=True).fillna(0.0).mean(axis=1)  # equal capital; a symbol with no trade earns 0
             test = both.loc[start:END]
             res[f"{cost_bp}bp"] = {"both": stats(test, lv), **{s: stats(r.loc[start:END], lv) for s, r in per.items()}}
             if cost_bp == 1:

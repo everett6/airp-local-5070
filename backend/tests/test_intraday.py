@@ -172,3 +172,15 @@ def test_d8_buys_the_breakout_and_sells_below_the_stop():
     assert abs(r.loc[days[p + 8], "ret"] - w * (99 / 107 - 1)) < 1e-12
     assert abs(r.loc[days[p + 9], "ret"] - (w * (98 / 99 - 1) - w * 0.001)) < 1e-12
     assert r.loc[days[p + 9], "held"] == 0 and r["ret"].iloc[: p + 6].abs().max() == 0
+
+
+def test_d9_longs_overnight_losers_shorts_winners():
+    rows = []
+    for i in range(20):  # day 1 close 100; day 2 opens at 100 + i (S19 gapped up most), losers bounce, winners fade
+        rows.append({"Date": pd.Timestamp("2024-07-01"), "Ticker": f"S{i}", "Open": 100.0, "Close": 100.0})
+        o = 100.0 + i
+        rows.append({"Date": pd.Timestamp("2024-07-02"), "Ticker": f"S{i}", "Open": o,
+                     "Close": o * (1.02 if i < 2 else 0.98 if i >= 18 else 1.0)})
+    r = I.d9_open_reversal(pd.DataFrame(rows), [f"S{i}" for i in range(20)], cost=0.0001)
+    assert len(r) == 1 and r["names"].iloc[0] == 20
+    assert abs(r["ret"].iloc[0] - (0.5 * 0.02 + 0.5 * 0.02 - 0.0002)) < 1e-9
