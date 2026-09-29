@@ -190,6 +190,19 @@ self-improving agent's lessons and stacker decisions, every individual
 prediction, a cross-run comparison, the memorization probe, and a form to
 launch new runs on your local Ollama models with live progress.
 
+### Paper portfolio viewer (live)
+
+```bash
+scripts/portfolio_ui.sh          # http://localhost:8502
+scripts/portfolio_ui.sh --lan    # also from your phone on the same Wi-Fi
+```
+
+Read-only view of the forward test: each book's holdings, live equity, today's move, drawdown
+and brake level (marked at Yahoo's latest prices every minute); orders waiting to fill; every fill;
+the AI picks (open picks' return vs sector so far, closed picks' 5-day result, missed releases);
+and run health (last runs, weekdays with no run, ledger hash check). It never trades or writes: the
+books change only when `forward_allocator.py` / `forward_events.py` are run by hand.
+
 A local-first AI investment research platform: runs against **your own GPUs**
 (no cloud LLM API keys required) and includes a **point-in-time sandbox** for
 honestly backtesting predictions — the data connectors physically reject

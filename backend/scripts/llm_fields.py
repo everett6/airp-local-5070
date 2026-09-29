@@ -3,6 +3,11 @@
     python scripts/llm_fields.py dev                  # step 1: the 4 prompts on 100 dev releases, quality metrics only
     python scripts/llm_fields.py extract --prompt P3  # step 2: the frozen prompt on the 2024 and 2025-26 samples
     python scripts/llm_fields.py test                 # step 3: the one pre-registered return test
+    python scripts/llm_fields.py extract-research     # arm B: release + Jan's as-of research evidence
+    python scripts/llm_fields.py test-research        # arm B's pre-registered test (research beyond arm A)
+    python scripts/llm_fields.py dev-judgement        # arm C quality gate (100 dev releases; exit 3 = gate failed)
+    python scripts/llm_fields.py extract-judgement    # arm C: arm B + four judgement fields and a reason
+    python scripts/llm_fields.py test-judgement       # arm C's pre-registered test (judgement beyond arm B)
 
 Bonsai reads each earnings press release and labels 7 things code cannot compute from the numbers, each with an
 exact quote. Code keeps a non-default label only if its quote is word for word in the release. The prompt is chosen on
@@ -25,6 +30,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 sys.path.insert(0, str(BACKEND / "scripts"))
 
+import httpx
 import numpy as np
 import pandas as pd
 
@@ -74,6 +80,179 @@ PROMPTS = {
     "P4": _HEAD + _DEFS + _RULES + "\nWrite each field's quote BEFORE its label.\n" + _EX + "JSON: " + _SCHEMA_Q,
 }
 
+FIELDS_R = FIELDS | {"vs_prior_guidance": (("beat", "met", "missed", "not_stated"), "not_stated")}
+_SCHEMA_R = "{" + ", ".join(f'"{k}": {{"label": "{"|".join(v[0])}", "quote": "..."}}' for k, v in FIELDS_R.items()) + "}"
+_DEF_R = """- vs_prior_guidance: this quarter's results vs the guidance range the company gave in its PREVIOUS earnings
+  release (in the research evidence): beat = above the range, met = inside it, missed = below it; not_stated if the
+  evidence has no earlier guidance for this quarter. Quote the earlier guidance.
+"""
+_RULES_R = _RULES.replace("use ONLY the release", "use ONLY the release and the research evidence").replace(
+    "word for word", "word for word from the release or the evidence")
+# arm B: P2 (frozen) plus the research evidence block and the one research-only field; nothing else changed
+PROMPT_R = _HEAD + _DEFS + _DEF_R + _RULES_R + "\nJSON: " + _SCHEMA_R
+EVIDENCE = BACKEND / "results"
+
+# arm C (docs/PLAN_60_V2.md "Arm C"): arm B's prompt plus four JUDGEMENT fields and a short reason written first.
+# Arm B's prompt and fields above are unchanged; this only adds.
+FIELDS_J = FIELDS_R | {
+    "earnings_quality": (("clean", "flattered", "not_clear"), "not_clear"),
+    "outlook_tone": (("confident", "cautious", "not_stated"), "not_stated"),
+    "net_read": (("bullish", "neutral", "bearish"), "neutral"),
+    "conviction": (("high", "low"), "low"),
+}
+_DEF_J = """- earnings_quality: flattered = the headline growth or beat leans on one-offs, a lower tax rate, a smaller share
+  count or adjustments that leave out recurring costs; clean = it comes from the core business (revenue and operating
+  profit); not_clear otherwise. Quote the sentence that shows it.
+- outlook_tone: how management talks about the coming quarters: confident = raised or firmly reaffirmed outlook with
+  upbeat specifics; cautious = headwinds, uncertainty, softer trends or a lowered outlook; not_stated if nothing.
+- net_read: YOUR judgement as a skeptical analyst, weighing the good against the bad (and the results against the
+  earlier guidance, if the evidence has it): does this release make the next few weeks better (bullish) or worse
+  (bearish) for the stock than a typical earnings release? neutral if it is mixed or ordinary. Quote the ONE sentence
+  that matters most.
+- conviction: high only if the release and evidence point clearly one way; low otherwise. Quote the deciding sentence.
+"""
+_SCHEMA_J = ('{"reason": "at most 40 words: the main good and bad points, weighed", '
+             + _SCHEMA_R[1:-1] + ", "
+             + ", ".join(f'"{k}": {{"label": "{"|".join(v[0])}", "quote": "..."}}' for k, v in FIELDS_J.items()
+                         if k not in FIELDS_R) + "}")
+PROMPT_J = (_HEAD + _DEFS + _DEF_R + _DEF_J + _RULES_R
+            + "\nWrite \"reason\" first: weigh the evidence before you label.\nJSON: " + _SCHEMA_J)
+J_GATE = {"parse_rate": 0.95, "verified_share": 0.85}
+
+# Long-term picks track (docs/PLAN_60_V2.md "Long-term picks track", fixed 2026-09-28): a 3-to-6-month view of one
+# company from a code-built card. Forward-only.
+FIELDS_LT: dict[str, tuple[tuple[str, ...], str]] = {"outlook_6m": (("1", "2", "3", "4", "5"), "3")}
+PROMPT_LT = """You are a long-term investor choosing S&P 500 stocks to hold for the next 3 to 6 months.
+You read one company card: its latest quarterly earnings release, the outlook it gave the quarter before, and its
+recent returns against the S&P 500. Judge the business, not the last week's price move: growth and its direction,
+margins, the outlook versus what was promised before, balance-sheet or accounting risks, and how durable the demand
+is. Weigh the good against the bad.
+- outlook_6m: 5 = likely to do much better than the S&P 500 over the next 3 to 6 months; 4 = better; 3 = about the
+  same, or unclear; 2 = worse; 1 = much worse. For any rating other than 3, copy the ONE sentence from the card
+  that matters most, word for word, as "quote" (at most 30 words). Never guess.
+Reply with ONLY one JSON object on one line.
+Before you rate, argue BOTH sides:
+- "bull": up to 3 of the strongest reasons it beats the S&P 500, each a short "point" (at most 20 words) with a
+  supporting "quote" copied word for word from the card.
+- "bear": up to 3 of the strongest reasons it lags, same form. Make the bear case in earnest even for a strong card,
+  and the bull case even for a weak one.
+Then weigh the two cases in "reason" and rate.
+JSON: {"bull": [{"point": "...", "quote": "..."}], "bear": [{"point": "...", "quote": "..."}], "reason": "at most 40 words: which case wins and why", "outlook_6m": {"label": "1|2|3|4|5", "quote": "..."}}"""
+
+
+# Arm D (docs/PLAN_60_V2.md "Arm D", fixed 2026-09-28): the AI-build-out lens the user asked for, after Leopold
+# Aschenbrenner's 2024 essay "Situational Awareness". Forward-only: the thesis is known to have worked in 2024-26, so
+# a backtest on those years would be flattered.
+FIELDS_AI: dict[str, tuple[tuple[str, ...], str]] = {
+    "ai_exposure": (("beneficiary", "neutral", "hurt"), "neutral"),
+    "ai_read": (("bullish", "neutral", "bearish"), "neutral"),
+}
+_DEF_AI = """You hold the AI-scaling view (Leopold Aschenbrenner, "Situational Awareness", 2024): AI capability keeps
+scaling with compute, so spending on AI chips, datacenters, networking, electric power, cooling and the grid grows
+far faster than most investors expect; companies that sell into that build-out gain for years, and businesses that
+AI automates or undercuts lose. You still judge THIS release on its facts.
+- ai_exposure: beneficiary = the release shows the company selling into the AI build-out (AI or datacenter demand,
+  chips, servers, networking, power, cooling, grid, or AI products that customers pay for); hurt = the release shows
+  AI competition, automation or substitution hurting its business; neutral otherwise. Quote the sentence.
+- ai_read: under this view, does this release make the next few weeks better (bullish) or worse (bearish) for the
+  stock than a typical earnings release? neutral if it is ordinary or unrelated to the build-out. Quote the ONE
+  sentence that matters most.
+"""
+_SCHEMA_AI = ('{"reason": "at most 40 words, through the AI-build-out lens", '
+              + ", ".join(f'"{k}": {{"label": "{"|".join(v[0])}", "quote": "..."}}' for k, v in FIELDS_AI.items()) + "}")
+PROMPT_AI = (_HEAD + _DEF_AI + _RULES_R + "\nWrite \"reason\" first.\nJSON: " + _SCHEMA_AI)
+
+# Arm E (docs/PLAN_60_V2.md "Arm E", fixed 2026-09-28): a bull/bear thesis the user asked for. Bonsai argues both
+# sides of the release with quoted points, then weighs them. Live-only like C2 and D (a judgement Bonsai could
+# flatter with hindsight on 2024-26).
+FIELDS_BB: dict[str, tuple[tuple[str, ...], str]] = {"bb_read": (("bullish", "neutral", "bearish"), "neutral")}
+_DEF_BB = """Argue both sides before you decide:
+- "bull": up to 3 of the strongest reasons this release makes the next few weeks BETTER for the stock than a typical
+  earnings release, each a short "point" (at most 20 words) with a supporting "quote" copied word for word.
+- "bear": up to 3 of the strongest reasons it makes them WORSE, same form. Make the bear case in earnest even for a
+  strong release, and the bull case even for a weak one.
+- bb_read: after weighing the two cases, bullish if the bull case clearly wins, bearish if the bear case clearly
+  wins, neutral if they balance or the release is ordinary. Quote the ONE sentence that decides it.
+"""
+_SCHEMA_BB = ('{"bull": [{"point": "...", "quote": "..."}], "bear": [{"point": "...", "quote": "..."}], '
+              '"reason": "at most 40 words: which case wins and why", "bb_read": {"label": "bullish|neutral|bearish", '
+              '"quote": "..."}}')
+PROMPT_BB = (_HEAD + _DEF_BB + _RULES_R + "\nWrite \"bull\", \"bear\" and \"reason\" first.\nJSON: " + _SCHEMA_BB)
+
+
+_BOTH = """Before you rate, argue BOTH sides:
+- "bull": up to 3 of the strongest reasons for, each a short "point" (at most 20 words) with a supporting "quote"
+  copied word for word from the card.
+- "bear": up to 3 of the strongest reasons against, same form. Make each case in earnest, even when the card clearly
+  favours the other side.
+Then weigh the two cases in "reason" and rate. For any rating other than the middle one, copy the ONE card line that
+matters most, word for word, as "quote". Never guess.
+Reply with ONLY one JSON object on one line.
+"""
+
+# Theme track (docs/PLAN_60_V2.md "Theme track", fixed 2026-09-28): investment directions by horizon, and the
+# market-risk register (the AI-bubble gauge). Forward-only.
+FIELDS_TH: dict[str, tuple[tuple[str, ...], str]] = {"theme_outlook": (("1", "2", "3", "4", "5"), "3")}
+PROMPT_TH = """You are a portfolio strategist choosing investment themes (a group of related stocks, held through an
+ETF or a basket) for the holding period on the card: 6 months for medium-term themes, 12 months for long-term ones.
+You read one theme card: the theme, its recent returns, trend and volatility against the S&P 500, and the market
+risk register (AI spending, market concentration, credit and volatility). Judge where the theme is heading over its
+holding period: the demand and technology behind it, how much of that is already in the price, and what could go
+wrong, including a bubble in AI-linked stocks. Long-term themes can be early and volatile; weigh that honestly.
+- theme_outlook: 5 = likely to do much better than the S&P 500 over its holding period; 4 = better; 3 = about the
+  same, or unclear; 2 = worse; 1 = much worse.
+""" + _BOTH + """JSON: {"bull": [{"point": "...", "quote": "..."}], "bear": [{"point": "...", "quote": "..."}], "reason": "at most 40 words: which case wins and why", "theme_outlook": {"label": "1|2|3|4|5", "quote": "..."}}"""
+
+FIELDS_RISK: dict[str, tuple[tuple[str, ...], str]] = {"bubble_risk": (("low", "elevated", "high"), "elevated")}
+PROMPT_RISK = """You are a risk officer. You read the market risk register: hyperscaler AI spending and how it
+compares with their cash flow, market concentration, semiconductor prices against their trend, credit spreads and
+volatility. Judge the risk that AI-linked stocks (chips, hyperscalers, power and grid) fall hard over the next 6 to
+12 months because spending or prices ran ahead of the returns AI earns.
+- "bull" here means reasons the risk is LOW (spending is funded, prices are not stretched, credit is calm);
+  "bear" means reasons the risk is HIGH.
+- bubble_risk: low, elevated or high. "elevated" is the middle answer.
+""" + _BOTH.replace("reasons for", "reasons the risk is low").replace("reasons against", "reasons the risk is high") + (
+    """JSON: {"bull": [{"point": "...", "quote": "..."}], "bear": [{"point": "...", "quote": "..."}], "reason": "at most 40 words: which case wins and why", "bubble_risk": {"label": "low|elevated|high", "quote": "..."}}""")
+
+DIGITS = ("1", "2", "3", "4", "5")
+
+
+def expected(probs: dict[str, float]) -> float | None:
+    """Probability-weighted rating from the digits' next-token probabilities; None without any mass."""
+    m = sum(probs.values())
+    return None if m <= 0 else sum(int(k) * v for k, v in probs.items()) / m
+
+
+async def rating_score(llm: Any, system: str, user: str, reply: str, field: str, raw: dict[str, Any] | None,
+                       rating: int) -> tuple[float, dict[str, float] | None]:
+    """The score behind a 1-5 rating: Bonsai's own probabilities for each digit at the point it wrote the rating
+    (its reply up to the label, continued), so ties between equal ratings are broken by how sure it was. A rating
+    the quote check sent back to the middle keeps its value; so does a model without next_token_probs."""
+    m = re.search(rf'"{field}"\s*:\s*\{{\s*"label"\s*:\s*"', reply)
+    label = (raw or {}).get(field)
+    if not m or not hasattr(llm, "next_token_probs") or not isinstance(label, dict) or label.get("label") != str(rating):
+        return float(rating), None
+    probs = await llm.next_token_probs(system, user, reply[:m.end()], DIGITS)
+    return (expected(probs) or float(rating)), {k: round(v, 4) for k, v in probs.items()}
+
+
+def theses(raw: dict[str, Any] | None, text: str) -> dict[str, list[dict[str, Any]]]:
+    """The bull and bear points (at most 3 each), each marked verified if its quote is word for word in the source."""
+    body = _norm(text)
+    out: dict[str, list[dict[str, Any]]] = {}
+    for side in ("bull", "bear"):
+        pts = (raw or {}).get(side)
+        keep = []
+        for p in pts[:3] if isinstance(pts, list) else []:
+            if not isinstance(p, dict) or not str(p.get("point", "")).strip():
+                continue
+            q = str(p.get("quote", "")).strip()
+            keep.append({"point": str(p["point"]).strip()[:200], "quote": q[:300],
+                         "verified": len(q) >= 12 and _norm(q).strip('"') in body})
+        out[side] = keep
+    return out
+
+
 SILVER = {  # code-only keyword labels, the quality yardstick: does the model flag a field when the words are there?
     "one_off": r"impairment|restructuring (charge|cost|expense)|goodwill write|litigation (charge|settlement)|write-?down",
     "capital_return": r"((repurchase|buyback)[^.]{0,80}(authoriz|new|additional|increase))|((increas|rais)\w* (its |the |our )?(quarterly )?(cash )?dividend)|((suspend|reduc|cut)\w* (its |the |our )?(quarterly )?dividend)",
@@ -95,11 +274,24 @@ def parse(reply: str) -> dict[str, Any] | None:
     return o if isinstance(o, dict) else None
 
 
-def verify(raw: dict[str, Any] | None, text: str) -> dict[str, Any]:
-    """Code has the last word: a non-default label needs a quote found word for word in the release."""
+async def ask(llm: Any, system: str, user: str) -> tuple[str, bool]:
+    """The reply, and whether the input overflowed the context window. Ollama refuses a prompt longer than num_ctx
+    with HTTP 400 ("exceeds the available context size"); such a release counts as unparsed, so every field keeps its
+    default (PLAN_60_V2 "Context overflow", fixed 2026-09-27 before arm B resumed). Other errors still stop the run."""
+    try:
+        return await llm(system, user), False
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 400 and "context" in e.response.text:
+            return "", True
+        raise
+
+
+def verify(raw: dict[str, Any] | None, text: str, fields: dict[str, tuple[tuple[str, ...], str]] = FIELDS
+           ) -> dict[str, Any]:
+    """Code has the last word: a non-default label needs a quote found word for word in the source text."""
     body = _norm(text)
     out: dict[str, Any] = {"parsed": raw is not None, "claimed": 0, "verified": 0}
-    for f, (labels, default) in FIELDS.items():
+    for f, (labels, default) in fields.items():
         v = (raw or {}).get(f)
         label = str(v.get("label", "")).strip().lower() if isinstance(v, dict) else ""
         quote = str(v.get("quote", "")).strip() if isinstance(v, dict) else ""
@@ -193,9 +385,126 @@ async def extract(prompt: str) -> None:
         await llm.unload()
 
 
+def research_folder(tag: str, variant: str = "") -> Path:
+    """Jan's evidence folder. variant "b2": arm B2's re-gather with the news actually fetched (PLAN_60_V2 "Arm B2");
+    "b3": B2's research with the evidence rebuilt by code (scripts/b3_evidence.py, "Arm B3")."""
+    return EVIDENCE / (f"events_research_Jan-v1-4B-GGUF_Q4_K_M_v3{variant}" + ("_2024" if tag == "2024" else ""))
+
+
+async def extract_research(variant: str = "") -> None:
+    """Arm B: the release plus Jan's as-of evidence; quotes may come from either."""
+    llm = llm_client()
+    try:
+        for tag, events, feats in (("2024", "data/events/events_sp500_2024.csv", "features_sp500_2024_secchk.csv"),
+                                   ("2025", "data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv")):
+            out = OUT / f"llm_fields_research{('_' + variant) if variant else ''}_{tag}.jsonl"
+            done = {json.loads(x)["accession"] for x in out.read_text().splitlines()} if out.exists() else set()
+            keep = set(pd.read_csv(OUT / feats)["accession"])
+            rows = [r for r in pd.read_csv(BACKEND / events).itertuples() if r.accession in keep and r.accession not in done]
+            print(f"{tag}: {len(rows)} releases to label with research", flush=True)
+            t0 = time.monotonic()
+
+            async def one(r: Any, tag: str = tag) -> dict[str, Any] | None:
+                text, rp = text_of(r.accession), research_folder(tag, variant) / f"{r.accession}.json"
+                if text is None:
+                    return None
+                ev = (json.loads(rp.read_text()).get("evidence") or "")[:6000] if rp.exists() else ""
+                user = (text[:6000] + "\n\n=== Research evidence (web, as of the release) ===\n"
+                        + (ev or "No research evidence was found."))
+                reply, overflow = await ask(llm, PROMPT_R, user)
+                return {"accession": r.accession, "has_research": bool(ev), "overflow": overflow,
+                        **verify(parse(reply), text[:6000] + "\n" + ev, FIELDS_R)}
+            for i in range(0, len(rows), 60):
+                recs = [x for x in await asyncio.gather(*(one(r) for r in rows[i:i + 60])) if x is not None]
+                with out.open("a") as fh:
+                    for rec in recs:
+                        fh.write(json.dumps(rec) + "\n")
+                n = i + len(rows[i:i + 60])
+                print(f"  {n}/{len(rows)} eta={(len(rows) - n) * (time.monotonic() - t0) / n / 60:.0f}min", flush=True)
+    finally:
+        await llm.unload()
+
+
+def llm_client_j() -> Any:
+    from app.sandbox.walkforward import OllamaLLM
+    return OllamaLLM("bonsai-27b:latest", base_url="http://127.0.0.1:11435", concurrency=3, num_ctx=8192,
+                     num_predict=1000, cache=True, require_gpu=True)
+
+
+def _user_j(acc: str, tag: str) -> tuple[str, str, bool] | None:
+    text, rp = text_of(acc), research_folder(tag) / f"{acc}.json"
+    if text is None:
+        return None
+    ev = (json.loads(rp.read_text()).get("evidence") or "")[:6000] if rp.exists() else ""
+    user = text[:6000] + "\n\n=== Research evidence (web, as of the release) ===\n" + (ev or "No research evidence was found.")
+    return user, text[:6000] + "\n" + ev, bool(ev)
+
+
+async def _label_j(llm: Any, acc: str, tag: str) -> dict[str, Any] | None:
+    u = _user_j(acc, tag)
+    if u is None:
+        return None
+    user, source, has = u
+    t0 = time.monotonic()
+    reply, overflow = await ask(llm, PROMPT_J, user)
+    raw = parse(reply)
+    reason = str((raw or {}).get("reason", ""))[:400]
+    return {"accession": acc, "has_research": has, "overflow": overflow, "s": time.monotonic() - t0, "reason": reason,
+            **verify(raw, source, FIELDS_J)}
+
+
+async def dev_judgement() -> bool:
+    """Arm C quality gate on the same 100 dev releases as step 1: parse rate and verified quotes only."""
+    ev = pd.read_csv(BACKEND / "data/events/events_sp500_2024.csv")
+    rows = list(ev.sample(100, random_state=1).itertuples())
+    llm = llm_client_j()
+    try:
+        t0 = time.monotonic()
+        recs = [x for x in await asyncio.gather(*(_label_j(llm, r.accession, "2024") for r in rows)) if x]
+    finally:
+        await llm.unload()
+    claimed = sum(r["claimed"] for r in recs)
+    q = {"n": len(recs), "parse_rate": float(np.mean([r["parsed"] for r in recs])),
+         "verified_share": sum(r["verified"] for r in recs) / claimed if claimed else 0.0,
+         "s_per_release": (time.monotonic() - t0) / max(1, len(recs)),
+         "label_counts": {f: pd.Series([r[f] for r in recs]).value_counts().to_dict() for f in FIELDS_J
+                          if f not in FIELDS_R}}
+    q["gate"] = J_GATE
+    q["pass"] = bool(q["parse_rate"] >= J_GATE["parse_rate"] and q["verified_share"] >= J_GATE["verified_share"])
+    (OUT / "llm_fields_judgement_dev.json").write_text(json.dumps(q, indent=1, default=str) + "\n")
+    print(json.dumps(q, indent=1, default=str), flush=True)
+    return q["pass"]
+
+
+async def extract_judgement() -> None:
+    """Arm C labels for the 2024 (train) and 2025-26 (test) samples; resumable."""
+    llm = llm_client_j()
+    try:
+        for tag, events, feats in (("2024", "data/events/events_sp500_2024.csv", "features_sp500_2024_secchk.csv"),
+                                   ("2025", "data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv")):
+            out = OUT / f"llm_fields_judgement_{tag}.jsonl"
+            done = {json.loads(x)["accession"] for x in out.read_text().splitlines()} if out.exists() else set()
+            keep = set(pd.read_csv(OUT / feats)["accession"])
+            rows = [r for r in pd.read_csv(BACKEND / events).itertuples() if r.accession in keep and r.accession not in done]
+            print(f"{tag}: {len(rows)} releases to label with judgement", flush=True)
+            t0 = time.monotonic()
+            for i in range(0, len(rows), 60):
+                chunk = rows[i:i + 60]
+                recs = [x for x in await asyncio.gather(*(_label_j(llm, r.accession, tag) for r in chunk)) if x]
+                with out.open("a") as fh:
+                    for rec in recs:
+                        fh.write(json.dumps(rec) + "\n")
+                n = i + len(chunk)
+                print(f"  {n}/{len(rows)} eta={(len(rows) - n) * (time.monotonic() - t0) / n / 60:.0f}min", flush=True)
+    finally:
+        await llm.unload()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=("dev", "extract", "test"))
+    ap.add_argument("cmd", choices=("dev", "extract", "extract-research", "test", "test-research", "extract-research-b2",
+                                    "test-research-b2", "extract-research-b3", "test-research-b3", "dev-judgement",
+                                    "extract-judgement", "test-judgement"))
     ap.add_argument("--prompt", default="")
     args = ap.parse_args()
     if args.cmd == "dev":
@@ -204,6 +513,23 @@ def main() -> None:
         if args.prompt not in PROMPTS:
             raise SystemExit("--prompt must be the frozen winner from `dev`")
         asyncio.run(extract(args.prompt))
+    elif args.cmd == "extract-research":
+        asyncio.run(extract_research())
+    elif args.cmd in ("extract-research-b2", "extract-research-b3"):
+        asyncio.run(extract_research(args.cmd[-2:]))
+    elif args.cmd == "dev-judgement":
+        raise SystemExit(0 if asyncio.run(dev_judgement()) else 3)
+    elif args.cmd == "extract-judgement":
+        asyncio.run(extract_judgement())
+    elif args.cmd == "test-judgement":
+        from llm_fields_test import judgement_main
+        judgement_main()
+    elif args.cmd == "test-research":
+        from llm_fields_test import research_main
+        research_main()
+    elif args.cmd in ("test-research-b2", "test-research-b3"):
+        from llm_fields_test import research_main
+        research_main(args.cmd[-2:])
     else:
         from llm_fields_test import main as test_main
         test_main()

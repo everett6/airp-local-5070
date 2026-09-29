@@ -614,3 +614,593 @@ into a score.
   - the full model's own IC CI is above 0.
 - **Also reported:** the 20-day horizon, and each field's IC.
 - **Registry:** one trial.
+
+### Step 1 result: prompt optimization (2026-09-27 10:18). **P2 frozen.**
+
+Dev set: 100 releases from 2024. Only extraction quality was measured; no returns were looked at.
+
+| Prompt | Parse | Quotes verified | Keyword agreement | s / release | Score |
+|---|---|---|---|---|---|
+| P1: schema | 99% | 92.6% | 68.8% | 5.7 | 0.631 |
+| **P2: + definitions** | **100%** | **96.1%** | **80.3%** | 5.8 | **0.771** |
+| P3: + quote first | 98% | 93.7% | 78.0% | 6.6 | 0.716 |
+| P4: + examples | 100% | 93.9% | 80.0% | 6.5 | 0.752 |
+
+- The definitions did the work. Non-default labels per release fell from 3.5 to 2.4: fewer over-claims, and more
+  of the remaining ones are right.
+- Quote-first and the worked examples cost 13% more time and did not help.
+- Step 2 now runs with P2 on the 2024 (train) and 2025-26 (test) samples. `results/events/llm_fields_dev.json`.
+
+## Arm B: Jan researches → Bonsai labels → code decides (spec fixed 2026-09-27 ~10:35, before any arm-B data)
+
+User request: "make sure u are doing the jan web research then feed into bonsai which uses algorithms to help make
+judgement calls". Arm A (release only, running now) stays as specified. Arm B adds Jan's web research.
+
+- **Jan (research):** Jan-v1-4B gathers as-of evidence per release, with the same tools and prefetch as research v3.
+  The prefetch includes the company's previous release, which holds the guidance it gave. The research audit applies.
+  - 2025-26: the existing v3 evidence (1,180 releases).
+  - 2024: a new gather on the 2024 sample (`--run-tag _v3_2024`). Releases whose previous release predates 2024
+    may lack it; that is recorded.
+- **Bonsai (reading):** frozen prompt P2 plus the evidence (the release's first 6,000 characters and Jan's evidence,
+  up to 6,000), and one more field that only the research can answer:
+  - `vs_prior_guidance`: beat / met / missed / not_stated. This quarter's results vs the guidance range from the
+    company's previous release.
+- **Code check:** as in arm A, but a quote may come from the release or from Jan's evidence. No re-tuning: P2's
+  wording is unchanged, and only the evidence block and the one field definition are added.
+- **Code (the judgement):** the same ridge as arm A, trained on 2024 and scored on 2025-26. Full B = base + the 8 fields.
+- **Pass for arm B:**
+  - the 2025-26 monthly IC of (full B − full A) has a 95% CI above 0 (paired monthly bootstrap), AND
+  - full B's own IC CI is above 0 (5-day return vs sector).
+  - So research must add something beyond what Bonsai reads in the release alone.
+- **Registry:** one more trial. Also reported: the 20-day horizon, and the `vs_prior_guidance` field alone.
+- **Context overflow (fixed 2026-09-27 ~18:40, after 960 of 1,995 2024 labels and before any arm B return was
+  looked at):** one release plus its evidence came to 8,436 tokens, over Bonsai's 8,192-token window. Ollama refused it
+  (HTTP 400) and the run stopped. Rule from now on, for arms B and C: a release whose input does not fit is recorded as
+  unparsed (`overflow: true`, every field at its default), exactly like a reply that doesn't parse. Inputs are not
+  shortened differently, the window is not changed mid-run, and the 960 labels already made stand. The overflow count
+  is reported with the verdict. Arm A's verdict (below) does not depend on this.
+- **Arm B verdict (27 Sep, pre-registered 5-day test): FAIL.** Full B − full A +0.007 IC [−0.037, +0.052]; full B's
+  own IC +0.050 [−0.007, +0.107]. 20-day: B − A −0.019 [−0.070, +0.025]. `vs_prior_guidance` alone +0.069
+  [−0.095, +0.228] on 342 releases (836 of 1,180 "not_stated"). Context overflows: 1 of 3,175 (2024), 0 (2025-26).
+- **Arm A verdict (27 Sep, pre-registered 5-day test): FAIL.** Full A's IC +0.043 [+0.005, +0.082], but full − base
+  +0.015 [−0.035, +0.058]: Bonsai's release-only labels add nothing the code's base features don't already carry.
+  20-day: full − base −0.021 [−0.066, +0.024].
+
+### Arm B2: the same research with its news actually gathered (spec fixed 2026-09-27 ~23:30, after arm B's verdict)
+
+**Why a second arm B.** Arm B's gather ran 16 research workers behind the Internet Archive's pacing (one request per
+4 s); 75% of news calls hit their 15 s timeout. Jan had a news page for only **5% of 2024 releases** (the training
+year) and 46% of 2025-26. So arm B mostly tested "the filing twice", not web research. B2 changes only that.
+
+- **Step 1, news (network only):** `scripts/warm_news.py` makes the exact call Jan's prefetch makes
+  (`news_as_of` for the ticker at the release's acceptance time), one at a time with a long timeout, into the same
+  tool cache. The as-of rule and page parsing are unchanged. Coverage is reported per sample.
+- **Step 2, Jan (GPU, after arm C):** Jan-v1-4B re-gathers both samples with arm B's exact settings (model, prefetch v3,
+  rounds, tools, audit) into new folders (`_v3b2_2024`, `_v3b2`). Tool results come from the cache where present,
+  so the only intended difference is news being there.
+- **Step 3, Bonsai:** arm B's frozen prompt `PROMPT_R` and fields on the new evidence (same 6,000 + 6,000 characters,
+  same overflow rule), into `llm_fields_research_b2_<tag>.jsonl`.
+- **Step 4, the one test (trial `llm_fields_research_b2`):** exactly arm B's rule: the 2025-26 monthly IC of
+  (full B2 − full A) has a 95% CI above 0 (paired monthly bootstrap) AND full B2's own IC CI is above 0, 5-day vs
+  sector. Reported, not deciding: 20-day, B2 − B, and B2 on the releases where news was found.
+- **Stop rule:** if news coverage after step 1 is below 50% in 2024, B2 is not run (the Archive, not the pacing, is
+  then the limit) and a different free news source is specced instead.
+
+### Arm B2 result (2026-09-28): **FAIL**, the closest so far
+
+News coverage after the warm-up: 80% of 2024 releases (1,596 of 1,995; arm B 5%) and 81% of 2025-26.
+2025-26, monthly rank IC, 5-day vs sector (14 months, 1,177 releases):
+
+| | Mean IC | 95% CI |
+|---|---|---|
+| full A | +0.043 | [+0.005, +0.082] |
+| full B2 | +0.054 | [−0.004, +0.114] |
+| **B2 − A (deciding)** | **+0.011** | **[−0.035, +0.062]** |
+| B2 − B | +0.004 | [−0.033, +0.041] |
+| B2 on releases with news (953) | +0.064 | [+0.001, +0.125] |
+| 20-day: B2 − B (reported, not deciding) | +0.029 | [+0.009, +0.050] |
+
+- Neither pass check holds. Gathering the news made the research labels a little better than arm B (clearly so at
+  20 days), but not better than the release alone at 5 days.
+- `vs_prior_guidance` is still "not_stated" for 859 of 1,180 releases: the evidence doesn't carry last quarter's
+  guidance to Bonsai, as found before this verdict (arm B3 below was fixed before it).
+
+### Arm B3: evidence that actually reaches Bonsai (spec fixed 2026-09-28 ~12:10, BEFORE arm B2's verdict)
+
+**Why.** Looking at the evidence text (not at any returns): Bonsai's research evidence is a transcript capped at about
+5,600 characters, split evenly across every tool result, and the first-look results (the oldest round) get squeezed
+first. So each result reaches Bonsai as its first ~400 characters: for the news page that is Yahoo's page header
+("NYSE - Nasdaq Real Time Price…"), and for the previous quarter's release it is the headline, never its outlook.
+Arm B's most promising field, `vs_prior_guidance` (+0.069 on 342 releases), was "not_stated" for 71% of releases.
+Also measured: the "news" pages are Internet Archive snapshots of Yahoo's quote page, often weeks old, with 2–3
+headlines among boilerplate.
+
+B3 keeps Jan's B2 research and Bonsai's frozen `PROMPT_R` and fields, and changes only how the 6,000 evidence
+characters are filled. Code builds them from the same as-of material, in this order:
+
+1. **Previous quarter's outlook (up to 2,000 chars):** the same company's previous earnings release (30–200 days
+   earlier, `previous_releases`), full text from SEC (missing ones fetched once, free). Code keeps the paragraphs
+   whose text matches `outlook|guidance|expects?|anticipates?|forecast|full[- ]year|fiscal (year )?20\d\d` AND a
+   number (a digit), in document order, preferring those after a heading line containing "Outlook" or "Guidance".
+   None found → the line "No outlook found in the previous release (<date>)."
+2. **News headlines (up to 1,200 chars):** from the cached as-of news page: lines of 25–200 characters that are
+   not boilerplate (a fixed list: "Yahoo", "Subscribe", "Real Time Price", "Currency in", "Trade prices",
+   "Fair Value", "actionable insight", "All rights reserved", "As of "), headed by the snapshot's date and its age
+   in days before the release. None → "No news headlines found."
+3. **Jan's own research (the rest):** Jan's rounds after the first look, as in B2 (same renderer), then Jan's
+   final reason if it gave one.
+
+- **Test, one trial (`llm_fields_research_b3`):** exactly arm B's rule: the 2025–26 monthly IC of
+  (full B3 − full A) has a 95% CI above 0 (paired monthly bootstrap) AND full B3's own IC CI is above 0, 5-day vs
+  sector. Reported, not deciding: 20-day, B3 − B2, `vs_prior_guidance` coverage and its own IC, and the share of
+  releases where step 1 or 2 found something.
+- **Runs after B2's labels** (one model on the GPU at a time). If B2 passes, B3 still runs and is reported; it
+  replaces B2 only if it passes AND B3 − B2 has a 95% CI above 0.
+
+### Arm B3 result (2026-09-28): **FAIL**, no better than the release alone
+
+Step 1 found an outlook for 73% of 2024 releases and 98% of 2025-26; step 2 found headlines for 80% / 81%.
+2025-26, monthly rank IC, 5-day vs sector (14 months, 1,177 releases):
+
+| | Mean IC | 95% CI |
+|---|---|---|
+| full A | +0.043 | [+0.005, +0.082] |
+| full B3 | +0.044 | [+0.003, +0.090] |
+| **B3 − A (deciding)** | **+0.001** | **[−0.032, +0.035]** |
+| B3 − B2 | −0.010 | [−0.048, +0.031] |
+| B3 on releases with news (953) | +0.046 | [−0.001, +0.096] |
+| `vs_prior_guidance` alone (510 stated) | +0.042 | [−0.070, +0.158] |
+| 20-day: B3 − A / B3 − B2 (reported) | −0.017 / −0.027 | [−0.069, +0.047] / [−0.068, +0.020] |
+
+- Own IC is above 0, but the deciding check (better than the release alone) is not: +0.001.
+- Getting last quarter's outlook to Bonsai worked mechanically (`not_stated` 859 → 669 of 1,180) but the field
+  still carries no clear signal.
+- Across B, B2 and B3 the research evidence adds between −0.017 and +0.011 IC over the release alone, every CI
+  spanning 0. Reading: in these fields, the release already holds what Bonsai can use; more pre-release evidence
+  does not help. The sleeve keeps its arm-A-based score (untested, 10%).
+
+### skfolio test (spec fixed 2026-09-27, before any run)
+
+Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capital cap?
+
+- **Arm S, one trial (`skfolio_cvar_risk_parity`):** same rebalance days as B0 (every 5th trading day, 2018-01-02 to
+  2026-09-25), same trend rule deciding which crypto assets are on, same simulator and costs. The assets are SPY plus
+  each crypto asset whose trend is on. Weights come from skfolio `RiskBudgeting` on CVaR (β = 0.95), equal risk
+  budgets, long only. They are fitted on the trailing 252 daily returns up to the rebalance day (at least 120; with
+  fewer, B0's weights that day), then scaled to sum to 0.98. No crypto capital cap: the test is whether risk sizing
+  beats the cap.
+- **Pass (the adding rule):** vol-matched CAGR above B0's AND the 90% block-bootstrap CI of the Sharpe difference above
+  0. Results with the drawdown brakes are reported but do not decide.
+- **Even on a pass, nothing trades** until the user changes `config/mandate.json` (the crypto cap is 20%).
+- **Stress test (descriptive, not a trial):**
+  1. Fit skfolio's `VineCopula` to weekly returns of SPY, BTC and ETH, 2018–2026.
+  2. Sample 20,000 weeks conditioned on (a) SPY −10% in the week and (b) BTC −25% in the week.
+  3. Report the frozen book's weekly loss at today's targets (SPY 78%, BTC 11.6%, ETH 8.4%): median and 5th percentile,
+     next to the worst historical weeks. This informs the maximum-drawdown decision; it changes nothing.
+- *Implementation note (2026-09-27, before any result was seen):* the first run stopped when the CVaR solver
+  (CLARABEL) failed on 2 of 194 fits (2018-03-01 and 2024-04-08, both with only BTC on). Those days use B0's weights,
+  the same fallback the spec gives for too little data. Nothing was registered by the stopped run.
+
+### skfolio result (2026-09-27): **FAIL, narrowly (a lead, like the 35% crypto cap)**
+
+| 2018–26 | CAGR | Vol | Sharpe | Max DD | Worst year |
+|---|---|---|---|---|---|
+| B0 (20% crypto cap) | 21.6% | 20.6% | 1.05 | 33.8% | −23.0% |
+| S (CVaR risk parity) | 27.0% | 22.7% | 1.17 | 33.9% | −26.1% |
+| S, vol-matched to B0 | 24.5% | 20.6% | 1.17 | 31.2% | −23.9% |
+
+- Sharpe difference +0.12, 90% CI [−0.01, +0.23]. The lower end is just below 0, so it fails the adding rule. With the
+  brakes: +0.10 [−0.04, +0.22].
+- When crypto is on, risk parity holds 28% crypto on average (up to 44%) instead of 20%. That is much of the gain, and
+  2018–26 was a good period for crypto, so part of the gain is hindsight.
+- 2 of 439 rebalances fell back to B0's weights (solver failures).
+- **Stress test (descriptive), frozen book at today's weights, weekly loss:**
+  - a week when SPY falls 10%: median −9.4%, 5th percentile −14.5%, 1st percentile −17.7%;
+  - a week when BTC falls 25%: median −6.3%, 5th percentile −12.0%;
+  - for comparison, the worst real week was −15.7% (13 Mar 2020) and the 1st-percentile real week −8.1%.
+
+### Arm C: more judgement for Bonsai (spec fixed 2026-09-27, before any extraction)
+
+The user asked for Bonsai to use more judgement. Bonsai gets it; code still checks it and decides how much it counts.
+
+- **Input:** the same as arm B (the release plus Jan's as-of research). **Prompt `PROMPT_J`:** arm B's prompt plus
+  four judgement fields. Bonsai writes a short `reason` first (up to 40 words weighing the good and the bad), then the
+  labels:
+  - `earnings_quality`: clean / flattered (the beat leans on one-offs, tax, share count or adjustments) / not_clear;
+  - `outlook_tone`: confident / cautious / not_stated;
+  - `net_read`: bullish / neutral / bearish, Bonsai's own weighed call for the next few weeks, quoting the ONE sentence
+    that matters most;
+  - `conviction`: high / low.
+- **Code keeps the last word.** Every non-default label needs a quote found word for word in the release or the
+  evidence, or it falls back to the default. The ridge learns on 2024 how much each label is worth; it is scored on
+  2025–26.
+- **Quality gate, before the full run (quality only, no returns):** on the same 100 dev releases, parse rate ≥ 0.95 and
+  verified-quote share ≥ 0.85. If the gate fails, the run stops and nothing is extracted.
+- **Pass, one trial (`bonsai_judgement_fields_code`):** the 2025–26 monthly rank IC of (C − B) has a 95% CI above 0
+  (paired monthly bootstrap) AND C's own IC CI is above 0, on 5-day returns vs sector. Reported but not deciding:
+  20-day returns, C against C without its judgement fields, and `net_read` alone.
+- **Runs after the current Jan → Bonsai run** (one model on the GPU at a time): `scripts/bonsai_judgement_run.sh`.
+
+### Arm C result (2026-09-28): **FAIL**
+
+Quality gate passed; 1,995 + 1,180 releases labelled. 2025–26, monthly rank IC (14 months, 1,177 releases):
+
+| | 5-day, mean IC | 95% CI | 20-day, mean IC | 95% CI |
+|---|---|---|---|---|
+| B (for reference) | +0.050 | [−0.007, +0.107] | +0.030 | [−0.039, +0.102] |
+| C | +0.029 | [−0.020, +0.087] | +0.014 | [−0.047, +0.081] |
+| **C − B (deciding)** | **−0.022** | **[−0.065, +0.025]** | −0.017 | [−0.073, +0.034] |
+| judgement fields within C | −0.024 | [−0.052, +0.005] | −0.015 | [−0.060, +0.020] |
+| `net_read` alone (reported, not deciding) | +0.067 | [+0.002, +0.136] | +0.056 | [+0.014, +0.096] |
+
+- **Neither pass check holds.** Adding the four judgement fields to the ridge made it slightly worse: the ridge fitted
+  on 2024 gives them weights that don't carry to 2025–26.
+- **Caveat:** C reused arm B's evidence, so it had the same news gap (Jan had news for 5% of 2024 releases).
+- **`net_read` alone** (Bonsai's own bullish/neutral/bearish call, unfitted) is positive at both horizons. It was one
+  of three non-deciding diagnostics, picked after seeing them, on the same 2025–26 data. So it is **not a pass** and
+  can't be tested again on that data. Its honest test is new data: see "Arm C2" below.
+
+### Arm C2: `net_read` on new data only (spec fixed 2026-09-28, after arm C, before any live `net_read` exists)
+
+- **What:** the live event runner already has Bonsai read each new release; C2 adds arm C's `PROMPT_J` fields to that
+  read (same prompt, same quote check) and records `net_read` next to the forward ledger
+  (`<events dir>/net_read.jsonl`, `scripts/net_read_shadow.py`, run after each event run). No money, a shadow only.
+  The live runner has no Jan research, so the evidence part says none was found (as for most of arm C's 2024 sample).
+  A label written at or after the release's entry deadline is kept but never scored.
+- **Score, no fitting:** bullish = +1, neutral = 0, bearish = −1 (a failed quote check = neutral).
+- **Pass (one trial, `net_read_forward`), judged at the first review with at least 150 live scored releases and
+  3 months:** the monthly rank IC vs 5-day sector-relative returns has a mean above 0.02 and an 80% one-sided
+  bootstrap bound above 0, AND it adds to the live Bonsai log-odds (the blend-gain test of the learning loop).
+- **Until then it changes nothing** in the book. It can also enter via B2 if B2 passes (B2 decides first).
+
+### Disagreement test: Bonsai vs the market's first reaction (spec fixed 2026-09-27, before any run)
+
+**Why this form.** Plain post-earnings drift was measured before (`eval_baseline.txt`) and is absent in the S&P 500:
+the earnings-day reaction vs the next 20 days has an IC of −0.016 and −0.034 in the two samples. So the test asks a
+narrower question: when Bonsai reads a release much better or worse than the market's first reaction, does the price
+move back toward Bonsai's view?
+
+- **Signal, code only, no fitting:** D = rank(Bonsai's 1-week log-odds) − rank(earnings-day reaction vs sector ETF),
+  both as percentiles within the entry month. The reaction is the stock's move vs its sector ETF on the first trading
+  day the release is public (`ear` in event_eval.build).
+- **Outcome:** the excess return vs the sector ETF over the 20 trading days after the reaction day (`fwd20_ear`). It
+  starts at the next open, so it does not overlap the reaction or Bonsai's 1-week horizon start.
+- **Samples:** 2024 (1,995 releases) and 2025–26 (1,180). With nothing fitted, both are out of sample.
+- **Pass (one trial, `disagreement_bonsai_vs_reaction`), all three needed:**
+  1. the monthly rank IC of D over 2024–26 pooled has a 95% CI above 0;
+  2. the mean IC is positive in each period separately;
+  3. the top-minus-bottom fifth of D, net of 0.4% (20 bps each way on each leg), has a 90% monthly-bootstrap CI
+     above 0.
+- **Reported, not deciding:** Bonsai alone and the reaction alone on `fwd20_ear`, and D over 60 days.
+
+### Disagreement result (2026-09-27): **FAIL, clearly**
+
+| 20 days after the reaction day | Mean IC | 95% CI |
+|---|---|---|
+| D, pooled 2024–26 (3,145 releases, 26 months) | +0.010 | [−0.046, +0.066] |
+| D, 2024 / 2025–26 | −0.000 / +0.018 | — |
+| Bonsai alone | +0.018 | [−0.034, +0.067] |
+| Reaction alone | −0.003 | [−0.068, +0.057] |
+
+- Net top-minus-bottom fifth: +0.24% per 20 days, 90% CI [−0.61, +1.07].
+- **None of the three checks passes.** Past the first week, neither Bonsai's read, the market's reaction nor their
+  disagreement predicts large-cap returns. Whatever Bonsai knows gets priced within days, which fits the 1-week IC of
+  +0.10 fading to about 0 at 20 days.
+
+### 8-K breaking-news watcher (spec fixed 2026-09-27, before any text is read or any return computed)
+
+**Question:** can Bonsai read non-earnings news filings (deals, restructurings, leadership changes, distress) and tell
+good from bad well enough to trade the next week?
+
+- **Events:** `data/events/news8k_2024-01-01_2026-09-24.csv` from `scripts/build_8k_events.py`. These are 8-Ks
+  (not amendments) from S&P 500 members (as of Jan 1 of the year) with a news item and no Item 2.02:
+  - distress: 4.02, 3.01, 2.04, 1.03;
+  - restructuring: 2.05, 2.06;
+  - deal: 1.01, 2.01, 1.02;
+  - leadership: 5.02.
+  Items 7.01 and 8.01 on their own are left out (too broad).
+- **Input:** the filing's own text plus its press-release exhibit, if any (first 6,000 characters). The acceptance time
+  sets the entry: the next market open.
+- **Bonsai (W1):**
+  - a short `reason` first, then `direction` (positive / neutral / negative for the stock over the next week vs its
+    sector) and `size` (major / minor), each with a quote;
+  - code keeps a non-neutral label only if its quote is found word for word in the text.
+  - **Score, code only, nothing fitted:** direction (+1 / 0 / −1) × (2 if major, else 1).
+- **Quality gate first** (quality only, no returns): on 100 filings from 2024, parse rate ≥ 0.95 and verified-quote
+  share ≥ 0.85. If it fails, stop.
+- **Outcome:** the 5-day excess return vs the sector ETF from the entry open (the same `fwd5` as the earnings book).
+- **Pass (one trial, `news8k_bonsai_direction`), all three needed:**
+  1. the pooled 2024–26 monthly rank IC has a 95% CI above 0;
+  2. the mean IC is positive in 2024 and in 2025–26 separately;
+  3. long score > 0 minus short score < 0, per month, net of 0.4% (20 bps each way on each leg), has a 90%
+     monthly-bootstrap CI above 0.
+- **Reported, not deciding:** IC by category, and 20-day returns.
+- **W1 verdict (27 Sep): stopped at the quality gate, as pre-registered.** On the 100 dev filings: parse rate 0.97
+  (gate 0.95) but verified-quote share 0.826 (gate 0.85). Nothing was labelled and no return was looked at, so no
+  trial is registered. The 8-K watcher does not go into the forward test.
+- **W2 (Jan's research added) runs only if arm B passes tonight.** Otherwise research has failed four times, and W2
+  would be a fifth try at the same idea.
+
+### AI-picks paper sleeve (rules fixed 2026-09-28, before the forward test's first release)
+
+The user decided on 28 Sep that Jan and Bonsai should pick specific stocks on paper from 5 Oct, whether or not a
+version has passed its backtest, as a capped sleeve, and that a passing arm replaces its score when one passes.
+**No version has passed.** The sleeve is labelled "untested" everywhere it is shown.
+
+- **Size:** 10% of the paper account. The master book (SPY + crypto trend) keeps the other 90%: the broker mirror
+  plans it on 90% of the account's equity. Simulated sleeve capital: $10,000.
+- **Score and pick rule:** the live event score (Bonsai's 1-week log-odds; `source = bonsai` only, "lite" decisions
+  are never traded). Pick when log-odds ≥ **2.873**, the top fifth of the 2025–26 history
+  (`factsheet_secchk`). History of this exact rule, 5-day return vs the sector ETF per pick:
+  2024 −0.03% (275 picks), 2025–26 +1.20% (236 picks). It did not work in 2024.
+- **Trade:** long the stock and short its sector ETF, the same dollar amount (one fifth of the sleeve's equity at
+  entry), so the sleeve earns exactly what the tests measure. Enter at the release's entry open (a market-on-open
+  order sent by the 08:45 ET run), exit at the open 5 trading days later. At most 5 pairs open; a pick that finds no
+  free slot is logged as skipped. Whole shares; a pick whose stock costs more than a slot is skipped.
+- **Costs in the simulator:** 0.20% per leg each way (0.8% per pair round trip).
+- **Brakes:** the sleeve opens no new pairs while its drawdown is 25% or more; the kill switch and REDUCING state
+  of the master book apply to it too.
+- **Replacement:** if an arm passes (B2, B3...), its score and its own top-fifth threshold (from its 2025–26 scores)
+  replace these from the next run, and the change is logged.
+- **Review:** after 3 months or 60 closed pairs, whichever is later: continue only if the mean net return per pair
+  has an 80% bootstrap bound above 0; otherwise the sleeve stops and its 10% goes back to the master book.
+- **Replay of these exact rules** (day by day, two runs a day, slots and costs included; not a test, the rules were
+  not changed after it): 2024 **−13.2%** (101 pairs, −0.74% each, max drawdown 19.8%); 2025–26 **+8.6%** (131 pairs,
+  +0.41% each, max drawdown 9.8%). In earnings season the 5 slots fill and later picks are skipped.
+
+### Arm D: the AI-build-out lens (spec fixed 2026-09-28, before any live release is read with it)
+
+The user asked for the AIs to think like Leopold Aschenbrenner ("Situational Awareness", 2024): AI capability scales
+with compute, so spending on chips, datacenters, networking, power and the grid grows far faster than expected, and
+companies selling into that build-out gain for years.
+
+- **Prompt `PROMPT_AI`** (scripts/llm_fields.py, fixed): the view in five lines, then two fields with the same quote
+  check as every other arm: `ai_exposure` (beneficiary / neutral / hurt) and `ai_read` (bullish / neutral / bearish
+  for the next few weeks under this view). Score: bullish +1, neutral 0, bearish −1.
+- **Forward only, never backtested on 2024–26.** The thesis is famous because it worked in exactly those years
+  (Nvidia, power producers), and Bonsai may have learned those outcomes; a backtest would be flattered. It is judged
+  only on live releases, like C2: `scripts/net_read_shadow.py` labels each live decision before its entry deadline
+  into `<events dir>/ai_lens.jsonl`, no money.
+- **Pass (one trial, `ai_lens_forward`), at the first review with at least 150 scored releases and 3 months:** the
+  monthly rank IC of `ai_read` vs 5-day sector-relative returns has a mean above 0.02 and an 80% one-sided bootstrap
+  bound above 0, AND it adds to the live Bonsai log-odds (the learning loop's blend-gain test).
+- Note: this lens is about next-week earnings reactions. The view itself is a multi-year theme; a thematic sleeve
+  would need its own design and test.
+
+### Arm E: bull/bear thesis (spec fixed 2026-09-28 ~18:00, before any live release is read with it)
+
+The user asked for a bull/bear thesis. Bonsai argues both sides of each live release before it decides.
+
+- **Prompt `PROMPT_BB`** (scripts/llm_fields.py, fixed): up to 3 bull points and up to 3 bear points, each a short
+  point with a quote copied word for word. The prompt says to make each case in earnest, even when the release
+  clearly favours the other side. Then a weighed `reason` and `bb_read` (bullish / neutral / bearish), with the usual
+  quote check. Score: bullish +1, neutral 0, bearish −1. Each point is stored with `verified` (quote found in the
+  text or not); unverified points are shown, marked, and never scored.
+- **Forward only**, like C2 and D (a judgement Bonsai could flatter with hindsight on 2024–26):
+  `scripts/net_read_shadow.py` labels each live decision before its entry deadline into
+  `<events dir>/bull_bear.jsonl`, no money. The dashboard's AI PICKS tab shows each pick's thesis.
+- **Pass (one trial, `bull_bear_forward`):** C2's and D's rule. At the first review with at least 150 scored releases
+  and 3 months, the monthly rank IC of `bb_read` vs 5-day sector-relative returns has a mean above 0.02 and an 80%
+  one-sided bootstrap bound above 0, AND it adds to the live Bonsai log-odds (the learning loop's blend-gain test).
+- **Quality check before going live** (10 random releases, quality only, no returns): parsed 10/10, every release has
+  both sides, 53 of 60 point quotes verified; about 8 seconds per release.
+
+### Day-trading track (spec fixed 2026-09-28, before any intraday data was downloaded)
+
+Data: Alpaca's free historical SIP 1-minute bars (full market, 2016 onward), regular hours only, cached once.
+Universe: SPY and QQQ (the most liquid; one trade a day per symbol fits the pattern-day-trader rule's spirit).
+Costs: 1 bp per side (2 bps a round trip); also reported at 5 bps a side. No leverage: each trade is 1× the track's
+capital. Two published rules, each tested only on data AFTER its publication, each its own trial:
+
+- **D1, intraday momentum** (Gao, Han, Li and Zhou, *Journal of Financial Economics* 2018): the return from the
+  previous close to 10:00 ET predicts the last half hour. Rule: at 15:30 ET, go long if that return is positive,
+  short if negative; exit at the 15:59 bar's close. Test window: 2019-01-02 to 2026-09-25 (after publication).
+  Trial `daytrade_intraday_momentum`.
+- **D2, 5-minute opening-range breakout** (Zarattini and Aziz, SSRN 2023): after the first 5-minute bar, go long
+  if it closed up, short if down, at 09:35; stop at the other end of that first bar; otherwise exit at 15:59. No
+  trade if the first bar is flat. Test window: 2023-07-01 to 2026-09-25 (after publication); 2016–2023 is
+  reported only. Trial `daytrade_orb5`.
+- **Pass (each):** on its test window, at 2 bps a round trip, the annualized Sharpe of the daily P&L (SPY and QQQ,
+  equal capital) is at least 0.5 AND its 95% block-bootstrap CI (21-day blocks) is above 0. Reported, not deciding:
+  5 bps costs, each symbol alone, correlation with the core book, worst month.
+- **Then:** a passing rule goes to paper as "untested" (the planner's 10% rung) only after 1 month of clean dry runs,
+  and earns more weight only by the evidence ladder (3 months of forward paper results).
+
+### Day-trading round 2: D3 and D4 (spec fixed 2026-09-28 ~19:30, after D1/D2 failed, before any D3/D4 code ran)
+
+Why round 1 failed: before costs both rules earned about 0 a day (D1 was already negative in 2016–18, before its
+test window), so any cost made them lose. Round 2 tests two newer published rules that trade only on stronger
+signals. Same data, universe, costs, pass rule and windows-after-publication discipline as D1/D2; each its own trial.
+
+- **D3, "noise area" breakout with a VWAP stop** (Zarattini, Aziz and Barbon, "Beat the Market", SSRN May 2024),
+  as we read it, at 1× (the paper's volatility-sized leverage is left out, as in D1/D2):
+  - For each minute of the day, σ(minute) = mean over the previous 14 trading days of |price at that minute / that
+    day's open − 1|.
+  - Upper bound = max(today's open, yesterday's close) × (1 + σ); lower bound = min(today's open, yesterday's
+    close) × (1 − σ).
+  - Checks at 10:00, 10:30, …, 15:30 (the price is the close of the minute before). Flat: above the upper bound →
+    long, below the lower bound → short, at the next bar's open. Long: exit if price is below max(upper bound,
+    VWAP since 09:30); short: exit if above min(lower bound, VWAP). A position can be re-opened at a later check.
+    Everything is closed at the 15:59 close. Cost: 1 bp per side per entry and per exit.
+  - Test window: 2024-06-01 to 2026-09-25 (about 580 days; short, so its CI will be wide). Trial `daytrade_noise_vwap`.
+- **D4, market intraday momentum, rest-of-day signal** (Baltussen, Da, Lammers and Martens, *Journal of Financial
+  Economics*, October 2021): the return from yesterday's close to 15:30 (the close of the 15:29 bar) predicts the
+  last half hour. Rule: at 15:30 go long if positive, short if negative; exit at the 15:59 close. Test window:
+  2021-11-01 to 2026-09-25. Trial `daytrade_rod_momentum`.
+- **Pass (each):** as D1/D2 (Sharpe ≥ 0.5 and 95% block-bootstrap CI above 0 at 1 bp a side, SPY and QQQ equal
+  capital). Reported: 5 bps, each symbol, trades per week (the pattern-day-trader rule allows 3 per 5 days under
+  $25k), and the before-window.
+- **If one passes:** it would trade micro index futures (MES/MNQ, not subject to the pattern-day-trader rule) in
+  the simulator, after a month of clean dry runs, then by the evidence ladder.
+
+### Day-trading round 3: D5 end-of-day reversal (spec fixed 2026-09-28 ~20:00, before any stock-level intraday data was downloaded)
+
+Why this one: every failed rule (D1–D4) bet on the index's direction. D5 is market-neutral and cross-sectional,
+with a stated structural cause the authors test (attention-driven retail buying of the day's losers and short-sellers
+cutting risk before the close), which arbitrage does not easily remove.
+
+- **Rule** (Baltussen, Da and Soebhag, "End-of-Day Reversal", EFMA 2024; April 2025 version), on 30-minute bars
+  (Alpaca's free SIP feed, split-adjusted), for S&P 500 stocks:
+  - Signal ROD3 = yesterday's close to the 15:00 price (the close of the 14:30 bar). The 15:00–15:30 half hour is
+    skipped, as in the paper.
+  - At 15:30: long the 10% of stocks with the lowest ROD3, short the 10% with the highest, equal weight, dollar
+    neutral (each side = the track's capital × 0.5). Entry at the 15:30 bar's open, exit at its close (the last
+    trade before 16:00).
+  - Universe: the S&P 500 companies with an earnings release in 2024 in our event history (the membership near the
+    start of the test window). Needs 20 or more stocks with both prices that day; days without a 15:30 bar (half
+    days) are skipped.
+  - Costs: 1 bp per side per stock (large caps near the close); also reported at 3 bps.
+- **Test window: 2024-07-01 to 2026-09-25** (after the EFMA 2024 presentation). Reported, not deciding: 2016-01 to
+  2024-06 (inside the paper's sample; survivorship-biased because the universe is the 2024 list).
+- **Pass (trial `daytrade_eod_reversal`):** as D1–D4 (annualized Sharpe of the daily P&L ≥ 0.5 and its 95%
+  block-bootstrap CI above 0, at 1 bp a side). Reported: 3 bps, long and short legs apart, correlation with the core.
+- **If it passes:** a live paper shadow first (orders at 15:30, market-on-close exits) for 1 month of clean dry
+  runs, then the evidence ladder.
+- **Clarification (2026-09-28 ~21:30, before the full download and before any D5 result):** Alpaca returns
+  after-hours prints in the 14:30 and 15:30 slots of half days (e.g. 3 Jul 2024: 115 stocks, median 6 trades per
+  bar, vs 5,000-7,000 on regular days), so "days without a 15:30 bar are skipped" is implemented as: a day whose
+  median 15:30-bar trade count is under 100 is a half day and is dropped before anything is computed (it is also not
+  used as "yesterday's close"). Checked only on three known half-day weeks (Jul 2024, Thanksgiving 2024 and 2016).
+  The download fetches each trading day's 14:30-16:00 window for all stocks at once.
+
+- **Result (run once, 2026-09-28 ~23:00): FAIL.** Test window 2024-07-01..2026-09-25, 556 days, median 490 stocks:
+  Sharpe **−1.86** [−3.65, +0.08] at 1 bp a side, CAGR −3.4%, hit rate 44%; at 3 bps Sharpe −7.28. Before the
+  window (2016-01..2024-06, reported only): Sharpe −1.75 at 1 bp. Legs (gross, bp a day): long −0.13, short +1.39.
+  Correlation with the core −0.04. Diagnostic, not deciding: before costs the reversal is there but small, +0.99 bp
+  a day in 2016-24 (gross Sharpe 1.73) and +0.63 bp after publication (0.85 [−0.77, 2.76]); a round trip on both
+  legs costs 2 bp a day at 1 bp a side, so costs take all of it. In S&P 500 names at a 30-minute resolution the
+  effect is about a tenth of the paper's all-stock size. Day trading stays paused; no variant of D5 will be tried.
+
+### Arm F: a self-improving Bonsai (spec fixed 2026-09-28 ~20:00, before any code)
+
+The user asked for Bonsai's decision-making to improve itself. The honest version is a champion/challenger loop on
+the live bull/bear lens (arm E), where fast 5-day outcomes give feedback every week, and where only matured outcomes
+are ever shown to Bonsai.
+
+- **Champion:** starts as arm E's frozen prompt (`PROMPT_BB`, version 0). Arm E's own pass test always uses version
+  0 and is never changed by this loop.
+- **Reflection (monthly, with the long-term schedule):** code collects the champion's matured labels (5-day
+  sector-relative outcome known), up to the 80 most recent, and writes a summary: each label's count and average
+  outcome, then the 15 worst misses (bullish calls with the most negative outcomes, bearish with the most positive)
+  with their bull/bear points and reason. Bonsai reads it and writes at most 5 general lessons (each at most 30
+  words). Code drops any lesson naming a company or ticker in the universe. The challenger's prompt is the
+  champion's prompt plus "Lessons from your past calls:" and the lessons. Needs at least 40 matured labels;
+  otherwise no challenger that month.
+- **Challenger:** runs beside the champion on every live release after it was made (one more Bonsai call per
+  release, no money). One challenger at a time; each is its own registered trial (`bb_selfimprove_v<n>`).
+- **Promotion:** once the challenger has 100 or more paired scored releases over at least 2 months: the paired
+  monthly IC of (challenger − champion) has a mean above 0 and an 80% one-sided bootstrap bound above 0 → the
+  challenger becomes the champion. A challenger with 200 paired releases and no promotion is retired. The next
+  reflection makes a new one from the current champion.
+- **What it can change:** only the shadow champion. It reaches the event score only through the same test as any
+  lens (150 releases, 3 months, IC > 0.02, blend gain). Every version, lesson and decision is logged.
+
+### Day-trading result (2026-09-28): **both rules FAIL**
+
+| Rule, test window (after publication) | Sharpe at 2 bps | 95% CI | CAGR | at 10 bps | hit rate |
+|---|---|---|---|---|---|
+| D1 intraday momentum, 2019-01 to 2026-09 (1,939 days) | **−1.00** | [−2.22, −0.08] | −5.3% | −4.79 | 44% |
+| D2 5-minute ORB, 2023-07 to 2026-09 (812 days) | **−0.24** | [−1.40, +0.62] | −1.8% | −3.26 | 28% |
+
+- Reported: D1 before its window (2016–18) Sharpe −1.42; D2 before its window (2016–23) +0.05. Correlation with the
+  core book: 0.01 and 0.06.
+- Checked for a bug: the raw edge (the sign of the morning return times the last half hour) is about 0 bp a day in
+  every period and both symbols (−0.6 to +0.7 bp), against 2 bp of costs. The published effects are gone after
+  publication. D1's CI is entirely below 0.
+- The day-trading track stays at 0%. Any next rule needs its own pre-registration; the planner shows it as failed.
+
+### Day-trading round 2 result (2026-09-28): **both FAIL**
+
+| Rule | Test window | Sharpe (1 bp a side) | 95% CI | CAGR | Trade days / week | 5 bps Sharpe |
+|---|---|---|---|---|---|---|
+| D3 noise area + VWAP stop | 2024-06 → 2026-09 (581 days) | +0.20 | [−1.24, +1.20] | +1.2% | 3.4 | −2.46 |
+| D4 rest-of-day momentum | 2021-11 → 2026-09 (1,227 days) | −1.21 | [−2.13, −0.33] | −5.1% | 5.0 | −5.98 |
+
+- D3 worked before its publication: 2016 to May 2024, Sharpe +0.75 [+0.20, +1.31] (reported, not deciding). After
+  publication it fell to +0.20 (QQQ +0.72, SPY −0.62), well short of the pass bar. That is the pattern of a
+  published edge being traded away, the same as D1. Its window is short, so this is weak evidence either way.
+- D4, the hedging-demand version of intraday momentum, loses as D1 did (−1.21), and was already below 0 before its
+  publication (−0.26).
+- Four published day-trading rules have now failed after publication. The track stays at 0%. A fifth rule would
+  need a reason to expect it to survive publication (e.g. a structural cause that cannot be arbitraged), stated
+  before it is tested.
+
+**Correction (2026-09-28):** the pattern-day-trader rule mentioned above no longer applies. The SEC approved
+FINRA's Rule 4210 amendments on 14 Apr 2026, effective 4 Jun 2026: no $25k minimum and no day-trade count;
+intraday margin is checked in real time, and a margin account needs $2,000. Alpaca adopted the new framework on
+4 Jun 2026. The account-size limit on this track is gone; the results above are unchanged, since they never
+depended on it.
+
+### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
+
+Jan and Bonsai pick S&P 500 stocks to hold for 3 months. **Forward-only:** Bonsai was trained on text that covers
+2024–26, so a backtest of its stock picks on those years would be flattered.
+
+- **Candidates:** every S&P 500 company with an earnings release in the last 100 days (its latest release on disk).
+- **Company card, built by code:** the latest release's first 4,000 characters, the previous quarter's outlook
+  (arm B3's extractor), 12-month and 1-month returns vs SPY, and (once they exist) the live lens labels.
+- **Bonsai reads each card** with a fixed prompt (`PROMPT_LT`): a 3-to-6-month view, `outlook_6m` from 1 (much
+  worse than the market) to 5 (much better), with a quoted reason; an unverified quote counts as 3.
+- **Picks:** on the first trading day of each month, the 10 highest ratings (ties: better 12-month return vs SPY
+  first), equal weight, held 3 months (three overlapping monthly cohorts). Scored vs SPY, costs 0.2% per side.
+- **Machinery gate:** a shadow at 0% for its first month. Then the planner's 10% "untested" rung.
+- **Pass (trial `longterm_picks_forward`), judged after 12 monthly cohorts have closed:** the mean cohort excess
+  return vs SPY after costs is positive with an 80% one-sided bootstrap bound above 0.
+
+**Change before the first cohort (2026-09-28 ~18:00, no pick made yet):** at the user's request, `PROMPT_LT` now
+has Bonsai write a bull case and a bear case (up to 3 quoted points each, same form as arm E) before it weighs
+them and rates. The rating field, the quote check, the pick rule and the pass rule are unchanged; the theses are
+stored with each rating and shown on the dashboard. Quality check (10 random cards, quality only): parsed 10/10,
+both sides on every card, 54 of 60 quotes verified; 9 of 10 cards rated 4. Time: about 8 seconds per card (was 3),
+so a monthly cohort of about 490 cards takes about 70 minutes of GPU time.
+
+### Theme track and AI-bubble gauge (spec fixed 2026-09-28 ~18:45, before any cohort was made)
+
+The user asked for the AI to weigh investment directions by horizon (long-term: biotech, quantum computing;
+medium: hyperscalers) and risks such as an AI bubble. **Forward-only:** Bonsai knows how these themes did in 2024–26.
+
+- **Themes (fixed, `app/portfolio/themes.py`):**
+  - Medium, held 6 months (126 trading days): hyperscalers (equal-weight MSFT, AMZN, GOOGL, META, ORCL), semis
+    (SMH), power and grid (GRID), software (IGV), cybersecurity (CIBR), utilities (XLU).
+  - Long, held 12 months (252 trading days): biotech (XBI), quantum computing (QTUM), nuclear (NLR), robotics
+    (BOTZ), space (UFO), solar (TAN), batteries and lithium (LIT).
+  - AI-linked: hyperscalers, semis, power and grid.
+- **Cards, all numbers computed by code** from data dated before the run: 1/3/12-month return vs SPY, drawdown from
+  the 12-month high, price vs its 200-day average, 12-month volatility, and the market risk register:
+  - hyperscaler capex over the last 4 quarters and its growth vs a year earlier, and capex as a share of operating
+    cash flow (SEC filings);
+  - market concentration: SPY minus RSP over 12 months;
+  - SMH vs its trend;
+  - high-yield spread and its 3-month change, and VIX (FRED).
+- **Bonsai (`PROMPT_RISK`, `PROMPT_TH`):** for the register and for each theme it argues bull and bear first (up to
+  3 quoted points each), then rates. The register gets `bubble_risk` (low / elevated / high); each theme gets
+  `theme_outlook` (1–5). The usual quote check applies; an unverified quote counts as the middle answer.
+- **Picks, monthly** (the long-term picks' schedule):
+  - Per horizon, up to 2 themes rated 4 or 5 (ties: better 12-1 month momentum vs SPY).
+  - When `bubble_risk` is high, AI-linked themes are left out.
+  - No theme qualifies → that horizon stays in SPY (0 excess, no cost).
+  - Equal weight; ETF cost 0.1% per side.
+- **Code-only yardstick, recorded beside each cohort:** the 2 themes per horizon with the best 12-1 month momentum.
+- **Pass (trial `themes_forward`), judged after 12 medium cohorts have closed (about 18 months):**
+  - the mean excess vs SPY after costs is above 0 with an 80% one-sided bootstrap bound above 0;
+  - AND it is above the momentum yardstick's mean.
+  - Long cohorts are judged the same way after 12 have closed.
+  - Cohorts overlap, so the bootstrap overstates certainty; the result is read with that caveat.
+- **The bubble cap itself is not proven.** Bubbles are rare, so a few years of data can't test the gauge. It stays
+  a shadow rule, reported on the dashboard. It changes no money in the master book, whose drawdown brakes stay the
+  tested risk control.
+- **Quality check** (today's cards; quality only, no returns):
+  - Replies read: 14/14. Point quotes verified: 69 of 84. Run time: 95 seconds.
+  - `bubble_risk`: high ("capex growth is extreme and semiconductor prices are stretched").
+  - Picks today would be: medium none (the AI-linked themes were capped; the rest were rated 3 or lower), long
+    biotech and quantum.
+
+**Second change before the first cohort (2026-09-28 ~21:00, no pick made yet): ties broken by Bonsai's own
+probabilities.** A full rehearsal (clock set to 1 Oct, scratch folder) rated all 10 picks 4, so the 12-month-return
+tie-break chose them (5 of 10 were chip makers). Now each rating also gets a score: Bonsai's next-token
+probabilities for 1–5 at the point where it wrote its rating (its own reply up to the label, continued once), as
+a probability-weighted rating. Picks are ordered by that score, then by 12-month return. The same applies to the
+theme ratings (a theme still needs a rating of 4 or 5). A rating the quote check reset to 3 keeps 3.0. Checked on
+24 real cards: identical ratings, probabilities found for 21 (the other 3 were quote-check resets), scores
+among the 4s spread from 3.63 to 4.03. Parallel requests (3 / 6 / 8) gave the same answers and no speed-up (about
+9.5 s per card), so the monthly run stays at about 65–75 minutes.

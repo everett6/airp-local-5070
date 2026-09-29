@@ -2,6 +2,9 @@
 
     python scripts/forward_allocator.py            # fetch prices, fill last run's orders, decide, log, git commit
     python scripts/forward_allocator.py --status   # print the ledger so far, change nothing
+    python scripts/forward_allocator.py --halt "reason"   # kill switch on: later runs mark the books, trade nothing
+    python scripts/forward_allocator.py --reduce "reason"  # reduce-only: positions may shrink, never grow
+    python scripts/forward_allocator.py --resume   # kill switch off (the only way to turn it off)
 
 Paper money only. Free Yahoo prices. Nothing runs on its own (no service, no timer). Each run appends one line to
 results/forward/allocator/ledger.jsonl and saves the books in state.json; both are committed to git by the run itself
@@ -16,16 +19,19 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
+import httpx
 import pandas as pd
 import yfinance as yf
 
+from app.data_ingestion import bars
 from app.portfolio.forward import books_from_json, books_to_json, new_books, step
+from app.portfolio.guard import HALT, apply_drawdown_limit, halt, halt_info, state
 from app.portfolio.master import MasterConfig
 from app.sandbox.events import Prices
 
@@ -33,14 +39,39 @@ DIR = BACKEND / "results" / "forward" / "allocator"
 ASSETS = ("SPY", "BTC-USD", "ETH-USD")
 
 
+SOURCES: dict[str, str] = {}
+
+
+def fallback(t: str, start: date, end: date) -> tuple[pd.DataFrame, str]:
+    """When Yahoo returns nothing: Binance's public klines for crypto; for SPY, Alpaca (IEX feed) then Polygon, if the
+    user has put their own free keys in backend/.env. The source used is written into the run's ledger record."""
+    tries = [("binance", bars.binance_daily)] if t in bars.BINANCE_PAIRS else [("alpaca-iex", bars.alpaca_daily),
+                                                                              ("polygon", bars.polygon_daily)]
+    why = []
+    for name, fn in tries:
+        try:
+            df = fn(t, start, end)
+            if not df.empty:
+                return df, name
+            why.append(f"{name}: empty")
+        except (bars.NoKeyError, httpx.HTTPError) as e:
+            why.append(f"{name}: {e}")
+    raise SystemExit(f"no prices for {t} from Yahoo or any fallback ({'; '.join(why)}); try again later")
+
+
+REAL_BOOK = ("master+brakes", "master")  # the book the drawdown limit watches (the first one present)
+
+
 def fetch(now: datetime) -> Prices:
     frames = []
+    start, end = (now - timedelta(days=400)).date(), (now + timedelta(days=1)).date()
     for t in ASSETS:
-        df = yf.download(t, start=(now - timedelta(days=400)).date().isoformat(),
-                         end=(now + timedelta(days=1)).date().isoformat(), auto_adjust=True, progress=False,
+        df = yf.download(t, start=start.isoformat(), end=end.isoformat(), auto_adjust=True, progress=False,
                          multi_level_index=False)
+        SOURCES[t] = "yahoo"
         if df.empty:
-            raise SystemExit(f"no prices for {t} from Yahoo; try again later")
+            df, SOURCES[t] = fallback(t, start, end)
+            print(f"Yahoo had no prices for {t}; using {SOURCES[t]}")
         frames.append(df[["Open", "High", "Low", "Close", "Volume"]].assign(Ticker=t))
     long = pd.concat(frames).rename_axis("Date").reset_index()
     long["Date"] = pd.to_datetime(long["Date"]).dt.date.astype(str)
@@ -63,9 +94,33 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--no-commit", action="store_true")
+    ap.add_argument("--dir", default="", help="a separate books/ledger folder for dry runs (never the real books)")
+    ap.add_argument("--halt", metavar="REASON", help="turn the kill switch on and exit")
+    ap.add_argument("--reduce", metavar="REASON", help="reduce-only mode on and exit")
+    ap.add_argument("--resume", action="store_true", help="turn the kill switch off and exit")
     args = ap.parse_args()
+    global DIR
+    dry = bool(args.dir)
+    if dry:
+        DIR = BACKEND / args.dir
+        if DIR.resolve() == (BACKEND / "results" / "forward" / "allocator").resolve():
+            raise SystemExit("--dir is for dry runs: give it a folder of its own")
     if args.status:
         status()
+        print("kill switch:", halt_info() or "off")
+        return
+    if args.halt:
+        halt(args.halt, by="forward_allocator.py --halt")
+        print("kill switch ON:", halt_info())
+        return
+    if args.reduce:
+        halt(args.reduce, by="forward_allocator.py --reduce", mode="REDUCING")
+        print("trading state:", state(), halt_info())
+        return
+    if args.resume:
+        info = halt_info()
+        HALT.unlink(missing_ok=True)
+        print("kill switch OFF" + (f" (was: {info})" if info else " (it was not on)"))
         return
     DIR.mkdir(parents=True, exist_ok=True)
     state_path, ledger = DIR / "state.json", DIR / "ledger.jsonl"
@@ -76,12 +131,23 @@ def main() -> None:
         if last["run_at_utc"][:10] == now.date().isoformat():
             raise SystemExit(f"already ran today ({last['run_at_utc']}); run again on a later day")
     p = fetch(now)
-    rec = step(books, p.open, p.close, now, MasterConfig())
+    mode = state()
+    if mode != "ACTIVE":
+        print(f"trading state {mode}:", "marking only, nothing fills or is decided." if mode == "HALTED" else
+              "orders may only shrink positions.", halt_info())
+    rec = step(books, p.open, p.close, now, MasterConfig(), halted=mode == "HALTED", reducing=mode == "REDUCING")
+    rec["price_sources"] = dict(SOURCES)
+    name = next((n for n in REAL_BOOK if n in rec["books"]), None)
+    if name is not None:
+        rec["drawdown"] = apply_drawdown_limit(name, rec["books"][name]["equity"], books[name].peak,
+                                               path=DIR / "HALT" if dry else HALT)
+        if rec["drawdown"].get("action"):
+            print("DRAWDOWN", rec["drawdown"])
     with ledger.open("a") as f:
         f.write(json.dumps(rec) + "\n")
     state_path.write_text(json.dumps(books_to_json(books), indent=1) + "\n")
     print(json.dumps(rec, indent=1))
-    if not args.no_commit:
+    if not args.no_commit and not dry:
         repo = BACKEND.parent
         subprocess.run(["git", "-C", str(repo), "add", str(DIR)], check=True)
         subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m",

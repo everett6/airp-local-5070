@@ -33,11 +33,7 @@ import yfinance as yf
 
 BACKEND = Path(__file__).resolve().parents[1]
 UA = "airp-local-5070/0.2 (personal research; +https://github.com/everett6/airp-local-5070)"
-# Renamed tickers whose full history Yahoo now keeps under the new symbol. Same company, same shares.
-RENAMED = {"FB": "META", "ANTM": "ELV", "RE": "EG", "PKI": "RVTY", "FLT": "CPAY", "WLTW": "WTW", "ABC": "COR",
-           "CTL": "LUMN", "FISV": "FI", "PEAK": "DOC", "HCP": "DOC", "BLL": "BALL", "COG": "CTRA", "TMK": "GL",
-           "CBS": "PARA", "VIAC": "PARA", "SYMC": "GEN", "NLOK": "GEN", "KORS": "CPRI", "HRS": "LHX",
-           "ADS": "BFH", "DISCA": "WBD", "GPS": "GAP"}
+from app.data_ingestion.tickers import RENAMED
 
 
 def membership_as_of(as_of: date) -> tuple[pd.DataFrame, dict[str, Any]]:

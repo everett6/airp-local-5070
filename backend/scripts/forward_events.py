@@ -35,6 +35,7 @@ import signal
 import subprocess
 import sys
 import time
+from contextlib import ExitStack
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -47,9 +48,11 @@ import numpy as np
 import pandas as pd
 from event_eval import SECTOR_ETF
 
+from app.data_ingestion.tickers import trading_symbol
 from app.forward.ledger import Ledger
 from app.forward.schedule import NY, OPEN
 from app.sandbox.events import Prices, entry_index, fwd_excess
+from app.sandbox.gpu_lock import gpu_priority
 from app.tools.gateway import _read_env_file
 
 PY = str(BACKEND / ".venv" / "bin" / "python")
@@ -106,6 +109,16 @@ def gpu_free() -> bool:
     except (OSError, subprocess.TimeoutExpired):
         return False
     return out.returncode == 0 and not out.stdout.strip()
+
+
+def wait_gpu_free(timeout_s: float, poll_s: float = 15.0) -> bool:
+    """gpu_free(), waiting up to `timeout_s` for research jobs to yield (they unload within one request)."""
+    end = time.monotonic() + timeout_s
+    while not gpu_free():
+        if time.monotonic() >= end:
+            return False
+        time.sleep(poll_s)
+    return True
 
 
 class Ollama:
@@ -176,7 +189,7 @@ def pre_entry(ev: pd.DataFrame, p: Prices) -> pd.DataFrame:
     entry day's bar does not exist yet, so build() would mark every new release unscorable."""
     rows = []
     for r in ev.itertuples():
-        t, etf = str(r.ticker).replace(".", "-"), SECTOR_ETF.get(str(r.sector))
+        t, etf = trading_symbol(r.ticker), SECTOR_ETF.get(str(r.sector))
         if etf is None or t not in p.close.columns or etf not in p.close.columns:
             continue
         acc = datetime.fromisoformat(str(r.accepted_utc)).replace(tzinfo=UTC).astimezone(NY)
@@ -277,10 +290,13 @@ def main() -> None:
     allev.drop_duplicates("accession").to_csv(ev_csv, index=False)
     print(f"{len(new)} new releases", flush=True)
 
-    use_gpu = not args.no_gpu and gpu_free()
+    prio = ExitStack()  # forward decisions can't be made later: research jobs yield the GPU (app/sandbox/gpu_lock.py)
+    if len(new) and not args.no_gpu:
+        prio.enter_context(gpu_priority("forward_events"))
+    use_gpu = not args.no_gpu and wait_gpu_free(900 if len(new) else 0)
     logodds: dict[str, float] = {}
     source = "bonsai" if use_gpu else "lite"
-    tickers = {str(t).replace(".", "-") for t in allev["ticker"]} | set(SECTOR_ETF.values()) | {"SPY"}
+    tickers = {trading_symbol(t) for t in allev["ticker"]} | set(SECTOR_ETF.values()) | {"SPY"}
     px_file = d / "prices.parquet"
     p = prices_for(tickers, now.date() - timedelta(days=420), now.date(), px_file)
     if len(new):
@@ -291,6 +307,7 @@ def main() -> None:
             logodds = bonsai(new_csv, d / "extract.jsonl", feats, tag, since, d, px_file)
         else:
             logodds = lite(feats, new_csv, p)
+    prio.close()
     for r in new.itertuples():
         dl = entry_deadline(str(r.accepted_utc))
         base = {"accession": r.accession, "ticker": r.ticker, "sector": r.sector, "accepted_utc": r.accepted_utc,
@@ -310,7 +327,7 @@ def main() -> None:
     for r in ledger.records():
         if r["type"] != "decision" or r["accession"] in have:
             continue
-        t, etf = str(r["ticker"]).replace(".", "-"), SECTOR_ETF.get(str(r["sector"]))
+        t, etf = trading_symbol(r["ticker"]), SECTOR_ETF.get(str(r["sector"]))
         i = entry_index(days, datetime.fromisoformat(r["accepted_utc"]))
         if etf is None or i is None or i + H >= len(days) or t not in p.open.columns:
             continue
