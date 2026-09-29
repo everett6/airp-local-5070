@@ -1176,6 +1176,25 @@ Bonferroni split over the 3 trials of this round) above 0.
 - **If one passes:** a month of clean dry runs on paper, then the evidence ladder, as before. **If all fail:** the
   track stays at 0% and no variant of D6–D8 is tried.
 
+- **Result (run once, 2026-09-29 ~05:45 UTC): all three FAIL** (Sharpe at the stated costs; 98.3% CI):
+
+  | Rule | Window | Sharpe | 98.3% CI | CAGR | Before costs | Reported |
+  |---|---|---|---|---|---|---|
+  | D6 box theory (SPY+QQQ) | 2016-01 → 2026-09 (2,695 days) | **−0.91** | [−1.58, −0.21] | −5.7% | ≈ −0.3 bp a day | SPY −0.68, QQQ −0.87; since Oct 2024 −0.51; 5 bps −4.07 |
+  | D7 intraday periodicity | 2016-02 → 2026-09 (2,658 days) | **−0.07** | [−1.09, +0.74] | −0.1% | +2.0 bp a day (long +1.0, short +2.9) | since Jul 2024 +0.57 [−1.66, +2.52]; 3 bps −8.71 |
+  | D8 Darvas box (excess vs SPY) | 2024-07 → 2026-09 (561 days) | **−0.30** | [−1.84, +1.22] | −4.7% | — | book 13.2%/yr vs SPY 18.0%; 2016–24 excess +0.08 (survivorship-biased); corr with core −0.25 |
+
+  - D6: fading yesterday's range earns about nothing before costs and trades almost every day, so it loses the
+    costs; its CI is entirely below 0 even at the stricter level. Box theory as popularly taught has no edge on
+    SPY/QQQ.
+  - D7: the periodicity effect is real before costs (+2.0 bp a day, the biggest raw edge of the eight rules), but a
+    round trip on both legs costs 2 bp a day, so it nets 0. Only a lower-cost way to trade it (e.g. closing-auction
+    orders with near-zero spread) could make it pay; that would be a new, separately registered test, not a D7
+    variant.
+  - D8: the Darvas book trailed SPY by about 5 points a year, even with the survivorship bias in its favour before
+    2024.
+  - Eight published day-trading rules have now failed. The track stays at 0%; no variant of D6–D8 will be tried.
+
 ### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
 
 Jan and Bonsai pick S&P 500 stocks to hold for 3 months. **Forward-only:** Bonsai was trained on text that covers
