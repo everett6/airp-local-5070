@@ -1298,7 +1298,7 @@ D7 (same-slot history): the signal and the window differ.
   D10 at 1/2/3 bps: −0.63 / −1.15 / −1.66; negative in 8 of 11 years. The effect lives in the auction print and needs
   near-zero costs; neither changes the verdicts above.
 
-### Crypto funding carry C1 (spec fixed 2026-09-29 ~14:40 PDT, before any funding data was downloaded or viewed)
+### Crypto funding carry C1 (spec fixed 2026-09-29 ~14:48 PDT, before any funding data was downloaded or viewed)
 
 The user asked for research on making more money. Not yet tested here: the crypto cash-and-carry (long BTC/ETH spot,
 short the perpetual future, collect the funding that leveraged longs pay). Published: Schmeling, Schrimpf and Todorov,
