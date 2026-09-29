@@ -7,6 +7,7 @@
     python scripts/daytrade_test.py --rules P1   # pairs trading (GGR), daily closes
     python scripts/daytrade_test.py --rules C1   # crypto funding carry; needs scripts/funding_data.py
     python scripts/daytrade_test.py --rules T1   # turn-of-the-month on SPY, daily closes
+    python scripts/daytrade_test.py --rules O1   # SPY overnight premium, daily adjusted bars
 Each rule is one registered trial: run a rule once. Results merge into results/daytrade_test.json.
 
 Pass (each rule): on its post-publication window, at 1 bp a side, the annualized Sharpe of the daily P&L (SPY and
@@ -270,6 +271,54 @@ def run_t1(core: pd.Series) -> dict:
     return res
 
 
+O1_START, O1_END, O1_TRIAL = "2012-01-03", "2026-09-25", "spy_overnight"
+
+
+def run_o1(core: pd.Series) -> dict:
+    """O1 SPY overnight premium, one pre-registered calendar trial."""
+    from vol_target_b0 import tbill
+
+    from app.sandbox.overnight import data_check, overnight_excess, overnight_legs
+
+    prices = pd.read_parquet(BACKEND / "data" / "statarb" / "sector_etfs.parquet")
+    opens = prices[("SPY", "Open")]
+    closes = prices[("SPY", "Close")]
+    legs = overnight_legs(opens, closes)
+    rf = tbill().reindex(legs.index, method="ffill").fillna(0.0) / 252
+    daily = pd.DataFrame({"Open": opens, "Close": closes}).loc["2016-01-01":O1_END]
+    minute = pd.read_parquet(DATA / "SPY_1min.parquet")
+    ts = pd.to_datetime(minute["ts"])
+    minute = minute.loc[(ts.dt.date >= pd.Timestamp("2016-01-01").date()) &
+                        (ts.dt.date <= pd.Timestamp(O1_END).date())]
+    check = data_check(daily, minute)
+    if check["share_ok"] < 0.99:
+        raise SystemExit(f"O1 daily/minute data check failed: {check}")
+
+    excess_1bp = overnight_excess(legs, rf, 1e-4)
+    excess_3bp = overnight_excess(legs, rf, 3e-4)
+    window = slice(O1_START, O1_END)
+    res: dict = {"window": [O1_START, O1_END],
+                 "1bp": stats(excess_1bp.loc[window]), "3bp": stats(excess_3bp.loc[window]),
+                 "gross": stats((legs["overnight"] - rf).loc[window]),
+                 "intraday_gross": stats((legs["intraday"] - rf).loc[window]),
+                 "buy_hold": stats((legs["full"] - rf).loc[window]),
+                 "by_year": {str(year): round(sharpe(group), 2)
+                             for year, group in excess_1bp.loc[window].groupby(
+                                 excess_1bp.loc[window].index.year)},
+                 "since_2020": stats(excess_1bp.loc["2020-01-01":O1_END]),
+                 "corr_with_core": round(float(excess_1bp.loc[window].corr(
+                     core.reindex(excess_1bp.loc[window].index))), 3),
+                 "data_check": check}
+    result = res["1bp"]
+    res["pass"] = bool(result["sharpe"] >= 0.5 and result["ci"][0] > 0)
+    register({"trial": O1_TRIAL, "date": time.strftime("%Y-%m-%d"), "kind": "calendar",
+              "sharpe_ann": result["sharpe"], "window": f"{O1_START}..{O1_END}",
+              "result": "pass" if res["pass"] else "fail"})
+    print(f"O1 {O1_TRIAL}: Sharpe {result['sharpe']} CI {result['ci']} CAGR {result['cagr']:.1%} "
+          f"(3 bps: Sharpe {res['3bp']['sharpe']}) -> {'PASS' if res['pass'] else 'FAIL'}", flush=True)
+    return res
+
+
 def check_d9() -> dict:
     """D9's pre-stated validity check: the same rule on Alpaca's SIP daily bars (scripts/daily_alpaca.py)."""
     from intraday_stocks import universe
@@ -311,7 +360,7 @@ def main() -> None:
         return
     rules = a.rules.split(",")
     bars = ({s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")}
-            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "P1", "C1", "T1"} else {})
+            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "P1", "C1", "T1", "O1"} else {})
     core = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")["core"]
     f = BACKEND / "results" / "daytrade_test.json"
     out: dict = json.loads(f.read_text()) if f.exists() else {}
@@ -322,9 +371,9 @@ def main() -> None:
             out[name] = run_d5(core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
-        if name in ("D7", "D8", "D9", "D10", "P1", "C1", "T1"):
+        if name in ("D7", "D8", "D9", "D10", "P1", "C1", "T1", "O1"):
             out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10, "P1": run_p1, "C1": run_c1,
-                         "T1": run_t1}[name](core)
+                         "T1": run_t1, "O1": run_o1}[name](core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
         fn, start, trial = RULES[name]
