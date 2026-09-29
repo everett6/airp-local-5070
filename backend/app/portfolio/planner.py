@@ -40,7 +40,7 @@ TRACKS = [
           "backtest 2018-26: 17.7%/yr, max drawdown 27%"),
     Track("event", "Short-term event picks (5-day, Jan + Bonsai)", "untested",
           "a research arm passes its test, then 3 months of forward paper results",
-          "B2 failed (closest so far); B3 running; sleeve replay 2024-26: -2.2%/yr"),
+          "B2 and B3 failed (research adds ~0 over the release); sleeve replay 2024-26: -2.2%/yr"),
     Track("long_term", "Long-term stock picks (3 months, Bonsai)", "shadow",
           "first cohort 1 Oct 2026; one clean month -> 10% paper; judged after 12 cohorts",
           "forward-only: Bonsai knows 2024-26, so no backtest"),

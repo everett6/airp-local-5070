@@ -59,6 +59,7 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 | Day trading D1: intraday momentum (SPY+QQQ, 2019–26, after publication) | fail | Sharpe −1.00 [−2.22, −0.08] at 2 bps |
 | Day trading D2: 5-minute opening-range breakout (2023–26, after publication) | fail | Sharpe −0.24 [−1.40, +0.62] |
 | Arm B2 (arm B with the news actually gathered) | fail | +0.011 IC over arm A [−0.035, +0.062]; own IC +0.054 [−0.004, +0.114] |
+| Arm B3 (code-built evidence: last outlook + real headlines) | fail | +0.001 IC over arm A [−0.032, +0.035]; own IC +0.044 [+0.003, +0.090] |
 | Arm C (arm B + Bonsai judgement fields) | fail | −0.022 IC vs arm B [−0.065, +0.025]; `net_read` alone +0.067, to be tested on live data only (C2) |
 | 8-K breaking-news watcher (W1) | stopped at quality gate | verified quotes 82.6% (needs 85%); no returns looked at |
 

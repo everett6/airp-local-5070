@@ -737,6 +737,28 @@ characters are filled. Code builds them from the same as-of material, in this or
 - **Runs after B2's labels** (one model on the GPU at a time). If B2 passes, B3 still runs and is reported; it
   replaces B2 only if it passes AND B3 − B2 has a 95% CI above 0.
 
+### Arm B3 result (2026-09-28): **FAIL**, no better than the release alone
+
+Step 1 found an outlook for 73% of 2024 releases and 98% of 2025-26; step 2 found headlines for 80% / 81%.
+2025-26, monthly rank IC, 5-day vs sector (14 months, 1,177 releases):
+
+| | Mean IC | 95% CI |
+|---|---|---|
+| full A | +0.043 | [+0.005, +0.082] |
+| full B3 | +0.044 | [+0.003, +0.090] |
+| **B3 − A (deciding)** | **+0.001** | **[−0.032, +0.035]** |
+| B3 − B2 | −0.010 | [−0.048, +0.031] |
+| B3 on releases with news (953) | +0.046 | [−0.001, +0.096] |
+| `vs_prior_guidance` alone (510 stated) | +0.042 | [−0.070, +0.158] |
+| 20-day: B3 − A / B3 − B2 (reported) | −0.017 / −0.027 | [−0.069, +0.047] / [−0.068, +0.020] |
+
+- Own IC is above 0, but the deciding check (better than the release alone) is not: +0.001.
+- Getting last quarter's outlook to Bonsai worked mechanically (`not_stated` 859 → 669 of 1,180) but the field
+  still carries no clear signal.
+- Across B, B2 and B3 the research evidence adds between −0.017 and +0.011 IC over the release alone, every CI
+  spanning 0. Reading: in these fields, the release already holds what Bonsai can use; more pre-release evidence
+  does not help. The sleeve keeps its arm-A-based score (untested, 10%).
+
 ### skfolio test (spec fixed 2026-09-27, before any run)
 
 Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capital cap?
