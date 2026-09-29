@@ -759,6 +759,36 @@ Step 1 found an outlook for 73% of 2024 releases and 98% of 2025-26; step 2 foun
   spanning 0. Reading: in these fields, the release already holds what Bonsai can use; more pre-release evidence
   does not help. The sleeve keeps its arm-A-based score (untested, 10%).
 
+### Arm B4: the research arm at 20 days, on fresh releases (spec fixed 2026-09-29 ~15:45 PDT, before any B4 label)
+
+**Why, and the honest prior.** Arm B2 at 20 days beat arm B: +0.029 [+0.009, +0.050]. That was reported, not
+deciding. The comparison that matters, B2 against the release alone (arm A) at 20 days, was only +0.010
+[−0.042, +0.055] in the same run. B3 − A at 20 days was −0.017. So the odds are poor. The user asked to run it
+anyway ("ok start", 29 Sep); this is the one run.
+
+**Sample (fresh for these arms).** The S&P 400 and 600 releases in `features_breadth_2025.csv` accepted
+2026-01-01 .. 2026-08-24: 2,851 releases, 8 months. No arm A, B, B2 or B3 label exists for them. Their EPS and
+revenue numbers were already read in the breadth test; no new Qwen run is made. Their 5-day returns were used there,
+with Bonsai's decision score, not these fields. Their 20-day returns against these fields have never been computed.
+Differences from B2, stated in advance: mid and small caps instead of the S&P 500, and a short 8-month window.
+
+**Steps (Jan-v1-4B and Bonsai-27B only).**
+1. News warm-up (`warm_news.py`, same call and cache). Stop rule as B2: if coverage is below 50%, B4 is not run.
+2. Jan: arm B2's exact gather settings (`research_events.py`, vLLM, 16 workers) into `_v3b4`, then the audit.
+3. Bonsai: arm A's frozen prompt P2 on the release (`llm_fields_b4.jsonl`), and arm B's frozen `PROMPT_R` on
+   release + Jan's evidence (`llm_fields_research_b4.jsonl`). Same 6,000 + 6,000 characters and overflow rule.
+4. Models: arm A's and arm B2's ridges, trained on the 2024 S&P 500 sample only (their existing labels, lam 10),
+   scored on the B4 sample. No refit on B4 data.
+
+**The one test (trial `llm_fields_research_b4`), 20-day return vs the sector ETF:** the monthly rank IC of
+(full B2 − full A) has a 95% CI above 0 (paired monthly bootstrap, months with ≥ 20 releases, 5,000 draws, seed 0),
+AND full B2's own 20-day IC CI is above 0. Reported, not deciding: the 5-day numbers, B2 on releases with news, and
+S&P 400 vs 600 separately.
+
+**GPU etiquette.** GPU steps pause during the live runs: 05:30–06:30 and 15:15–16:30 PDT daily, and 15:15–18:00
+on Thu 1 Oct for the first long-term and theme cohorts. A paused step resumes where it stopped.
+**If it passes:** a shadow at 0 weight in the forward test. The AI-picks sleeve changes only by the user's decision.
+
 ### skfolio test (spec fixed 2026-09-27, before any run)
 
 Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capital cap?

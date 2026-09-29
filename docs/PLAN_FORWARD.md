@@ -126,7 +126,7 @@ arm that becomes eligible counts as one more trial in the registry.
 - Research uses Jan and Bonsai. Stock picking is never dropped without your say.
 - Failed tests are not re-proposed as new ideas; leads wait for a new pre-registered test.
 
-## Early go-live (user's call, 2026-09-29 ~15:50 PDT)
+## Early go-live (user's call, 2026-09-29 ~15:39 PDT)
 The user asked to go live at once ("GO LIVE RIGHT NOW"). Autorun mode switched dry → live by hand
 (`scripts/autonomy.sh live`) on Tue 29 Sep, before the Friday check. Its record at the switch: 3 good dry event runs
 and 1 failed (the boot catch-up, fixed). The dry run caught the extract-date bug (fixed in 2ab2774).

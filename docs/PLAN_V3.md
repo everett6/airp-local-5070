@@ -84,7 +84,7 @@ the weight the goal needs (see §6).
 1. **Speed** (this week): parallel Bonsai requests (§2). Expected: the 70-minute monthly run drops a lot.
 2. **Rating-probability scores** (built, needs a live check): breaks the many ties at rating 4 by Bonsai's own
    confidence. Recorded in PLAN_60_V2 before the first cohort.
-3. **Optional, needs your OK:** *B4*, the 20-day version of the research arm, tested only on 2026+ data
+3. **Started 29 Sep (user: "ok start"):** *B4*, the 20-day version of the research arm, tested only on 2026+ data
    (B2 looked better at 20 days: +0.029 [+0.009, +0.050]). Pre-registered before any run.
 4. **Optional, needs your OK (a download, and it is Qwen-based):** *Kev 4B* speed test: a local decision model
    scores all ~490 cards in minutes; Bonsai writes bull/bear only for the top 30. Adopted only if its ratings
