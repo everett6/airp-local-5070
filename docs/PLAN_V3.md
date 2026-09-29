@@ -117,6 +117,13 @@ the weight the goal needs (see §6).
 | Switch models: **Sonnet 5.5** for routine watching and fixes, **Opus 5.5** for new tests and verdicts | Report results as they are, pass or fail |
 | Only you can: add keys, switch to real money, power off (only when you say) | Never place real trades, spend money, or shut down without your command |
 
+## 7b. Mandate changes
+
+- **2026-09-29, by the user:** SGOV (0–3 month T-bill ETF) added to the mandate. The master+brakes book parks cash the
+  drawdown brakes leave idle in SGOV (only when 5% or more is idle; the 2% buffer stays cash). 2018–26 backtest
+  arithmetic: parked on 38% of days, about 35% of the book when on, +0.4% a year to the core (17.7% → 18.2%); nearer
+  +0.5–0.6% at today's T-bill rate. Not a strategy test (it moves no risk), so no trial.
+
 ## 8. Decision rules that never change
 
 - Money moves only on evidence, within the 35% max drawdown.

@@ -36,7 +36,7 @@ from app.portfolio.master import MasterConfig
 from app.sandbox.events import Prices
 
 DIR = BACKEND / "results" / "forward" / "allocator"
-ASSETS = ("SPY", "BTC-USD", "ETH-USD")
+ASSETS = ("SPY", "BTC-USD", "ETH-USD", "SGOV")
 
 
 SOURCES: dict[str, str] = {}

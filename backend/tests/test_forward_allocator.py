@@ -64,3 +64,17 @@ def test_old_state_gets_the_new_book():
         v.pop("peak")
     books = books_from_json(old)
     assert "master+brakes" in books and books["master"].peak == 0.0
+
+
+def test_braked_book_parks_idle_cash_in_sgov_and_passes_the_mandate():
+    from app.portfolio.forward import targets
+    from app.portfolio.guard import MANDATE, gate
+    _, closes = frames()
+    day = closes.index[-1]
+    full, info = targets("master+brakes", closes, day, MasterConfig(), {}, brake=1.0)
+    assert "SGOV" not in full and info["parked"] == 0.0  # only the 2% buffer idle: stays cash
+    half, info = targets("master+brakes", closes, day, MasterConfig(), {}, brake=0.5)
+    assert abs(sum(half.values()) - 0.98) < 1e-3 and half["SGOV"] > 0.4 and info["parked"] == half["SGOV"]
+    assert gate(half, MANDATE) == []
+    plain, _ = targets("master", closes, day, MasterConfig(), {})
+    assert "SGOV" not in plain  # the comparison book is unchanged

@@ -33,6 +33,7 @@ PAPER = "https://paper-api.alpaca.markets/v2"
 DATA = "https://data.alpaca.markets"
 NY = ZoneInfo("America/New_York")
 CRYPTO = {"BTC-USD": "BTC/USD", "ETH-USD": "ETH/USD"}
+STOCKS = ("SPY", "SGOV")  # the book's stock assets: sold when a decision drops them
 GAP_ALERT = 0.005
 MIN_NOTIONAL = 10.0  # smaller legs are skipped (Alpaca's crypto minimum is about $1; a $10 floor avoids dust)
 OPG_CLOSED = (time(9, 28), time(19, 0))  # Alpaca rejects opg orders submitted in [09:28, 19:00) ET
@@ -89,7 +90,7 @@ def plan(decided_at: str, targets: dict[str, float], equity: float, positions: d
     shares for stocks, 6 decimals for crypto, legs under $10 skipped. Assets held but absent from the targets are
     sold (the book's universe only; anything else in the account is left alone)."""
     legs = []
-    for a in sorted(set(targets) | {x for x in positions if x in targets or x in CRYPTO or x == "SPY"}):
+    for a in sorted(set(targets) | {x for x in positions if x in targets or x in CRYPTO or x in STOCKS}):
         if a not in prices:
             raise BrokerError(f"no price for {a}")
         want = equity * targets.get(a, 0.0) / prices[a]

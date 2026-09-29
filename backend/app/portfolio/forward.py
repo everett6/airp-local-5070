@@ -87,6 +87,9 @@ def execute(book: Book, opens: pd.Series, cost_bps: float = 5.0, reduce_only: bo
     return {"fills": fills}
 
 
+PARK, PARK_MIN, INVESTED = "SGOV", 0.05, 0.98  # T-bill ETF; park only real idle cash, not the 2% buffer
+
+
 def brake_multiplier(equity: float, peak: float) -> float:
     """The adopted drawdown brakes (docs/PLAN_60.md): 2/3 exposure from 10% below the peak, 1/2 from 20%."""
     dd = 1 - equity / peak if peak > 0 else 0.0
@@ -97,7 +100,11 @@ def targets(name: str, close: pd.DataFrame, day: pd.Timestamp, cfg: MasterConfig
             brake: float = 1.0) -> tuple[dict[str, float] | None, dict[str, Any]]:
     if name == "master+brakes":
         a = allocate([], crypto_state(close, day, cfg.crypto_assets), cfg)
-        return {k: w * brake for k, w in a.weights.items()}, {"dropped": a.dropped, "brake": round(brake, 3)}
+        t = {k: w * brake for k, w in a.weights.items()}
+        idle = INVESTED - sum(t.values())
+        if idle >= PARK_MIN:  # cash the brakes leave idle earns T-bill yield (user, 2026-09-29)
+            t[PARK] = round(idle, 4)
+        return t, {"dropped": a.dropped, "brake": round(brake, 3), "parked": round(t.get(PARK, 0.0), 4)}
     if name == "master":
         a = allocate([], crypto_state(close, day, cfg.crypto_assets), cfg)
         return a.weights, {"dropped": a.dropped}
