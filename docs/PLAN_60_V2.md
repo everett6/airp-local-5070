@@ -1131,6 +1131,51 @@ intraday margin is checked in real time, and a margin account needs $2,000. Alpa
 4 Jun 2026. The account-size limit on this track is gone; the results above are unchanged, since they never
 depended on it.
 
+### Day-trading round 4: box theory and intraday periodicity (spec fixed 2026-09-29 ~05:20 UTC, before any D6–D8 code ran)
+
+The user asked to try "box theory" and the other researched rules. "Box theory" means two different things, so both
+are tested; the third rule is the researched cross-sectional one that needs no new data. Each is its own trial, run
+once, on data already cached (SPY/QQQ 1-minute bars, the S&P 500 30-minute 14:30/15:30 bars, daily OHLCV). No
+parameter below was fitted to data; each comes from the source or is stated here once.
+
+**Multiple testing:** these are trials 6–8 of the day-trading track. Pass for each: annualized Sharpe of the daily
+P&L ≥ 0.5 at the costs below AND the lower bound of a **98.3%** block-bootstrap CI (21-day blocks; 95% with a
+Bonferroni split over the 3 trials of this round) above 0.
+
+- **D6, "box theory" (previous-day range; popular on social media since 2024, floor-trader support/resistance
+  lore before that)**, SPY and QQQ, equal capital, 1× per symbol, at most one trade per symbol per day:
+  - Box: yesterday's regular-session high H and low L; middle M = (H + L) / 2; width W = H − L. If today's 09:30
+    open is outside [L, H] (a gap), the box is redrawn from today's 09:30–09:59 high and low and checks start at
+    10:00; otherwise checks start with the 09:30 bar.
+  - Each minute until the 15:29 bar, while flat: close ≤ L + 0.25W → long; close ≥ H − 0.25W → short; the middle
+    is never traded. Entry at the next bar's open.
+  - Exit (at the next bar's open) when the close reaches M (target) or goes beyond the box by 0.25W (stop: close
+    < L − 0.25W for a long, > H + 0.25W for a short); otherwise at the 15:59 close. 1 bp a side.
+  - Decides on 2016-01-05 → 2026-09-25 (no publication date; no parameter was fitted). Reported: 2024-10 onward,
+    5 bps, each symbol. Trial `daytrade_box_theory`.
+- **D7, intraday periodicity** (Heston, Korajczyk and Sadka, *Journal of Finance* 2010: a stock's return in a given
+  half hour repeats in the same half hour on following days, for weeks), S&P 500 list of D5, the 15:30–16:00 slot:
+  - Signal: the mean of the stock's 15:30-bar returns (open to close) over its previous 20 full trading days (at
+    least 15 present). At 15:30: long the top 10%, short the bottom 10%, equal weight, dollar neutral, 15:30 bar
+    open to close. Half days dropped as in D5. 1 bp a side per stock; also reported at 3 bps.
+  - Decides on 2016-02 → 2026-09-25 (all after publication). Survivorship bias is small here: the rule is
+    long/short and the list is fixed. Trial `daytrade_periodicity`.
+- **D8, Darvas box** (Nicolas Darvas, *How I Made $2,000,000 in the Stock Market*, 1960): a swing rule on daily bars,
+  not a same-day rule, long only, D5's S&P 500 list:
+  - A box can start only on a day whose high is a 52-week high (≥ every high of the previous 252 days). Box top T =
+    that high once the next 3 days' highs all stay below it (a higher high first restarts the search). Box bottom B
+    = the lowest low after the top, fixed once 3 days in a row each have a low above it. While T and B are set,
+    a close above T is a breakout; a close below B before that cancels the box.
+  - Buy on a breakout at the next open; hold. The stop is B; each new box that completes above while held moves
+    the stop to its bottom. A close below the stop → sell at the next open.
+  - Portfolio: 20 slots of 5% each; the money in free slots is held in SPY. More breakouts than free slots: highest
+    close / T first. 10 bps a side per trade (stock trades, slippage included).
+  - P&L measured as the daily return of the book minus SPY's. Decides on 2024-07-01 → 2026-09-24 (the list is the
+    2024 membership, so earlier years are survivorship-biased in the rule's favour; 2016–2024-06 reported only).
+    Trial `daytrade_darvas_box`.
+- **If one passes:** a month of clean dry runs on paper, then the evidence ladder, as before. **If all fail:** the
+  track stays at 0% and no variant of D6–D8 is tried.
+
 ### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
 
 Jan and Bonsai pick S&P 500 stocks to hold for 3 months. **Forward-only:** Bonsai was trained on text that covers
