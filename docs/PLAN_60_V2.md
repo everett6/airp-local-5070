@@ -1180,3 +1180,13 @@ medium: hyperscalers) and risks such as an AI bubble. **Forward-only:** Bonsai k
   - `bubble_risk`: high ("capex growth is extreme and semiconductor prices are stretched").
   - Picks today would be: medium none (the AI-linked themes were capped; the rest were rated 3 or lower), long
     biotech and quantum.
+
+**Second change before the first cohort (2026-09-28 ~21:00, no pick made yet): ties broken by Bonsai's own
+probabilities.** A full rehearsal (clock set to 1 Oct, scratch folder) rated all 10 picks 4, so the 12-month-return
+tie-break chose them (5 of 10 were chip makers). Now each rating also gets a score: Bonsai's next-token
+probabilities for 1–5 at the point where it wrote its rating (its own reply up to the label, continued once), as
+a probability-weighted rating. Picks are ordered by that score, then by 12-month return. The same applies to the
+theme ratings (a theme still needs a rating of 4 or 5). A rating the quote check reset to 3 keeps 3.0. Checked on
+24 real cards: identical ratings, probabilities found for 21 (the other 3 were quote-check resets), scores
+among the 4s spread from 3.63 to 4.03. Parallel requests (3 / 6 / 8) gave the same answers and no speed-up (about
+9.5 s per card), so the monthly run stays at about 65–75 minutes.
