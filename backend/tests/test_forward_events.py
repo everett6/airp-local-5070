@@ -68,3 +68,23 @@ def test_gpu_busy_ignores_desktop_apps():
     assert gpu_busy("/usr/bin/nautilus, 61\n/home/u/.venv/bin/python, 900\n")
     assert gpu_busy("/usr/local/bin/ollama, 20000\n") and gpu_busy("some-game, 4096\n")
     assert gpu_busy("weird line without memory\n")
+
+
+def test_live_extract_has_no_backtest_end_date(tmp_path, monkeypatch):
+    """29 Sep 2026: the extract step kept extract_events.py's backtest default --to 2026-09-24, so every new
+    release was dropped and missed. Both GPU steps must read to the far future."""
+    import forward_events as fe
+    cmds = []
+    monkeypatch.setattr(fe, "run", lambda cmd: cmds.append(cmd) or True)
+
+    class NoServer:
+        def __init__(self, *a):
+            pass
+
+        def stop(self):
+            pass
+    monkeypatch.setattr(fe, "Ollama", NoServer)
+    monkeypatch.setattr(fe, "BACKEND", tmp_path)  # the extract path is written relative to BACKEND
+    fe.fact_sheets(tmp_path, tmp_path / "ev.csv", datetime(2026, 9, 28).date(), True, "t", tmp_path / "p")
+    ext = next(c for c in cmds if "extract" in c)
+    assert ext[ext.index("--to") + 1] == "2099-12-31"

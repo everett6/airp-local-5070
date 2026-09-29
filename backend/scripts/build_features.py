@@ -147,7 +147,9 @@ def main() -> None:
                      "guidance": e.get("guidance"), "tone": e.get("tone"),
                      "sec_quarters": len(tool["history"]),
                      "fact_sheet": sheet + ("\n" + "\n".join(extra) if extra else "")})
-    df = pd.DataFrame(rows)
+    cols = ["accession", "ticker", "cik", "sector", "accepted_utc", "entry", "eps_q", "eps_prior", "eps_prior_source",
+            "rev_q", "rev_prior", "guidance", "tone", "sec_quarters", "fact_sheet"]
+    df = pd.DataFrame(rows, columns=cols)  # the header even when no release could be read (the decider reads it)
     out = BACKEND / "results" / "events" / f"features_{args.name}.csv"
     df.to_csv(out, index=False)
     both = df[["eps_q", "eps_prior"]].notna().all(axis=1)

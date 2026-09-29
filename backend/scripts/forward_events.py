@@ -173,7 +173,7 @@ def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str, pri
         srv = Ollama(11437, "/usr/share/ollama/.ollama/models", 4, d / "ollama.log")
         try:
             run([PY, "scripts/extract_events.py", "extract", "--events", str(ev_csv), "--from", since.isoformat(),
-                 "--model", "qwen3:8b", "--base-url", "http://127.0.0.1:11437", "--parallel", "4", "--out",
+                 "--to", "2099-12-31", "--model", "qwen3:8b", "--base-url", "http://127.0.0.1:11437", "--parallel", "4", "--out",
                  str(ex.relative_to(BACKEND))])
         finally:
             srv.stop()
