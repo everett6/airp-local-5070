@@ -1296,6 +1296,29 @@ D7 (same-slot history): the signal and the window differ.
   D10 at 1/2/3 bps: −0.63 / −1.15 / −1.66; negative in 8 of 11 years. The effect lives in the auction print and needs
   near-zero costs; neither changes the verdicts above.
 
+### Crypto funding carry C1 (spec fixed 2026-09-29 ~14:55 PDT, before any funding data was downloaded or viewed)
+
+The user asked for research on making more money. Not yet tested here: the crypto cash-and-carry (long BTC/ETH spot,
+short the perpetual future, collect the funding that leveraged longs pay). Published: Schmeling, Schrimpf and Todorov,
+"Crypto Carry", BIS WP 1087 (April 2023; *Management Science*), who already report that it fades from 2024 and is
+negative in 2025. Market-neutral, so it is judged against cash, not SPY.
+
+- **Data:** Deribit public API, `get_funding_rate_history`, hourly `interest_1h` for BTC-PERPETUAL and ETH-PERPETUAL
+  (free; Binance blocks US users). A short perpetual receives the funding when it is positive.
+- **Rule:** each Monday 00:00 UTC, per asset: if the mean hourly funding over the previous 7 days is > 0, hold the
+  carry (long spot, short perpetual, equal notional) for the next 7 days, else be flat. Half the sleeve per asset.
+  Capital per asset = spot notional + 25% margin on the perpetual, so return on capital = funding / 1.25.
+- **P&L:** daily sum of the hourly funding while held. Not modeled (reported as a limitation): changes in the
+  spot-perpetual basis (small at a weekly horizon, since funding pulls the perpetual to the index), exchange risk.
+- **Costs:** each switch in or out of an asset's carry costs 15 bps of its notional (spot 10 bps + perpetual 5 bps).
+- **Pass (trial `crypto_funding_carry`):** on **2023-05-01 → 2026-09-24** (after the BIS paper), the annualized
+  Sharpe of daily returns **in excess of the 3-month T-bill** (FRED DTB3, cached) ≥ 0.5 and its 95% block-bootstrap
+  CI (21-day blocks) above 0. Reported: each year, each asset, time in the trade, return before costs, before the
+  window.
+- **Tradability (stated now):** Deribit does not serve US residents; a pass would be a paper shadow first, and a real
+  version would need a US venue (e.g. Coinbase's US perpetual-style futures) and a mandate change by the user.
+  **If it fails:** no variant.
+
 ### Core leads, forward check (spec fixed 2026-09-29 ~12:05 PDT, before any forward data)
 
 The user asked to raise the book's Sharpe. The two known ways were already tested on 2018–26 and failed narrowly,
