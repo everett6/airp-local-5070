@@ -1226,6 +1226,27 @@ D7 (same-slot history): the signal and the window differ.
   regular-session open and close, split- and dividend-adjusted; an independent source), also has Sharpe ≥ 0.5 and a
   95% CI above 0 at 1 bp a side over the same window. Reported: the result with the top and bottom 1% of stock-day
   open-to-close returns removed from both legs. If the check fails, the pass is treated as a data artifact.
+- **Validity check result (run once, 2026-09-29): HOLDS.** Alpaca SIP daily bars, same window: Sharpe **+1.08**
+  [+0.47, +1.63], CAGR +9.8%; legs long +8.3, short +3.5 bp a day; with the top/bottom 1% of stock-day returns
+  removed +1.70 [+1.07, +2.26], so it is not bad prints. Since 2024-07: +0.57 [−0.97, +1.87].
+- **Implementation flaw found (2026-09-29):** the signal uses the official open, which is set by the opening
+  auction itself, so a market-on-open order cannot be conditioned on it. D9 as tested is not tradable as written;
+  the paper plan above is withdrawn. A tradable version is D10.
+
+### Day-trading round 6: D10 tradable opening reversal (spec fixed 2026-09-29, before any D10 data or code)
+
+- **Rule:** as D9, but the signal is known before the open: pre-market return = the last trade at or before 09:25
+  ET (the close of Alpaca's SIP 08:00-09:25 bar, one 85-minute bar per stock) / yesterday's official close − 1.
+  Stocks without a pre-market trade in 08:00-09:25 that day are left out. Short the top 10%, long the bottom 10%,
+  equal weight, dollar neutral; enter at the official open (market-on-open), exit at the official close
+  (market-on-close). Prices: Alpaca SIP daily bars (split- and dividend-adjusted) and the pre-market bars
+  split-adjusted, with the signal's previous close taken split-adjusted too (dividend days: the ex-dividend drop is
+  in the signal, a small bias against nothing in particular; reported only).
+- **Universe, window, costs, pass:** D5's list; 2016-01-04 → 2026-09-24; 1 bp a side (also 2 bps); Sharpe ≥ 0.5 and
+  95% block-bootstrap CI above 0. Trial `daytrade_open_reversal_premarket`. Needs 20+ stocks a day.
+- **If it passes:** a live paper shadow: the existing 5:45 AM PDT events run waits until 09:25 ET, reads the
+  pre-market prices, places MOO/MOC orders on the paper account (no new timer), for a month of clean runs, then
+  the evidence ladder. **If it fails:** no variant; D9 stays an untradable finding.
 
 ### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
 
