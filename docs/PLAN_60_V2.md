@@ -1287,6 +1287,27 @@ D7 (same-slot history): the signal and the window differ.
   pre-market prices, places MOO/MOC orders on the paper account (no new timer), for a month of clean runs, then
   the evidence ladder. **If it fails:** no variant; D9 stays an untradable finding.
 
+### Pairs trading P1 (spec fixed 2026-09-29 ~01:45, before any pairs code or data view)
+
+The user asked for pairs trading (stat-arb failed; trend following is the core; market making needs co-location and
+paid order-book data, so it is not attempted). PLAN_STATARB left pairs as a separate new trial. Rule as published
+(Gatev, Goetzmann and Rouwenhorst, *RFS* 2006), within sectors, on daily adjusted closes (cached yfinance):
+
+- **Formation** (each month start): the previous 252 trading days; stocks of D5's S&P 500 list with no missing
+  close. Prices normalized to 1 at the formation start. Within each sector, every pair's sum of squared differences
+  (SSD); the 20 pairs with the smallest SSD overall are chosen.
+- **Trading** (the next 126 trading days): when a pair's normalized spread is more than 2 formation standard
+  deviations from 0 at a close, open the next day at the close (GGR's one-day wait): long the cheaper, short the
+  dearer, equal dollars. Close at the close of the first day the spread crosses 0, or at the period's end; a pair
+  can reopen. Each portfolio's daily return = the mean over its 20 pairs (committed capital; a closed pair earns 0).
+- **Book:** 6 overlapping portfolios (one started each month); the daily return is their mean.
+- **Costs:** 10 bps per side per stock trade (both legs at open and at close).
+- **Pass (trial `pairs_ggr`):** annualized Sharpe ≥ 0.5 and a 95% block-bootstrap CI (21-day blocks) above 0 on
+  **2024-07-01 → 2026-09-24** (the list is the 2024 membership; earlier years are survivorship-biased, reported
+  only: 2016-01 → 2024-06). Reported: correlation with the core, share of days invested, 0 and 20 bps costs.
+- **If it passes:** paper sleeve after a month of clean dry runs, then the evidence ladder. **If it fails:** no
+  variant (other thresholds, cointegration tests or universes would each be a new, separately justified trial).
+
 ### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
 
 Jan and Bonsai pick S&P 500 stocks to hold for 3 months. **Forward-only:** Bonsai was trained on text that covers
