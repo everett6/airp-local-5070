@@ -132,6 +132,21 @@ def main() -> None:
     else:
         lines.append("No allocator runs yet.")
 
+    lines += ["", "## Core leads, forward check (shadows, no money; verdict from 2027-09-30)", ""]
+    try:
+        from core_leads import forward
+        f = forward()
+        if "note" in f:
+            lines.append(f"- {f['days']} forward days: {f['note']}")
+        for k in ("vol_target", "risk_parity"):
+            if k in f:
+                v = f[k]
+                lines.append(f"- {k}: Sharpe vs B0 {v['sharpe_diff']:+.2f} (90% CI {v['ci90']}), vol-matched CAGR "
+                             f"{v['cagr_vol_matched_pct']}% vs {v['b0_cagr_pct']}% over {f['days']} days"
+                             + (" (verdict due)" if f["verdict_due"] else " (interim, not judged)"))
+    except Exception as e:  # noqa: BLE001 - a report line must never fail the review
+        lines.append(f"- not available: {type(e).__name__}: {e}"[:200])
+
     lines += ["", "## 1-week Bonsai book (shadow, 0 weight)", ""]
     led = Ledger(FWD / "events" / "ledger.jsonl")
     recs = led.verify()
