@@ -1232,6 +1232,8 @@ Bonferroni split over the 3 trials of this round) above 0.
     variant.
   - D8: the Darvas book trailed SPY by about 5 points a year, even with the survivorship bias in its favour before
     2024.
+  - Code review note (Codex, 2026-09-29): on a sell day the freed slot also earns SPY's overnight move, and on a buy
+    day the slot misses it. The two roughly cancel (as many buys as sells) and are far inside the CI; not re-run.
   - Eight published day-trading rules have now failed. The track stays at 0%; no variant of D6–D8 will be tried.
 
 ### Day-trading round 5: D9 opening-auction reversal (spec fixed 2026-09-29, before any D9 code ran)
@@ -1359,6 +1361,10 @@ paid order-book data, so it is not attempted). PLAN_STATARB left pairs as a sepa
   10 bps, CAGR −1.7%; at 0 bps −0.24, at 20 bps −0.98; half the pairs open on a typical day. Before the window
   (2016–2024-06, survivorship-biased): −0.37. Correlation with the core +0.08. Pairs trading in large caps has no
   edge left even before costs, as later studies of GGR found (Do and Faff 2010).
+- **Code review note (Codex, 2026-09-29):** (1) prices are re-based to 1 at each trading period's start and the
+  2-SD test uses that spread, as common GGR replications do; the spec did not say which base, so this is recorded as
+  the implemented reading, not re-run. (2) The reported "invested" share counts an open pair on a zero-P&L day as not
+  invested, so 52% is a slight undercount; reporting only.
 
 ### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
 

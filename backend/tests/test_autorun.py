@@ -99,7 +99,8 @@ def test_step_runs_without_the_inhibitor_when_logind_refuses(monkeypatch):
             return subprocess.CompletedProcess(args, 1, "", "Failed to inhibit: Access denied as the requested ...")
         return subprocess.CompletedProcess(args, 0, "ok\n", "")
     monkeypatch.setattr(autorun.subprocess, "run", fake)
-    r = autorun.step(["python", "x.py"])
+    assert not autorun.can_inhibit()
+    r = autorun.step(["python", "x.py"], inhibit=False)
     assert r.returncode == 0 and "ran without it" in r.stdout and calls[-1] == ["python", "x.py"]
 
 
@@ -107,6 +108,10 @@ def test_step_keeps_a_real_failure(monkeypatch):
     import subprocess
 
     import autorun
-    monkeypatch.setattr(autorun.subprocess, "run",
-                        lambda args, **kw: subprocess.CompletedProcess(args, 2, "", "Traceback: boom"))
-    assert autorun.step(["python", "x.py"]).returncode == 2
+    calls = []
+
+    def fake(args, **kw):
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 1, "", "Failed to inhibit: looks similar but is the job's own error")
+    monkeypatch.setattr(autorun.subprocess, "run", fake)
+    assert autorun.step(["python", "x.py"], inhibit=True).returncode == 1 and len(calls) == 1  # never re-run

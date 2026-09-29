@@ -158,13 +158,21 @@ def push(job: str) -> None:
         alert(job, f"git push failed: {p.stderr.strip()[:200]}")
 
 
-def step(cmd: list[str]) -> subprocess.CompletedProcess[str]:
-    """One command, holding off idle sleep while it runs. Right after boot, before the desktop session is active,
-    logind refuses the inhibitor ("Failed to inhibit: Access denied"); the command then runs without it."""
-    r = subprocess.run(["systemd-inhibit", "--what=idle:sleep", "--why=paper book run", *cmd], cwd=BACKEND,
-                       capture_output=True, text=True, check=False, timeout=6 * 3600)
-    if r.returncode != 0 and r.stderr.startswith("Failed to inhibit"):
-        r = subprocess.run(cmd, cwd=BACKEND, capture_output=True, text=True, check=False, timeout=6 * 3600)
+def can_inhibit() -> bool:
+    """Whether logind grants a sleep inhibitor now (right after boot, before the desktop session is active, it
+    refuses: "Failed to inhibit: Access denied")."""
+    try:
+        return subprocess.run(["systemd-inhibit", "--what=idle:sleep", "--why=paper book run", "true"],
+                              capture_output=True, timeout=30, check=False).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def step(cmd: list[str], inhibit: bool = True) -> subprocess.CompletedProcess[str]:
+    """One command, holding off idle sleep while it runs when `inhibit` (else noted in its output)."""
+    pre = ["systemd-inhibit", "--what=idle:sleep", "--why=paper book run"] if inhibit else []
+    r = subprocess.run([*pre, *cmd], cwd=BACKEND, capture_output=True, text=True, check=False, timeout=6 * 3600)
+    if not inhibit:
         r.stdout = "(sleep inhibitor refused; ran without it)\n" + r.stdout
     return r
 
@@ -188,8 +196,9 @@ def run(job: str) -> int:
                                        "skipped": "lock"})
             return 1
         rc, out = 0, ""
+        inhibit = can_inhibit()
         for cmd in commands(job, m):
-            r = step(cmd)
+            r = step(cmd, inhibit)
             out += r.stdout + r.stderr
             rc = rc or r.returncode
         log.write_text(out)
