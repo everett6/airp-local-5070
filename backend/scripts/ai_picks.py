@@ -29,7 +29,16 @@ from event_eval import SECTOR_ETF
 
 from app.forward.ledger import Ledger
 from app.portfolio import sleeve
-from app.portfolio.broker import Alpaca, BrokerError, Leg, leg_dict, leg_from, opg_open, reconcile
+from app.portfolio.broker import (
+    STOCK_TIF,
+    Alpaca,
+    BrokerError,
+    Leg,
+    leg_dict,
+    leg_from,
+    opg_open,
+    reconcile,
+)
 from app.portfolio.guard import HALT, state
 from app.sandbox.events import Prices
 
@@ -44,14 +53,14 @@ def due_legs(p: dict[str, Any], days: pd.DatetimeIndex, now: datetime) -> list[L
         return []
     have = {d["client_order_id"] for d in p.get("legs", [])}
     if p["status"] == "planned" and now < datetime.fromisoformat(p["entry_deadline"]):
-        legs = [Leg(p["ticker"], p["ticker"], "buy", p["qty"], "opg", leg_id(p["accession"], "in", "s"), 0.0),
-                Leg(p["etf"], p["etf"], "sell", p["etf_qty"], "opg", leg_id(p["accession"], "in", "e"), 0.0)]
+        legs = [Leg(p["ticker"], p["ticker"], "buy", p["qty"], STOCK_TIF, leg_id(p["accession"], "in", "s"), 0.0),
+                Leg(p["etf"], p["etf"], "sell", p["etf_qty"], STOCK_TIF, leg_id(p["accession"], "in", "e"), 0.0)]
     elif p["status"] == "open":
         i = int(days.searchsorted(pd.Timestamp(p["entry_index_day"])))
         if len(days) - 1 - i < sleeve.HOLD - 1:  # the exit open is not the next one yet
             return []
-        legs = [Leg(p["ticker"], p["ticker"], "sell", p["qty"], "opg", leg_id(p["accession"], "out", "s"), 0.0),
-                Leg(p["etf"], p["etf"], "buy", p["etf_qty"], "opg", leg_id(p["accession"], "out", "e"), 0.0)]
+        legs = [Leg(p["ticker"], p["ticker"], "sell", p["qty"], STOCK_TIF, leg_id(p["accession"], "out", "s"), 0.0),
+                Leg(p["etf"], p["etf"], "buy", p["etf_qty"], STOCK_TIF, leg_id(p["accession"], "out", "e"), 0.0)]
     else:
         return []
     return [x for x in legs if x.client_order_id not in have]
@@ -118,7 +127,7 @@ def mirror(st: dict[str, Any], client: Alpaca, days: pd.DatetimeIndex, now: date
                 if mode == "REDUCING" and "-in-" in leg.client_order_id:
                     continue
                 if dry:
-                    print(f"ai picks (dry): would send {leg.side} {leg.qty} {leg.symbol} opg")
+                    print(f"ai picks (dry): would send {leg.side} {leg.qty} {leg.symbol} at the open")
                     leg.status = "dry"
                 else:
                     try:
