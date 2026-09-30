@@ -823,6 +823,9 @@ GPU quiet windows. No returns have been looked at.
 
 **Arm A labels.** Bonsai P2 on the release alone does not depend on news, so it can continue now. Its 960 labels
 from B4 are reused (same prompt and inputs).
+**Note (22:4x PDT, before the warm-up):** the probe's 17-of-18 figure used windows shifted 7 h late: it read the
+naive UTC acceptance times as local time. It was a feasibility hint only. The gates above are measured by
+`scripts/warm_gdelt.py`, which keeps UTC (tested), and the probe is fixed too (892ecb9).
 **Test (one trial, `llm_fields_research_b4b`):** B4's rule exactly. The 20-day (B2 − A) monthly IC paired CI must be
 above 0 AND B2's own 20-day IC CI above 0.
 
