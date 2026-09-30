@@ -797,7 +797,7 @@ the coverage (about 15–28%) was already far below 50%. That is a stop, not a r
 (960 done, `llm_fields_b4.jsonl`) are kept but not scored. Re-running B4 needs a different free news source; that
 would be a new spec.
 
-### Arm B4b: B4 with GDELT news (spec fixed 2026-09-29 ~21:50 PDT, before any B4b label or GDELT warm-up)
+### Arm B4b: B4 with GDELT news (spec fixed 2026-09-29 ~21:47 PDT, before any B4b label or GDELT warm-up)
 
 **Why.** B4 was stopped because the Internet Archive had news for 21% of these mid and small caps (the rule needs
 50%). The user asked to continue B4. Its own stop rule names the remedy: a different free news source. A GDELT
