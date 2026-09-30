@@ -253,6 +253,13 @@ def run(job: str) -> int:
     return rc
 
 
+def disk_low(path: Path = BACKEND, min_free_gb: float = 20.0) -> str | None:
+    """An alert when the disk holding the ledgers runs low: a full disk would break every append silently."""
+    import shutil
+    free = shutil.disk_usage(path).free / 1e9
+    return f"disk space low: {free:.1f} GB free (alert below {min_free_gb:.0f} GB)" if free < min_free_gb else None
+
+
 def check(today: date | None = None) -> list[str]:
     """Weekdays in the last 7 days whose expected runs are missing from the heartbeat (in this mode)."""
     m = mode()
@@ -344,6 +351,9 @@ def main() -> None:
         gaps = check()
         for g in gaps:
             alert("check", "missed run: " + g)
+        low = disk_low()
+        if low:
+            alert("check", low)
         print("\n".join(gaps) or "no missed runs")
         msg = go_live()
         if msg:

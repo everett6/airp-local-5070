@@ -196,3 +196,9 @@ def test_failed_required_step_stops_following_steps(tmp_path, monkeypatch):
     # a broker failure blocks nothing; an event-runner failure skips only its readers
     assert called == ["scripts/broker_sync.py", "scripts/forward_events.py", "scripts/longterm_picks.py",
                       "scripts/themes.py"]
+
+
+def test_disk_low_alerts_only_below_the_floor(tmp_path):
+    assert autorun.disk_low(tmp_path, min_free_gb=0.0) is None
+    msg = autorun.disk_low(tmp_path, min_free_gb=1e9)
+    assert msg is not None and msg.startswith("disk space low")

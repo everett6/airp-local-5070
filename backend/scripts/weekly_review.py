@@ -154,6 +154,25 @@ def main() -> None:
     except Exception as e:  # noqa: BLE001 - a report line must never fail the review
         lines.append(f"- not available: {type(e).__name__}: {e}"[:200])
 
+    lines += ["", "## Trading health (report only)", ""]
+    try:
+        from trading_health import load
+        s4, ex = load()
+        if "sharpe" in s4:
+            lines.append(f"- Leverage gate ({s4['book']}): forward Sharpe {s4['sharpe']}, lower 80% bound "
+                         f"{s4.get('lower80', 'n/a')}, {s4['weeks']} weeks / {s4['months']} months, vol "
+                         f"{s4.get('vol_pct', 'n/a')}%, max drawdown {s4['max_drawdown_pct']}%; Stage 4 row: "
+                         f"{s4.get('stage4_row', s4.get('note', 'n/a'))}")
+        else:
+            lines.append(f"- Leverage gate ({s4['book']}): {s4.get('note', 'no data')}")
+        lines.append(f"- Paper execution: {ex['legs']} broker legs {ex['by_status']}; fill gap vs simulator "
+                     f"mean {ex['mean_abs_gap_bp'] if ex['mean_abs_gap_bp'] is not None else 'n/a'} bp, worst "
+                     f"{ex['worst_gap_bp'] if ex['worst_gap_bp'] is not None else 'n/a'} bp, "
+                     f"{ex['gaps_over_alert']} over 0.5%; {ex['problem_legs']} rejected/canceled/expired; "
+                     f"AI pairs {ex['ai_pairs']} (audit flags {ex['ai_audit_flags']})")
+    except Exception as e:  # noqa: BLE001 - a report line must never fail the review
+        lines.append(f"- not available: {type(e).__name__}: {e}"[:200])
+
     lines += ["", "## T1 / O1 forward shadows (failed backtests, tracked on new days only; no money; verdict 2028-09-30)", ""]
     try:
         from calendar_shadows import forward
