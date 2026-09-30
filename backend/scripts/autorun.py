@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import re
 import socket
 import subprocess
 import sys
@@ -53,6 +54,13 @@ MIN_GOOD_EVENT_RUNS = 8          # of the 10 scheduled Mon-Fri
 # steps that read the event runner's ledger; the broker, long-term and theme steps are independent and always run
 EVENT_READERS = {"scripts/ai_picks.py", "scripts/guidance_shadow.py", "scripts/net_read_shadow.py",
                  "scripts/self_improve.py", "scripts/learn_loop.py"}
+# a step that failed for a network reason is retried once: each of these is idempotent (ledgers skip what they have
+# seen; broker orders carry client ids, so a resend is refused, not duplicated)
+RETRYABLE = {"scripts/forward_events.py", "scripts/forward_allocator.py", "scripts/broker_sync.py", "scripts/ai_picks.py"}
+TRANSIENT = re.compile(r"Temporary failure in name resolution|Name or service not known|Connection (reset|refused|"
+                       r"aborted)|timed out|HTTP (429|502|503|504)|RemoteDisconnected|ConnectTimeout|ReadTimeout|"
+                       r"URLError", re.IGNORECASE)
+RETRY_WAIT = 90
 EXPECTED = {"events": 2, "allocator_weekday": 0}  # event runs per weekday; the allocator runs Mondays
 
 
@@ -231,6 +239,10 @@ def run(job: str) -> int:
                 out += f"(skipped {cmd[1]}: the event runner failed)\n"
                 continue
             r = step(cmd, inhibit)
+            if r.returncode != 0 and cmd[1:2] and cmd[1] in RETRYABLE and TRANSIENT.search(r.stdout + r.stderr):
+                out += r.stdout + r.stderr + f"(transient failure in {cmd[1]}; retrying once in 90 s)\n"
+                time.sleep(RETRY_WAIT)
+                r = step(cmd, inhibit)
             out += r.stdout + r.stderr
             rc = rc or r.returncode
             if r.returncode != 0 and cmd[1:2] == ["scripts/forward_events.py"]:
@@ -250,7 +262,21 @@ def run(job: str) -> int:
         alert(job, f)
     if m == "live" and rc == 0 and job in ("events", "allocator", "review", "learn"):
         push(job)
+    post_run(job)
     return rc
+
+
+def post_run(job: str) -> None:
+    """After a job: let the research queue start/restart what is due, and after the afternoon event run send the
+    daily digest. Neither may affect the job's result."""
+    extra = [[PY, "scripts/research_queue.py", "tick"]]
+    if job == "events" and datetime.now(ZoneInfo("America/Los_Angeles")).hour >= 12:
+        extra.append([PY, "scripts/digest.py", "--send"])
+    for cmd in extra:
+        try:
+            subprocess.run(cmd, cwd=BACKEND, capture_output=True, text=True, timeout=300, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
 
 
 def disk_low(path: Path = BACKEND, min_free_gb: float = 20.0) -> str | None:
@@ -354,6 +380,7 @@ def main() -> None:
         low = disk_low()
         if low:
             alert("check", low)
+        post_run("check")
         print("\n".join(gaps) or "no missed runs")
         msg = go_live()
         if msg:

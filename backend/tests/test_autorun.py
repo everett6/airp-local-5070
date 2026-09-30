@@ -183,6 +183,7 @@ def test_failed_required_step_stops_following_steps(tmp_path, monkeypatch):
     steps = [["py", "scripts/broker_sync.py"], ["py", "scripts/forward_events.py"], ["py", "scripts/ai_picks.py"],
              ["py", "scripts/longterm_picks.py"], ["py", "scripts/themes.py"], ["py", "scripts/learn_loop.py"]]
     monkeypatch.setattr(autorun, "commands", lambda job, mode: steps)
+    monkeypatch.setattr(autorun, "post_run", lambda job: None)
     monkeypatch.setattr(autorun, "alert", lambda *a: None)
     called = []
     failing = {"scripts/broker_sync.py", "scripts/forward_events.py"}
@@ -202,3 +203,37 @@ def test_disk_low_alerts_only_below_the_floor(tmp_path):
     assert autorun.disk_low(tmp_path, min_free_gb=0.0) is None
     msg = autorun.disk_low(tmp_path, min_free_gb=1e9)
     assert msg is not None and msg.startswith("disk space low")
+
+
+def _run_with(tmp_path, monkeypatch, steps, results):
+    import subprocess
+    monkeypatch.setattr(autorun, "FWD", tmp_path)
+    monkeypatch.setattr(autorun, "BACKEND", tmp_path)
+    monkeypatch.setattr(autorun, "wait_online", lambda: True)
+    monkeypatch.setattr(autorun, "can_inhibit", lambda: False)
+    monkeypatch.setattr(autorun, "commands", lambda job, mode: steps)
+    monkeypatch.setattr(autorun, "alert", lambda *a: None)
+    monkeypatch.setattr(autorun, "post_run", lambda job: None)
+    monkeypatch.setattr(autorun, "RETRY_WAIT", 0)
+    calls = []
+
+    def fake_step(cmd, inhibit):
+        calls.append(cmd[1])
+        rc, err = results.pop(0)
+        return subprocess.CompletedProcess(cmd, rc, "", err)
+    monkeypatch.setattr(autorun, "step", fake_step)
+    return autorun.run("events"), calls
+
+
+def test_a_transient_network_failure_is_retried_once(tmp_path, monkeypatch):
+    steps = [["py", "scripts/forward_events.py"]]
+    rc, calls = _run_with(tmp_path, monkeypatch, steps, [(1, "URLError: Temporary failure in name resolution"),
+                                                          (0, "")])
+    assert rc == 0 and calls == ["scripts/forward_events.py"] * 2
+
+
+def test_a_real_failure_or_unsafe_step_is_not_retried(tmp_path, monkeypatch):
+    rc, calls = _run_with(tmp_path, monkeypatch, [["py", "scripts/forward_events.py"]], [(1, "KeyError: 'eps'")])
+    assert rc == 1 and calls == ["scripts/forward_events.py"]
+    rc, calls = _run_with(tmp_path, monkeypatch, [["py", "scripts/learn_loop.py"]], [(1, "HTTP 503")])
+    assert rc == 1 and calls == ["scripts/learn_loop.py"]
