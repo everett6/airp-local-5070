@@ -797,6 +797,36 @@ the coverage (about 15–28%) was already far below 50%. That is a stop, not a r
 (960 done, `llm_fields_b4.jsonl`) are kept but not scored. Re-running B4 needs a different free news source; that
 would be a new spec.
 
+### Arm B4b: B4 with GDELT news (spec fixed 2026-09-29 ~21:50 PDT, before any B4b label or GDELT warm-up)
+
+**Why.** B4 was stopped because the Internet Archive had news for 21% of these mid and small caps (the rule needs
+50%). The user asked to continue B4. Its own stop rule names the remedy: a different free news source. A GDELT
+probe (DOC 2.0 API, free) got an answer for 18 of its first 30 releases, and 17 of those 18 had ≥ 3 articles in
+the 45 days before the release. Everything else is B4's spec, unchanged: sample, arms, ridges, deciding rule and
+GPU quiet windows. No returns have been looked at.
+
+**News source (frozen).**
+- Query: GDELT DOC 2.0 `mode=artlist`, the exact phrase of the cleaned company name (the rules in
+  `scripts/gdelt_probe.py`: legal suffixes dropped) plus `sourcelang:english`.
+- A one-word cleaned name gets ` (stock OR shares OR earnings OR NYSE OR Nasdaq)` added.
+- Window: 45 days before the acceptance time, ending 1 minute before it. Only articles whose `seendate` is strictly
+  before the acceptance count.
+- Paced at one request every 20 s or more, with 180 s backoff on refusals.
+- The newest 15 as-of headlines (date, domain, title) replace the Archive page as the result of Jan's `news_as_of`
+  call, stored in the same tool cache under the same key. Jan's gather (B2 settings), the evidence rules and Bonsai's
+  prompts are unchanged.
+
+**Gates before any Jan or B2 labels (both needed, else B4b stops, no test):**
+1. As-of coverage (≥ 1 headline) on at least 50% of the 2,851 releases after the warm-up.
+2. Relevance: 40 releases drawn at random (seed 0) from those with headlines. Claude reads the titles only. The top
+   headline must be about that company in at least 70% of them.
+
+**Arm A labels.** Bonsai P2 on the release alone does not depend on news, so it can continue now. Its 960 labels
+from B4 are reused (same prompt and inputs).
+**Test (one trial, `llm_fields_research_b4b`):** B4's rule exactly. The 20-day (B2 − A) monthly IC paired CI must be
+above 0 AND B2's own 20-day IC CI above 0.
+
+
 ### skfolio test (spec fixed 2026-09-27, before any run)
 
 Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capital cap?
