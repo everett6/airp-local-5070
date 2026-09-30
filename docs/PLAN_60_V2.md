@@ -1444,6 +1444,20 @@ Since 2020: +0.14. By year the sign flips (2022 −1.5, 2024 +1.4). The data che
 matched the minute bars. Correlation with the core book: 0.54. Built by Codex (6 Luna) from this spec; Claude
 reviewed and ran it.
 
+### T1 and O1 forward shadows (spec fixed 2026-09-29 evening PDT, before any forward day; user: "set up the T1 and O1 shadow books")
+
+Both failed their one backtest (T1 +0.30, O1 +0.25 net). Neither is re-tested or changed. They are tracked on
+future days only, with the frozen code, and no money: `app/sandbox/calendar_fx.tom_overlay` (T1, 1 bp a side)
+and `app/sandbox/overnight.overnight_legs` / `overnight_excess` (O1, 1 bp a side). Both are excess returns over
+the 3-month T-bill.
+- **Forward window:** trading days from **2026-09-30** on. Data: SPY daily Open/Close from Yahoo (adjusted), fetched
+  fresh at each weekly review. The T-bill comes from FRED DTB3 (free).
+- **Reported every Saturday** (weekly review): days tracked, cumulative net excess return, annualized Sharpe so far
+  and its 95% CI once 60+ days exist. Reported only; nothing moves money.
+- **Verdict on 2028-09-30** (two years, about 500 nights for O1 and 100 TOM days for T1), with each test's own
+  pass rule: net Sharpe ≥ 0.5 AND 95% 21-day block-bootstrap CI above 0. A pass there is a candidate for the
+  leverage ladder only, proposed to the user. No earlier verdict, and no rule change on the way.
+
 ### Core leads, forward check (spec fixed 2026-09-29, midday PDT, before any forward data)
 
 The user asked to raise the book's Sharpe. The two known ways were already tested on 2018–26 and failed narrowly,
