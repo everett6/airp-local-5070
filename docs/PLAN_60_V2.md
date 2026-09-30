@@ -789,6 +789,14 @@ S&P 400 vs 600 separately.
 on Thu 1 Oct for the first long-term and theme cohorts. A paused step resumes where it stopped.
 **If it passes:** a shadow at 0 weight in the forward test. The AI-picks sleeve changes only by the user's decision.
 
+**Outcome (2026-09-29 ~18:05 PDT): STOPPED by the pre-registered news stop rule; no test run, no trial registered.**
+After 150 of 2,851 releases the Archive had a news page for 31 (21%). The 50% floor was fixed in advance. The S&P
+500 samples had 80%: mid and small caps rarely have archived Yahoo pages. Each release took about 50 s, so a full
+warm-up would take about 40 hours. The rule was applied at 150 releases rather than 2,851, because the 95% range of
+the coverage (about 15–28%) was already far below 50%. That is a stop, not a result. Bonsai's arm A labels
+(960 done, `llm_fields_b4.jsonl`) are kept but not scored. Re-running B4 needs a different free news source; that
+would be a new spec.
+
 ### skfolio test (spec fixed 2026-09-27, before any run)
 
 Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capital cap?
