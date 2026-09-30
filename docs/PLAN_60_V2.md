@@ -1444,6 +1444,38 @@ Since 2020: +0.14. By year the sign flips (2022 −1.5, 2024 +1.4). The data che
 matched the minute bars. Correlation with the core book: 0.54. Built by Codex (6 Luna) from this spec; Claude
 reviewed and ran it.
 
+### Macro-announcement premium E1 (spec fixed 2026-09-29 evening PDT, before any E1 code, calendar or number)
+
+**Idea.** Stocks earn much more on days when scheduled macro news comes out: 11.4 bp against 1.1 bp on other days
+(Savor and Wilson, JFQA 2013). **Stated cause:** investors are paid for holding stocks through the resolution of
+macro uncertainty (inflation, jobs, the Fed); it is a risk premium, not a mispricing. Found by Codex's screen
+(29 Sep, paper checked). **Known risk:** the pre-FOMC drift alone faded after 2015 (Kurov, Wolfe and Gilbert).
+Nothing about announcement days has been computed in this repo. T1 (month turn) is a different calendar.
+
+**Rule (one trial, `macro_announcement`).**
+- Events: first releases of the **Employment Situation** (BLS) and the **PPI** (BLS), and **scheduled** FOMC
+  statement days. Unscheduled FOMC moves are excluded. For two-day meetings the statement day is the second day.
+- Dates: the Employment Situation and PPI first-release dates come from ALFRED's release-date lists (free; release
+  ids 50 and 46). Only each reference month's first release counts, not revisions. FOMC statement dates come from the
+  Fed's historical calendars (free). A date is used only if it was a scheduled release (announced ahead). Calendar
+  checks before any returns: 11–13 jobs and PPI dates a year, and 8 FOMC dates a year (2020 may differ; list any
+  exception).
+- Position: long SPY from the close of the trading day before an event day to the close of the event day. Adjacent
+  event days are merged into one holding. Otherwise T-bills (excess 0). 1 bp a side per holding.
+- Data: SPY adjusted closes (`data/trend/etf_closes.parquet`); risk-free `vol_target_b0.tbill()` / 252.
+- Window: 2013-05-01 .. 2026-09-25 (after the paper's publication).
+
+**Pass (both, 95%):**
+1. The strategy's net daily excess (0 on non-event days) has annualized Sharpe ≥ 0.5 AND a 21-day block-bootstrap
+   CI above 0.
+2. Mean SPY excess on event days minus mean on other days has a 95% block-bootstrap CI above 0 (21-day blocks,
+   5,000 draws, seed 0; `calendar_fx.diff_ci`).
+
+**Reported, not deciding:** each event type alone (diagnostic only; no subset is ever promoted), by year, 3 bp
+costs, correlation with the core book.
+**Use if it passes:** a leverage-ladder candidate only, proposed to the user. Under gross 1.0 it holds SPY on only
+about 32 days a year.
+
 ### T1 and O1 forward shadows (spec fixed 2026-09-29 evening PDT, before any forward day; user: "set up the T1 and O1 shadow books")
 
 Both failed their one backtest (T1 +0.30, O1 +0.25 net). Neither is re-tested or changed. They are tracked on
