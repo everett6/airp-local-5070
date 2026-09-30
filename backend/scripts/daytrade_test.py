@@ -319,6 +319,62 @@ def run_o1(core: pd.Series) -> dict:
     return res
 
 
+E1_START, E1_END, E1_TRIAL = "2013-05-01", "2026-09-25", "macro_announcement"
+
+
+def run_e1(core: pd.Series) -> dict:
+    """E1 scheduled macro-announcement overlay; call only for its one registered run."""
+    from vol_target_b0 import tbill
+
+    from app.sandbox.calendar_fx import diff_ci
+    from app.sandbox.macro_events import announcement_strategy, event_days
+    from scripts.macro_calendar import count_exceptions
+
+    calendar_path = BACKEND / "data" / "macro" / "announcements.csv"
+    calendar = pd.read_csv(calendar_path, dtype=str)
+    problems = count_exceptions(calendar)
+    if problems:
+        raise SystemExit("E1 calendar count check failed: " + "; ".join(problems))
+    spy = pd.read_parquet(BACKEND / "data" / "trend" / "etf_closes.parquet")["SPY"].dropna()
+    rf = tbill().reindex(spy.index, method="ffill").fillna(0.0) / 252
+    ex = (spy.pct_change() - rf).dropna()
+    window = slice(E1_START, E1_END)
+    x = ex.loc[window]
+    calendar_dates = pd.to_datetime(calendar["date"])
+    in_window = (calendar_dates >= pd.Timestamp(E1_START)) & (calendar_dates <= pd.Timestamp(E1_END))
+    window_calendar = calendar.loc[in_window]
+    event_series = event_days(pd.DatetimeIndex(x.index), window_calendar["date"].tolist())
+    missing = sorted(set(window_calendar["date"]) - set(x.index.strftime("%Y-%m-%d")))
+    if missing:
+        print(f"E1 calendar dates outside trading index (not mapped): {missing}", flush=True)
+    res: dict = {"window": [E1_START, E1_END]}
+    overlays: dict[int, pd.DataFrame] = {}
+    for bp in (1, 3):
+        overlays[bp] = announcement_strategy(x, event_series, bp / 1e4)
+        res[f"{bp}bp"] = stats(overlays[bp]["ret"])
+    point, lo, hi = diff_ci(x, event_series, block=21, n=5000, seed=0, level=0.95)
+    res["diff_bp_per_day"] = {"point": round(point * 1e4, 2), "ci": [round(lo * 1e4, 2), round(hi * 1e4, 2)],
+                              "event_mean": round(float(x[event_series].mean()) * 1e4, 2),
+                              "other_mean": round(float(x[~event_series].mean()) * 1e4, 2),
+                              "event_days": int(event_series.sum())}
+    res["by_event"] = {}
+    for kind in ("jobs", "ppi", "fomc"):
+        mask = event_days(pd.DatetimeIndex(x.index),
+                          window_calendar.loc[window_calendar.event == kind, "date"].tolist())
+        res["by_event"][kind] = stats(announcement_strategy(x, mask, 1e-4)["ret"])
+    one = overlays[1]["ret"]
+    res["by_year"] = {str(year): round(sharpe(group), 2) for year, group in one.groupby(one.index.year)}
+    res["corr_with_core"] = round(float(one.corr(core.reindex(one.index))), 3)
+    t = res["1bp"]
+    res["pass"] = bool(t["sharpe"] >= 0.5 and t["ci"][0] > 0 and lo > 0)
+    register({"trial": E1_TRIAL, "date": time.strftime("%Y-%m-%d"), "kind": "calendar",
+              "sharpe_ann": t["sharpe"], "window": f"{E1_START}..{E1_END}",
+              "result": "pass" if res["pass"] else "fail"})
+    print(f"E1 {E1_TRIAL}: Sharpe {t['sharpe']} CI {t['ci']}; event-minus-other {res['diff_bp_per_day']['point']} "
+          f"bp/day CI {res['diff_bp_per_day']['ci']} -> {'PASS' if res['pass'] else 'FAIL'}", flush=True)
+    return res
+
+
 def check_d9() -> dict:
     """D9's pre-stated validity check: the same rule on Alpaca's SIP daily bars (scripts/daily_alpaca.py)."""
     from intraday_stocks import universe
@@ -360,7 +416,7 @@ def main() -> None:
         return
     rules = a.rules.split(",")
     bars = ({s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")}
-            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "P1", "C1", "T1", "O1"} else {})
+            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "P1", "C1", "T1", "O1", "E1"} else {})
     core = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")["core"]
     f = BACKEND / "results" / "daytrade_test.json"
     out: dict = json.loads(f.read_text()) if f.exists() else {}
@@ -371,9 +427,9 @@ def main() -> None:
             out[name] = run_d5(core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
-        if name in ("D7", "D8", "D9", "D10", "P1", "C1", "T1", "O1"):
+        if name in ("D7", "D8", "D9", "D10", "P1", "C1", "T1", "O1", "E1"):
             out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10, "P1": run_p1, "C1": run_c1,
-                         "T1": run_t1, "O1": run_o1}[name](core)
+                         "T1": run_t1, "O1": run_o1, "E1": run_e1}[name](core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
         fn, start, trial = RULES[name]
