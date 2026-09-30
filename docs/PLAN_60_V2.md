@@ -1476,6 +1476,14 @@ costs, correlation with the core book.
 **Use if it passes:** a leverage-ladder candidate only, proposed to the user. Under gross 1.0 it holds SPY on only
 about 32 days a year.
 
+**Result (run once, 2026-09-29 ~19:35 PDT): FAIL.** At 1 bp a side the net Sharpe was +0.08, CI [−0.42, +0.66],
+CAGR 0.3%; at 3 bp it was −0.11. Announcement days averaged 3.5 bp of excess against 5.4 bp on other days: a
+difference of −1.9 bp a day, CI [−13.6, +9.1], over 416 event days. The premium the paper found (+10 bp) is gone
+since publication. By type, diagnostic only: jobs +0.20, PPI −0.17, FOMC +0.10, all CIs spanning 0. Four
+jobs-report dates fell on Good Friday (market closed) and were left unmapped, as the spec says. Calendar: 12
+jobs, 12 PPI and 8 FOMC dates a year, matching BLS for 2015 and 2024; 2020 and the 2025 shutdown are documented in
+`data/macro/announcements.csv`. Built by Codex (6 Luna, session e1); Claude reviewed and ran it.
+
 ### T1 and O1 forward shadows (spec fixed 2026-09-29 evening PDT, before any forward day; user: "set up the T1 and O1 shadow books")
 
 Both failed their one backtest (T1 +0.30, O1 +0.25 net). Neither is re-tested or changed. They are tracked on
