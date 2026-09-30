@@ -154,6 +154,19 @@ def main() -> None:
     except Exception as e:  # noqa: BLE001 - a report line must never fail the review
         lines.append(f"- not available: {type(e).__name__}: {e}"[:200])
 
+    lines += ["", "## T1 / O1 forward shadows (failed backtests, tracked on new days only; no money; verdict 2028-09-30)", ""]
+    try:
+        from calendar_shadows import forward
+        f = forward()
+        for k in ("T1", "O1"):
+            v = f[k]
+            lines.append(f"- {k}: {v['days']} days ({v['active_days']} active), net excess "
+                         f"{v['cum_net_excess_pct'] if v['cum_net_excess_pct'] is not None else 'n/a'}%, "
+                         f"Sharpe {v['sharpe'] if v['sharpe'] is not None else 'n/a'}, "
+                         f"95% CI {v['ci95'] or 'n/a'}" + (" (verdict due)" if f["verdict_due"] else ""))
+    except Exception as e:  # noqa: BLE001 - a report line must never fail the review
+        lines.append(f"- not available: {type(e).__name__}: {e}"[:200])
+
     lines += ["", "## 1-week Bonsai book (shadow, 0 weight)", ""]
     led = Ledger(FWD / "events" / "ledger.jsonl")
     recs = led.verify()
