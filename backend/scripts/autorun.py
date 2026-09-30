@@ -267,11 +267,13 @@ def run(job: str) -> int:
 
 
 def post_run(job: str) -> None:
-    """After a job: let the research queue start/restart what is due, and after the afternoon event run send the
-    daily digest. Neither may affect the job's result."""
+    """After a job: let the research queue start/restart what is due, after the afternoon event run send the
+    daily digest, and after the daily check refresh the desktop app's charts. None may affect the job's result."""
     extra = [[PY, "scripts/research_queue.py", "tick"]]
     if job == "events" and datetime.now(ZoneInfo("America/Los_Angeles")).hour >= 12:
         extra.append([PY, "scripts/digest.py", "--send"])
+    if job == "check":  # refresh the desktop app's chart data once a day
+        extra.append([PY, "scripts/desktop_export.py"])
     for cmd in extra:
         try:
             subprocess.run(cmd, cwd=BACKEND, capture_output=True, text=True, timeout=300, check=False)
