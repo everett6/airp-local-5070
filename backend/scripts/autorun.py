@@ -52,8 +52,10 @@ LIVE_FROM = date(2026, 9, 30)    # first eligible live filing date after the use
 DRY_FROM = date(2026, 9, 28)
 MIN_GOOD_EVENT_RUNS = 8          # of the 10 scheduled Mon-Fri
 # steps that read the event runner's ledger; the broker, long-term and theme steps are independent and always run
+CONSENSUS = "scripts/consensus_shadow.py"
 EVENT_READERS = {"scripts/ai_picks.py", "scripts/guidance_shadow.py", "scripts/net_read_shadow.py",
-                 "scripts/self_improve.py", "scripts/learn_loop.py"}
+                 "scripts/self_improve.py", "scripts/learn_loop.py", CONSENSUS}
+SIDE_STEPS = {CONSENSUS}  # recorded in the log, but their exit code never becomes the job's result
 # a step that failed for a network reason is retried once: each of these is idempotent (ledgers skip what they have
 # seen; broker orders carry client ids, so a resend is refused, not duplicated)
 RETRYABLE = {"scripts/forward_events.py", "scripts/forward_allocator.py", "scripts/broker_sync.py", "scripts/ai_picks.py"}
@@ -155,8 +157,11 @@ def commands(job: str, m: str) -> list[list[str]]:
         longterm = [PY, "scripts/longterm_picks.py", *(DRY["longterm"] if dry else [])]
         themes = [PY, "scripts/themes.py"]  # the theme track and AI-bubble gauge: a shadow, one ledger in both modes
         improve = [PY, "scripts/self_improve.py", *(DRY["self_improve"] if dry else [])]  # arm F, a shadow
-        return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], picks, guide, net_read, longterm,
-                themes, improve, [*learn, "collect", *largs]]
+        # the consensus shadow (PLAN_60_V2), live only, CPU: right after the agents' labels, so its lines are
+        # written (and pushed with this run) before the open even when a later step takes long
+        consensus = [] if dry else [[PY, CONSENSUS]]
+        return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], picks, guide, net_read,
+                *consensus, longterm, themes, improve, [*learn, "collect", *largs]]
     if job == "allocator":
         return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])], broker]
     if job == "review":
@@ -278,6 +283,10 @@ def run(job: str) -> int:
                 out += f"(skipped {cmd[1]}: the event runner failed)\n"
                 continue
             r = safe_step(cmd, inhibit)
+            if cmd[1:2] and cmd[1] in SIDE_STEPS:
+                out += r.stdout + r.stderr + (f"({cmd[1]} failed; the run's result is not affected)\n"
+                                              if r.returncode != 0 else "")
+                continue
             if r.returncode != 0 and cmd[1:2] and cmd[1] in RETRYABLE and TRANSIENT.search(r.stdout + r.stderr):
                 out += r.stdout + r.stderr + f"(transient failure in {cmd[1]}; retrying once in 90 s)\n"
                 time.sleep(RETRY_WAIT)
@@ -309,12 +318,9 @@ def run(job: str) -> int:
 
 
 def post_run(job: str) -> None:
-    """After a job: let the research queue start/restart what is due, after an event run record the consensus
-    shadow, after the afternoon event run send the daily digest, and after the daily check refresh the desktop app's
-    charts. None may affect the job's result."""
+    """After a job: let the research queue start/restart what is due, after the afternoon event run send the daily
+    digest, and after the daily check refresh the desktop app's charts. None may affect the job's result."""
     extra = [[PY, "scripts/research_queue.py", "tick"]]
-    if job == "events" and mode() == "live":  # the consensus shadow (PLAN_60_V2): CPU only, reads the agents' labels
-        extra.append([PY, "scripts/consensus_shadow.py"])
     if job == "events" and datetime.now(ZoneInfo("America/Los_Angeles")).hour >= 12:
         extra.append([PY, "scripts/digest.py", "--send"])
     if job == "check":  # refresh the desktop app's chart data once a day

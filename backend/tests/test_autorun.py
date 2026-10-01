@@ -240,19 +240,23 @@ def test_a_real_failure_or_unsafe_step_is_not_retried(tmp_path, monkeypatch):
     assert rc == 1 and calls == ["scripts/learn_loop.py"]
 
 
-def test_post_run_records_the_consensus_shadow_after_live_event_runs_only(monkeypatch):
-    seen = []
-    monkeypatch.setattr(autorun.subprocess, "run", lambda cmd, **kw: seen.append(cmd[1]))
-    monkeypatch.setattr(autorun, "mode", lambda: "live")
-    autorun.post_run("events")
-    assert "scripts/consensus_shadow.py" in seen and seen[0] == "scripts/research_queue.py"
-    seen.clear()
-    autorun.post_run("check")
-    assert "scripts/consensus_shadow.py" not in seen
-    monkeypatch.setattr(autorun, "mode", lambda: "dry")
-    seen.clear()
-    autorun.post_run("events")
-    assert "scripts/consensus_shadow.py" not in seen
+def test_consensus_shadow_runs_right_after_the_labels_in_live_event_runs_only():
+    live = [c[1] for c in autorun.commands("events", "live")]
+    i = live.index("scripts/consensus_shadow.py")
+    assert live[i - 1] == "scripts/net_read_shadow.py" and live[i + 1] == "scripts/longterm_picks.py"
+    assert "scripts/consensus_shadow.py" not in [c[1] for c in autorun.commands("events", "dry")]
+    for job in ("allocator", "review"):
+        assert "scripts/consensus_shadow.py" not in [c[1] for c in autorun.commands(job, "live")]
+
+
+def test_a_failing_consensus_shadow_never_changes_the_runs_result(tmp_path, monkeypatch):
+    steps = [["py", "scripts/forward_events.py"], ["py", "scripts/consensus_shadow.py"], ["py", "scripts/themes.py"]]
+    rc, calls = _run_with(tmp_path, monkeypatch, steps, [(0, ""), (1, "boom"), (0, "")])
+    assert rc == 0 and calls == ["scripts/forward_events.py", "scripts/consensus_shadow.py", "scripts/themes.py"]
+    assert "consensus_shadow.py failed; the run's result is not affected" in next(tmp_path.glob("logs/*.log")).read_text()
+    # and it is skipped, like the other readers, when the event runner itself failed
+    rc, calls = _run_with(tmp_path, monkeypatch, steps, [(1, "KeyError"), (0, "")])
+    assert rc == 1 and calls == ["scripts/forward_events.py", "scripts/themes.py"]
 
 
 def test_an_event_run_that_only_alerted_counts_as_run_and_is_pushed(tmp_path, monkeypatch):

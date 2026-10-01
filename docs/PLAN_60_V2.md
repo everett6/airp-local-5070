@@ -1747,7 +1747,10 @@ fitted to or looked at against results.
   `consensus_eq`. The prior (10 hits in 20) and the 0.1 floor are fixed here and never tuned.
 - **Record.** `scripts/consensus_shadow.py` appends one line per release to `results/forward/consensus/ledger.jsonl`
   (votes, weights, matured calls per agent, both scores, time written), once, never rewritten. It runs after each
-  event run (`autorun.post_run`, CPU only; a failure there cannot change the run's result). A line written at or
+  event run (`autorun.post_run`, CPU only; a failure there cannot change the run's result). *From the afternoon of
+  1 Oct 2026, before its first line was written:* it runs inside the event job right after the agents' labels
+  instead of after the job, with the same guarantee, so that its lines are written and pushed before the open even
+  when a later step is slow. A line written at or
   after the entry deadline is kept but never scored (the six releases of 30 Sep and 1 Oct fall under this).
 - **Pass (two trials, `consensus_eq_forward` and `consensus_rw_forward`), the rule of arms C2, D and E:** at the
   first review with at least 150 scored releases and 3 months, the monthly rank IC against 5-day sector-relative
