@@ -10,6 +10,7 @@ let win = null;
 // The packaging smoke test uses its own profile, so it can run while the real app is open.
 const SMOKE = !!process.env.AIRP_SMOKE_SCREENSHOT;
 if (SMOKE) app.setPath('userData', path.join(app.getPath('temp'), 'airp-smoke-profile'));
+if (SMOKE) app.disableHardwareAcceleration();  // screenshots never touch the graphics card
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();  // the open window is focused by its own 'second-instance' handler
 

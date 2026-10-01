@@ -282,11 +282,13 @@ def _stats_of(v: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
-GROUP = {"D": "day trading", "P": "pairs", "C": "crypto carry", "T": "calendar", "O": "calendar", "E": "calendar"}
+GROUP = {"D": "day trading", "P": "pairs", "C": "crypto carry", "T": "calendar", "O": "calendar", "E": "calendar",
+         "R": "flows", "M": "flows", "A": "flows"}
 NAMES = {"D1": "Intraday momentum", "D2": "Opening-range breakout", "D3": "Noise-band VWAP", "D4": "Rest-of-day momentum",
          "D5": "End-of-day reversal", "D6": "Box theory", "D7": "Intraday periodicity", "D8": "Darvas box",
          "D9": "Opening-auction reversal", "D10": "Pre-market reversal", "P1": "Pairs (GGR)", "C1": "Funding carry",
-         "T1": "Turn of the month", "O1": "SPY overnight", "E1": "Macro announcements"}
+         "T1": "Turn of the month", "O1": "SPY overnight", "E1": "Macro announcements",
+         "R1": "Rebalancing pressure", "M1": "Month-end Treasuries", "A1": "Treasury auction cycle"}
 
 
 def both(x: Any) -> dict[str, Any]:
@@ -327,6 +329,24 @@ def lab() -> dict[str, Any]:
             curves["E1"] = curve(announcement_strategy(x, ev, 1e-4)["ret"])
     except Exception as e:  # noqa: BLE001 - a missing input drops a curve, never the export
         curves["error_calendar"] = f"{type(e).__name__}: {e}"[:200]
+    try:  # the flow tests of 1 Oct (R1, M1, A1), each from the start of its deciding window
+        from vol_target_b0 import tbill
+
+        from app.sandbox import flows as F
+        closes = pd.read_parquet(BACKEND / "data" / "trend" / "etf_closes.parquet")
+        ret = closes[["SPY", "IEF"]].pct_change().dropna()
+        sig = F.threshold_signal(ret["SPY"], ret["IEF"])
+        curves["R1"] = curve(F.rebalance_stream(ret["SPY"], ret["IEF"], sig, 1e-4)["ret"].loc["2023-03-20":])
+        tlt = closes["TLT"].dropna()
+        ex = (tlt.pct_change() - tbill().reindex(tlt.index, method="ffill").fillna(0.0) / 252).dropna()
+        days = pd.DatetimeIndex(ex.index)
+        curves["M1"] = curve(F.overlay(ex, F.month_end_days(days, 3), 1e-4).loc["2019-01-02":"2026-08-31"])
+        cal = BACKEND / "data" / "macro" / "treasury_auctions.csv"
+        if cal.exists():
+            post, _ = F.auction_windows(days, pd.read_csv(cal, dtype=str)["date"].tolist())
+            curves["A1"] = curve(F.overlay(ex, post, 1e-4).loc["2014-01-02":])
+    except Exception as e:  # noqa: BLE001
+        curves["error_flows"] = f"{type(e).__name__}: {e}"[:200]
     try:
         from daytrade_test import daily_list
 

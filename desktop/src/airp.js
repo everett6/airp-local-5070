@@ -93,6 +93,99 @@ export function createAirp(root) {
       });
     },
 
+    // The user's 2.5x paper book next to the frozen one: size, borrowing, and distance to its own limits.
+    async aggressive() {
+      const NAME = 'aggressive 2.5x';
+      const runs = jsonl(path.join(fwd, 'allocator', 'ledger.jsonl'));
+      const limits = json(path.join(backend, 'config', 'mandate.json'), {})?.books?.[NAME] ?? null;
+      const pts = (n) => runs.filter((r) => r.books?.[n]).map((r) => ({ date: r.data_through, ...r.books[n] }));
+      const agg = pts(NAME), frozen = pts('master+brakes');
+      let peak = 0;
+      for (const x of agg) peak = Math.max(peak, x.equity);
+      const last = agg.at(-1) ?? null;
+      const order = Object.values(json(path.join(fwd, 'broker', 'orders.json'), {}) || {}).filter((o) => o.book === NAME).at(-1) ?? null;
+      const next = (await timers()).find((t) => String(t.unit || t.activates).startsWith('airp-allocator'))?.next ?? null;
+      const slim = (xs) => xs.map((x) => ({ date: x.date, equity: x.equity }));
+      return {
+        name: NAME, limits, started: agg.length > 0, nextAllocator: next,
+        last: last && { date: last.date, equity: last.equity, gross: last.gross ?? null, borrowed: last.borrowed ?? null,
+          interest_paid: last.interest_paid ?? null, wiped_out: !!last.wiped_out },
+        drawdown: last && peak ? 1 - last.equity / peak : null,
+        series: { aggressive: slim(agg), frozen: slim(frozen) },
+        broker: order && { scale: order.broker_scale ?? null, gross: order.broker_gross ?? null },
+      };
+    },
+
+    // The consensus shadow: each agent's vote per release, its record so far and its weight (no money).
+    consensus(limit = 30) {
+      const AGENTS = ['judge', 'net_read', 'ai_read', 'bb_read', 'guidance'];
+      const lines = jsonl(path.join(fwd, 'consensus', 'ledger.jsonl'));
+      const outcome = Object.fromEntries(jsonl(path.join(fwd, 'events', 'ledger.jsonl'))
+        .filter((r) => r.type === 'outcome').map((r) => [r.accession, r.fwd5 ?? null]));
+      const last = lines.at(-1);
+      return {
+        recorded: lines.length,
+        scored: lines.filter((x) => new Date(x.written_at) < new Date(x.entry_deadline) && outcome[x.accession] != null).length,
+        agents: AGENTS.map((a) => ({ agent: a, hits: last?.records?.[a]?.[0] ?? 0, calls: last?.records?.[a]?.[1] ?? 0, weight: last?.weights?.[a] ?? null })),
+        releases: lines.slice(-limit).reverse().map((x) => ({ ticker: x.ticker, entry_deadline: x.entry_deadline, votes: x.votes, eq: x.eq, rw: x.rw,
+          on_time: new Date(x.written_at) < new Date(x.entry_deadline), result: outcome[x.accession] ?? null })),
+      };
+    },
+
+    // What the research queue's gate is waiting for: news coverage so far against the 50% it needs.
+    researchExtra() {
+      const warm = jsonl(path.join(backend, 'results', 'events', 'warm_gdelt.jsonl'));
+      const done = new Map();
+      for (const r of warm) if (r.status === 'ok' || r.status === 'none') done.set(r.accession, r);
+      const withNews = [...done.values()].filter((r) => (r.n_asof ?? 0) >= 1).length;
+      return {
+        b4b: { done: done.size, total: 2851, with_news: withNews, coverage: done.size ? withNews / done.size : null, needed: 0.5,
+          errors: warm.filter((r) => r.status === 'error').length },
+        engine: process.env.AIRP_LABEL_ENGINE === 'ollama' ? 'Ollama, one report at a time' : 'llama-server, 3 reports at once',
+      };
+    },
+
+    // Every scheduled run with the alerts it raised, newest first.
+    async runs(limit = 200) {
+      const alerts = jsonl(path.join(fwd, 'alerts.jsonl'));
+      const beats = jsonl(path.join(fwd, 'heartbeat.jsonl')).slice(-limit).reverse();
+      const ms = (x) => (x ? Date.parse(x) : NaN);
+      return {
+        runs: beats.map((b) => {
+          const a = ms(b.start), z = ms(b.end) || a;
+          return { job: b.job, mode: b.mode, start: b.start, end: b.end ?? null, rc: b.rc, seconds: b.end ? Math.round((z - a) / 1000) : null,
+            missed_total: b.missed_total ?? null, gaps: b.gaps ?? null, skipped: b.skipped ?? null,
+            alerts: alerts.filter((x) => x.job === b.job && ms(x.at) >= a && ms(x.at) <= z + 10_000).map((x) => x.msg) };
+        }),
+        timers: await timers(),
+      };
+    },
+
+    // What changed in the last `hours` hours: decisions, practice trades, fills, alerts, test results, runs.
+    today(hours = 24, now = Date.now()) {
+      const since = now - hours * 3600_000;
+      const fresh = (t) => t && Date.parse(t) >= since;
+      const led = jsonl(path.join(fwd, 'events', 'ledger.jsonl'));
+      const book = json(path.join(fwd, 'ai_picks', 'book.json'), {}) || {};
+      const thr = book.threshold ?? null;
+      const legs = (book.pairs || []).flatMap((p) => (p.legs || []).map((l) => ({ ...l, pair: p.ticker })))
+        .concat(Object.values(json(path.join(fwd, 'broker', 'orders.json'), {}) || {}).flatMap((o) => (o.legs || []).map((l) => ({ ...l, pair: o.book }))));
+      const day = new Date(since).toISOString().slice(0, 10);
+      return {
+        hours,
+        decisions: led.filter((r) => r.type === 'decision' && fresh(r.written_at))
+          .map((r) => ({ ticker: r.ticker, logodds: r.logodds, trade: thr != null && r.logodds >= thr })),
+        missed: led.filter((r) => r.type === 'missed' && fresh(r.written_at)).length,
+        outcomes: led.filter((r) => r.type === 'outcome' && fresh(r.written_at)).map((r) => ({ accession: r.accession, fwd5: r.fwd5 })),
+        fills: legs.filter((l) => l.status === 'filled' && fresh(l.filled_at))
+          .map((l) => ({ pair: l.pair, symbol: l.symbol, side: l.side, qty: l.qty, price: l.filled_price })),
+        alerts: jsonl(path.join(fwd, 'alerts.jsonl')).filter((a) => fresh(a.at)).map((a) => ({ at: a.at, job: a.job, msg: a.msg })),
+        tests: jsonl(path.join(backend, 'results', 'trials_registry.jsonl')).filter((r) => String(r.date) >= day)
+          .map((r) => ({ trial: r.trial || r.name, result: r.result ?? r.verdict, sharpe: r.sharpe_ann ?? null })),
+        runs: jsonl(path.join(fwd, 'heartbeat.jsonl')).filter((b) => fresh(b.start)).map((b) => ({ job: b.job, rc: b.rc, start: b.start })),
+      };
+    },
+
     health: () => runJson('trading_health.py'),
     metrics() { return json(path.join(backend, 'results', 'desktop', 'metrics.json'), null); },
     rebuildMetrics: () => run('desktop_export.py', [], 600_000),

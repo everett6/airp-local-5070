@@ -22,9 +22,57 @@ async function api(path, body) {
   return data;
 }
 
+const JOBS = { events: 'Earnings run', check: 'Daily check', allocator: 'Weekly rebalance', review: 'Weekly review', learn: 'Learning loop' };
+const AGENT_NAMES = { judge: 'Master judge (Bonsai)', net_read: 'Summary agent', ai_read: 'AI build-out view', bb_read: 'Bull vs bear debate', guidance: 'Company outlook (checked by code)' };
+const plural = (n, word) => `<b>${n}</b> ${word}${n === 1 ? '' : 's'}`;
+const vote = (v) => (v > 0 ? pill('▲ up', 'ok') : v < 0 ? pill('▼ down', 'bad') : pill('– no view'));
+
+function todayCard(td) {
+  if (!td) return '';
+  const items = [];
+  if (td.decisions.length) items.push(`${plural(td.decisions.length, 'new earnings report')} judged: ${td.decisions.map((d) => `${esc(d.ticker)} ${d.trade ? pill('practice trade', 'lime') : pill('no trade')}`).join(' ')}`);
+  if (td.fills.length) items.push(`${plural(td.fills.length, 'practice order')} filled at the broker: ${td.fills.map((f) => `${esc(f.side)} ${esc(f.qty)} ${esc(f.symbol)} at ${fmt(f.price, 2)}`).join(' · ')}`);
+  if (td.outcomes.length) items.push(`${plural(td.outcomes.length, 'earlier pick')} got a one-week result`);
+  if (td.tests.length) items.push(`${plural(td.tests.length, 'strategy test')} finished: ${td.tests.map((t) => `${esc(t.trial)} ${pill(t.result, String(t.result).startsWith('pass') ? 'ok' : String(t.result).startsWith('fail') ? 'bad' : '')}`).join(' ')}`);
+  if (td.alerts.length) items.push(`${plural(td.alerts.length, 'alert')}, the latest: ${esc(td.alerts.at(-1).msg)}`);
+  if (td.missed) items.push(`${plural(td.missed, 'report')} missed (not decided before the market opened)`);
+  const bad = td.runs.filter((r) => r.rc !== 0).length;
+  items.push(td.runs.length ? `${plural(td.runs.length, 'automatic run')}, ${bad ? `${bad} ended with a problem` : 'all clean'}` : 'No automatic run in this period');
+  return `<div class="card wide"><h3>What changed in the last ${td.hours} hours</h3><ul class="changes">${items.map((x) => `<li>${x}</li>`).join('')}</ul></div>`;
+}
+
+function aggressiveCard(a) {
+  if (!a) return '';
+  const L = a.limits || {};
+  const head = '<h3>Aggressive book (2.5×) · your decision of 30 Sep</h3>';
+  const rules = `It holds 2.5 times the frozen book's positions on borrowed practice money (5% a year interest). It warns at a ${pct(L.alert_drawdown, 0)} fall from its peak and stops buying at ${pct(L.max_drawdown, 0)}.`;
+  if (!a.started) return `<div class="card wide">${head}<p class="empty">Not started yet: it begins at the next weekly rebalance${a.nextAllocator ? ` (${esc(when(Number(a.nextAllocator) / 1000))})` : ''}.</p><p class="muted">${rules} In the backtest this size made about 35% a year with falls of up to 57%.</p></div>`;
+  const x = a.last, dd = a.drawdown ?? 0, room = L.max_drawdown ? Math.min(100, (100 * dd) / L.max_drawdown) : 0;
+  const s = a.series;
+  return `<div class="card wide">${head}${x.wiped_out ? '<div class="banner bad"><b>Wiped out.</b> The loan grew larger than the holdings; this book is closed for good.</div>' : ''}
+    <p class="muted">${rules} It is a what-if beside the frozen book, not a tested strategy.</p>
+    <div class="kpis">${kpi('Value now', fmt(x.equity))}${kpi('Size', x.gross == null ? '–' : `${fmt(x.gross, 2)}×`, 'holdings ÷ own money')}${kpi('Borrowed', fmt(x.borrowed))}${kpi('Interest paid so far', fmt(x.interest_paid))}
+      ${kpi('Fall from its peak', pct(dd), `warns at ${pct(L.alert_drawdown, 0)} · stops buying at ${pct(L.max_drawdown, 0)}`)}${kpi('Size at the broker', a.broker?.gross == null ? '–' : `${fmt(a.broker.gross, 2)}×`, 'Alpaca lends 2× on stocks, nothing on crypto')}</div>
+    <div class="bar ${dd >= (L.alert_drawdown ?? 1) ? 'hot' : ''}"><span style="width:${room.toFixed(1)}%"></span></div><p class="tiny muted">How much of the room before it stops buying is used up</p>
+    ${s.aggressive.length > 1 ? lineChart([{ name: 'Aggressive 2.5×', x: s.aggressive.map((r) => r.date), y: s.aggressive.map((r) => r.equity) }, { name: 'Frozen book', x: s.frozen.map((r) => r.date), y: s.frozen.map((r) => r.equity) }], { height: 200, yFmt: (v) => v.toFixed(0) }) : '<p class="empty">The chart starts after two weekly runs.</p>'}</div>`;
+}
+
+function consensusCard(c) {
+  if (!c) return '';
+  const head = '<h3>Master algorithm · combines every agent (in testing, no money)</h3>';
+  const what = 'Each agent votes up, down or no view on every report. One score is the plain average of the votes. The other gives more say to agents that have been right more often so far, using only results that were already known at the time.';
+  if (!c.recorded) return `<div class="card wide">${head}<p class="muted">${what}</p><p class="empty">Starts recording with the next earnings run.</p></div>`;
+  return `<div class="card wide">${head}<p class="muted">${what} ${fmt(c.recorded)} reports recorded, ${fmt(c.scored)} with a result. It is judged at 150 results and 3 months, like the other tests.</p>
+    <div class="split"><div><table><tr><th>Agent</th><th class="num">Calls with a known result</th><th class="num">Right</th><th class="num">Say (weight)</th></tr>
+      ${c.agents.map((a) => `<tr><td>${esc(AGENT_NAMES[a.agent] || a.agent)}</td><td class="num">${fmt(a.calls)}</td><td class="num">${a.calls ? pct(a.hits / a.calls, 0) : '–'}</td><td class="num">${a.weight == null ? '–' : fmt(a.weight, 2)}</td></tr>`).join('')}</table>
+      <p class="tiny muted">Every agent starts with the same small say (0.10). An agent only gains say once its own record beats a coin flip.</p></div>
+    <div><table><tr><th>Report</th>${Object.keys(AGENT_NAMES).map((k) => `<th>${esc(AGENT_NAMES[k].split(' (')[0])}</th>`).join('')}<th class="num">Plain average</th><th class="num">Record-weighted</th><th>Result</th></tr>
+      ${c.releases.slice(0, 12).map((r) => `<tr><td>${esc(r.ticker)}${r.on_time ? '' : ' <span class="muted">(recorded late, not scored)</span>'}</td>${Object.keys(AGENT_NAMES).map((k) => `<td>${vote(r.votes?.[k] ?? 0)}</td>`).join('')}<td class="num">${fmt(r.eq, 2)}</td><td class="num">${fmt(r.rw, 2)}</td><td>${r.result == null ? pill('due in a week', 'warn') : pill(pct(r.result), r.result > 0 ? 'ok' : 'bad')}</td></tr>`).join('')}</table></div></div></div>`;
+}
+
 const views = {
   async overview() {
-    const [o, m] = await Promise.all([api('overview'), metrics().catch(() => ({ missing: true }))]);
+    const [o, m, td] = await Promise.all([api('overview'), metrics().catch(() => ({ missing: true })), api('today').catch(() => null)]);
     const runs = o.recentRuns.filter((r) => r.job !== 'check');
     const clean = runs.slice(0, 10).filter((r) => r.rc === 0).length;
     const next = (o.timers || []).map((t) => ({ unit: t.unit || t.activates, next: t.next })).filter((t) => t.next);
@@ -35,6 +83,7 @@ const views = {
           : `<b>Running, but ${Math.min(10, runs.length) - clean} of the last ${Math.min(10, runs.length)} runs had a problem.</b> See Alerts below for what happened.`}
         ${next[0] ? ` Next automatic run: <b>${esc(when(Number(next.slice().sort((a, b) => a.next - b.next)[0].next) / 1000))}</b>.` : ''}</div>
       ${plain('airp follows a fixed set of rules to invest <b>pretend money</b>. The numbers below compare the main rule set (the "core book") with simply buying the whole US market (SPY) since 2018. Hover any <b>?</b> for what a word means, or open <b>How it works</b>.')}
+      ${todayCard(td)}
       ${m.missing ? '' : `<div class="kpis">
         ${kpi('Growth per year', pct(m.tracks.core.stats.cagr), `market (SPY) ${pct(m.tracks.SPY.stats.cagr)}`)}
         ${kpi('Quality score (Sharpe)', esc(m.tracks.core.stats.sharpe), `market (SPY) ${esc(m.tracks.SPY.stats.sharpe)}`)}
@@ -62,7 +111,7 @@ const views = {
   },
 
   async books() {
-    const b = await api('books');
+    const [b, agg] = await Promise.all([api('books'), api('aggressive').catch(() => null)]);
     const names = Object.keys(b.series);
     const main = b.series['master+brakes'] || b.series.master || [];
     const ai = b.aiPicks;
@@ -70,6 +119,7 @@ const views = {
       .concat((ai?.pairs || []).flatMap((p) => (p.legs || []).map((l) => ({ ...l, decision: `AI ${p.ticker}` }))));
     return `<h2>Live book &amp; orders</h2><p class="lede">What the system holds right now and the practice orders it has sent.</p>
       ${plain('The system keeps its own record of every trade (the "simulator") and also sends the same trades to a practice account at the broker Alpaca. This page shows both, so you can see they agree. No real money is involved.')}
+      ${aggressiveCard(agg)}
       <div class="card wide"><h3>Live equity by book (simulator, weekly runs)</h3>${main.length > 1
         ? lineChart(['aggressive 2.5x', 'master+brakes', 'master', 'SPY'].filter((n) => b.series[n]).concat(names).filter((n, i, a) => a.indexOf(n) === i).slice(0, 4).map((n) => ({ name: n, x: b.series[n].map((r) => r.date), y: b.series[n].map((r) => r.equity) })), { yFmt: (v) => v.toFixed(0) })
         : '<p class="empty">The first live allocator run is Mon 5 Oct 15:00; the curve starts after two weekly runs.</p>'}</div>
@@ -102,15 +152,31 @@ const views = {
   },
 
   async research() {
-    const q = await api('research');
+    const [q, x] = await Promise.all([api('research'), api('research_extra').catch(() => null)]);
     if (!Array.isArray(q)) return `<h2>Research queue</h2><p class="err">${esc(q.error)}</p>`;
     return `<h2>Research queue</h2><p class="lede">Long background jobs that test new ideas. They restart themselves.</p>
       ${plain('These jobs gather news and have the AI label thousands of past earnings releases, to test whether research agents can improve the picks. Jobs that need the graphics card only run at night (18:00–05:25) so they never get in the way of live trading. You can pause one if the PC feels slow.')}
+      ${x ? `<div class="card wide"><h3>The check this research is waiting for</h3>
+        <p class="muted">The news crawl must find at least one headline for ${pct(x.b4b.needed, 0)} of the reports, or the test is stopped without being run. So far ${fmt(x.b4b.done)} of ${fmt(x.b4b.total)} reports are checked${x.b4b.errors ? ` (${fmt(x.b4b.errors)} requests were refused by the news service and are retried)` : ''}.</p>
+        <div class="kpis">${kpi('Reports with news so far', x.b4b.coverage == null ? '–' : pct(x.b4b.coverage, 0), `needs ${pct(x.b4b.needed, 0)}`)}${kpi('Checked', `${fmt(x.b4b.done)} / ${fmt(x.b4b.total)}`)}${kpi('AI label engine', esc(x.engine.split(',')[0]), esc(x.engine.split(', ')[1] || ''))}</div></div>` : ''}
       <div class="grid">${q.map((j) => { const [d, t] = j.progress; const pct = t ? Math.min(100, (100 * d) / t) : 0;
         const state = j.done ? pill('done', 'ok') : j.paused ? pill('paused', 'warn') : j.running ? pill('running', 'lime') : pill(j.kind === 'gate' ? 'waiting for check' : 'queued');
         return `<div class="card wide"><div class="row"><h3 style="margin:0">${esc(j.name)}</h3>${pill(j.kind)}${state}
           <span style="margin-left:auto" class="row">${j.kind === 'gate' || j.done ? '' : `<button class="btn ghost" data-q="${j.paused ? 'resume' : 'pause'}" data-name="${esc(j.name)}">${j.paused ? 'Resume' : 'Pause'}</button>`}</span></div>
           <p class="muted">${esc(j.note)}</p>${j.kind === 'gate' ? '' : `<div class="bar"><span style="width:${pct.toFixed(1)}%"></span></div><p class="tiny muted">${fmt(d)} / ${fmt(t)}</p>`}</div>`; }).join('')}</div>`;
+  },
+
+  async runs() {
+    const r = await api('runs');
+    const live = r.runs.filter((x) => x.mode === 'live'), bad = live.filter((x) => x.rc !== 0);
+    const next = (r.timers || []).map((t) => ({ unit: String(t.unit || t.activates).replace('.timer', '').replace('.service', '').replace('airp-', ''), next: t.next })).filter((t) => t.next).sort((a, b) => a.next - b.next);
+    const took = (s) => (s == null ? '–' : s < 90 ? `${s} s` : `${Math.round(s / 60)} min`);
+    return `<h2>Run history</h2><p class="lede">Every automatic run, newest first, with what went wrong if anything did.</p>
+      ${plain('The PC runs the system by itself four ways: an <b>earnings run</b> twice a day reads new company reports, a <b>daily check</b> looks for gaps, a <b>weekly rebalance</b> on Monday adjusts the main book, and a <b>weekly review</b> on Saturday writes a report. A run "with a problem" still finished; the alert says what needs attention.')}
+      <div class="kpis">${kpi('Live runs recorded', fmt(live.length))}${kpi('Ended clean', live.length ? pct((live.length - bad.length) / live.length, 0) : '–')}${kpi('Last problem', bad[0] ? esc(when(bad[0].start)) : 'none', bad[0] ? esc(JOBS[bad[0].job] || bad[0].job) : '')}${kpi('Next run', next[0] ? esc(when(Number(next[0].next) / 1000)) : '–', next[0] ? esc(JOBS[next[0].unit] || next[0].unit) : '')}</div>
+      <div class="card wide"><h3>Coming up</h3><table><tr><th>Job</th><th>Next run</th></tr>${next.map((t) => `<tr><td>${esc(JOBS[t.unit] || t.unit)}</td><td>${esc(when(Number(t.next) / 1000))}</td></tr>`).join('') || '<tr><td colspan="2" class="muted">timers not visible</td></tr>'}</table></div>
+      <div class="card wide"><h3>All runs</h3><table><tr><th>Started</th><th>Job</th><th>Mode</th><th class="num">Took</th><th>Result</th><th>What it reported</th></tr>
+        ${r.runs.map((x) => `<tr><td>${esc(when(x.start))}</td><td>${esc(JOBS[x.job] || x.job)}</td><td>${esc(x.mode === 'live' ? 'live' : 'rehearsal')}</td><td class="num">${took(x.seconds)}</td><td>${x.rc === 0 ? pill('clean', 'ok') : x.skipped ? pill('skipped', 'warn') : pill('problem', 'bad')}</td><td>${x.alerts.length ? x.alerts.map(esc).join('<br>') : x.gaps ? `${esc(x.gaps)} gap(s)` : '<span class="muted">nothing</span>'}</td></tr>`).join('')}</table></div>`;
   },
 
   async tests() {
@@ -281,16 +347,17 @@ Object.assign(views, {
   async lab() {
     const m = await metrics(); if (m.missing) return `<h2>Strategy lab</h2>${noMetrics}`;
     const tests = m.lab.tests;
-    const order = ['day trading', 'calendar', 'pairs', 'crypto carry'];
+    const order = ['day trading', 'calendar', 'flows', 'pairs', 'crypto carry'];
     const rows = tests.slice().sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || (b.sharpe ?? -9) - (a.sharpe ?? -9))
       .map((x) => ({ label: `${x.id} · ${x.name}`, group: x.group, v: x.sharpe, lo: x.ci?.[0], hi: x.ci?.[1], pass: x.pass }));
-    const c = m.lab.curves, names = { D9: 'D9 opening-auction reversal', T1: 'T1 turn of the month', O1: 'O1 SPY overnight', E1: 'E1 macro announcements' };
-    const curveCards = ['D9', 'T1', 'O1', 'E1'].filter((k) => c[k]).map((k) => `<div class="card"><h3>${esc(names[k])}</h3>
+    const c = m.lab.curves, names = { D9: 'D9 opening-auction reversal', T1: 'T1 turn of the month', O1: 'O1 SPY overnight', E1: 'E1 macro announcements',
+      R1: 'R1 rebalancing pressure', M1: 'M1 month-end Treasuries', A1: 'A1 Treasury auction cycle' };
+    const curveCards = ['D9', 'T1', 'O1', 'E1', 'R1', 'M1', 'A1'].filter((k) => c[k]).map((k) => `<div class="card"><h3>${esc(names[k])}</h3>
       <div class="kpis">${kpi('Sharpe (net)', esc(c[k].stats.sharpe))}${kpi('CAGR', pct(c[k].stats.cagr))}${kpi('Max DD', pct(c[k].stats.max_dd))}</div>
       ${lineChart([{ name: names[k], x: c[k].dates, y: c[k].equity }], { width: 560, height: 220, yFmt: (v) => v.toFixed(0) })}</div>`).join('');
     const passed = tests.filter((x) => x.pass).length;
     return `<h2>Strategy lab</h2><p class="lede">Trading ideas we tested, and whether they held up. ${passed} of ${tests.length} passed.</p>
-      ${plain('Each row is one idea (day trading, calendar effects, pairs, crypto). The dot is its score after costs and the line is how uncertain that score is. To pass, the dot must be right of the dashed line <b>and</b> the whole line must be right of zero. Grey rows failed, so they do not trade.')}
+      ${plain('Each row is one idea (day trading, calendar effects, money flows of big funds, pairs, crypto). The dot is its score after costs and the line is how uncertain that score is. To pass, the dot must be right of the dashed line <b>and</b> the whole line must be right of zero. Grey rows failed, so they do not trade.')}
       <div class="card wide">${h3('Score after costs, with its uncertainty range', '95% interval')}${ciChart(rows, { refs: [{ v: 0.5, label: 'pass line 0.5' }] })}</div>
       <div class="card wide"><h3>The detail behind each test</h3><p class="muted">"Score by trading cost" shows the same idea at cheap and expensive trading: an idea that only works when trading is free is not real. "Before it was published" is the score on the years before the idea became widely known.</p>
         <table><tr><th>Test</th><th>Tested on</th><th class="num">Days</th><th class="num">Score by trading cost</th><th class="num">Before it was published</th><th class="num">Up days</th><th class="num">Worst month</th><th class="num">Moves with core book${help('Correlation')}</th><th>Verdict</th></tr>
@@ -386,7 +453,7 @@ Object.assign(views, {
   },
 
   async signals() {
-    const [d, m, team] = await Promise.all([api('decisions'), metrics().catch(() => ({})), api('team').catch(() => [])]);
+    const [d, m, team, cons] = await Promise.all([api('decisions'), metrics().catch(() => ({})), api('team').catch(() => []), api('consensus').catch(() => null)]);
     const vals = d.filter((r) => r.type === 'decision' && r.logodds != null).map((r) => Number(r.logodds));
     const thr = m?.live?.ai_threshold, ai = m?.ai && !m.ai.error ? m.ai : null;
     const tone = (v) => pill(v ?? 'no view', v === 'bullish' || v === 'positive' || v === 'raised' ? 'ok' : v === 'bearish' || v === 'negative' || v === 'lowered' ? 'bad' : '');
@@ -410,6 +477,7 @@ Object.assign(views, {
     return `<h2>AI picks</h2><p class="lede">What the AI team thought of each new earnings report, and how well that has worked.</p>
       ${plain('When a big company reports earnings, a reader AI pulls out the key numbers and the judge AI (Bonsai) gives a confidence score that the stock will beat its industry group over the next week. Only scores above the threshold become a practice trade. The other agents give opinions that are scored in the background. This part is <b>still unproven</b>: it trades pretend money only.')}
       <div class="kpis">${kpi('Live decisions', vals.length)}${kpi('Above threshold', vals.filter((v) => thr != null && v >= thr).length, `threshold ${esc(thr ?? '–')}`)}${kpi('Missed', d.filter((r) => r.type === 'missed').length)}</div>
+      ${consensusCard(cons)}
       <h3>The team's view on each report</h3>
       <div class="team">${team.map(card).join('') || '<p class="empty">No live reports yet.</p>'}</div>
       <div class="card wide">${h3('How confident the judge was (each bar counts reports)', 'Log-odds')}${histogram(vals, { mark: thr, markLabel: 'pick threshold', bins: 16 })}</div>
