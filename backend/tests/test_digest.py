@@ -31,3 +31,10 @@ def test_digest_summarises_runs_decisions_picks_alerts_and_research(tmp_path):
     assert "decisions: 1 on time, 1 missed; top JBL +4.1" in text and "pairs {'open': 1}" in text
     assert "alerts: 1 (latest: failed (exit 1))" in text and "warm 63/2851 running" in text
     assert "WAITING" not in text  # the gate's requirement is not done yet
+
+
+def test_a_run_that_finished_with_an_alert_is_not_called_failed(tmp_path):
+    w(tmp_path / "heartbeat.jsonl", [{"job": "events", "start": "2026-10-01T12:45", "rc": 1, "missed_total": 0},
+                                      {"job": "events", "start": "2026-10-01T22:30", "rc": 0, "missed_total": 0}])
+    assert "runs: 1/2 clean, 1 finished with an alert" in build(date(2026, 10, 1), tmp_path)
+    assert "FAILED" not in build(date(2026, 10, 1), tmp_path)

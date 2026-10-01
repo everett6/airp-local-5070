@@ -291,7 +291,7 @@ Object.assign(views, {
           ${step(1, 'Watcher', 'code', 'Spots new earnings reports', 'Twice every weekday it checks the official SEC feed for S&amp;P 500 companies that just reported.')}
           ${step(2, 'Reader agent', 'AI', 'Pulls out the facts', 'A small AI reads the report for sales, profit, outlook and tone. Code then checks every number is quoted word-for-word, so it cannot make things up.')}
           ${step(3, 'Fact tools', 'algorithm', 'Adds hard numbers', 'Formulas add the company\'s filing history and how the stock has moved against its industry group.')}
-          ${step(4, 'Research agents', 'in testing', 'Gather news and opinions', 'Extra agents (a news researcher, a bull-versus-bear debate, a summary reader) form views. They are scored in the background and only count once they prove useful.')}
+          ${step(4, 'Research agents', 'in testing', 'Gather news and opinions', 'Extra agents (a news researcher, a bull-versus-bear debate, a summary reader) form views. They are scored in the background and only count once they prove useful. A <b>master algorithm</b> (new, also in testing) keeps each agent\'s track record and combines their votes, giving more say to the ones that have been right.')}
           ${step(5, 'Master judge', 'AI', 'Says BUY or PASS', 'The large AI (Bonsai) reads the fact sheet and answers one word. Maths reads how sure it was and turns that into a confidence score.')}
           ${step(6, 'Decision rule', 'algorithm', 'Acts only on strong scores', `A score above ${esc(thr ?? 'the threshold')} becomes a practice trade: buy the stock, and bet against its industry fund so only the company's own news matters.`)}
           ${step(7, 'Scorekeeper', 'code', 'Checks who was right', 'A week later it compares the stock with its industry group and records the result. Nothing can be edited afterwards.')}
@@ -304,6 +304,7 @@ Object.assign(views, {
           <p class="muted">So far the AI picks have not proven themselves on past data. That is why they trade a small pretend sleeve and why the research agents are still being tested.</p></div>
         <div class="card"><h3>The aggressive book (your choice)</h3>
           <p>From Mon 5 Oct a second paper book holds <b>2.5 times</b> the core book's positions using borrowed pretend money, because you set the baseline at 40% a year. Borrowing costs it 5% a year.</p>
+          <p class="muted">If it ever falls 60% from its peak, only this book stops buying; the frozen book is never affected by it.</p>
           <p class="muted">On past data that is about 35% a year with falls of up to 57%. It is a bet on the core book's rules, not a tested strategy, and the frozen 1x book keeps running beside it as the honest comparison.</p></div>
         <div class="card"><h3>The core book (no AI)</h3>
           <p>Most of the pretend money follows simple rules: hold the US market (SPY), add a little Bitcoin and Ether when they are rising, and cut back automatically in a big fall. Spare cash sits in short-term government bills.</p>

@@ -33,14 +33,18 @@ def build(day: date, fwd: Path = FWD, research: list[dict[str, Any]] | None = No
     d = day.isoformat()
     beats = [h for h in _jsonl(fwd / "heartbeat.jsonl") if h.get("start", "").startswith(d)]
     runs = [h for h in beats if h.get("job") in ("events", "allocator")]
-    bad = [h for h in runs if h.get("rc") != 0]
+    # a run whose event runner finished but a later step alerted (rc 1, scoreboard present) is not a failed run
+    done = [h for h in runs if h.get("rc") == 0 or (h.get("job") == "events" and h.get("missed_total") is not None)]
+    bad = [h for h in runs if h not in done]
+    noisy = [h for h in done if h.get("rc") != 0]
     led = [r for r in _jsonl(fwd / "events" / "ledger.jsonl") if str(r.get("as_of", "")).startswith(d)]
     dec = [r for r in led if r.get("type") == "decision"]
     missed = [r for r in led if r.get("type") == "missed"]
     alerts = [a for a in _jsonl(fwd / "alerts.jsonl") if a.get("at", "").startswith(d) and a.get("job") != "ntfy"]
     lines = [f"airp {d} ({(fwd / 'AUTORUN_MODE').read_text().strip() if (fwd / 'AUTORUN_MODE').exists() else 'dry'})"]
-    lines.append(f"runs: {len(runs) - len(bad)}/{len(runs)} clean" + (f", FAILED: {', '.join(h['job'] for h in bad)}"
-                                                                     if bad else ""))
+    lines.append(f"runs: {len(runs) - len(bad) - len(noisy)}/{len(runs)} clean"
+                 + (f", {len(noisy)} finished with an alert" if noisy else "")
+                 + (f", FAILED: {', '.join(h['job'] for h in bad)}" if bad else ""))
     top = sorted(dec, key=lambda r: -float(r.get("logodds") or 0))[:3]
     tops = ", ".join(f"{r.get('ticker')} {float(r.get('logodds') or 0):+.1f}" for r in top)
     lines.append(f"decisions: {len(dec)} on time, {len(missed)} missed" + (f"; top {tops}" if top else ""))

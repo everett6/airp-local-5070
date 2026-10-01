@@ -37,6 +37,27 @@ test and its own commit.
    number passed the quote check, so the release likely states it in a unit the reader misread. The judge saw that
    number. Worth a look in the Saturday review; the frozen reader is not changed here.
 
+6. **Entry day in winter.** The live runner lets a release filed before 09:30 New York time enter at that day's
+   open, and the AI-picks sleeve trades that open. The scoring code (`entry_index`) uses a fixed cut-off of 13:00 UTC,
+   which is 09:00 New York in summer and 08:00 in winter. From 1 Nov, a release filed between 08:00 and 09:30 New
+   York time will be scored from the next day's open while the sleeve trades the same day's open. The score stays
+   honest (the decision is still made before the scored entry) but it will no longer measure the trade the sleeve
+   makes for those releases. Both rules were fixed before the forward test, so nothing is changed here.
+
+## Also fixed in this pass
+
+| # | Where | What | Commit |
+|---|---|---|---|
+| 9 | `scripts/digest.py` | The phone digest called a run that did its job but raised a broker alert "FAILED". It now says "finished with an alert". | this commit |
+
+## Read and found sound
+`app/portfolio/master.py` (calibration, Kelly sizing, the weight simulator), `app/portfolio/sleeve.py`,
+`app/portfolio/broker.py`, `app/forward/ledger.py`, `app/sandbox/events.py`, `app/sandbox/gpu_lock.py`,
+`app/signals/registry.py`, `scripts/guidance_shadow.py`, `scripts/longterm_picks.py` (rehearsed on the CPU: 489
+company cards are ready for today's first cohort). A stricter lint pass over all of `app/` and `scripts/`
+(bug-prone patterns, async misuse, naive datetimes) found nothing in live code. The test suite takes 26 s; its
+slowest tests are deliberate timeouts.
+
 ## Still to read
 Library (`app/sandbox`, `app/data_ingestion`, `app/llm`), the research runners, the desktop app's server and UI,
 and the slow tests.
