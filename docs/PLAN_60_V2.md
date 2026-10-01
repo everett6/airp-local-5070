@@ -1649,3 +1649,39 @@ theme ratings (a theme still needs a rating of 4 or 5). A rating the quote check
 24 real cards: identical ratings, probabilities found for 21 (the other 3 were quote-check resets), scores
 among the 4s spread from 3.63 to 4.03. Parallel requests (3 / 6 / 8) gave the same answers and no speed-up (about
 9.5 s per card), so the monthly run stays at about 65–75 minutes.
+
+### Aggressive book, 2.5× (spec fixed 2026-09-30 ~21:30 PDT, before any code for it; the user's decision)
+
+**Why it exists.** On 30 Sep the user raised the target ("the baseline is 40% a year … 60% is much more desirable")
+and asked for "much more aggressive" trading. Asked to pick a size from the leverage table (the core backtest replayed
+with borrowed money: 2× = 30%/yr and a −48% worst fall, 3× = 39%/yr and −64%), the user chose **2.5×**, chose that the
+Alpaca paper account should trade this book, and chose to keep the Aschenbrenner AI-build-out lens (arm D) as an
+opinion only. This skips the Stage 4 ladder, which would have allowed leverage only from month 6 on evidence. It is the
+user's mandate decision, not something a test supports: no test has shown this book earns its risk.
+
+- **What stays frozen.** The frozen books (`master`, `master+brakes`, `SPY`, `80/20 SPY/BTC`) and every rule they use
+  are unchanged and keep running in the simulator. `master+brakes` stays the forward test's book of record and the
+  control this book is compared with.
+- **The book (`aggressive 2.5x`), in the simulator:**
+  - Starts with 100,000 paper dollars at the first allocator run after this commit (Mon 5 Oct 2026).
+  - Target weights = 2.5 × the weights `master+brakes` would hold at the same run (the same allocation and the same
+    drawdown-brake multiplier, taken from the `master+brakes` book's own drawdown), without the SGOV parking leg.
+    With no brake that is SPY 1.95, crypto up to 0.50, gross up to 2.45.
+  - Borrowing: cash may go negative down to the amount the targets need. Borrowed cash costs **5.0% a year**
+    (T-bill 4.1% on 24 Sep 2026 plus about 1%), charged for each calendar day between runs, fixed here.
+  - Same fills, costs (5 bp a side), whole shares and timing rules as the other books.
+- **Its own limits** (mandate section `books.aggressive 2.5x`, committed with this spec on the user's instruction):
+  max gross 2.5, max single weight 2.0, max crypto 0.5, **alert at 45% below its peak, limit at 60%**. The backtest's
+  worst fall at 2.5× was −57%. At the limit the kill switch goes to REDUCING for every book, as it does for the frozen
+  book at 35%. The user can change these numbers; they were not asked for separately.
+- **The Alpaca paper account** mirrors this book instead of `master+brakes`, as far as the account's rules allow.
+  The account lends 2× overnight on stocks and nothing against crypto, so the mirrored weights are scaled by
+  `min(1, 0.98 / (0.5 × stock weight + crypto weight))`. At full size that is about 0.66, or roughly **1.6× at the
+  broker against 2.5× in the simulator**. The gap is reported, not hidden. Reaching 2.5× at the broker would need
+  leveraged ETFs, which are not in the mandate.
+- **No pass rule.** This is not a trial and is not entered in the trials registry. The weekly review reports it beside
+  `master+brakes`: return, drawdown, interest paid, and whether its return is tracking 2.5× the frozen book's return
+  minus financing. Its numbers never count as evidence for the frozen book.
+- **What the backtest arithmetic says to expect** (30 Sep, `desktop_export.leverage_table`): about 35% a year, 41%
+  volatility, a −57% worst fall, a −47% worst year, a 46% chance of a 40% year, a 32% chance of a 60% year, a 25%
+  chance of a losing year and a 31% chance of a 35% fall within any year. Live results are usually worse than backtests.
