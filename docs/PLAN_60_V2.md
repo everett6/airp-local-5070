@@ -1405,6 +1405,62 @@ D7 (same-slot history): the signal and the window differ.
   D10 at 1/2/3 bps: −0.63 / −1.15 / −1.66; negative in 8 of 11 years. The effect lives in the auction print and needs
   near-zero costs; neither changes the verdicts above.
 
+### Day-trading round 7: D11 limit-on-open reversal (spec fixed 2026-10-01 ~16:25 PDT, before any D11 code ran)
+
+The user asked (1 Oct) for a day-trading rule that can actually work. Nine intraday rules are on record. Eight have
+no edge after costs. The ninth, D9, has one: it passed its registered test and an independent-data check (Sharpe
++1.08 on Alpaca SIP bars, positive in every year 2016–2025), and it trades only in the two auctions, where there is
+no spread. It was withdrawn for one reason: its signal is the official open, and a market-on-open order cannot be
+conditioned on a price the auction has not set yet. D10 tried to replace the signal with the pre-market price and
+failed.
+
+**What was missed on 29 Sep:** a market-on-open order cannot be conditioned on the auction price, but a
+**limit-on-open** order is. A sell order "at the open, at X or higher" fills, at the auction price, exactly when
+the auction prints at or above X. So an order can be made to fill only when the stock's official overnight return is
+beyond a cut-off, which is D9's own selection. Alpaca takes such orders (`time_in_force: opg` with a limit, placed
+before 09:28 New York time).
+
+**Relation to the rule "no variants of failed tests", stated openly.** D9 passed; what failed (D10) was a different
+signal, the pre-market price, as a stand-in. D11 does not re-try that signal: nothing in D11 predicts the reversal
+from pre-market prices. They are used only to place the limits (where the day's cut-offs are) and to choose which
+stocks get an order. D11 is the third trial of this family, so its bar is higher (below), and it is counted in the
+registry like every other trial. If it fails, the family is closed: no further version.
+
+- **Cause (as D9):** attention-driven buying at the open pushes up the stocks that jumped overnight, and the push
+  reverses during the day (Berkman, Koch, Tuttle and Zhang, *JFQA* 2012); more generally, the opening auction pays
+  whoever provides liquidity against one-sided demand.
+- **Data (all on disk since 29 Sep, nothing new is downloaded):** D5's S&P 500 list; Alpaca SIP daily bars,
+  split-adjusted (`sp500_daily_alpaca_split.parquet`: official open and close); the last pre-market trade at or
+  before 09:25 New York time (`sp500_premarket.parquet`).
+- **Rule, each day:**
+  1. At 09:25, for every stock with a pre-market trade: pm = pre-market price / yesterday's close − 1. Needs 20+
+     stocks. The day's cut-offs are the 10th and 90th percentiles of pm across those stocks (`q_lo`, `q_hi`).
+  2. Orders, placed before the open: for the quarter of stocks with the highest pm, a limit-on-open **sell short**
+     at yesterday's close × (1 + `q_hi`); for the quarter with the lowest pm, a limit-on-open **buy** at yesterday's
+     close × (1 + `q_lo`).
+  3. Every order has the same dollar size: capital × 0.5 / (0.10 × the number of stocks with a pre-market trade).
+     (If exactly a tenth of the stocks fill on each side, each side holds half the capital, as in D9.)
+  4. A sell fills, at the official open, if the open is at or above its limit; a buy fills if the open is at or
+     below its limit. Everything that filled is closed at the official close (market-on-close).
+  5. The day's return is the sum over the fills, on the whole capital; unfilled capital earns nothing. A day with
+     no fill returns 0.
+- **Costs:** 1 bp per side per fill (auction fills: fees, no spread), also reported at 2 bps.
+- **Window:** 2016-01-04 → 2026-09-24 (D9's and D10's).
+- **Pass (trial `daytrade_open_reversal_loo`):** annualized Sharpe ≥ 0.5 **and** the block-bootstrap interval
+  (21-day blocks) above 0 at the **98.3%** level (0.05 split over the three trials of this family), at 1 bp a side.
+- **Reported, not deciding:** the 95% interval; 2 bps; since 2024-07; each side; fills per side per day; average
+  gross and net exposure (the sides need not balance on a day when the whole market gaps); the share of days with a
+  one-sided book; correlation with the core and with SPY's open-to-close return; the dollar value of all resting
+  orders against capital (about 2.5×, inside a margin account's intraday buying power).
+- **Known limits of the simulation, before the run:** (a) the bar's "open" is taken as the auction price; a small
+  share of opens are not auction prints; (b) an order priced exactly at the auction price may fill only in part;
+  (c) short sales need a locate; (d) the pre-market price is the last trade by 09:25, the orders must be in by
+  09:28. Only a paper shadow with real orders can measure these.
+- **If it passes:** nothing moves money. A paper shadow with real limit-on-open orders (placed by the existing
+  morning run, no new timer), a month of clean runs with fills compared against the simulator, then the evidence
+  ladder. The stocks and the shorts are outside today's mandate, so a paper shadow also needs the user's yes.
+  **If it fails:** the opening-reversal family is closed.
+
 ### Crypto funding carry C1 (spec fixed 2026-09-29 ~14:48 PDT, before any funding data was downloaded or viewed)
 
 The user asked for research on making more money. Not yet tested here: the crypto cash-and-carry (long BTC/ETH spot,
