@@ -1716,7 +1716,7 @@ user's mandate decision, not something a test supports: no test has shown this b
   chance of a losing year and a 31% chance of a 35% fall within any year. Live results are usually worse than backtests.
 
 
-### Consensus shadow: a master algorithm over the research agents (spec fixed 2026-10-01 ~08:15 PDT, before any live outcome exists)
+### Consensus shadow: a master algorithm over the research agents (spec fixed 2026-10-01 ~07:45 PDT, before any live outcome exists)
 
 The user expected airp to have "a master agent which also uses algorithms to judge information given by research
 agents". Today the Bonsai judge decides alone and the other agents are separate shadows. This adds the algorithm as a
@@ -1745,7 +1745,7 @@ fitted to or looked at against results.
 - **Reported, not deciding:** each agent's own hit rate and weight over time; `consensus_rw` minus `consensus_eq`.
 - **Until then it changes nothing** in any book. A pass makes it a proposal to the user, not a change.
 
-### Anonymised-prompt check: is the judge's backtest edge reading skill or memory? (spec fixed 2026-10-01 ~08:15 PDT, before any masked prompt is scored)
+### Anonymised-prompt check: is the judge's backtest edge reading skill or memory? (spec fixed 2026-10-01 ~07:45 PDT, before any masked prompt is scored)
 
 Bonsai was trained on text that may include what happened to these companies in 2024–26. If its backtest edge comes
 from recognising the company and the date, it will not carry into the future (Glasserman and Lin 2023, "Assessing
@@ -1773,3 +1773,76 @@ checks the backtests it was built on.
 - **Consequence of a flag:** the judge's backtest numbers are marked as flattered in the docs and the app. The live
   threshold and the forward test are not changed by this check.
 - **Built now, run later.** It needs about an hour of GPU time, so it waits for the user's go.
+
+
+### Three flow-pressure tests on SPY and Treasuries: R1, M1, A1 (specs fixed 2026-10-01 ~08:00 PDT, before any code or number for them)
+
+**Screening (the user asked for new strategy tests toward the 40% target; CPU only).** Six ideas were screened
+against four rules: a published source with a stated cause, a mechanism that is not a relative of any of the 39
+registry entries, allowed assets with no shorts needed to use it, and data on disk or a small free public file.
+Kept (at most 3): the three below. Dropped without a run: a QQQ-vs-SPY momentum switch (a relative of the failed
+`trend_sleeve` and `momentum_volmanaged`), a stock-bond correlation regime for the SPY/TLT split (no published rule
+with fixed parameters was found), and a crypto weekend effect (no source with a stated cause strong enough).
+All three share one family of cause: large investors who must trade on a known schedule or rule move prices for a
+few days. T1, O1 and E1 (calendar effects in SPY) all failed; these differ in asset or in mechanism, as stated under
+each. The SPY, IEF and TLT closes in `data/trend/etf_closes.parquet` were seen before, in the trend test; nothing
+about these three effects has been computed in this repo.
+
+**Common rules.** Adjusted closes from `data/trend/etf_closes.parquet` (through 2026-09-25). Risk-free: the 3-month
+T-bill (`vol_target_b0.tbill()`) / 252. `stats()` of `scripts/daytrade_test.py` (annualized Sharpe, 21-day
+block-bootstrap 95% CI). Each rule is one trial, run once. Each deciding window starts after the sample of the paper
+it tests. A pass changes no book: it becomes a proposal to the user, with a forward shadow first.
+
+**R1, rebalancing pressure (`rebalance_threshold`).**
+- **Idea and cause.** Funds that hold a fixed stock/bond mix must sell the asset that has outperformed. Harvey,
+  Mazzoleni and Melone ("The Unintended Consequences of Rebalancing", NBER w33554, 2025; sample 1997-09-10 to
+  2023-03-17) find that when stocks are overweight in a 60/40 portfolio, stocks earn about 17–20 bp less than bonds
+  over the next day, and report a Sharpe ratio of 1.1 for trading ahead of it.
+- **Signal (their Threshold signal, eq. B.1 and 2).** A 60/40 portfolio of SPY and IEF (7–10 year Treasuries, the
+  ETF nearest their 10-year note) drifts with daily returns. For each band δ in 0%, 0.1%, …, 2.5%: the deviation of
+  the stock weight from 60% at the close is the signal; if its size is at least δ, the portfolio is set back to
+  60/40 at that close. Threshold_t = the mean of the 26 deviations. Started at 60/40 on 2006-01-03.
+- **Stream.** r_{t+1} = w_t × (SPY − IEF return on day t+1), w_t = −Threshold_t / 1.5% (their scaling). Cost: 1 bp
+  × |w_t − w_{t−1}| on each of the two legs.
+- **Deciding window:** 2023-03-20 .. 2026-09-25 (all after their sample).
+- **Pass (both, 95%):** (1) annualized Sharpe ≥ 0.5 with its CI above 0; (2) the effect itself: the mean next-day
+  SPY − IEF return after days with Threshold > 0 minus after days with Threshold < 0 has a block-bootstrap CI
+  (21-day blocks, 5,000 draws, seed 0) below 0.
+- **Reported, not deciding:** 2007-01-03 .. 2023-03-17 (a replication inside their sample); trading one day later;
+  3 bp costs; TLT in place of IEF as the bond leg (TLT is the mandate's bond); by year; the largest |w|;
+  correlation with the core book.
+- **Use if it passes:** a small tilt between SPY and TLT inside a book that already holds SPY (no short is needed
+  while the tilt is smaller than the SPY held). Their Calendar signal is a month-end rule and is not tested: only
+  one month-end test is run (M1).
+
+**M1, month-end Treasury returns (`treasury_month_end`).**
+- **Idea and cause.** Hartley and Schwarz ("Predictable End-of-Month Treasury Returns", 2019; sample 1990–2018):
+  Treasury excess returns are earned in the last few days of the month (Sharpe about 1 for the last 3 days) and are
+  about zero otherwise. Cause: month-end buying by insurers and index funds when bond indexes extend their
+  duration, and window dressing. Different from T1: another asset (Treasuries, not SPY), other days (the last 3 of
+  the month, not the last 1 and the first 3) and another cause (index extension, not cash needs).
+- **Rule.** TLT. Month-end days = the last 3 trading days of each calendar month in the data's own index: hold from
+  the close of the 4th-last trading day to the month's last close. Overlay o_t = TLT return − rf on those days, 0
+  otherwise. Cost: 1 bp on the entry day and on the exit day.
+- **Deciding window:** 2019-01-02 .. 2026-08-31 (after their sample; September 2026 is incomplete in the data).
+- **Pass (both, 95%):** (1) overlay Sharpe ≥ 0.5 with its CI above 0; (2) mean excess on month-end days minus the
+  mean on other days: block-bootstrap CI above 0.
+- **Reported, not deciding:** 2006-01-03 .. 2018-12-31 (inside their sample); IEF; the last 1 and the last 5 days;
+  3 bp; by year; correlation with the core book.
+
+**A1, Treasury auction cycle (`treasury_auction_cycle`).**
+- **Idea and cause.** Lou, Yan and Zhang ("Anticipated and Repeated Shocks in Liquid Markets", RFS 2013; sample
+  1980–2008): Treasury prices fall in the days before an auction and recover after it, because dealers who must
+  absorb the new supply have limited risk-bearing capacity. For 10-year notes the 5-day return after an auction was
+  24 bp above the 5 days before (t = 1.8); the effect spills over to other maturities. Their own strategy is a
+  hedged trade in single notes; this tests the plain direction on TLT, which is what the mandate could hold.
+- **Auctions.** Nominal 10-year note and 30-year bond auctions, first issues and reopenings, from TreasuryDirect's
+  public auction list. Auctions on consecutive trading days form one cluster, dated by its last auction day A.
+- **Rule.** Post days = the 5 trading days after A (close of A to the close of A+5). Pre days = the 5 trading days
+  ending on A. A day in both a post and a later pre window counts as pre. Overlay o_t = TLT return − rf on post
+  days, 0 otherwise. Cost: 1 bp on each entry and exit day.
+- **Deciding window:** 2014-01-02 .. 2026-09-25 (after publication).
+- **Pass (both, 95%):** (1) overlay Sharpe ≥ 0.5 with its CI above 0; (2) mean excess on post days minus the mean on
+  pre days: block-bootstrap CI above 0 (their measure).
+- **Reported, not deciding:** 2009-01-02 .. 2013-12-31; IEF; 3 bp; by year; correlation with the core book and
+  with M1.
