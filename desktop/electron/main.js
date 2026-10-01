@@ -8,7 +8,7 @@ let srv = null;
 let win = null;
 
 // The packaging smoke test uses its own profile, so it can run while the real app is open.
-const SMOKE = !!process.env.AIRP_SMOKE_SCREENSHOT;
+const SMOKE = !!(process.env.AIRP_SMOKE_SCREENSHOT || process.env.AIRP_SMOKE_ERRORS);
 if (SMOKE) app.setPath('userData', path.join(app.getPath('temp'), 'airp-smoke-profile'));
 if (SMOKE) app.disableHardwareAcceleration();  // screenshots never touch the graphics card
 const gotLock = app.requestSingleInstanceLock();
@@ -48,6 +48,19 @@ async function createWindow() {
   lockDown(win.webContents, srv.origin);
   if (!SMOKE) win.once('ready-to-show', () => win.show());
   await win.loadURL(srv.launchUrl);
+  if (process.env.AIRP_SMOKE_ERRORS) {  // smoke test: open every page, write {page: error text or null}, exit
+    await new Promise((r) => setTimeout(r, 3000));
+    const js = (code) => win.webContents.executeJavaScript(code);
+    const out = {};
+    for (const view of await js("[...document.querySelectorAll('[data-view]')].map((b) => b.dataset.view)")) {
+      await js(`document.querySelector('[data-view="${view}"]').click(); 0`);
+      await new Promise((r) => setTimeout(r, 2500));
+      out[view] = await js("document.querySelector('#view .err')?.textContent ?? (document.querySelector('#view').children.length ? null : 'empty page')");
+    }
+    writeFileSync(process.env.AIRP_SMOKE_ERRORS, `${JSON.stringify(out, null, 1)}\n`);
+    app.quit();
+    return;
+  }
   if (process.env.AIRP_SMOKE_SCREENSHOT) {  // packaging smoke test: capture the window and exit
     await new Promise((r) => setTimeout(r, 3000));
     const view = process.env.AIRP_SMOKE_VIEW;  // optional: open one page first (e.g. "lab")
