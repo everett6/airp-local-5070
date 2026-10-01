@@ -62,6 +62,14 @@ test and its own commit.
 | 14 | `scripts/forward_allocator.py`, `broker_sync.py`, `forward_events.py` | The books' state, the broker order record, the list of past releases and the price file were rewritten in place. A crash or power loss mid-write would have left half a file: the next weekly rebalance or order sync could not start, or past releases would silently drop out of scoring. | Each is now replaced in one step (`app/forward/ledger.write_atomic`). Contents are identical; the rebalance and the order mirror were rehearsed on a scratch copy. | e6e34ca |
 | 15 | `scripts/extract_events.py`, `build_features.py`, `decide_events.py`, `forward_events.py`, the label and consensus shadows | The reader's and the judge's output files are appended one line per release. A power loss during such a write leaves a cut-off last line; every later live run would then have failed at that line, so every later decision would have been missed until the file was repaired by hand, and the next record would have been glued onto the broken line. | Reads skip a cut-off line (that release is read or judged again) and appends start on a fresh line (`app/forward/ledger.open_append`). Checked: the judge's output and the live fact sheets are byte-identical before and after; new end-to-end tests of the reader and judge steps with a stub model. | this commit |
 
+## Tests added for paths that had none
+Measured with the coverage tool: the run functions of the two monthly cohort scripts (`scripts/themes.py` 0%,
+`scripts/longterm_picks.py` 52%) and of the reader and judge steps had only ever been exercised by real runs. They
+now have end-to-end tests with a stub model (`tests/test_monthly_cohorts.py`, `tests/test_decide_events.py`): what is
+written, what is picked, that a second run in the same month does nothing, and that AI-linked themes are left out
+while the bubble gauge reads high. Also new: `tests/test_weekly_review.py`, `tests/test_forward_ledger.py`.
+Still only rehearsed, not unit-tested: the `main()` bodies of `forward_events.py` and `forward_allocator.py`.
+
 ## Rehearsed on scratch copies (nothing live was touched)
 - Saturday's weekly review and the weekly learning review (found fix 12).
 - Monday's rebalance with the aggressive book and the order mirror (dry): 3 legs planned at 1.63× at the broker.
