@@ -58,8 +58,23 @@ live book, and no trial was run or registered.
   240 tokens (68 tok/s). About 475 prompt tokens per call already come from the prefix cache.
 - **Only one request runs at a time.** Ollama 0.34.0 logs "model architecture does not currently support parallel
   requests" (architecture qwen35) and starts the model with one slot, so `OLLAMA_NUM_PARALLEL=3` and the client's
-  `concurrency=3` are ignored. 4.9 of 12.2 GB VRAM is used. A later Ollama release removes that block (ollama PR
-  17144). An Ollama update is a download, so it needs the user's OK; no airp code changes are needed afterwards.
+  `concurrency=3` are ignored. 4.9 of 12.2 GB VRAM is used. The fix (ollama PR 17144) is still an **open** pull
+  request; the newest release (v0.35.0, 28 Sep 2026) does not contain it, so updating Ollama does not help.
+- **Measured fix, no download (30 Sep, 24-36 real arm-A prompts against Ollama's cached replies):** the engine Ollama
+  bundles (`/usr/local/lib/ollama/llama-server`, started directly with `--jinja`, `enable_thinking: false` and JSON
+  output) gives:
+
+  | Slots | Seconds per release | Speed | Replies identical to Ollama | Field agreement |
+  |---|---|---|---|---|
+  | 1 | 5.66 | 1.0x | 24/24 | 100% |
+  | 3 | 3.44 | **1.63x** | 22/24 | 98.2% |
+  | 6 | 4.03 | 1.39x | 30/36 | 97.2% |
+
+  One slot reproduces Ollama exactly, so the request format is equivalent; the differences at 3 and 6 slots are
+  floating-point effects of batching. Three slots is the sweet spot. No crash in about 110 requests.
+  **Not switched yet:** the label client speaks Ollama's API, so it needs a small OpenAI-style client and a launcher,
+  and a registered arm labelled this way differs from a one-slot arm in about 2% of fields (random, not directional).
+  To be adopted with a dated note in PLAN_60_V2 when the next label stage starts.
 - **The news crawl is the real bottleneck.** GDELT's DOC API limiter is stricter than its documented one request per
   5 s; at the current rate the 2,851-release warm-up needs about 400 more hours. Faster sources (GDELT on BigQuery,
   grouped OR queries) change the frozen B4b news query, so they need a new pre-registration and, for BigQuery, the
