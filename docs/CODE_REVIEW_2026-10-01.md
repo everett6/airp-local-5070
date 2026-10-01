@@ -33,9 +33,12 @@ test and its own commit.
    data path of the frozen runner.
 4. **Broker mirror after a wipe-out.** If the aggressive book is ever closed, its positions at Alpaca stay open:
    the mirror only follows pending targets. Paper only; needs a decision on what the mirror should then do.
-5. **Reader oddity seen in the app:** MKC's sales are recorded as 17.4 million dollars (they are about 1.7 billion). The reader's
-   number passed the quote check, so the release likely states it in a unit the reader misread. The judge saw that
-   number. Worth a look in the Saturday review; the frozen reader is not changed here.
+5. **Reader oddity seen in the app (checked later the same day: no harm done).** MKC's sales show as 17.4 million
+   dollars in the app (they are about 1.7 billion): the reader took the "17%" growth figure for the amount. The
+   code's SEC cross-check caught it and dropped the number, so the judge's fact sheet said "Revenue: not stated" plus
+   a note about the dropped figure; the judge never saw 17.4. The app shows the reader's raw number, which is
+   misleading. The reader also read "reaffirmed its outlook" as no guidance. Worth a look in the Saturday review;
+   the frozen reader is not changed here.
 
 6. **Entry day in winter.** The live runner lets a release filed before 09:30 New York time enter at that day's
    open, and the AI-picks sleeve trades that open. The scoring code (`entry_index`) uses a fixed cut-off of 13:00 UTC,
