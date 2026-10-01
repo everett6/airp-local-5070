@@ -59,7 +59,8 @@ EVENT_READERS = {"scripts/ai_picks.py", "scripts/guidance_shadow.py", "scripts/n
 RETRYABLE = {"scripts/forward_events.py", "scripts/forward_allocator.py", "scripts/broker_sync.py", "scripts/ai_picks.py"}
 TRANSIENT = re.compile(r"Temporary failure in name resolution|Name or service not known|Connection (reset|refused|"
                        r"aborted)|timed out|HTTP (429|502|503|504)|RemoteDisconnected|ConnectTimeout|ReadTimeout|"
-                       r"URLError", re.IGNORECASE)
+                       r"URLError|YFRateLimitError|Too Many Requests|No objects to concatenate|"
+                       r"no SPY closing prices", re.IGNORECASE)  # the last three: Yahoo returned nothing
 RETRY_WAIT = 90
 EXPECTED = {"events": 2, "allocator_weekday": 0}  # event runs per weekday; the allocator runs Mondays
 

@@ -23,16 +23,13 @@ sys.path.insert(0, str(BACKEND))
 import numpy as np
 import pandas as pd
 
+from app.forward.ledger import jsonl_records as _jsonl
 from app.sandbox import consensus as C
 
 # agent -> (file next to the event ledger, its scored field)
 READS = {"net_read": ("net_read.jsonl", "net_read"), "ai_read": ("ai_lens.jsonl", "ai_read"),
          "bb_read": ("bull_bear.jsonl", "bb_read")}
 PASS = {"min_events": 150, "min_months": 3, "min_ic": 0.02}  # arms C2, D and E's rule, plus the blend-gain test
-
-
-def _jsonl(p: Path) -> list[dict[str, Any]]:
-    return [json.loads(x) for x in p.read_text().splitlines() if x.strip()] if p.exists() else []
 
 
 def _ts(s: str) -> datetime:

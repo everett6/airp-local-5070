@@ -42,7 +42,7 @@ from llm_fields import (
     verify,
 )
 
-from app.forward.ledger import Ledger
+from app.forward.ledger import Ledger, jsonl_records
 from app.sandbox.gpu_lock import gpu_priority
 
 PORT = 11440
@@ -98,7 +98,7 @@ def scored(d: Path, lens: str = "net_read") -> pd.DataFrame:
     p = d / fname
     if not p.exists() or not (d / "ledger.jsonl").exists():
         return pd.DataFrame(columns=["accession", "month", "net", "fwd5"])
-    lab = [json.loads(x) for x in p.read_text().splitlines()]
+    lab = [x for x in jsonl_records(p) if key in x and "written_at" in x]
     lab = [x for x in lab if datetime.fromisoformat(x["written_at"]) < datetime.fromisoformat(x["entry_deadline"])]
     out = {r["accession"]: r for r in Ledger(d / "ledger.jsonl").records() if r.get("type") == "outcome"}
     rows = [{"accession": x["accession"], "month": out[x["accession"]]["entry"][:7], "net": SCORE[x[key]],
@@ -133,7 +133,7 @@ def run(d: Path, use_gpu: bool) -> dict[str, int]:
     specs = lenses(d)
     for lens, (_, _, _, fname) in specs.items():
         p = d / fname
-        done = {json.loads(x)["accession"] for x in p.read_text().splitlines()} if p.exists() else set()
+        done = {x["accession"] for x in jsonl_records(p) if "accession" in x}
         rows = [r for r in todo(recs_all, done) if datetime.fromisoformat(r["entry_deadline"]) > now]
         if rows:
             todo_by[lens] = rows

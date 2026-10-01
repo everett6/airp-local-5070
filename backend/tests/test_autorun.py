@@ -300,3 +300,12 @@ def test_a_hung_step_and_a_missing_notifier_do_not_kill_the_run(tmp_path, monkey
     monkeypatch.setattr(autorun, "ntfy_topic", lambda: "")
     autorun.alert("events", "something")  # must not raise
     assert json.loads((tmp_path / "alerts.jsonl").read_text())["msg"] == "something"
+
+
+def test_an_empty_yahoo_answer_is_retried_once(tmp_path, monkeypatch):
+    """Code review, 1 Oct 2026: when Yahoo returns no prices the event runner stops with one of these messages; a
+    retry 90 s later saves the morning's decisions (the runner skips anything already in its ledger)."""
+    for msg in ("ValueError: No objects to concatenate", "ValueError: event data check: no SPY closing prices",
+                "yfinance.exceptions.YFRateLimitError: Too Many Requests. Rate limited."):
+        rc, calls = _run_with(tmp_path, monkeypatch, [["py", "scripts/forward_events.py"]], [(1, msg), (0, "")])
+        assert rc == 0 and calls == ["scripts/forward_events.py"] * 2

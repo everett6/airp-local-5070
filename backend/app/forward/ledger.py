@@ -26,6 +26,24 @@ class LedgerError(RuntimeError):
     pass
 
 
+def jsonl_records(path: Path) -> list[dict[str, Any]]:
+    """The JSON objects of a plain (not hash-chained) .jsonl file, skipping a line cut off by a crash or power loss.
+    For the shadows' label files: one torn line must not stop every later run from labelling new releases."""
+    out: list[dict[str, Any]] = []
+    if not path.exists():
+        return out
+    for line in path.read_text(errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(rec, dict):
+            out.append(rec)
+    return out
+
+
 class Ledger:
     def __init__(self, path: Path) -> None:
         self.path = path

@@ -90,3 +90,17 @@ def test_status_on_nothing(tmp_path: Path) -> None:
     assert st == {"recorded": 0, "scored": 0,
                   "consensus_eq": {"months": 0, "mean_ic": None, "ic_lo80": None, "ready_to_judge": False},
                   "consensus_rw": {"months": 0, "mean_ic": None, "ic_lo80": None, "ready_to_judge": False}}
+
+
+def test_a_torn_label_line_does_not_stop_the_shadows(tmp_path: Path) -> None:
+    """Code review, 1 Oct 2026: a line cut off by a crash made every later run fail on json.loads, and labels on live
+    releases cannot be made afterwards."""
+    from app.forward.ledger import jsonl_records
+    p = tmp_path / "net_read.jsonl"
+    p.write_text('{"accession": "a", "net_read": "bullish", "entry_deadline": "2026-10-02T09:30:00-04:00", '
+                 '"written_at": "2026-10-01T12:05:00+00:00"}\n\n{"accession": "b", "net_re')
+    assert [x["accession"] for x in jsonl_records(p)] == ["a"] and jsonl_records(tmp_path / "none.jsonl") == []
+    d = tmp_path
+    _write(d / "ledger.jsonl", [_dec(0, "a", "2026-10-02T09:30:00-04:00", 1.0)])
+    assert S.on_time_reads(d) == {"a": {"net_read": "bullish"}}
+    assert S.collect(d, tmp_path / "out", datetime(2026, 10, 1, 12, 10, tzinfo=UTC)) == 1
