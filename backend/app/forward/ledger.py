@@ -12,7 +12,7 @@ import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 GENESIS = "0" * 64
 
@@ -34,11 +34,14 @@ def write_atomic(path: Path, text: str) -> None:
     tmp.replace(path)
 
 
-def jsonl_records(path: Path) -> list[dict[str, Any]]:
+def jsonl_records(path: Path, must_exist: bool = False) -> list[dict[str, Any]]:
     """The JSON objects of a plain (not hash-chained) .jsonl file, skipping a line cut off by a crash or power loss.
-    For the shadows' label files: one torn line must not stop every later run from labelling new releases."""
+    For the pipeline's and the shadows' line files: one torn line must not stop every later run. `must_exist` keeps
+    a missing input file an error."""
     out: list[dict[str, Any]] = []
     if not path.exists():
+        if must_exist:
+            raise FileNotFoundError(path)
         return out
     for line in path.read_text(errors="replace").splitlines():
         if not line.strip():
@@ -50,6 +53,19 @@ def jsonl_records(path: Path) -> list[dict[str, Any]]:
         if isinstance(rec, dict):
             out.append(rec)
     return out
+
+
+def open_append(path: Path) -> TextIO:
+    """Open a .jsonl file for appending. If its last line was cut off (no newline at the end), end that line first,
+    so the next record starts on a line of its own and `jsonl_records` skips only the torn one."""
+    if path.exists() and path.stat().st_size:
+        with path.open("rb") as r:
+            r.seek(-1, 2)
+            torn = r.read(1) != b"\n"
+        if torn:
+            with path.open("ab") as w:
+                w.write(b"\n")
+    return path.open("a")
 
 
 class Ledger:

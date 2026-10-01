@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 
 from app.forward.ledger import jsonl_records as _jsonl
+from app.forward.ledger import open_append
 from app.sandbox import consensus as C
 
 # agent -> (file next to the event ledger, its scored field)
@@ -73,7 +74,7 @@ def collect(d: Path, out: Path, now: datetime | None = None) -> int:
                 "records": {a: list(rec[a]) for a in C.AGENTS}, "matured": len(past), **C.combine(v, rec),
                 "written_at": now.isoformat(timespec="seconds")}
         out.mkdir(parents=True, exist_ok=True)
-        with path.open("a") as f:
+        with open_append(path) as f:
             f.write(json.dumps(line) + "\n")
         have.add(acc)
         votes_of[acc] = v

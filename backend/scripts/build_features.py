@@ -30,6 +30,7 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 import pandas as pd
 from decide_events import SECTOR_ETF, event_text, pct
 
+from app.forward.ledger import jsonl_records
 from app.sandbox.events import Prices, entry_index, plausible
 
 
@@ -90,7 +91,7 @@ def main() -> None:
                     help="forward test: a release whose entry day is not in the prices yet uses the closes before it")
     args = ap.parse_args()
     ev = pd.read_csv(BACKEND / args.events)
-    ex = {json.loads(x)["accession"]: json.loads(x) for x in (BACKEND / args.extract).read_text().splitlines()}
+    ex = {x["accession"]: x for x in jsonl_records(BACKEND / args.extract, must_exist=True)}
     xb = pd.read_csv(BACKEND / args.xbrl)
     by_cik = {int(c): g for c, g in xb.groupby("cik")}
     p = Prices.from_long(pd.read_parquet(BACKEND / args.prices))

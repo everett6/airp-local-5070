@@ -42,7 +42,7 @@ from llm_fields import (
     verify,
 )
 
-from app.forward.ledger import Ledger, jsonl_records
+from app.forward.ledger import Ledger, jsonl_records, open_append
 from app.sandbox.gpu_lock import gpu_priority
 
 PORT = 11440
@@ -164,7 +164,7 @@ def run(d: Path, use_gpu: bool) -> dict[str, int]:
             srv.stop()
     at = datetime.now(UTC).isoformat(timespec="seconds")
     for lens, recs in out.items():
-        with (d / specs[lens][3]).open("a") as f:
+        with open_append(d / specs[lens][3]) as f:
             for r in recs:
                 f.write(json.dumps(r | {"written_at": at}) + "\n")
     return {lens: len(recs) for lens, recs in out.items()}

@@ -27,6 +27,7 @@ sys.path.insert(0, str(BACKEND))
 
 import pandas as pd
 
+from app.forward.ledger import jsonl_records, open_append
 from app.sandbox.events import check
 from app.sandbox.gpu_lock import gpu_job
 from app.sandbox.walkforward import OllamaLLM
@@ -136,7 +137,7 @@ async def extract(args: argparse.Namespace) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     slug = args.model.split("/")[-1].replace(":", "_").replace("/", "_")
     out_path = BACKEND / args.out if args.out else OUT / f"extract_{slug}.jsonl"
-    done = {json.loads(x)["accession"] for x in out_path.read_text().splitlines()} if out_path.exists() else set()
+    done = {x["accession"] for x in jsonl_records(out_path)}  # a line cut off by a power loss is read again
     todo = [r for r in ev.itertuples() if r.accession not in done and text_path(r.accession).exists()]
     if args.limit:
         todo = todo[: args.limit]
@@ -155,7 +156,7 @@ async def extract(args: argparse.Namespace) -> None:
 async def _extract_loop(todo: list[Any], llm: OllamaLLM, out_path: Path, t0: float, args: argparse.Namespace) -> None:
     nu = "nuextract" in args.model.lower()
     n = 0
-    with out_path.open("a") as f:
+    with open_append(out_path) as f:
         async def one(r: Any) -> None:
             nonlocal n
             text = gzip.decompress(text_path(r.accession).read_bytes()).decode()[: args.max_chars]

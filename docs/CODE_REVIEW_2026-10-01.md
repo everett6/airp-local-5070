@@ -44,6 +44,12 @@ test and its own commit.
    honest (the decision is still made before the scored entry) but it will no longer measure the trade the sleeve
    makes for those releases. Both rules were fixed before the forward test, so nothing is changed here.
 
+7. **The hash-chained ledgers stop at a cut-off last line.** `app/forward/ledger.Ledger` (events, guidance,
+   long-term, themes) checks every line; a last line cut off by a power loss would make every later run fail until
+   the line is removed by hand. That strictness is the point of the ledger (nothing can be dropped silently), so it
+   is not changed here. Proposed, if the user wants it: treat only an unterminated last line as never written,
+   and say so in an alert.
+
 ## Also fixed in this pass
 
 | # | Where | What | Commit |
@@ -53,7 +59,17 @@ test and its own commit.
 | 11 | `app/sandbox/walkforward.py` | The one-token probability call behind the monthly long-term and theme ratings had no retry: one dropped connection in about 500 calls would have failed the whole cohort (75 minutes of GPU, repeated at the next run). | Three attempts, as the main call already had. Answers unchanged. | 69c6574 |
 | 12 | `scripts/weekly_review.py`, `forward_allocator.py --status`, `desktop_export.py`, `desktop/src/airp.js` | A week in which the aggressive book fails is stored as an error entry without numbers (fix 3). Four readers took `equity` from every entry: the Saturday review would have crashed, the status command too, and the app's book table would have shown broken numbers. Found by rehearsing the review on a scratch copy. | They leave such an entry out; the review says the book's last run failed. The review and the health report also skip a ledger line cut off by a crash. | d3e917f |
 | 13 | `scripts/self_improve.py`, `scripts/net_read_shadow.py` | The self-improvement versions file is rewritten after every event run, in place. Had a crash cut it off, the label shadows (which read it first) would have stopped labelling live releases with all three lenses; those labels cannot be made afterwards. | The file is written through a temporary file; if it is ever unreadable the fixed lenses still label and an alert is raised; it is never rewritten from a damaged read. A cut-off label line no longer stops the champion/challenger scoring. | 9b79e9c |
-| 14 | `scripts/forward_allocator.py`, `broker_sync.py`, `forward_events.py` | The books' state, the broker order record, the list of past releases and the price file were rewritten in place. A crash or power loss mid-write would have left half a file: the next weekly rebalance or order sync could not start, or past releases would silently drop out of scoring. | Each is now replaced in one step (`app/forward/ledger.write_atomic`). Contents are identical; the rebalance and the order mirror were rehearsed on a scratch copy. | this commit |
+| 14 | `scripts/forward_allocator.py`, `broker_sync.py`, `forward_events.py` | The books' state, the broker order record, the list of past releases and the price file were rewritten in place. A crash or power loss mid-write would have left half a file: the next weekly rebalance or order sync could not start, or past releases would silently drop out of scoring. | Each is now replaced in one step (`app/forward/ledger.write_atomic`). Contents are identical; the rebalance and the order mirror were rehearsed on a scratch copy. | e6e34ca |
+| 15 | `scripts/extract_events.py`, `build_features.py`, `decide_events.py`, `forward_events.py`, the label and consensus shadows | The reader's and the judge's output files are appended one line per release. A power loss during such a write leaves a cut-off last line; every later live run would then have failed at that line, so every later decision would have been missed until the file was repaired by hand, and the next record would have been glued onto the broken line. | Reads skip a cut-off line (that release is read or judged again) and appends start on a fresh line (`app/forward/ledger.open_append`). Checked: the judge's output and the live fact sheets are byte-identical before and after; new end-to-end tests of the reader and judge steps with a stub model. | this commit |
+
+## Rehearsed on scratch copies (nothing live was touched)
+- Saturday's weekly review and the weekly learning review (found fix 12).
+- Monday's rebalance with the aggressive book and the order mirror (dry): 3 legs planned at 1.63× at the broker.
+- The event runner without the graphics card, twice, after the file-write changes.
+- The AI-picks sleeve day by day to 9 Oct with made-up prices and a stand-in broker: MU and ACN exits are sent on
+  the morning of 8 Oct, JBL (never filled) closes on 7 Oct with no order and no new alert, and the fill audit is
+  written when a pair closes.
+- The consensus shadow on the six live releases (they are recorded late and never scored, as planned).
 
 ## Noted, not changed
 - `scripts/learn_loop.py monthly` (first run Sat 3 Oct): if it crashed between testing a proposal and saving, the

@@ -28,6 +28,7 @@ sys.path.insert(0, str(BACKEND))
 
 import pandas as pd
 
+from app.forward.ledger import jsonl_records, open_append
 from app.sandbox.events import Prices, entry_index
 from app.sandbox.gpu_lock import gpu_job
 from app.sandbox.walkforward import OllamaLLM
@@ -81,7 +82,7 @@ def event_text(ev: Any, ex: dict[str, Any], p: Prices, i: int, etf: str) -> str:
 async def run(args: argparse.Namespace) -> None:
     ev = pd.read_csv(BACKEND / args.events)
     ev = ev[(ev["filed"] >= args.date_from) & (ev["filed"] <= args.date_to)]
-    ex = {json.loads(x)["accession"]: json.loads(x) for x in (BACKEND / args.extract).read_text().splitlines()}
+    ex = {x["accession"]: x for x in jsonl_records(BACKEND / args.extract, must_exist=True)}
     p = Prices.from_long(pd.read_parquet(BACKEND / args.prices))
     days = pd.DatetimeIndex(p.open.index)
     slug = (args.model.replace(":", "_").replace("/", "_") + (f"_{args.tag}" if args.tag else "")
@@ -89,7 +90,7 @@ async def run(args: argparse.Namespace) -> None:
     sheets = (pd.read_csv(BACKEND / args.features).set_index("accession")["fact_sheet"].to_dict()
               if args.features else {})
     out_path = BACKEND / "results" / "events" / f"decide_{slug}.jsonl"
-    done = {json.loads(x)["accession"] for x in out_path.read_text().splitlines()} if out_path.exists() else set()
+    done = {x["accession"] for x in jsonl_records(out_path)}  # a line cut off by a power loss is decided again
     todo = [r for r in ev.itertuples() if r.accession in ex and r.accession not in done
             and (not sheets or r.accession in sheets)]
     if args.limit:
@@ -122,7 +123,7 @@ async def run(args: argparse.Namespace) -> None:
         return rec
 
     try:
-        with out_path.open("a") as f:
+        with open_append(out_path) as f:
             for c in range(0, len(todo), args.parallel):  # one-token answers: several in flight fill the GPU
                 chunk = list(enumerate(todo[c:c + args.parallel], start=c + 1))
                 for rec in await asyncio.gather(*(one(n, r) for n, r in chunk)):

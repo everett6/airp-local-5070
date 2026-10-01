@@ -49,7 +49,7 @@ import pandas as pd
 from event_eval import SECTOR_ETF
 
 from app.data_ingestion.tickers import trading_symbol
-from app.forward.ledger import Ledger
+from app.forward.ledger import Ledger, jsonl_records, open_append
 from app.forward.schedule import NY, OPEN
 from app.sandbox.events import Prices, entry_index, fwd_excess
 from app.sandbox.gpu_lock import gpu_priority
@@ -179,8 +179,8 @@ def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str, pri
         finally:
             srv.stop()
     else:  # no reader: the fact sheet keeps only the SEC-filed and price parts (lite reads those)
-        done = {json.loads(x)["accession"] for x in ex.read_text().splitlines()} if ex.exists() else set()
-        with ex.open("a") as f:
+        done = {x["accession"] for x in jsonl_records(ex)}
+        with open_append(ex) as f:
             for r in pd.read_csv(ev_csv).itertuples():
                 if r.accession not in done:
                     f.write(json.dumps({"accession": r.accession, "ticker": r.ticker, "cik": int(r.cik),
@@ -199,8 +199,7 @@ def bonsai(ev_csv: Path, ex: Path, feats: Path, tag: str, since: date, d: Path, 
     finally:
         srv.stop()
     p = BACKEND / "results" / "events" / f"decide_bonsai-27b_latest_{tag}_h{H}.jsonl"
-    rows = [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
-    return {r["accession"]: float(r["logodds"]) for r in rows if not r.get("censored")}
+    return {r["accession"]: float(r["logodds"]) for r in jsonl_records(p) if not r.get("censored")}
 
 
 def pre_entry(ev: pd.DataFrame, p: Prices) -> pd.DataFrame:
