@@ -116,3 +116,32 @@ def test_without_the_gpu_proposals_come_from_the_grid(tmp_path: Path) -> None:
     assert len(props) == 5 and {p.proposer for p in props} == {"grid"}
     for p in props:
         R.validate({"terms": p.terms})  # every grid recipe is on the menu
+
+
+def test_collect_keeps_new_releases_after_a_row_cut_off_by_a_power_loss(tmp_path, monkeypatch):
+    """live_features.csv is the only copy of the live releases' fields (the feature file is rewritten every run).
+    A cut-off row used to make every later collect fail at reading it."""
+    days = pd.bdate_range(end="2026-09-30", periods=300)
+    px = pd.DataFrame([{"Date": d.date().isoformat(), "Ticker": t, "Open": 100.0 + i, "Close": 100.0 + i}
+                       for i, d in enumerate(days) for t in ("SPY", "XLI", "AAA", "BBB")])
+    ev_dir, out = tmp_path / "events", tmp_path / "signals"
+    ev_dir.mkdir()
+    px.to_parquet(ev_dir / "prices.parquet")
+    monkeypatch.setattr(L, "EV", tmp_path)
+
+    def release(acc, t):
+        pd.DataFrame([{"accession": acc, "ticker": t, "sector": "Industrials",
+                       "accepted_utc": "2026-10-01T20:10:00"}]).to_csv(ev_dir / "events.csv", index=False)
+        pd.DataFrame([{"accession": acc, "eps_q": 1.0, "eps_prior": 0.9, "rev_q": 10.0, "rev_prior": 9.0,
+                       "guidance": "raised", "tone": "positive"}]).to_csv(tmp_path / "features_forward.csv", index=False)
+    release("a1", "AAA")
+    assert L.collect(ev_dir, out) == 1
+    store = out / "live_features.csv"
+    with store.open("a") as f:
+        f.write("a-torn,Industr")  # power loss in the middle of a row
+    release("a2", "BBB")
+    assert L.collect(ev_dir, out) == 1
+    got = pd.read_csv(store, on_bad_lines="skip")
+    assert list(got["accession"]) == ["a1", "a-torn", "a2"] or list(got["accession"]) == ["a1", "a2"]
+    assert not np.isnan(got[got["accession"] == "a2"]["eps_q"].iloc[0])
+    assert L.collect(ev_dir, out) == 0  # nothing is collected twice

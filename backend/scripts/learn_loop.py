@@ -28,6 +28,7 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 
 import pandas as pd
 
+from app.forward.ledger import jsonl_records, open_append
 from app.signals import registry as R
 
 EV = BACKEND / "results" / "events"
@@ -72,7 +73,8 @@ def collect(events_dir: Path, out: Path, tag: str = "forward") -> int:
         print("learn collect: nothing to collect yet")
         return 0
     store = out / "live_features.csv"
-    have = set(pd.read_csv(store)["accession"]) if store.exists() else set()
+    # a row cut off by a power loss is skipped: it must not stop every later run from keeping its releases
+    have = set(pd.read_csv(store, on_bad_lines="skip")["accession"]) if store.exists() else set()
     f = pd.read_csv(feats)
     f = f[[c for c in FEATS if c in f.columns]]
     f = f[~f["accession"].isin(have)]
@@ -84,7 +86,8 @@ def collect(events_dir: Path, out: Path, tag: str = "forward") -> int:
     rows = pre_entry(ev, Prices.from_long(pd.read_parquet(px))).merge(f, on="accession")
     rows["collected_at"] = datetime.now(UTC).isoformat(timespec="seconds")
     out.mkdir(parents=True, exist_ok=True)
-    rows.to_csv(store, mode="a", header=not store.exists(), index=False)
+    open_append(store).close()  # ends a row that a power loss cut off, so the new rows are not glued to it
+    rows.to_csv(store, mode="a", header=not store.stat().st_size, index=False)
     print(f"learn collect: {len(rows)} new releases")
     return len(rows)
 
@@ -100,7 +103,7 @@ def live(events_dir: Path, out: Path) -> pd.DataFrame:
     dec = {r["accession"]: r["logodds"] for r in recs if r.get("type") == "decision" and r.get("on_time")}
     outc = {r["accession"]: (r["fwd5"], r["entry"]) for r in recs if r.get("type") == "outcome"
             and r.get("fwd5") is not None}
-    df = pd.read_csv(store).drop_duplicates("accession")
+    df = pd.read_csv(store, on_bad_lines="skip").drop_duplicates("accession")
     df = df[df["accession"].isin(dec) & df["accession"].isin(outc)]
     if df.empty:
         return pd.DataFrame(columns=cols)
@@ -200,8 +203,8 @@ def monthly(out: Path, use_gpu: bool, today: date | None = None, train: pd.DataF
     reg = R.Registry(out / "registry.json")
     month = today.strftime("%Y-%m")
     runs = out / "monthly.jsonl"
-    done = [json.loads(x) for x in runs.read_text().splitlines()] if runs.exists() else []
-    if any(r["month"] == month for r in done):
+    done = jsonl_records(runs)
+    if any(r.get("month") == month for r in done):
         print(f"learn monthly: already ran for {month}")
         return {}
     train = history("2024") if train is None else train
@@ -233,7 +236,7 @@ def monthly(out: Path, use_gpu: bool, today: date | None = None, train: pd.DataF
         summary["signals"][s.name] = res
         print(f"  {s.name:40} {s.proposer:6} train IC {tr['mean_ic']}  -> {s.status}")
     reg.save()
-    with runs.open("a") as f:
+    with open_append(runs) as f:
         f.write(json.dumps(summary) + "\n")
     return summary
 

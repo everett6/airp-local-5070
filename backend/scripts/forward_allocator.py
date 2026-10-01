@@ -31,7 +31,7 @@ import pandas as pd
 import yfinance as yf
 
 from app.data_ingestion import bars
-from app.forward.ledger import write_atomic
+from app.forward.ledger import jsonl_records, open_append, write_atomic
 from app.portfolio.forward import (
     COST_BPS,
     LEVERAGE,
@@ -144,7 +144,7 @@ def status() -> None:
     if not ledger.exists():
         print("no runs yet")
         return
-    runs = [json.loads(x) for x in ledger.read_text().splitlines()]
+    runs = [r for r in jsonl_records(ledger) if "books" in r]
     print(f"{len(runs)} runs, first {runs[0]['run_at_utc']}, last {runs[-1]['run_at_utc']}")
     for r in runs:
         eq = "  ".join(f"{k}: {v['equity']:>11,.2f}" if "equity" in v else f"{k}: failed" for k, v in r["books"].items())
@@ -191,7 +191,7 @@ def main() -> None:
     books = books_from_json(json.loads(state_path.read_text())) if state_path.exists() else new_books()
     now = datetime.now(UTC)
     if ledger.exists():
-        history = [json.loads(line) for line in ledger.read_text().splitlines()]
+        history = [r for r in jsonl_records(ledger) if "run_at_utc" in r]  # a line cut off by a power loss is skipped
         if not history:
             raise ValueError("allocator ledger check: empty ledger")
         last = history[-1]
@@ -223,7 +223,7 @@ def main() -> None:
                 books[name].reducing = True
             if dd.get("action"):
                 print("DRAWDOWN", dd)
-    with ledger.open("a") as f:
+    with open_append(ledger) as f:
         f.write(json.dumps(rec) + "\n")
     write_atomic(state_path, json.dumps(books_to_json(books), indent=1) + "\n")
     print(json.dumps(rec, indent=1))

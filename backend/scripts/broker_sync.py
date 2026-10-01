@@ -23,7 +23,7 @@ sys.path.insert(0, str(BACKEND))
 
 import httpx
 
-from app.forward.ledger import write_atomic
+from app.forward.ledger import jsonl_records, write_atomic
 from app.portfolio.broker import (
     CRYPTO,
     Alpaca,
@@ -53,12 +53,9 @@ def broker_scale(targets: dict[str, float]) -> float:
 
 def sim_fills(ledger: Path, book: str, decided_at: str) -> dict[str, float]:
     """The simulator's fill prices for the decision made at `decided_at` (the first run after it that filled)."""
-    if not ledger.exists():
-        return {}
-    for line in ledger.read_text().splitlines():
-        rec = json.loads(line)
+    for rec in jsonl_records(ledger):
         r = rec.get("books", {}).get(book, {})
-        if rec["run_at_utc"] > decided_at and r.get("filled_on"):
+        if rec.get("run_at_utc", "") > decided_at and r.get("filled_on"):
             return {f["asset"]: float(f["price"]) for f in r.get("fills", [])}
     return {}
 

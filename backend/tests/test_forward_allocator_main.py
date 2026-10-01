@@ -64,11 +64,11 @@ def test_a_run_writes_one_ledger_line_and_the_books_and_refuses_a_second_run_tha
     # the next run (the first one moved a week back): last week's targets fill at the first open after it
     week_ago = (datetime.now(UTC) - timedelta(days=7)).isoformat(timespec="seconds")
     rec["run_at_utc"] = week_ago
-    (d / "ledger.jsonl").write_text(json.dumps(rec) + "\n")
+    (d / "ledger.jsonl").write_text(json.dumps(rec) + "\n" + '{"run_at_utc": "2026-')  # and a write cut off by a power loss
     (d / "state.json").write_text(json.dumps({k: v | {"decided_at": week_ago} for k, v in state.items()}))
     allocator["last"] = allocator["then"]  # one more market day since the first run
     FA.main()
-    second = json.loads((d / "ledger.jsonl").read_text().splitlines()[1])
+    second = json.loads((d / "ledger.jsonl").read_text().splitlines()[2])  # on its own line, after the torn one
     assert all(np.isfinite(second["books"][b]["equity"]) and second["books"][b]["equity"] > 0 for b in BOOKS)
     assert 0 < second["books"][AGGRESSIVE]["gross"] <= 2.5 + 1e-6
 
