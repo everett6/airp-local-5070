@@ -18,6 +18,8 @@ Jobs live in results/research/queue.json; per-job logs in results/research/logs/
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 import time
@@ -131,6 +133,20 @@ def notify(title: str, msg: str) -> None:
     alert(title, msg)
 
 
+def detached(cmd: list[str], name: str, log: Path) -> list[str] | None:
+    """The command that runs a job as its own transient systemd service (None if systemd-run is missing).
+    A tick called from a timer's service lives in that service's control group, and systemd kills the whole group
+    when the service finishes: this killed both jobs 3 s after the 18:29 check on 30 Sep 2026. A transient service
+    is started by the user manager itself, so it outlives the caller. Not a timer or a unit file: it ends with the job
+    (a scope was tried first and did not survive the caller in a real test)."""
+    if not shutil.which("systemd-run"):
+        return None
+    return ["systemd-run", "--user", "--collect", "--quiet", f"--unit=airp-research-{name}",
+            f"--description=airp research: {name}", f"--working-directory={BACKEND}",
+            f"--setenv=PATH={os.environ.get('PATH', '/usr/bin:/bin')}",
+            "-p", f"StandardOutput=append:{log}", "-p", "StandardError=inherit", "--", *cmd]
+
+
 def start(job: dict[str, Any], now: datetime) -> None:
     logs = QDIR / "logs"
     logs.mkdir(parents=True, exist_ok=True)
@@ -138,9 +154,13 @@ def start(job: dict[str, Any], now: datetime) -> None:
     if job["kind"] == "gpu":
         cmd = ["timeout", str(seconds_to_stop(now)), *cmd]
     cmd = ["systemd-inhibit", "--what=idle:sleep", f"--why=airp research: {job['name']}", *cmd]
-    with (logs / f"{job['name']}.log").open("a") as f:
+    log = logs / f"{job['name']}.log"
+    with log.open("a") as f:
         f.write(f"\n=== start {now.isoformat(timespec='seconds')}\n")
         f.flush()
+        unit = detached(cmd, job["name"], log)
+        if unit and subprocess.run(unit, cwd=BACKEND, stdout=f, stderr=subprocess.STDOUT, check=False).returncode == 0:
+            return
         subprocess.Popen(cmd, cwd=BACKEND, stdout=f, stderr=subprocess.STDOUT, start_new_session=True)
 
 

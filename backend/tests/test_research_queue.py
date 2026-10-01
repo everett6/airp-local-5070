@@ -60,3 +60,12 @@ def test_gate_waits_for_approval_and_notifies_once(tmp_path, monkeypatch):
 def test_gpu_stop_time_is_before_the_live_run():
     assert rq.seconds_to_stop(datetime(2026, 10, 1, 23, 25, tzinfo=LA)) == 6 * 3600
     assert rq.seconds_to_stop(datetime(2026, 10, 2, 5, 0, tzinfo=LA)) == 25 * 60
+
+
+def test_jobs_start_outside_the_callers_control_group(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(rq.shutil, "which", lambda _: "/usr/bin/systemd-run")
+    cmd = rq.detached(["sleep", "1"], "x", tmp_path / "x.log")
+    assert cmd is not None and cmd[:2] == ["systemd-run", "--user"] and "--scope" not in cmd
+    assert "--unit=airp-research-x" in cmd and cmd[-3:] == ["--", "sleep", "1"]
+    monkeypatch.setattr(rq.shutil, "which", lambda _: None)
+    assert rq.detached(["sleep", "1"], "x", tmp_path / "x.log") is None
