@@ -55,8 +55,8 @@ export function createAirp(root) {
     books() {
       const runs = jsonl(path.join(fwd, 'allocator', 'ledger.jsonl'));
       const names = [...new Set(runs.flatMap((r) => Object.keys(r.books || {})))];
-      const series = Object.fromEntries(names.map((n) => [n, runs.filter((r) => r.books?.[n])
-        .map((r) => ({ date: r.data_through, equity: r.books[n].equity }))]));
+      const series = Object.fromEntries(names.map((n) => [n, runs.filter((r) => r.books?.[n]?.equity != null)  // a failed week has no numbers
+        .map((r) => ({ date: r.data_through, equity: r.books[n].equity }))]).filter(([, s]) => s.length));
       const state = json(path.join(fwd, 'allocator', 'state.json'), {});
       const targets = Object.fromEntries(Object.entries(state || {}).map(([k, v]) => [k, { pending: v?.pending ?? null, decided_at: v?.decided_at ?? null }]));
       return { series, targets, aiPicks: json(path.join(fwd, 'ai_picks', 'book.json')), orders: json(path.join(fwd, 'broker', 'orders.json'), {}) };

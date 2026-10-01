@@ -146,7 +146,7 @@ def status() -> None:
     runs = [json.loads(x) for x in ledger.read_text().splitlines()]
     print(f"{len(runs)} runs, first {runs[0]['run_at_utc']}, last {runs[-1]['run_at_utc']}")
     for r in runs:
-        eq = "  ".join(f"{k}: {v['equity']:>11,.2f}" for k, v in r["books"].items())
+        eq = "  ".join(f"{k}: {v['equity']:>11,.2f}" if "equity" in v else f"{k}: failed" for k, v in r["books"].items())
         print(f"{r['data_through']}  {eq}")
 
 

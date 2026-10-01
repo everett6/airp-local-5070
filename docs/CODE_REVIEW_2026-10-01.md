@@ -50,7 +50,14 @@ test and its own commit.
 |---|---|---|---|
 | 9 | `scripts/digest.py` | The phone digest called a run that did its job but raised a broker alert "FAILED". It now says "finished with an alert". | 8824bf9 |
 | 10 | `app/portfolio/broker.py`, `scripts/ai_picks.py` | Class shares (BRK-B, BF-B) were sent to Alpaca with a dash. Alpaca only knows BRK.B (read-only lookup, 1 Oct): the order would have been rejected, leaving the pair's sector-ETF short open without its stock, and one such name in a price request makes the whole request fail. Not hit yet (no class share has been picked). | The book keeps the dash; orders, price requests and positions use the broker's dot. | daf49b0 |
-| 11 | `app/sandbox/walkforward.py` | The one-token probability call behind the monthly long-term and theme ratings had no retry: one dropped connection in about 500 calls would have failed the whole cohort (75 minutes of GPU, repeated at the next run). | Three attempts, as the main call already had. Answers unchanged. | this commit |
+| 11 | `app/sandbox/walkforward.py` | The one-token probability call behind the monthly long-term and theme ratings had no retry: one dropped connection in about 500 calls would have failed the whole cohort (75 minutes of GPU, repeated at the next run). | Three attempts, as the main call already had. Answers unchanged. | 69c6574 |
+| 12 | `scripts/weekly_review.py`, `forward_allocator.py --status`, `desktop_export.py`, `desktop/src/airp.js` | A week in which the aggressive book fails is stored as an error entry without numbers (fix 3). Four readers took `equity` from every entry: the Saturday review would have crashed, the status command too, and the app's book table would have shown broken numbers. Found by rehearsing the review on a scratch copy. | They leave such an entry out; the review says the book's last run failed. The review and the health report also skip a ledger line cut off by a crash. | this commit |
+
+## Read and found sound, second pass
+`app/portfolio/themes.py` and `scripts/themes.py` (the cards for today's first theme cohort were built on the CPU and
+look right), `app/data_ingestion/edgar.py`, `app/forward/schedule.py`, the model client in `app/sandbox/walkforward.py`,
+`scripts/research_queue.py` (no GPU job is waiting; the news crawl is its only running job), `scripts/trading_health.py`,
+the desktop server (token on every call, local address only).
 
 ## Read and found sound
 `app/portfolio/master.py` (calibration, Kelly sizing, the weight simulator), `app/portfolio/sleeve.py`,

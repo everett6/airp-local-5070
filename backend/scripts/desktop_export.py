@@ -374,7 +374,8 @@ def live() -> dict[str, Any]:
     books: dict[str, list[list[Any]]] = {}
     for r in runs:
         for name, b in (r.get("books") or {}).items():
-            books.setdefault(name, []).append([r.get("data_through"), b.get("equity")])
+            if b.get("equity") is not None:  # a failed week of the aggressive book has no numbers
+                books.setdefault(name, []).append([r.get("data_through"), b["equity"]])
     book = FWD / "ai_picks" / "book.json"
     ai = json.loads(book.read_text()) if book.exists() else {}
     dec = [r for r in _jsonl(FWD / "events" / "ledger.jsonl") if r.get("type") == "decision"]

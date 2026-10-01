@@ -24,7 +24,7 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 
 import pandas as pd
 
-from app.forward.ledger import Ledger
+from app.forward.ledger import Ledger, jsonl_records
 from app.portfolio.forward import AGGRESSIVE, brake_multiplier
 
 FWD = BACKEND / "results" / "forward"
@@ -124,7 +124,7 @@ def shadow_lines(fwd: Path = FWD) -> list[str]:
 def main() -> None:
     lines = [f"# Forward test review, {datetime.now(UTC).date().isoformat()}", ""]
     alloc = FWD / "allocator" / "ledger.jsonl"
-    runs = [json.loads(x) for x in alloc.read_text().splitlines()] if alloc.exists() else []
+    runs = [r for r in jsonl_records(alloc) if "books" in r]
     lines += ["## Books", ""]
     run_days: set[date] = set()
     if runs:
@@ -132,7 +132,11 @@ def main() -> None:
         lines += ["| Book | Start | Now | Return | Max drawdown | Brake |", "|---|---|---|---|---|---|"]
         names = sorted({k for r in runs for k in r["books"]})
         for n in names:
-            pts = [(date.fromisoformat(r["data_through"]), r["books"][n]["equity"]) for r in runs if n in r["books"]]
+            # a week where the aggressive book failed has an {"error": ...} entry without numbers: left out here
+            pts = [(date.fromisoformat(r["data_through"]), r["books"][n]["equity"]) for r in runs
+                   if "equity" in r["books"].get(n, {})]
+            if not pts:
+                continue
             eq = pd.Series({d: e for d, e in pts})
             dd = float((1 - eq / eq.cummax()).max())
             lines.append(f"| {n} | {eq.iloc[0]:,.0f} | {eq.iloc[-1]:,.0f} | {eq.iloc[-1] / eq.iloc[0] - 1:+.2%} | "
