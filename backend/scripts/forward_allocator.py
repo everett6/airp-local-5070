@@ -31,7 +31,15 @@ import pandas as pd
 import yfinance as yf
 
 from app.data_ingestion import bars
-from app.portfolio.forward import COST_BPS, Book, books_from_json, books_to_json, new_books, step
+from app.portfolio.forward import (
+    COST_BPS,
+    LEVERAGE,
+    Book,
+    books_from_json,
+    books_to_json,
+    new_books,
+    step,
+)
 from app.portfolio.guard import HALT, apply_drawdown_limit, halt, halt_info, state
 from app.portfolio.master import MasterConfig
 from app.sandbox.events import Prices
@@ -100,6 +108,12 @@ def validate_result(rec: dict, books: dict[str, Book]) -> None:
     if not rec.get("books") or not rec.get("price_sources"):
         raise ValueError("allocator result check: book or price sources absent")
     for name, result in rec["books"].items():
+        if name in LEVERAGE:  # the user's aggressive book is separate: its faults are reported, never fatal
+            bad = [k for k in ("rejected", "rejected_at_fill", "wiped_out") if k in result]
+            if bad:
+                rec.setdefault("aggressive_issues", []).append(f"{name}: {', '.join(bad)}")
+                print(f"AGGRESSIVE BOOK: {name}: {bad} {result.get('rejected') or result.get('rejected_at_fill') or ''}")
+            continue
         if "rejected" in result or "rejected_at_fill" in result:
             raise ValueError(f"allocator result check: {name} target weights rejected")
         equity = result.get("equity")
@@ -181,6 +195,13 @@ def main() -> None:
                                                path=DIR / "HALT" if dry else HALT)
         if rec["drawdown"].get("action"):
             print("DRAWDOWN", rec["drawdown"])
+    for name in LEVERAGE:  # the aggressive book against its own limits (mandate "books" section)
+        if name in rec["books"] and not rec["books"][name].get("wiped_out"):
+            dd = apply_drawdown_limit(name, rec["books"][name]["equity"], books[name].peak,
+                                      path=DIR / "HALT" if dry else HALT)
+            rec.setdefault("drawdown_leveraged", {})[name] = dd
+            if dd.get("action"):
+                print("DRAWDOWN", dd)
     with ledger.open("a") as f:
         f.write(json.dumps(rec) + "\n")
     state_path.write_text(json.dumps(books_to_json(books), indent=1) + "\n")

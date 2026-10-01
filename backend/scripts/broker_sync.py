@@ -23,12 +23,31 @@ sys.path.insert(0, str(BACKEND))
 
 import httpx
 
-from app.portfolio.broker import Alpaca, BrokerError, leg_dict, leg_from, opg_open, plan, reconcile
+from app.portfolio.broker import (
+    CRYPTO,
+    Alpaca,
+    BrokerError,
+    leg_dict,
+    leg_from,
+    opg_open,
+    plan,
+    reconcile,
+)
+from app.portfolio.forward import AGGRESSIVE
 from app.portfolio.guard import HALT, state
 from app.portfolio.sleeve import SHARE as SLEEVE_SHARE
 
-REAL_BOOK = ("master+brakes", "master")
+# The paper account mirrors the user's aggressive book when it exists (user, 2026-09-30), else the frozen book.
+REAL_BOOK = (AGGRESSIVE, "master+brakes", "master")
+STOCK_MARGIN, BROKER_ROOM = 0.5, 0.98  # the account lends 2x overnight on stocks and nothing against crypto
 MAX_AGE_DAYS = 3  # an older decision fills in the simulator at a past open: mirroring it now would only make a gap
+
+
+def broker_scale(targets: dict[str, float]) -> float:
+    """How much of these weights the account can hold overnight: stocks need half their value in equity, crypto all
+    of it. 1.0 for an unleveraged book; about 0.66 for the 2.5x book at full size (so roughly 1.6x at the broker)."""
+    need = sum(w * (1.0 if a in CRYPTO else STOCK_MARGIN) for a, w in targets.items() if w > 0)
+    return min(1.0, BROKER_ROOM / need) if need > 0 else 1.0
 
 
 def sim_fills(ledger: Path, book: str, decided_at: str) -> dict[str, float]:
@@ -82,10 +101,15 @@ def sync(client: Alpaca, alloc: Path, out: Path, now: datetime, dry: bool, halt_
         pos = client.positions()
         px = client.prices(sorted(set(book["pending"]) | set(pos)))
         equity = float(acct["equity"]) * (1 - SLEEVE_SHARE)  # the AI-picks sleeve trades the rest (sleeve.py)
-        legs = plan(dec, book["pending"], equity, pos, px, reduce_only=mode == "REDUCING")
+        scale = broker_scale(book["pending"])
+        want = {a: w * scale for a, w in book["pending"].items()}
+        legs = plan(dec, want, equity, pos, px, reduce_only=mode == "REDUCING")
         orders[dec] = {"book": name, "planned_at": now.isoformat(timespec="seconds"), "equity": equity,
-                       "targets": book["pending"], "legs": [leg_dict(x) for x in legs]}
-        print(f"broker: planned {len(legs)} leg(s) for the decision of {dec} on equity {equity:,.0f}")
+                       "targets": book["pending"], "broker_scale": round(scale, 4),
+                       "broker_gross": round(sum(want.values()), 3), "legs": [leg_dict(x) for x in legs]}
+        print(f"broker: planned {len(legs)} leg(s) for the decision of {dec} on equity {equity:,.0f}"
+              + (f" at {scale:.0%} of the {name} weights (gross {sum(want.values()):.2f}x; the account's margin limit)"
+                 if scale < 1 else ""))
     for dec, o in orders.items():  # send what may go now
         legs = [leg_from(d) for d in o["legs"]]
         for leg in legs:

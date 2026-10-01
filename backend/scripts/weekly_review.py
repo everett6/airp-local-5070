@@ -25,7 +25,7 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 import pandas as pd
 
 from app.forward.ledger import Ledger
-from app.portfolio.forward import brake_multiplier
+from app.portfolio.forward import AGGRESSIVE, brake_multiplier
 
 FWD = BACKEND / "results" / "forward"
 SPREAD = 0.015
@@ -126,6 +126,13 @@ def main() -> None:
             lines.append(f"| {n} | {eq.iloc[0]:,.0f} | {eq.iloc[-1]:,.0f} | {eq.iloc[-1] / eq.iloc[0] - 1:+.2%} | "
                          f"{dd:.1%} | {brake_multiplier(eq.iloc[-1], eq.max()):.2f} |")
         base = "master+brakes" if any("master+brakes" in r["books"] for r in runs) else "master"
+        agg = [r["books"][AGGRESSIVE] for r in runs if AGGRESSIVE in r["books"]]
+        if agg:  # the user's 2.5x paper book (PLAN_60_V2 "Aggressive book, 2.5x"): reported, never evidence
+            a = agg[-1]
+            lines += ["", f"**{AGGRESSIVE}** (your decision of 30 Sep; not a tested strategy): " + (
+                "wiped out: the loan grew larger than the holdings." if a.get("wiped_out") else
+                f"holding {a.get('gross', 0):.2f}× its equity, borrowed {a.get('borrowed', 0):,.0f}, interest paid so "
+                f"far {a.get('interest_paid', 0):,.0f}. Compare its return with 2.5× the {base} return above.")]
         eq = pd.Series({date.fromisoformat(r["data_through"]): r["books"][base]["equity"] for r in runs
                         if base in r["books"]})
         rf_f = BACKEND / "data" / "fred_dtb3.csv"

@@ -51,18 +51,25 @@ def _num(d: dict[str, Any], k: str, lo: float, hi: float) -> float:
     return float(v)
 
 
-def load_mandate(path: Path = MANDATE) -> Mandate:
+def load_mandate(path: Path = MANDATE, book: str | None = None) -> Mandate:
+    """The mandate; for a book named under "books" (a leveraged paper book the user added), that section's limits
+    replace the general ones. Every other book gets the general limits."""
     try:
         d = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as e:
         raise MandateError(f"mandate unreadable: {e}") from e
+    own = (d.get("books") or {}).get(book) if book else None
+    if own is not None and not isinstance(own, dict):
+        raise MandateError(f"mandate 'books' entry for {book!r} must be an object")
+    hi = 3.0 if own else 1.0  # only a book with its own section may exceed 1.0 gross
+    d = d | (own or {})
     uni, cry = d.get("universe"), d.get("crypto")
     if not isinstance(uni, list) or not uni or not all(isinstance(a, str) and a for a in uni):
         raise MandateError("mandate 'universe' must be a non-empty list of symbols")
     if not isinstance(cry, list) or not set(cry) <= set(uni):
         raise MandateError("mandate 'crypto' must be a list of symbols inside the universe")
     dd = {k: _num(d, k, 0.01, 1) for k in ("max_drawdown", "alert_drawdown") if k in d}
-    return Mandate(frozenset(uni), frozenset(cry), _num(d, "max_weight", 0, 1), _num(d, "max_gross", 0, 1),
+    return Mandate(frozenset(uni), frozenset(cry), _num(d, "max_weight", 0, hi), _num(d, "max_gross", 0, hi),
                    _num(d, "max_crypto", 0, 1), **dd)
 
 
@@ -95,10 +102,11 @@ def check(targets: dict[str, Any], m: Mandate) -> list[str]:
     return bad
 
 
-def gate(targets: dict[str, Any], path: Path = MANDATE) -> list[str]:
-    """check() against the mandate on disk; an unreadable mandate rejects everything (fail closed)."""
+def gate(targets: dict[str, Any], path: Path = MANDATE, book: str | None = None) -> list[str]:
+    """check() against the mandate on disk (the book's own section if it has one); an unreadable mandate rejects
+    everything (fail closed)."""
     try:
-        return check(targets, load_mandate(path))
+        return check(targets, load_mandate(path, book))
     except MandateError as e:
         return [str(e)]
 
@@ -141,7 +149,7 @@ def apply_drawdown_limit(book: str, equity: float, peak: float, mandate: Path = 
     next run's fills can only sell); at the alert level the run is flagged. An unreadable mandate is reported (the
     gate already rejects every order then)."""
     try:
-        m = load_mandate(mandate)
+        m = load_mandate(mandate, book)
     except MandateError as e:
         return {"book": book, "error": str(e)}
     dd = 1 - equity / peak if peak > 0 else 0.0
