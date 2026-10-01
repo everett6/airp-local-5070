@@ -6,6 +6,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAirp } from './airp.js';
+import { systemStats } from './system.js';
 
 export const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -42,7 +43,8 @@ export async function startServer({ airpRoot, port = 0, publicDir = path.join(ap
     'GET /api/research': () => airp.research(),
     'GET /api/tests': () => airp.tests(),
     'GET /api/reviews': () => airp.reviews(),
-    'GET /api/info': () => ({ airpRoot, found: airp.exists() }),
+    'GET /api/info': () => ({ airpRoot, found: airp.exists(), versions: { node: process.versions.node, electron: process.versions.electron ?? null, app: process.env.npm_package_version ?? null } }),
+    'GET /api/system': () => systemStats(airpRoot),
     'GET /api/metrics': () => airp.metrics() ?? { missing: true },
     'POST /api/metrics': () => airp.rebuildMetrics(),
     'POST /api/halt': async (req) => {

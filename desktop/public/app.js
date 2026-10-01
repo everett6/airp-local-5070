@@ -6,6 +6,15 @@ const fmt = (n, d = 0) => (n == null || Number.isNaN(n) ? '–' : Number(n).toLo
 const when = (s) => (s ? new Date(s).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–');
 const pill = (text, kind = '') => `<span class="pill ${kind}">${esc(text)}</span>`;
 
+// App settings live in this window's own storage (nothing here touches airp's trading rules).
+const DEFAULTS = { autoReload: true, reloadSec: 30, plainWords: true, startPage: 'overview', target: 40, stretch: 60 };
+const settings = (() => { try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('airp.settings') || '{}') }; } catch { return { ...DEFAULTS }; } })();
+function saveSettings() {
+  try { localStorage.setItem('airp.settings', JSON.stringify(settings)); } catch { /* storage unavailable: settings last for this session */ }
+  document.body.classList.toggle('no-plain', !settings.plainWords);
+}
+const sysHistory = [];  // recent machine readings for the System page charts (kept while the app is open)
+
 async function api(path, body) {
   const r = await fetch(`/api/${path}`, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
   const data = await r.json().catch(() => ({}));
@@ -30,6 +39,7 @@ const views = {
         ${kpi('Growth per year', pct(m.tracks.core.stats.cagr), `market (SPY) ${pct(m.tracks.SPY.stats.cagr)}`)}
         ${kpi('Quality score (Sharpe)', esc(m.tracks.core.stats.sharpe), `market (SPY) ${esc(m.tracks.SPY.stats.sharpe)}`)}
         ${kpi('Worst fall', pct(m.tracks.core.stats.max_dd), `market (SPY) ${pct(m.tracks.SPY.stats.max_dd)}`)}
+        ${kpi(`Chance of a ${settings.target}% year`, pct(m.tracks.core.tear?.cone?.prob_40, 0), `your baseline · ${settings.stretch}% year: ${pct(m.tracks.core.tear?.cone?.prob_60, 0)}`)}
         ${kpi('Ideas that passed', `${m.lab.tests.filter((x) => x.pass).length}/${m.lab.tests.length}`, 'strategy lab')}
         ${kpi('Live AI decisions', m.live.decisions.length, `pick threshold ${esc(m.live.ai_threshold ?? '–')}`)}
       </div>
@@ -159,6 +169,7 @@ const GLOSS = {
   'Chance it is real (PSR)': 'The probability the true Sharpe score is above zero, given how long and how bumpy the record is.',
   'Bootstrap cone': 'We reshuffle real past months 2,000 times to see the range of years that history could have produced. A what-if, not a forecast.',
   'Drawdown brake': 'A safety rule: after a 10% fall the book cuts its positions to two-thirds, after 20% to half, until it recovers.',
+  'Leverage': 'Trading with borrowed money. 2x doubles every gain and every loss, and you pay interest on the borrowed half.',
   'Pre-registered': 'The test rules were written down and published before the test ran, so the result cannot be bent afterwards.',
 };
 const help = (term, text = GLOSS[term]) => (text ? `<span class="help" tabindex="0" data-tip="${esc(text)}">?</span>` : '');
@@ -300,9 +311,75 @@ Object.assign(views, {
         <div class="card"><h3>Where the money is today</h3>${shareBars(order.map((a) => ({ label: names[a], v: f.now[a] ?? 0 })), colors)}</div>
         <div class="card">${h3('Where the risk comes from today', 'Risk contribution')}${shareBars(f.assets.map((a) => ({ label: names[a], v: f.risk_contrib[a], note: `swings ${pct(f.asset_vol[a], 0)} a year on its own` })), colors)}</div>
       </div>
+      ${m.tracks.core.leverage ? `<div class="card wide">${h3('What would more risk do? (borrowing to trade bigger)', 'Leverage')}
+        <p class="muted">The core book's own history replayed with borrowed money, paying T-bill + 1% a year on the borrowed part. Your baseline is ${settings.target}% a year and ${settings.stretch}% is the stretch. This is arithmetic on a backtest, not a tested strategy, and live results are usually worse.</p>
+        <table><tr><th>Size</th><th class="num">Growth per year</th><th class="num">Bumpiness</th><th class="num">Worst fall</th><th class="num">Worst year</th><th class="num">Best year</th><th class="num">Chance of a ${settings.target}% year</th><th class="num">Chance of a ${settings.stretch}% year</th><th class="num">Chance of a losing year</th><th class="num">Chance of a 35% fall in a year</th></tr>
+        ${m.tracks.core.leverage.map((r) => `<tr><td>${r.lev === 1 ? `${pill('today', 'lime')} 1.0x` : `${r.lev.toFixed(1)}x`}</td><td class="num">${pct(r.cagr)}</td><td class="num">${pct(r.vol, 0)}</td><td class="num">${pct(r.max_dd, 0)}</td><td class="num">${pct(r.worst_year, 0)}</td><td class="num">${pct(r.best_year, 0)}</td><td class="num">${pct(r.prob_40, 0)}</td><td class="num">${pct(r.prob_60, 0)}</td><td class="num">${pct(r.prob_loss, 0)}</td><td class="num">${pct(r.prob_dd35, 0)}</td></tr>`).join('')}</table>
+        <p class="muted">Reading it: more size raises the average and the chance of a big year, but the worst fall grows just as fast. The mandate's current limit is a 35% fall.</p></div>` : ''}
       <div class="card wide"><h3>How the mix changed over time</h3><p class="muted">Grey is cash. It grows when crypto is in a downtrend or when the drawdown brake cuts positions.</p>${stackArea(f.dates, order.map((a) => ({ name: names[a], y: f.weights[a] })), { colors })}</div>
       <div class="card wide">${h3('How the holdings move together (last 12 months)', 'Correlation')}${heatmap(f.assets.map((a) => names[a]), f.corr, { cols: f.assets.map((a) => names[a]), total: false, fmt: (v) => v.toFixed(2), unit: '', max: 1 })}
         <p class="muted">1.00 means two holdings always move together and 0 means they are unrelated. ${f.corr[1][2] >= 0.8 ? 'Bitcoin and Ether move almost as one, so together they act like a single bet. ' : ''}The lower the stock-to-crypto numbers, the more mixing them smooths the ride.</p></div>`;
+  },
+
+
+  async system() {
+    const s = await api('system');
+    sysHistory.push({ t: s.at, cpu: s.cpu.temp_c, gpu: s.gpu?.temp_c ?? null, cpuUse: s.cpu.usage, gpuUse: s.gpu ? s.gpu.util / 100 : null });
+    if (sysHistory.length > 240) sysHistory.shift();
+    const gb = (b) => (b == null ? '–' : `${(b / 2 ** 30).toFixed(1)} GB`), heat = (c, warn, hot) => (c == null ? '' : c >= hot ? pill('hot', 'bad') : c >= warn ? pill('warm', 'warn') : pill('ok', 'ok'));
+    const g = s.gpu, memUsed = s.mem.total != null ? 1 - s.mem.available / s.mem.total : null, x = sysHistory.map((h) => h.t.slice(11, 19));
+    const hist = (keys, names, f) => (sysHistory.length > 1 ? lineChart(keys.map((k, i) => ({ name: names[i], x, y: sysHistory.map((h) => h[k]) })), { width: 560, height: 220, yFmt: f }) : '<p class="empty">The chart fills in as this page refreshes (every few seconds).</p>');
+    const up = `${Math.floor(s.uptime_s / 86400)}d ${Math.floor((s.uptime_s % 86400) / 3600)}h ${Math.floor((s.uptime_s % 3600) / 60)}m`;
+    return `<h2>System</h2><p class="lede">How hard this PC is working right now. ${pill('experimental', 'warn')}</p>
+      ${plain('The AI models run on the graphics card (GPU) and the trading code on the processor (CPU). If the GPU memory is full or something is running hot, research jobs slow down or stop. This page only reads the sensors; it changes nothing.')}
+      <div class="kpis">
+        ${kpi('CPU temperature', s.cpu.temp_c == null ? '–' : `${s.cpu.temp_c.toFixed(0)} °C`, heat(s.cpu.temp_c, 80, 92))}
+        ${kpi('GPU temperature', g?.temp_c == null ? '–' : `${g.temp_c} °C`, heat(g?.temp_c, 75, 85))}
+        ${kpi('CPU in use', pct(s.cpu.usage, 0), `load ${s.cpu.load.map((v) => v.toFixed(1)).join(' · ')} on ${s.cpu.cores} threads`)}
+        ${kpi('GPU in use', g ? `${g.util}%` : '–', g ? `${g.power_w?.toFixed(0) ?? '–'} W${g.fan != null ? ` · fan ${g.fan}%` : ''}` : 'no NVIDIA GPU found')}
+        ${kpi('GPU memory', g ? `${(g.mem_used_mb / 1024).toFixed(1)} / ${(g.mem_total_mb / 1024).toFixed(1)} GB` : '–', g ? `${pct(g.mem_used_mb / g.mem_total_mb, 0)} used` : '')}
+        ${kpi('Memory (RAM)', memUsed == null ? '–' : pct(memUsed, 0), `${gb(s.mem.available)} free of ${gb(s.mem.total)}`)}
+        ${kpi('Disk', s.disk ? gb(s.disk.free) : '–', s.disk ? `free of ${gb(s.disk.total)}` : '')}
+        ${kpi('Up for', up, esc(s.host))}
+      </div>
+      <div class="split">
+        <div class="card"><h3>Temperature (°C)</h3>${hist(['cpu', 'gpu'], ['CPU', 'GPU'], (v) => v.toFixed(0))}</div>
+        <div class="card"><h3>How busy</h3>${hist(['cpuUse', 'gpuUse'], ['CPU', 'GPU'], (v) => pct(v, 0))}</div>
+      </div>
+      <div class="split">
+        <div class="card"><h3>What is using the GPU</h3><table><tr><th>Program</th><th class="num">GPU memory</th></tr>
+          ${(g?.procs || []).map((p) => `<tr><td>${esc(p.name)}</td><td class="num">${p.mb == null ? '–' : `${fmt(p.mb)} MB`}</td></tr>`).join('') || '<tr><td colspan="2" class="muted">nothing</td></tr>'}</table>
+          <p class="muted">${esc(g?.name ?? '')}</p></div>
+        <div class="card"><h3>All temperature sensors</h3><table><tr><th>Part</th><th>Sensor</th><th class="num">°C</th></tr>
+          ${s.sensors.map((t) => `<tr><td>${esc({ k10temp: 'CPU', nvme: 'SSD', amdgpu: 'Built-in graphics', coretemp: 'CPU' }[t.chip] || t.chip)}</td><td>${esc(t.label)}</td><td class="num">${t.c.toFixed(1)}</td></tr>`).join('')}</table>
+          <p class="muted">${esc(s.cpu.model ?? '')}</p></div>
+      </div>`;
+  },
+
+  async settings() {
+    const info = await api('info').catch(() => ({}));
+    const pages = [...document.querySelectorAll('#nav [data-view]')].map((b) => [b.dataset.view, [...b.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim() || b.dataset.view]);
+    const sw = (key, label, note) => `<label class="set-row"><span><b>${esc(label)}</b><em>${esc(note)}</em></span><input type="checkbox" data-set="${key}" ${settings[key] ? 'checked' : ''}></label>`;
+    const sel = (key, label, note, opts) => `<label class="set-row"><span><b>${esc(label)}</b><em>${esc(note)}</em></span><select data-set="${key}">${opts.map(([v, n]) => `<option value="${esc(v)}" ${String(settings[key]) === String(v) ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>`;
+    return `<h2>Settings</h2><p class="lede">How this app looks and refreshes. ${pill('experimental', 'warn')}</p>
+      ${plain('These settings only change this window. They never change what airp trades: the trading rules, the risk limits and the kill switch are not here on purpose.')}
+      <div class="card wide"><h3>Refreshing</h3>
+        ${sw('autoReload', 'Reload pages automatically', 'Keeps the numbers fresh without pressing Refresh.')}
+        ${sel('reloadSec', 'Reload every', 'The System page always refreshes every 5 seconds while it is open.', [[10, '10 seconds'], [30, '30 seconds'], [60, '1 minute'], [300, '5 minutes']])}
+      </div>
+      <div class="card wide"><h3>Display</h3>
+        ${sw('plainWords', 'Show the "In plain words" boxes', 'The short explanations at the top of each page.')}
+        ${sel('startPage', 'Open the app on', 'The first page you see.', pages.filter(([v]) => v !== 'settings'))}
+      </div>
+      <div class="card wide"><h3>Your return targets</h3>
+        ${sel('target', 'Baseline target per year', 'Shown on Home and on the risk table. It is a goal, not a promise.', [[20, '20%'], [30, '30%'], [40, '40%'], [50, '50%']])}
+        ${sel('stretch', 'Stretch target per year', 'The result you would love to see.', [[40, '40%'], [60, '60%'], [80, '80%'], [100, '100%']])}
+        <p class="muted">The chances shown in the app are worked out for 40% and 60%; other values change the labels only.</p>
+      </div>
+      <div class="card wide"><h3>About</h3><div class="statgrid">
+        <div><span>airp folder</span><b>${esc(info.airpRoot ?? '–')}</b></div><div><span>Folder found</span><b>${info.found ? 'yes' : 'no'}</b></div>
+        <div><span>Electron</span><b>${esc(info.versions?.electron ?? 'browser')}</b></div><div><span>Node</span><b>${esc(info.versions?.node ?? '–')}</b></div>
+      </div><div class="row" style="margin-top:12px"><button class="btn ghost" id="reset-settings">Reset to defaults</button></div></div>`;
   },
 
   async signals() {
@@ -322,7 +399,7 @@ Object.assign(views, {
           ${r.net_read ? `Conviction: ${esc(r.net_read.conviction ?? '–')}<br>Margins: ${esc(r.net_read.fields.margin ?? '–')} · Demand: ${esc(r.net_read.fields.demand ?? '–')}<br>Earnings quality: ${esc(r.net_read.fields.earnings_quality ?? '–')}` : '<span class="muted">not run</span>'}</div>
         <div class="agent"><div class="who"><span>Bull case · in testing</span></div>${r.bull_bear ? pts(r.bull_bear.bull) : '<span class="muted">not run</span>'}</div>
         <div class="agent"><div class="who"><span>Bear case · in testing</span>${r.bull_bear ? pill(`debate verdict: ${r.bull_bear.read ?? 'none'}`, r.bull_bear.read === 'bullish' ? 'ok' : r.bull_bear.read === 'bearish' ? 'bad' : '') : ''}</div>${r.bull_bear ? pts(r.bull_bear.bear) : '<span class="muted">not run</span>'}</div>
-        <div class="agent"><div class="who"><span>AI-theme agent · in testing</span>${tone(r.ai_lens?.read)}</div>${r.ai_lens ? `AI exposure: ${esc(r.ai_lens.exposure ?? '–')}` : '<span class="muted">not run</span>'}</div>
+        <div class="agent"><div class="who"><span>Aschenbrenner AI build-out view · in testing</span>${tone(r.ai_lens?.read)}</div>${r.ai_lens ? `AI exposure: ${esc(r.ai_lens.exposure ?? '–')}` : '<span class="muted">not run</span>'}</div>
         <div class="agent verdict"><div class="who"><span>Master judge · decides</span>${pill(r.logodds > 0 ? 'BUY' : 'PASS', r.logodds > 0 ? 'ok' : '')}</div>
           Confidence score <b>${fmt(r.logodds, 2)}</b>${thr != null ? `<br><span class="muted">needs ${esc(thr)} to trade</span>` : ''}</div>
       </div></div>`;
@@ -415,8 +492,29 @@ $('#view').addEventListener('click', async (e) => {
   }
 });
 
+saveSettings();
 const start = location.hash.slice(1);
-show(views[start] ? start : 'overview');
+show(views[start] ? start : views[settings.startPage] ? settings.startPage : 'overview');
 window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (views[v]) show(v); });
 sidebarState();
-setInterval(() => { sidebarState(); if (current === 'overview' || current === 'research') show(current, true); }, 60_000);
+// Auto-reload: every page except the ones you read or type in. The System page ticks every 5 s so its charts move.
+const NO_RELOAD = new Set(['settings', 'how', 'reviews']);
+let lastReload = Date.now();
+setInterval(() => {
+  const due = current === 'system' ? 5 : settings.reloadSec;
+  if (!settings.autoReload || NO_RELOAD.has(current) || document.querySelector('dialog[open]') || document.hidden) return;
+  if (Date.now() - lastReload < due * 1000) return;
+  lastReload = Date.now();
+  if (current !== 'system') { metricsCache = null; sidebarState(); }
+  show(current, true);
+}, 1000);
+document.addEventListener('change', (e) => {
+  const el = e.target.closest('[data-set]'); if (!el) return;
+  const k = el.dataset.set;
+  settings[k] = el.type === 'checkbox' ? el.checked : (typeof DEFAULTS[k] === 'number' ? Number(el.value) : el.value);
+  saveSettings();
+});
+document.addEventListener('click', (e) => {
+  if (e.target.id !== 'reset-settings') return;
+  Object.assign(settings, DEFAULTS); saveSettings(); show('settings');
+});

@@ -7,7 +7,11 @@ import { startServer } from '../src/server.js';
 let srv = null;
 let win = null;
 
-if (!app.requestSingleInstanceLock()) app.quit();
+// The packaging smoke test uses its own profile, so it can run while the real app is open.
+const SMOKE = !!process.env.AIRP_SMOKE_SCREENSHOT;
+if (SMOKE) app.setPath('userData', path.join(app.getPath('temp'), 'airp-smoke-profile'));
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) app.quit();  // the open window is focused by its own 'second-instance' handler
 
 // Where the airp checkout lives: $AIRP_ROOT, else the saved choice, else ~/airp-local-5070, else ask once.
 function airpRoot() {
@@ -36,11 +40,12 @@ async function createWindow() {
   win = new BrowserWindow({
     width: 1400, height: 900, minWidth: 960, minHeight: 640, backgroundColor: '#11110f', title: 'airp', show: false,
     icon: path.join(app.getAppPath(), 'build', 'icon.png'),
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true },
+    // the smoke test renders off-screen: no window appears, so it cannot steal focus or catch a stray click
+    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true, offscreen: SMOKE },
   });
   win.setMenuBarVisibility(false);
   lockDown(win.webContents, srv.origin);
-  win.once('ready-to-show', () => win.show());
+  if (!SMOKE) win.once('ready-to-show', () => win.show());
   await win.loadURL(srv.launchUrl);
   if (process.env.AIRP_SMOKE_SCREENSHOT) {  // packaging smoke test: capture the window and exit
     await new Promise((r) => setTimeout(r, 3000));
@@ -62,6 +67,7 @@ async function createWindow() {
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 
 app.whenReady().then(async () => {
+  if (!gotLock) return;
   const root = airpRoot();
   if (!root) { app.quit(); return; }
   try {

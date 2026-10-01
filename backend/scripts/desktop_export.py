@@ -102,7 +102,9 @@ def bootstrap_cone(ret: pd.Series, horizon: int = 252, paths: int = 2000, block:
     pcts = {f"p{q}": [100.0] + [_r(v, 1) for v in np.percentile(eq[:, month], q, axis=0)] for q in (5, 25, 50, 75, 95)}
     dd = (eq / np.maximum.accumulate(eq, axis=1) - 1).min(axis=1)
     return {"months": list(range(len(month) + 1)), **pcts, "prob_loss": _r((eq[:, -1] < 100).mean(), 3),
-            "prob_dd20": _r((dd <= -0.20).mean(), 3), "median_dd": _r(float(np.median(dd)), 3), "paths": paths}
+            "prob_dd20": _r((dd <= -0.20).mean(), 3), "median_dd": _r(float(np.median(dd)), 3), "paths": paths,
+            # the user's yearly targets (40% baseline, 60% stretch): how often a reshuffled year reached them
+            "prob_40": _r((eq[:, -1] >= 140).mean(), 3), "prob_60": _r((eq[:, -1] >= 160).mean(), 3)}
 
 
 def tearsheet(ret: pd.Series, bench: pd.Series | None = None, per_year: int = 252) -> dict[str, Any]:
@@ -151,12 +153,42 @@ def tearsheet(ret: pd.Series, bench: pd.Series | None = None, per_year: int = 25
     return out
 
 
+def leverage_table(ret: pd.DataFrame | pd.Series, spread: float = 0.01) -> list[dict[str, Any]]:
+    """What the core book's own history looks like with borrowed money: each day's return times L, minus T-bill plus
+    1% a year on the borrowed part. Arithmetic on the backtest for the user's risk decision, not a tested strategy:
+    the drawdown brakes are scaled along with everything else, and live results are usually worse than backtests."""
+    from vol_target_b0 import tbill
+    rf = tbill().reindex(ret.index, method="ffill").fillna(0.0) / 252
+    rows = []
+    for lev in (1.0, 1.5, 2.0, 2.5, 3.0):
+        r = lev * ret - (lev - 1) * (rf + spread / 252)
+        eq = (1 + r).cumprod()
+        dd = eq / eq.cummax() - 1
+        yearly = (1 + r).groupby(r.index.year).prod() - 1
+        cone = bootstrap_cone(r)
+        rows.append({"lev": lev, "cagr": _r(eq.iloc[-1] ** (252 / len(r)) - 1), "vol": _r(r.std() * math.sqrt(252)),
+                     "sharpe": _r(r.mean() / r.std() * math.sqrt(252), 2), "max_dd": _r(dd.min()),
+                     "worst_year": _r(yearly.min()), "best_year": _r(yearly.max()),
+                     "prob_40": cone["prob_40"], "prob_60": cone["prob_60"], "prob_loss": cone["prob_loss"],
+                     "prob_dd35": _r(float(np.mean(_cone_dd(r) <= -0.35)), 3)})
+    return rows
+
+
+def _cone_dd(ret: pd.Series, horizon: int = 252, paths: int = 2000, block: int = 21, seed: int = 0) -> np.ndarray:
+    """Worst drawdown inside each reshuffled year (same draws as bootstrap_cone)."""
+    x = ret.to_numpy()
+    starts = np.random.default_rng(seed).integers(0, len(x) - block, size=(paths, horizon // block))
+    eq = np.cumprod(1 + x[(starts[:, :, None] + np.arange(block)).reshape(paths, -1)], axis=1)
+    return (eq / np.maximum.accumulate(eq, axis=1) - 1).min(axis=1)
+
+
 def tracks() -> dict[str, Any]:
     t = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")
     t.index = pd.DatetimeIndex(t.index)
     spy = pd.read_parquet(BACKEND / "data" / "trend" / "etf_closes.parquet")["SPY"].pct_change()
     spy = spy.loc[t.index[0]:t.index[-1]]
     out = {"core": curve(t["core"]), "event": curve(t["event"]), "SPY": curve(spy)}
+    out["core"]["leverage"] = leverage_table(t["core"].dropna())
     out["core"]["tear"] = tearsheet(t["core"], spy)
     out["event"]["tear"] = tearsheet(t["event"], spy)
     out["SPY"]["tear"] = tearsheet(spy)
