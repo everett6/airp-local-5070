@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 from llm_fields import FIELDS_BB, PROMPT_BB, ask, parse
 
-from app.forward.ledger import Ledger
+from app.forward.ledger import Ledger, jsonl_records
 from app.forward.schedule import NY
 
 PORT = 11441
@@ -55,13 +55,17 @@ FRAMINGS = ("Focus on the errors behind your worst misses and how to avoid them.
 
 
 def versions(d: Path) -> list[dict[str, Any]]:
-    f = d / "bb_versions.jsonl"
+    f = d / "bb_versions.jsonl"  # read strictly: run() rewrites this file, and must not rewrite it from a damaged read
     vs = [json.loads(x) for x in f.read_text().splitlines()] if f.exists() else []
     return vs or [{"v": 0, "status": "champion", "lessons": [], "created_at": None, "parent": None}]
 
 
 def save(d: Path, vs: list[dict[str, Any]]) -> None:
-    (d / "bb_versions.jsonl").write_text("".join(json.dumps(v) + "\n" for v in vs))
+    # written whole after every event run: through a temporary file, so a crash cannot leave half a file (the
+    # label shadows read it before every labelling pass)
+    tmp = d / "bb_versions.jsonl.tmp"
+    tmp.write_text("".join(json.dumps(v) + "\n" for v in vs))
+    tmp.replace(d / "bb_versions.jsonl")
 
 
 def fname(v: int) -> str:
@@ -99,8 +103,7 @@ def matured(d: Path, v: int) -> pd.DataFrame:
     cols = ["accession", "month", "entry", "net", "fwd5", "written_at", "bull", "bear", "reason", "label"]
     if not p.exists() or not led.exists():
         return pd.DataFrame(columns=cols)
-    labs = [json.loads(x) for x in p.read_text().splitlines()]
-    labs = [x for x in labs if datetime.fromisoformat(x["written_at"]) < datetime.fromisoformat(x["entry_deadline"])]
+    labs = [x for x in jsonl_records(p) if datetime.fromisoformat(x["written_at"]) < datetime.fromisoformat(x["entry_deadline"])]
     out = {r["accession"]: r for r in Ledger(led).records() if r.get("type") == "outcome" and r.get("fwd5") is not None}
     rows = [{"accession": x["accession"], "month": out[x["accession"]]["entry"][:7],
              "entry": out[x["accession"]]["entry"][:10], "net": SCORE[x["bb_read"]],

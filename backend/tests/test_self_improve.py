@@ -146,3 +146,28 @@ def test_reflect_waits_for_enough_matured_labels(tmp_path):
     assert F.reflect_due(vs, now)
     assert F.reflect(d, vs, now, use_gpu=True) is None and vs[-1]["status"] == "skipped"
     assert not F.reflect_due(vs, now)  # one try a month
+
+
+def test_a_damaged_versions_file_does_not_stop_the_fixed_lenses(tmp_path, capsys):
+    """bb_versions.jsonl is rewritten after every event run. If it were ever cut off, the label shadows (which read
+    it first) must still label with the fixed lenses: labels on live releases cannot be made afterwards. The file
+    itself is left as it is (never rewritten from a damaged read), and saving goes through a temporary file."""
+    import net_read_shadow as N
+    d = tmp_path
+    (d / "bb_versions.jsonl").write_text('{"v": 0, "status": "champion", "lessons": []}\n{"v": 1, "status": "chall')
+    assert set(N.lenses(d)) == set(N.LENSES)
+    assert "LEARN ALERT: self-improve versions unreadable" in capsys.readouterr().out
+    (d / "ledger.jsonl").write_text("")
+    before = (d / "bb_versions.jsonl").read_text()  # run() raises on the damaged file before save()
+    try:
+        F.run(d, datetime(2026, 10, 2, 13, tzinfo=UTC), use_gpu=False)
+    except ValueError:
+        pass
+    assert (d / "bb_versions.jsonl").read_text() == before
+    vs = [{"v": 0, "status": "champion", "lessons": [], "created_at": None, "parent": None}]
+    F.save(d, vs)
+    assert F.versions(d) == vs and not (d / "bb_versions.jsonl.tmp").exists()
+    # a label file with a torn last line is still read
+    (d / "bull_bear.jsonl").write_text('{"accession": "a", "written_at": "2026-10-01T12:00:00+00:00", '
+                                       '"entry_deadline": "2026-10-01T13:30:00+00:00", "bb_read": "bullish"}\n{"acc')
+    assert F.matured(d, 0).empty  # no outcome yet, and no crash

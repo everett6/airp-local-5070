@@ -57,8 +57,12 @@ LENSES: dict[str, tuple[str, dict[str, tuple[tuple[str, ...], str]], str, str]] 
 
 def lenses(d: Path) -> dict[str, tuple[str, dict[str, tuple[tuple[str, ...], str]], str, str]]:
     """The fixed lenses plus arm F's self-improving versions (scripts/self_improve.py), if any."""
-    from self_improve import active_lenses
-    return LENSES | active_lenses(d)
+    try:
+        from self_improve import active_lenses
+        return LENSES | active_lenses(d)
+    except Exception as e:  # noqa: BLE001 - arm F's file must never stop the fixed lenses from labelling
+        print(f"LEARN ALERT: self-improve versions unreadable ({type(e).__name__}: {e}); fixed lenses only"[:300])
+        return dict(LENSES)
 
 
 PASS = {"min_events": 150, "min_months": 3, "min_ic": 0.02}  # judged with learn_loop's blend-gain test as well
