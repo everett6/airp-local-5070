@@ -153,9 +153,10 @@ def run(d: Path, use_gpu: bool) -> dict[str, int]:
             llm = OllamaLLM("bonsai-27b:latest", base_url=f"http://127.0.0.1:{PORT}", concurrency=3, num_ctx=8192,
                             num_predict=1200, cache=False, require_gpu=True)
 
-            async def go() -> dict[str, list[dict[str, Any]]]:
-                try:
-                    return {lens: list(await asyncio.gather(*(label(llm, r, lens, specs[lens]) for r in rows)))
+            async def go() -> dict[str, list[dict[str, Any] | BaseException]]:
+                try:  # one label that fails must not lose the others: these labels cannot be made afterwards
+                    return {lens: list(await asyncio.gather(*(label(llm, r, lens, specs[lens]) for r in rows),
+                                                            return_exceptions=True))
                             for lens, rows in todo_by.items()}
                 finally:
                     await llm.unload()
@@ -163,11 +164,19 @@ def run(d: Path, use_gpu: bool) -> dict[str, int]:
         finally:
             srv.stop()
     at = datetime.now(UTC).isoformat(timespec="seconds")
+    made: dict[str, int] = {}
+    failed: list[BaseException] = []
     for lens, recs in out.items():
+        good = [r for r in recs if not isinstance(r, BaseException)]
+        failed += [r for r in recs if isinstance(r, BaseException)]
         with open_append(d / specs[lens][3]) as f:
-            for r in recs:
+            for r in good:
                 f.write(json.dumps(r | {"written_at": at}) + "\n")
-    return {lens: len(recs) for lens, recs in out.items()}
+        made[lens] = len(good)
+    if failed:
+        print(f"LEARN ALERT: net_read shadow: {len(failed)} label(s) failed and are tried again next run "
+              f"({type(failed[0]).__name__}: {failed[0]})"[:300])
+    return made
 
 
 def main() -> None:

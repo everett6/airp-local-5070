@@ -110,3 +110,48 @@ def test_bull_bear_survives_garbage(monkeypatch):
         return '{"bull": "not a list", "bear": null}'
     out = asyncio.run(N.label(fake, r, "bull_bear"))
     assert out["bb_read"] == "neutral" and out["bull"] == [] and out["bear"] == []
+
+
+def test_one_failed_label_does_not_lose_the_others(tmp_path, monkeypatch, capsys):
+    """The run with a stub model. Before, one label that raised (after the client's own retries) lost every label of
+    that run, for all three lenses; labels on live releases cannot be made after their open."""
+    import contextlib
+    from datetime import UTC, datetime, timedelta
+
+    from app.sandbox import walkforward
+
+    class Server:
+        def __init__(self, *a, **k):
+            pass
+
+        def stop(self):
+            pass
+
+    class Stub:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __call__(self, system, user, mode=None):
+            if "release of BAD" in user:
+                raise RuntimeError("model error")
+            return json.dumps({"net_read": {"label": "neutral"}, "ai_read": {"label": "neutral"},
+                               "bb_read": {"label": "neutral"}, "bull": [], "bear": [], "reason": "r"})
+
+        async def unload(self):
+            pass
+
+    monkeypatch.setattr(N, "Ollama", Server)
+    monkeypatch.setattr(N, "wait_gpu_free", lambda *_a, **_k: True)
+    monkeypatch.setattr(N, "gpu_priority", lambda _n: contextlib.nullcontext())
+    monkeypatch.setattr(walkforward, "OllamaLLM", Stub)
+    monkeypatch.setattr(N, "text_of", lambda acc: f"release of {acc}")
+    led = Ledger(tmp_path / "ledger.jsonl")
+    ahead = (datetime.now(UTC) + timedelta(hours=12)).isoformat()
+    for acc in ("OK1", "BAD", "OK2"):
+        led.append("decision", accession=acc, ticker=acc, entry_deadline=ahead, on_time=True, logodds=1.0)
+    made = N.run(tmp_path, use_gpu=True)
+    assert made == dict.fromkeys(N.LENSES, 2)
+    for _, _, _, fname in N.LENSES.values():
+        assert [x["accession"] for x in N.jsonl_records(tmp_path / fname)] == ["OK1", "OK2"]
+    assert f"LEARN ALERT: net_read shadow: {len(N.LENSES)} label(s) failed" in capsys.readouterr().out
+    assert N.run(tmp_path, use_gpu=True) == dict.fromkeys(N.LENSES, 0)  # only BAD is tried again
