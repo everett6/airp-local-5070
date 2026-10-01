@@ -73,9 +73,11 @@ class Ledger:
         self.path = path
 
     def records(self) -> list[dict[str, Any]]:
-        if not self.path.exists():
-            return []
-        return [json.loads(line) for line in self.path.read_text().splitlines() if line.strip()]
+        """Every whole record. A line that is not a whole JSON object (cut off by a crash or power loss) was never
+        a record and is skipped; before 1 Oct 2026 it made every later run fail until the line was removed by hand.
+        Skipping it cannot hide anything: each whole record carries its place in the chain, so a record that was
+        removed or damaged still fails `verify`."""
+        return jsonl_records(self.path)
 
     def verify(self) -> list[dict[str, Any]]:
         """Return all records, or raise LedgerError at the first broken link."""
@@ -94,6 +96,6 @@ class Ledger:
                                **fields, "prev": recs[-1]["hash"] if recs else GENESIS}
         rec["hash"] = _digest(rec)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a") as f:
+        with open_append(self.path) as f:  # after a cut-off line the new record starts on a line of its own
             f.write(json.dumps(rec, sort_keys=True, default=str) + "\n")
         return rec

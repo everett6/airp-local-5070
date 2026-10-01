@@ -110,13 +110,13 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
   - a price calendar bug;
   - live fact sheets being dropped because the entry bar does not exist yet.
   Both are fixed; the second dry run decided 6 of 6 releases on time.
-- **Code review of 1 Oct 2026, before the earnings season** (`docs/CODE_REVIEW_2026-10-01.md`): 23 faults fixed on
+- **Code review of 1 Oct 2026, before the earnings season** (`docs/CODE_REVIEW_2026-10-01.md`): 24 faults fixed on
   the live path, none of which had cost a decision yet. The most serious: since 29 Sep, one filing without a
   press release (1.4% of past filings, at least one on 12% of release days) would have failed the whole live run
   and every run after it. Others: orders for class shares sent under a symbol the broker does not know, two stale
   ticker symbols (Fiserv, EQR), state files that a power cut could leave half-written, labels that would all have
   counted as late on a busy morning. Most were found by rehearsing each scheduled job on a scratch copy and by
-  writing end-to-end tests with a stand-in model, not by reading. 639 tests pass. Nine items are left for the
+  writing end-to-end tests with a stand-in model, not by reading. 639 tests pass. Eight items are left for the
   user to decide (`docs/open_decisions.json`, shown on the app's Home page).
 - (27 Sep) 404 tests pass; ruff and strict mypy are clean; CI is green again (it had been failing on two type errors, now
   fixed). No service or timer runs anything. Every run is manual.

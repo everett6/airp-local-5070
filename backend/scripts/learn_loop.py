@@ -95,7 +95,8 @@ def live(events_dir: Path, out: Path) -> pd.DataFrame:
     cols = ["accession", "sector", "momentum", "logodds", "fwd5", "entry", "month", *FEATS[1:]]
     if not (store.exists() and ledger.exists()):
         return pd.DataFrame(columns=cols)
-    recs = [json.loads(x) for x in ledger.read_text().splitlines()]
+    from app.forward.ledger import Ledger
+    recs = Ledger(ledger).records()
     dec = {r["accession"]: r["logodds"] for r in recs if r.get("type") == "decision" and r.get("on_time")}
     outc = {r["accession"]: (r["fwd5"], r["entry"]) for r in recs if r.get("type") == "outcome"
             and r.get("fwd5") is not None}

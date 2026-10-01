@@ -23,6 +23,10 @@ from pathlib import Path
 from typing import Any
 
 BACKEND = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND))
+
+from app.forward.ledger import Ledger
+
 RES = BACKEND / "results"
 DEFAULT = ["events_research_Jan-v1-4B-GGUF_Q4_K_M_v3", "spike_briefs"]
 LEDGERS = ["forward/events", "forward/events_breadth"]
@@ -60,7 +64,7 @@ def from_ledger(path: Path) -> list[dict[str, Any]]:
         return []
     run = path.parent.name
     return [{"run": run, "id": r["accession"], "stage": "forward", "cause": r["reason"]}
-            for r in map(json.loads, path.read_text().splitlines()) if r.get("type") == "missed"]
+            for r in Ledger(path).records() if r.get("type") == "missed"]
 
 
 def main() -> None:
