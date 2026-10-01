@@ -92,8 +92,9 @@ def execution(orders: dict[str, Any], ai_book: dict[str, Any], gap_alert: float 
 def load() -> tuple[dict[str, Any], dict[str, Any]]:
     sys.path.insert(0, str(BACKEND / "scripts"))
     from vol_target_b0 import tbill
-    runs = [json.loads(x) for x in (FWD / "allocator" / "ledger.jsonl").read_text().splitlines()] \
-        if (FWD / "allocator" / "ledger.jsonl").exists() else []
+    sys.path.insert(0, str(BACKEND))
+    from app.forward.ledger import jsonl_records
+    runs = [r for r in jsonl_records(FWD / "allocator" / "ledger.jsonl") if "books" in r]  # skips a torn line
     base = "master+brakes" if any("master+brakes" in r["books"] for r in runs) else "master"
     eq = pd.Series({r["data_through"]: r["books"][base]["equity"] for r in runs if base in r["books"]})
     s4 = stage4(eq, tbill()) | {"book": base}
