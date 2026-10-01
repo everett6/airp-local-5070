@@ -223,12 +223,21 @@ export function createAirp(root) {
         alerts: jsonl(path.join(fwd, 'alerts.jsonl')).filter((a) => fresh(a.at)).map((a) => ({ at: a.at, job: a.job, msg: a.msg })),
         tests: jsonl(path.join(backend, 'results', 'trials_registry.jsonl')).filter((r) => String(r.date) >= day)
           .map((r) => ({ trial: r.trial || r.name, result: r.result ?? r.verdict, sharpe: r.sharpe_ann ?? null })),
-        runs: jsonl(path.join(fwd, 'heartbeat.jsonl')).filter((b) => fresh(b.start)).map((b) => ({ job: b.job, rc: b.rc, start: b.start })),
+        // an event run that did its job but raised a broker alert ends with rc 1 and a missed count: not a failure
+        runs: jsonl(path.join(fwd, 'heartbeat.jsonl')).filter((b) => fresh(b.start)).map((b) => ({ job: b.job, rc: b.rc, start: b.start,
+          alert_only: b.rc !== 0 && b.job === 'events' && b.missed_total != null })),
         // the monthly cohorts, when they were made in this period
         longterm: jsonl(path.join(fwd, 'longterm', 'ledger.jsonl')).filter((r) => r.type === 'cohort' && fresh(r.written_at)).map((r) => ({ month: r.month, tickers: r.tickers || [] })).at(-1) ?? null,
         themes: jsonl(path.join(fwd, 'themes', 'ledger.jsonl')).filter((r) => r.type === 'cohort' && fresh(r.written_at))
           .map((r) => ({ month: r.month, bubble_risk: r.bubble_risk ?? null, picks: Object.values(r.picks || {}).flat() })).at(-1) ?? null,
       };
+    },
+
+    // Decisions that wait for the user (kept by Claude in docs/open_decisions.json; the app only shows them).
+    openDecisions() {
+      const xs = json(path.join(root, 'docs', 'open_decisions.json'), []);
+      return (Array.isArray(xs) ? xs : []).filter((x) => x && typeof x.title === 'string')
+        .map((x) => ({ id: String(x.id ?? ''), since: x.since ?? null, title: x.title, detail: String(x.detail ?? ''), kind: x.kind === 'do' ? 'do' : 'decide' }));
     },
 
     health: () => runJson('trading_health.py'),

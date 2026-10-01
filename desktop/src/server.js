@@ -47,6 +47,7 @@ export async function startServer({ airpRoot, port = 0, publicDir = path.join(ap
     'GET /api/runs': () => airp.runs(),
     'GET /api/today': () => airp.today(),
     'GET /api/longterm': () => airp.longterm(),
+    'GET /api/open_decisions': () => airp.openDecisions(),
     'GET /api/research': () => airp.research(),
     'GET /api/tests': () => airp.tests(),
     'GET /api/reviews': () => airp.reviews(),

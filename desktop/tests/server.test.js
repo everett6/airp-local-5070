@@ -167,3 +167,15 @@ test('each release carries the fact sheet the judge read and what the SEC check 
   assert.match(r.sheet, /Revenue: not stated/);
   assert.deepEqual(r.dropped, ["the release's revenue (17.4M as read) was dropped: it does not match the SEC-filed scale."]);
 });
+
+test('open decisions come from docs/open_decisions.json; a missing or broken file is an empty list', async (t) => {
+  const { s, get } = await session();
+  t.after(() => s.close());
+  assert.deepEqual(await (await get('/api/open_decisions')).json(), []);
+  mkdirSync(path.join(s.airpRoot, 'docs'));
+  writeFileSync(path.join(s.airpRoot, 'docs', 'open_decisions.json'), JSON.stringify([{ id: 'a', title: 'Restart', detail: 'd', kind: 'do' }, { title: 'Q' }, { nope: 1 }]));
+  assert.deepEqual(await (await get('/api/open_decisions')).json(),
+    [{ id: 'a', since: null, title: 'Restart', detail: 'd', kind: 'do' }, { id: '', since: null, title: 'Q', detail: '', kind: 'decide' }]);
+  writeFileSync(path.join(s.airpRoot, 'docs', 'open_decisions.json'), '{not json');
+  assert.deepEqual(await (await get('/api/open_decisions')).json(), []);
+});

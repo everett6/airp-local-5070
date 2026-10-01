@@ -38,8 +38,8 @@ function todayCard(td) {
   if (td.themes) items.push(`Themes rated: AI-bubble risk ${pill(td.themes.bubble_risk ?? '–', { low: 'ok', elevated: 'warn', high: 'bad' }[td.themes.bubble_risk] || '')}, picked ${esc(td.themes.picks.join(', ') || 'none')}`);
   if (td.alerts.length) items.push(`${plural(td.alerts.length, 'alert')}, the latest: ${esc(td.alerts.at(-1).msg)}`);
   if (td.missed) items.push(`${plural(td.missed, 'report')} missed (not decided before the market opened)`);
-  const bad = td.runs.filter((r) => r.rc !== 0).length;
-  items.push(td.runs.length ? `${plural(td.runs.length, 'automatic run')}, ${bad ? `${bad} ended with a problem` : 'all clean'}` : 'No automatic run in this period');
+  const bad = td.runs.filter((r) => r.rc !== 0 && !r.alert_only).length, warned = td.runs.filter((r) => r.alert_only).length;
+  items.push(td.runs.length ? `${plural(td.runs.length, 'automatic run')}: ${[bad ? `${bad} failed` : '', warned ? `${warned} did its job but raised an alert` : '', !bad && !warned ? 'all clean' : ''].filter(Boolean).join(', ')}` : 'No automatic run in this period');
   return `<div class="card wide"><h3>What changed in the last ${td.hours} hours</h3><ul class="changes">${items.map((x) => `<li>${x}</li>`).join('')}</ul></div>`;
 }
 
@@ -79,6 +79,16 @@ function longtermTab(d) {
   return `${plain('Once a month the AI reads every large company\'s latest earnings report and picks <b>10 stocks</b> for the next few months, and rates a fixed list of <b>big themes</b> (chips, biotech, nuclear and so on) together with the risk of an AI bubble. Both are only watched and scored. No money follows them until a year of results says they work.')}${picks}${pickResults}${themes}${themeResults}`;
 }
 
+// What waits for the user: things to do, then questions only they can answer (the list is kept by Claude).
+function openCard(xs) {
+  if (!xs?.length) return '';
+  const row = (x) => `<li><b>${esc(x.title)}</b>${x.kind === 'do' ? ` ${pill('to do', 'lime')}` : ''}<br><span class="muted">${esc(x.detail)}</span></li>`;
+  const sorted = [...xs].sort((a, b) => (a.kind === 'do' ? 0 : 1) - (b.kind === 'do' ? 0 : 1));
+  return `<div class="card wide"><h3>Waiting for you (${xs.length})</h3>
+    <p class="muted">Nothing here stops the system. Tell Claude yes or no on any of them; until then things stay as they are.</p>
+    <details${xs.length <= 4 ? ' open' : ''}><summary>Show the list</summary><ul class="changes">${sorted.map(row).join('')}</ul></details></div>`;
+}
+
 function aggressiveCard(a) {
   if (!a) return '';
   const L = a.limits || {};
@@ -112,18 +122,19 @@ function consensusCard(c) {
 
 const views = {
   async overview() {
-    const [o, m, td] = await Promise.all([api('overview'), metrics().catch(() => ({ missing: true })), api('today').catch(() => null)]);
+    const [o, m, td, open] = await Promise.all([api('overview'), metrics().catch(() => ({ missing: true })), api('today').catch(() => null), api('open_decisions').catch(() => [])]);
     const runs = o.recentRuns.filter((r) => r.job !== 'check');
-    const clean = runs.slice(0, 10).filter((r) => r.rc === 0).length;
+    const clean = runs.slice(0, 10).filter((r) => r.rc === 0 || (r.job === 'events' && r.missed_total != null)).length;  // an alert-only run did its job
     const next = (o.timers || []).map((t) => ({ unit: t.unit || t.activates, next: t.next })).filter((t) => t.next);
     return `<h2>Home</h2><p class="lede">Your practice-money trading system at a glance.</p>
       <div class="banner ${o.halted ? 'bad' : clean === Math.min(10, runs.length) ? 'ok' : 'warn'}">${o.halted
         ? '<b>Trading is stopped.</b> The kill switch is on; nothing will be bought or sold until you resume.'
         : clean === Math.min(10, runs.length) ? '<b>Everything is running normally.</b> The system trades practice money by itself; you do not need to do anything.'
-          : `<b>Running, but ${Math.min(10, runs.length) - clean} of the last ${Math.min(10, runs.length)} runs had a problem.</b> See Alerts below for what happened.`}
+          : `<b>Running, but ${Math.min(10, runs.length) - clean} of the last ${Math.min(10, runs.length)} runs failed.</b> See Alerts below for what happened.`}
         ${next[0] ? ` Next automatic run: <b>${esc(when(Number(next.slice().sort((a, b) => a.next - b.next)[0].next) / 1000))}</b>.` : ''}</div>
       ${plain('airp follows a fixed set of rules to invest <b>pretend money</b>. The numbers below compare the main rule set (the "core book") with simply buying the whole US market (SPY) since 2018. Hover any <b>?</b> for what a word means, or open <b>How it works</b>.')}
       ${todayCard(td)}
+      ${openCard(open)}
       ${m.missing ? '' : `<div class="kpis">
         ${kpi('Growth per year', pct(m.tracks.core.stats.cagr), `market (SPY) ${pct(m.tracks.SPY.stats.cagr)}`)}
         ${kpi('Quality score (Sharpe)', esc(m.tracks.core.stats.sharpe), `market (SPY) ${esc(m.tracks.SPY.stats.sharpe)}`)}
