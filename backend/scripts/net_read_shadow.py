@@ -153,26 +153,29 @@ def run(d: Path, use_gpu: bool) -> dict[str, int]:
             llm = OllamaLLM("bonsai-27b:latest", base_url=f"http://127.0.0.1:{PORT}", concurrency=3, num_ctx=8192,
                             num_predict=1200, cache=False, require_gpu=True)
 
-            async def go() -> dict[str, list[dict[str, Any] | BaseException]]:
-                try:  # one label that fails must not lose the others: these labels cannot be made afterwards
-                    return {lens: list(await asyncio.gather(*(label(llm, r, lens, specs[lens]) for r in rows),
-                                                            return_exceptions=True))
-                            for lens, rows in todo_by.items()}
+            made = dict.fromkeys(todo_by, 0)
+
+            async def one(lens: str, r: dict[str, Any]) -> None:
+                # each label is written the moment it is made, with its own time: on a morning with many releases
+                # the last label can come after the open, and one time stamp at the end would make them all late
+                rec = await label(llm, r, lens, specs[lens])
+                with open_append(d / specs[lens][3]) as f:
+                    f.write(json.dumps(rec | {"written_at": datetime.now(UTC).isoformat(timespec="seconds")}) + "\n")
+                made[lens] += 1
+
+            async def go() -> list[BaseException | None]:
+                # release by release (earliest open first), so a release has all its labels as early as possible;
+                # one label that fails must not lose the others: these labels cannot be made afterwards
+                jobs = sorted(((r["entry_deadline"], i, lens, r) for lens, rows in todo_by.items()
+                               for i, r in enumerate(rows)), key=lambda x: x[:2])
+                try:
+                    return list(await asyncio.gather(*(one(lens, r) for _, _, lens, r in jobs),
+                                                     return_exceptions=True))
                 finally:
                     await llm.unload()
-            out = asyncio.run(go())
+            failed = [x for x in asyncio.run(go()) if isinstance(x, BaseException)]
         finally:
             srv.stop()
-    at = datetime.now(UTC).isoformat(timespec="seconds")
-    made: dict[str, int] = {}
-    failed: list[BaseException] = []
-    for lens, recs in out.items():
-        good = [r for r in recs if not isinstance(r, BaseException)]
-        failed += [r for r in recs if isinstance(r, BaseException)]
-        with open_append(d / specs[lens][3]) as f:
-            for r in good:
-                f.write(json.dumps(r | {"written_at": at}) + "\n")
-        made[lens] = len(good)
     if failed:
         print(f"LEARN ALERT: net_read shadow: {len(failed)} label(s) failed and are tried again next run "
               f"({type(failed[0]).__name__}: {failed[0]})"[:300])

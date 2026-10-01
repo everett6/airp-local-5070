@@ -132,6 +132,7 @@ def test_one_failed_label_does_not_lose_the_others(tmp_path, monkeypatch, capsys
             pass
 
         async def __call__(self, system, user, mode=None):
+            on_disk.append(sum(len(N.jsonl_records(tmp_path / f[3])) for f in N.LENSES.values()))
             if "release of BAD" in user:
                 raise RuntimeError("model error")
             return json.dumps({"net_read": {"label": "neutral"}, "ai_read": {"label": "neutral"},
@@ -149,8 +150,12 @@ def test_one_failed_label_does_not_lose_the_others(tmp_path, monkeypatch, capsys
     ahead = (datetime.now(UTC) + timedelta(hours=12)).isoformat()
     for acc in ("OK1", "BAD", "OK2"):
         led.append("decision", accession=acc, ticker=acc, entry_deadline=ahead, on_time=True, logodds=1.0)
+    on_disk: list[int] = []
     made = N.run(tmp_path, use_gpu=True)
     assert made == dict.fromkeys(N.LENSES, 2)
+    # each label is on disk before the next one is asked for (with its own time), release by release
+    assert on_disk == [0, 1, 2, 3, 3, 3, 3, 4, 5]
+    assert all("written_at" in x for f in N.LENSES.values() for x in N.jsonl_records(tmp_path / f[3]))
     for _, _, _, fname in N.LENSES.values():
         assert [x["accession"] for x in N.jsonl_records(tmp_path / fname)] == ["OK1", "OK2"]
     assert f"LEARN ALERT: net_read shadow: {len(N.LENSES)} label(s) failed" in capsys.readouterr().out
