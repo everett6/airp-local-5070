@@ -246,15 +246,42 @@ def lite(feats: Path, ev_csv: Path, p: Prices) -> dict[str, float]:
     return dict(zip(new["accession"], model(design(new, cats)), strict=True))
 
 
+BAR_COLS = ["Open", "High", "Low", "Close", "Volume"]
+
+
+def daily_bars(tickers: list[str], start: str, end: str) -> dict[str, pd.DataFrame]:
+    """Each ticker's daily bars from Yahoo: one request for all of them, then one by one for any that request left
+    out (the only path until 1 Oct 2026). Both return the same numbers (compared on the live tickers that day); the
+    list grows with every release, and hundreds of single requests twice a day invite Yahoo's rate limit."""
+    import yfinance as yf
+    out: dict[str, pd.DataFrame] = {}
+    if len(tickers) > 1:
+        try:
+            both = yf.download(tickers, start=start, end=end, auto_adjust=True, progress=False, group_by="ticker",
+                               threads=True)
+        except Exception as e:  # noqa: BLE001 - whatever the batch does, the one-by-one path below still runs
+            print(f"prices: the batched request failed ({type(e).__name__}); fetching one by one", flush=True)
+            both = pd.DataFrame()
+        have = set(both.columns.get_level_values(0)) if isinstance(both.columns, pd.MultiIndex) else set()
+        for t in tickers:
+            if t in have and set(BAR_COLS) <= set(both[t].columns):
+                df = both[t][BAR_COLS].dropna(how="all").rename_axis(columns=None)
+                if not df.empty:
+                    if df["Volume"].notna().all():  # whole numbers, as a single download returns them
+                        df = df.astype({"Volume": "int64"})
+                    out[t] = df
+    for t in tickers:
+        if t not in out:
+            df = yf.download(t, start=start, end=end, auto_adjust=True, progress=False, multi_level_index=False)
+            if not df.empty:
+                out[t] = df[BAR_COLS]
+    return out
+
+
 def prices_for(tickers: set[str], start: date, end: date, save: Path) -> Prices:
     """Daily bars dated before `end` (Yahoo, free), also saved in the long format the pipeline scripts read."""
-    import yfinance as yf
-    frames = []
-    for t in sorted(tickers):
-        df = yf.download(t, start=start.isoformat(), end=end.isoformat(), auto_adjust=True, progress=False,
-                         multi_level_index=False)
-        if not df.empty:
-            frames.append(df[["Open", "High", "Low", "Close", "Volume"]].assign(Ticker=t))
+    bars = daily_bars(sorted(tickers), start.isoformat(), end.isoformat())
+    frames = [bars[t].assign(Ticker=t) for t in sorted(tickers) if t in bars]
     long = pd.concat(frames).rename_axis("Date").reset_index()
     long["Date"] = pd.to_datetime(long["Date"]).dt.date.astype(str)
     tmp = save.with_name(save.name + ".tmp")  # whole file in one step: the sleeve reads it right after this run

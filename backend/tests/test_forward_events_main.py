@@ -123,3 +123,37 @@ def test_a_release_whose_fact_sheet_is_missing_still_fails_the_run(runner: dict[
     monkeypatch.setattr(FE, "fact_sheets", broken)
     with pytest.raises(ValueError, match="fact sheet absent"):
         runner["run"]("2026-10-01T22:30:00")
+
+
+def test_prices_come_from_one_request_with_the_single_requests_as_fallback(monkeypatch: pytest.MonkeyPatch,
+                                                                           capsys: pytest.CaptureFixture[str]) -> None:
+    import yfinance
+
+    days = pd.bdate_range("2026-09-01", periods=5, name="Date")
+    calls: list[Any] = []
+
+    def one(t: str) -> pd.DataFrame:
+        base = {"AAA": 10.0, "BBB": 20.0, "CCC": 30.0}[t]
+        return pd.DataFrame({c: base + np.arange(5.0) for c in FE.BAR_COLS[:4]} | {"Volume": np.arange(5) + 100},
+                            index=days)
+
+    def download(tickers: Any, **kw: Any) -> pd.DataFrame:
+        calls.append(tickers)
+        if isinstance(tickers, str):
+            return pd.DataFrame() if tickers == "NONE" else one(tickers)
+        if state["fail"]:
+            raise RuntimeError("rate limited")
+        frames = {t: one(t).astype({"Volume": "float64"}) for t in tickers if t in ("AAA", "BBB")}  # CCC left out
+        return pd.concat(frames, axis=1, names=["Ticker", "Price"])
+
+    state = {"fail": False}
+    monkeypatch.setattr(yfinance, "download", download)
+    got = FE.daily_bars(["AAA", "BBB", "CCC", "NONE"], "2026-09-01", "2026-09-08")
+    assert calls == [["AAA", "BBB", "CCC", "NONE"], "CCC", "NONE"] and sorted(got) == ["AAA", "BBB", "CCC"]
+    for t in got:  # the batched and the single results have the same shape, names and number types
+        pd.testing.assert_frame_equal(got[t], one(t), check_exact=True)
+    calls.clear()
+    state["fail"] = True
+    got = FE.daily_bars(["AAA", "BBB"], "2026-09-01", "2026-09-08")
+    assert calls == [["AAA", "BBB"], "AAA", "BBB"] and sorted(got) == ["AAA", "BBB"]
+    assert "the batched request failed (RuntimeError)" in capsys.readouterr().out
