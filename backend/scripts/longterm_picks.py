@@ -161,6 +161,24 @@ def score(recs: list[dict[str, Any]], opens: pd.DataFrame) -> list[dict[str, Any
     return out
 
 
+def score_each(recs: list[dict[str, Any]], opens: pd.DataFrame) -> list[dict[str, Any]]:
+    """`score`, cohort by cohort. A cohort that cannot be scored (a pick stopped trading before its exit: bought
+    out or delisted) is reported and left unscored: it must not stop the other cohorts' results or this month's new
+    cohort. How to price such a pick is a rule for the user to set; no result is invented here."""
+    if "SPY" not in opens:
+        raise ValueError("long-term cohort: SPY open prices missing")
+    results = [r for r in recs if r.get("type") == "result"]
+    out: list[dict[str, Any]] = []
+    for c in recs:
+        if c.get("type") != "cohort":
+            continue
+        try:
+            out += score([*results, c], opens)
+        except ValueError as e:
+            print(f"LEARN ALERT: {e}; that cohort stays unscored until its pricing is decided")
+    return out
+
+
 def prices(tickers: set[str], now: datetime) -> tuple[pd.DataFrame, pd.DataFrame]:
     import yfinance as yf  # type: ignore[import-untyped]
     df = yf.download(sorted(tickers | {"SPY"}), start=(now - timedelta(days=560)).date().isoformat(),
@@ -236,7 +254,7 @@ def run(events_dir: Path, out: Path, now: datetime, use_gpu: bool) -> None:
     recent = ev[ev["t"] >= now - timedelta(days=LOOKBACK_DAYS)]
     tickers = {trading_symbol(t) for t in recent["ticker"]} if make else set()
     opens, closes = prices(tickers | cohort_tickers, now)
-    for r in score(recs, opens):
+    for r in score_each(recs, opens):
         led.append("result", **r)
         print(f"long-term picks: cohort {r['month']} closed, {r['excess_net']:+.2%} vs SPY after costs")
     if not make:

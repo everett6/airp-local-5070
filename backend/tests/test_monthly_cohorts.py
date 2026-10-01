@@ -144,3 +144,35 @@ def test_longterm_cohort_picks_ten_distinct_names_once(tmp_path: Path, monkeypat
     LT.run(tmp_path / "events", out, NOW, use_gpu=True)  # same month: nothing new
     assert len(Ledger(out / "ledger.jsonl").verify()) == 1
     assert "LEARN ALERT" not in capsys.readouterr().out
+
+
+def test_a_pick_that_stopped_trading_does_not_stop_later_cohorts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                                 stubs: None, capsys: pytest.CaptureFixture[str]
+                                                                 ) -> None:
+    """Before: the first cohort with a bought-out or delisted pick made scoring raise at every run, before the new
+    month's cohort was made, so the track stopped for good. Now that cohort is reported and left unscored, the
+    others are scored and the new cohort is made."""
+    names = [f"T{i:02d}" for i in range(14)]
+    opens, closes = _prices({*names, "SPY"})
+    gone = opens.copy()
+    gone.loc[gone.index[-70]:, "T13"] = np.nan  # T13 stopped trading before the first cohort's exit day
+    out = tmp_path / "longterm"
+    led = Ledger(out / "ledger.jsonl")
+    made = [d.date().isoformat() for d in (opens.index[-120], opens.index[-100])]
+    led.append("cohort", month="2026-05", made_on=made[0], tickers=names[4:14], ratings=[4] * 10)  # holds T13
+    led.append("cohort", month="2026-06", made_on=made[1], tickers=names[0:10], ratings=[4] * 10)
+    ev = pd.DataFrame({"cik": range(14), "ticker": names, "sector": "Industrials",
+                       "accession": [f"a{i}" for i in range(14)], "t": pd.Timestamp("2026-09-15", tz="UTC")})
+    cards = [{"ticker": t, "cik": i, "accession": f"a{i}", "r12": 0.01 * i, "card": f"Company: {t} (Industrials)",
+              "source": f"Company: {t} (Industrials)"} for i, t in enumerate(names)]
+    monkeypatch.setattr(LT, "releases", lambda _d: ev)
+    monkeypatch.setattr(LT, "cards", lambda _ev, _now, _closes: cards)
+    monkeypatch.setattr(LT, "prices", lambda _t, _now: (gone, closes))
+    LT.run(tmp_path / "events", out, NOW, use_gpu=True)
+    recs = led.verify()
+    assert [(r["type"], r["month"]) for r in recs] == [("cohort", "2026-05"), ("cohort", "2026-06"),
+                                                       ("result", "2026-06"), ("cohort", "2026-10")]
+    text = capsys.readouterr().out
+    assert "LEARN ALERT: long-term cohort 2026-05: missing entry/exit opens for T13" in text
+    with pytest.raises(ValueError, match="missing entry/exit opens for T13"):  # the check itself is unchanged
+        LT.score(recs[:2], gone)
