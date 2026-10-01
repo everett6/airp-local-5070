@@ -122,3 +122,38 @@ def test_the_broker_holds_what_its_margin_rules_allow():
     assert s == pytest.approx(0.98 / (0.5 * 1.95 + 0.5), abs=1e-9) and 0.6 < s < 0.7
     assert 0.5 * t["SPY"] * s + (t["BTC-USD"] + t["ETH-USD"]) * s == pytest.approx(0.98)
     assert broker_scale({}) == 1.0
+
+
+def test_its_drawdown_limit_stops_only_this_book_and_never_the_shared_kill_switch(tmp_path):
+    """Found in review on 1 Oct, before the book's first run: at -60% the first version switched the shared kill
+    switch to REDUCING, which would have stopped the frozen books from buying too."""
+    import forward_allocator as FA
+
+    from app.portfolio.guard import apply_drawdown_limit, drawdown_status
+    opens, closes = frames()
+    with_agg, without = new_books(), {k: v for k, v in new_books().items() if k != AGGRESSIVE}
+    run(with_agg, opens, closes, "2026-10-02")
+    run(without, opens, closes, "2026-10-02")
+    b = with_agg[AGGRESSIVE]
+    dd = drawdown_status(AGGRESSIVE, 39_000.0, 100_000.0)  # 61% below its peak
+    assert dd["action"] == "REDUCING" and dd["limit_at"] == 0.6
+    assert drawdown_status(AGGRESSIVE, 54_000.0, 100_000.0)["action"] == "alert"
+    assert "action" not in drawdown_status(AGGRESSIVE, 90_000.0, 100_000.0)
+    halt_file = tmp_path / "HALT"
+    assert not halt_file.exists()  # drawdown_status has no side effect ...
+    apply_drawdown_limit("master+brakes", 60_000.0, 100_000.0, path=halt_file)
+    assert json.loads(halt_file.read_text())["mode"] == "REDUCING"  # ... the frozen book's own limit still does
+
+    b.reducing = True  # what forward_allocator does at the limit
+    a2, w2 = run(with_agg, opens, closes, "2026-10-09"), run(without, opens, closes, "2026-10-09")
+    agg = a2["books"][AGGRESSIVE]
+    assert agg["fills"] == [] and agg["positions"] == {} and agg["reducing"] is True  # it held nothing: it buys nothing
+    assert agg["new_targets"] == {a: 0.0 for a in agg["new_targets"]}
+    assert {k: v for k, v in a2["books"].items() if k != AGGRESSIVE} == w2["books"]  # the frozen books do not notice
+    assert "reducing" not in a2 and w2["books"]["master"]["fills"]  # and they traded as usual
+
+    state = tmp_path / "state.json"
+    from app.portfolio.forward import books_to_json
+    state.write_text(json.dumps(books_to_json(with_agg)))
+    assert FA.resume_books(state) == [AGGRESSIVE] and FA.resume_books(state) == []
+    assert books_from_json(json.loads(state.read_text()))[AGGRESSIVE].reducing is False

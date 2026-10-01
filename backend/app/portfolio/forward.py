@@ -48,6 +48,7 @@ class Book:
     interest: float = 0.0                         # interest paid on borrowed cash so far (leveraged books)
     interest_through: str | None = None           # the date interest was last charged up to
     wiped: bool = False                           # a leveraged book whose equity reached zero: closed for good
+    reducing: bool = False                        # a leveraged book past its own drawdown limit: it may only sell
 
 
 def fill_day(days: pd.DatetimeIndex, decided_at: str) -> pd.Timestamp | None:
@@ -169,7 +170,7 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
             fd = fill_day(days, b.decided_at)
             if fd is not None:
                 r["filled_on"] = fd.date().isoformat()
-                r.update(execute(b, pd.Series(opens.loc[fd]), reduce_only=reducing))
+                r.update(execute(b, pd.Series(opens.loc[fd]), reduce_only=reducing or b.reducing))
             else:
                 r["waiting_for_open_after"] = datetime.fromisoformat(b.decided_at).date().isoformat()
         if b.wiped:
@@ -192,8 +193,10 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
         if b.pending is None and not halted:
             t, info = targets(name, closes, last, cfg, b.positions,
                               brakes.get("master+brakes", 1.0) if name in LEVERAGE else brakes[name])
-            if t is not None and reducing:
+            if t is not None and (reducing or b.reducing):
                 t = cap_to_current(t, b.positions, b.cash, px)
+            if b.reducing:
+                r["reducing"] = True  # this book only: past its own drawdown limit until the user resumes
             if t is not None and (bad := gate(t, mandate, name)):
                 r["rejected"] = bad  # fail closed: nothing is left pending
             elif t is not None:

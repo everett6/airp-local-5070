@@ -40,7 +40,7 @@ from app.portfolio.forward import (
     new_books,
     step,
 )
-from app.portfolio.guard import HALT, apply_drawdown_limit, halt, halt_info, state
+from app.portfolio.guard import HALT, apply_drawdown_limit, drawdown_status, halt, halt_info, state
 from app.portfolio.master import MasterConfig
 from app.sandbox.events import Prices
 
@@ -124,6 +124,19 @@ def validate_result(rec: dict, books: dict[str, Book]) -> None:
             raise ValueError(f"allocator result check: {name} trading cost invalid")
 
 
+def resume_books(state_path: Path) -> list[str]:
+    """--resume also lets a book that passed its own drawdown limit buy again. Returns the books it cleared."""
+    if not state_path.exists():
+        return []
+    saved = json.loads(state_path.read_text())
+    cleared = [n for n, b in saved.items() if b.get("reducing")]
+    for n in cleared:
+        saved[n]["reducing"] = False
+    if cleared:
+        state_path.write_text(json.dumps(saved, indent=1) + "\n")
+    return cleared
+
+
 def status() -> None:
     ledger = DIR / "ledger.jsonl"
     if not ledger.exists():
@@ -167,6 +180,9 @@ def main() -> None:
         info = halt_info()
         HALT.unlink(missing_ok=True)
         print("kill switch OFF" + (f" (was: {info})" if info else " (it was not on)"))
+        cleared = resume_books(DIR / "state.json")
+        if cleared:
+            print("may buy again:", ", ".join(cleared))
         return
     DIR.mkdir(parents=True, exist_ok=True)
     state_path, ledger = DIR / "state.json", DIR / "ledger.jsonl"
@@ -195,11 +211,14 @@ def main() -> None:
                                                path=DIR / "HALT" if dry else HALT)
         if rec["drawdown"].get("action"):
             print("DRAWDOWN", rec["drawdown"])
-    for name in LEVERAGE:  # the aggressive book against its own limits (mandate "books" section)
+    # the aggressive book against its own limits (mandate "books" section). At its limit only THIS book stops buying
+    # (its own flag): the kill switch is shared, and the frozen books must never change because of this book.
+    for name in LEVERAGE:
         if name in rec["books"] and not rec["books"][name].get("wiped_out"):
-            dd = apply_drawdown_limit(name, rec["books"][name]["equity"], books[name].peak,
-                                      path=DIR / "HALT" if dry else HALT)
+            dd = drawdown_status(name, rec["books"][name]["equity"], books[name].peak)
             rec.setdefault("drawdown_leveraged", {})[name] = dd
+            if dd.get("action") == "REDUCING":
+                books[name].reducing = True
             if dd.get("action"):
                 print("DRAWDOWN", dd)
     with ledger.open("a") as f:

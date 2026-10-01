@@ -1711,6 +1711,10 @@ user's mandate decision, not something a test supports: no test has shown this b
 - **No pass rule.** This is not a trial and is not entered in the trials registry. The weekly review reports it beside
   `master+brakes`: return, drawdown, interest paid, and whether its return is tracking 2.5× the frozen book's return
   minus financing. Its numbers never count as evidence for the frozen book.
+- **Correction (2026-10-01, before the book's first run; found in code review).** At its −60% limit only this book
+  stops buying, through a flag of its own (`Book.reducing`, cleared by `forward_allocator.py --resume`). The first
+  version switched the shared kill switch to REDUCING, which would also have stopped the frozen books and the
+  AI-picks sleeve from buying. That broke the rule that this book can never change the frozen ones. Tested.
 - **What the backtest arithmetic says to expect** (30 Sep, `desktop_export.leverage_table`): about 35% a year, 41%
   volatility, a −57% worst fall, a −47% worst year, a 46% chance of a 40% year, a 32% chance of a 60% year, a 25%
   chance of a losing year and a 31% chance of a 35% fall within any year. Live results are usually worse than backtests.

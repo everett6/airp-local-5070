@@ -143,11 +143,9 @@ def reduce_only(targets: dict[str, float], positions: dict[str, float], cash: fl
     return {a: min(w, cur.get(a, 0.0)) for a, w in targets.items()}
 
 
-def apply_drawdown_limit(book: str, equity: float, peak: float, mandate: Path = MANDATE, path: Path = HALT
-                         ) -> dict[str, Any]:
-    """The mandate's drawdown rules on the real book after a run: at the limit the kill switch goes to REDUCING (the
-    next run's fills can only sell); at the alert level the run is flagged. An unreadable mandate is reported (the
-    gate already rejects every order then)."""
+def drawdown_status(book: str, equity: float, peak: float, mandate: Path = MANDATE) -> dict[str, Any]:
+    """Where a book stands against its drawdown rules (its own "books" section if it has one). Changes nothing:
+    "action" is "REDUCING" at the limit and "alert" at the alert level. An unreadable mandate is reported."""
     try:
         m = load_mandate(mandate, book)
     except MandateError as e:
@@ -156,12 +154,21 @@ def apply_drawdown_limit(book: str, equity: float, peak: float, mandate: Path = 
     out: dict[str, Any] = {"book": book, "from_peak": round(dd, 4), "alert_at": m.alert_drawdown,
                            "limit_at": m.max_drawdown}
     act = drawdown_check(equity, peak, m)
-    if act == "limit":
-        halt(f"{book} is {dd:.1%} below its peak (limit {m.max_drawdown:.0%})", by="drawdown limit", path=path,
-             mode="REDUCING")
-        out["action"] = "REDUCING"
-    elif act == "alert":
-        out["action"] = "alert"
+    if act:
+        out["action"] = "REDUCING" if act == "limit" else "alert"
+    return out
+
+
+def apply_drawdown_limit(book: str, equity: float, peak: float, mandate: Path = MANDATE, path: Path = HALT
+                         ) -> dict[str, Any]:
+    """The mandate's drawdown rules on the real book after a run: at the limit the kill switch goes to REDUCING (the
+    next run's fills can only sell); at the alert level the run is flagged. An unreadable mandate is reported (the
+    gate already rejects every order then). The kill switch is shared by every book: a book with limits of its own
+    (the aggressive paper book) uses drawdown_status and its own `reducing` flag instead."""
+    out = drawdown_status(book, equity, peak, mandate)
+    if out.get("action") == "REDUCING":
+        halt(f"{book} is {out['from_peak']:.1%} below its peak (limit {out['limit_at']:.0%})", by="drawdown limit",
+             path=path, mode="REDUCING")
     return out
 
 
