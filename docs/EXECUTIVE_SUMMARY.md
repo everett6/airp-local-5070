@@ -116,7 +116,7 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
   and every run after it. Others: orders for class shares sent under a symbol the broker does not know, two stale
   ticker symbols (Fiserv, EQR), state files that a power cut could leave half-written, labels that would all have
   counted as late on a busy morning. Most were found by rehearsing each scheduled job on a scratch copy and by
-  writing end-to-end tests with a stand-in model, not by reading. 639 tests pass. Eight items are left for the
+  writing end-to-end tests with a stand-in model, not by reading. 642 tests pass. Six questions are left for the
   user to decide (`docs/open_decisions.json`, shown on the app's Home page).
 - (27 Sep) 404 tests pass; ruff and strict mypy are clean; CI is green again (it had been failing on two type errors, now
   fixed). No service or timer runs anything. Every run is manual.

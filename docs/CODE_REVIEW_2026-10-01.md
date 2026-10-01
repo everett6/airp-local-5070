@@ -1,135 +1,139 @@
 # Code review, 1 Oct 2026
 
-Scope: the user asked for a read-through of the whole code for bugs and optimizations. Order: the live trading path
-first, then the library, the desktop app and the scripts still in use. Rules for every change: the frozen books'
-results must not change; a finding that would change a live decision is reported here, not changed; each fix has a
-test and its own commit.
+The user asked for a read-through of the whole code for bugs and optimizations, before the earnings season
+(mid-October) multiplies the load on the live runner. Rules kept for every change: the frozen books' results and
+the registered decision rules do not change; anything that would change what a live decision is goes to the user;
+each fix has a test and its own commit.
+
+**Result: 24 faults fixed, 6 questions left for the user, no live decision lost or changed so far.** Most faults were
+found by running each scheduled job's first-time path on a scratch copy and by writing end-to-end tests with a
+stand-in model, not by reading. 642 tests pass (592 in the morning).
+
+## The most serious finding (fix 16)
+
+Since the health checks added on 29 Sep, one new release that could not be decided made the whole live run fail
+before any decision was written, and the same release would have failed every later run. A filing without a
+press-release exhibit is enough: 80 of 5,751 past S&P 500 earnings filings (1.4%), at least one on 12% of release
+days. It had not happened yet (six releases so far). In the earnings season it would have within days, and every
+decision after it would have been missed until someone repaired it by hand. The registered rule ("late or impossible
+decisions are logged as missed") is restored: that release is left out, tried again by the next run while its open
+is still ahead, then logged as missed with its reason; the others are decided. A broken pipeline or missing market
+data still fails the run. Dated correction in `PLAN_60_V2.md`; the test fails on the old code with exactly this
+fault.
 
 ## Fixed
 
+Numbers are the order of discovery.
+
+### Would have stopped the live runner, or lost decisions or labels
+
 | # | Where | What was wrong | Fix | Commit |
 |---|---|---|---|---|
-| 1 | `scripts/ai_picks.py` | An exit was sent for a pair whose entry never filled at the broker. JBL's entry legs expired on 30 Sep; on 7 Oct the exit would have shorted 6 JBL and bought back 9 XLK of MU's and ACN's hedge. | Exit legs only for entry legs that filled; closing such a pair raises no second alert. | f208053 |
-| 2 | `app/portfolio/guard.py`, `forward.py`, `scripts/forward_allocator.py` | The aggressive 2.5× book's −60% limit switched the **shared** kill switch to sell-only, which would also have stopped the frozen books and the AI-picks sleeve from buying. Found before the book's first run. | The limit sets a flag on that book only (`Book.reducing`, cleared by `--resume`). | 9633438 |
-| 3 | `app/portfolio/forward.py` | Any exception inside the aggressive book (for example its cash assertion) failed the whole weekly allocator run, frozen books included. | Its errors are reported in the ledger and the app, the book is put back as it was, the run goes on. | d361aa4 |
-| 4 | `scripts/autorun.py` | An event run that did its job but ended with a broker alert (exit 1) was not pushed, so its decisions had no outside timestamp, and the daily check would have called it a missed run. Both live runs with the JBL alert were affected. | A run whose event runner finished counts as a run and is pushed. Their result files were committed as written (49a427b). | 8758d8f |
-| 5 | `scripts/autorun.py` | A heartbeat line cut off by a crash, a step that hung past its limit, a hung git, or a missing `notify-send` each killed a run without a heartbeat or alert. | Tolerant reader, safe append, `safe_step`, timeouts on git, guarded notifier. | 8758d8f |
-| 6 | `scripts/broker_sync.py` | One failed order lookup or send aborted the sync before `orders.json` was saved, so the failure repeated every run and later decisions could not be mirrored. | Each leg reports its own problem and the file is still saved. | 6a7b882 |
-| 7 | `scripts/net_read_shadow.py`, `consensus_shadow.py` | A label line cut off by a crash stopped all later labelling; labels on live releases cannot be made afterwards. | `app/forward/ledger.jsonl_records` skips a torn line. | 13686be |
-| 8 | `scripts/autorun.py` | When Yahoo returned no prices the event run failed without a retry (the message was not in the transient list). | Retried once after 90 s. | 13686be |
+| **16** | `scripts/forward_events.py` | One undecidable release (no press release, or no price for the stock) failed the whole run and every later one. See above. | Left out, retried, then logged as missed; the others are decided. | cd377e3 |
+| 15 | `extract_events.py`, `build_features.py`, `decide_events.py`, `forward_events.py`, the label and consensus shadows | The reader's and the judge's files are appended one line per release. A power cut during a write leaves half a line; every later live run would have failed at it, and the next record would have been glued onto it. | Reads skip a cut-off line (that release is done again); appends start on a fresh line. Judge output and live fact sheets byte-identical before and after. | 12b719a |
+| 24 | `app/forward/ledger.py`, then `forward_allocator.py`, `broker_sync.py`, `learn_loop.py` | The tamper-proof ledgers (and the rebalance's own ledger) stopped at a half-written line: after a power cut, every later run failed until it was removed by hand. This machine has had such a line (the model cache, 16 Sep). | The line is skipped and stays in the file; the next record starts on its own line. Tamper evidence is unchanged and tested: a whole record removed, damaged or edited still fails the chain check. | 6f8d97a, 4be9033 |
+| 14 | `forward_allocator.py`, `broker_sync.py`, `forward_events.py` | The books' state, the broker order record, the list of past releases and the price file were rewritten in place; a power cut could leave half a file. | Each is replaced in one step. Contents identical. | e6e34ca |
+| 13 | `self_improve.py`, `net_read_shadow.py` | The self-improvement versions file is rewritten after every run. Cut off, it would have stopped all three opinion agents from labelling live releases (labels cannot be made afterwards). | Written in one step; if unreadable the fixed agents still label and an alert is raised; never rewritten from a damaged read. | 9b79e9c |
+| 18 | `net_read_shadow.py` | One failed label lost every label of that run, for all three agents. | The good ones are kept; the failed ones are retried while their open is ahead. | 8d6809a |
+| 20 | `net_read_shadow.py` | All labels of a run got one time stamp, after the last label. On a morning with 70+ reports that is after the 09:30 open, so the busiest days would have dropped out of the agents' tests. | Each label is written when it is made, with its own time, release by release. | 91ade9c |
+| 7 | `net_read_shadow.py`, `consensus_shadow.py` | A cut-off label line stopped all later labelling. | Tolerant reader. | 13686be |
+| 4 | `autorun.py` | An event run that did its job but ended with a broker alert was not pushed (no outside time stamp for its decisions) and would have been called a missed run. Both live runs with the JBL alert were affected. | Such a run counts as a run and is pushed; their files were committed as written (49a427b). | 8758d8f |
+| 5 | `autorun.py` | A cut-off heartbeat line, a step hanging past its limit, a hung git or a missing notifier each killed a run without a trace. | Tolerant reader, safe append, time limits, guarded notifier. | 8758d8f |
+| 8 | `autorun.py` | When Yahoo returned no prices the run failed without a retry. | Retried once after 90 s. | 13686be |
+| 19 | `forward_events.py` | Prices were fetched one ticker at a time; at a few hundred names that is minutes, twice a day, in the 45 minutes before the open. | One call for all tickers (the downloads run side by side), single requests as the fallback. Price file byte-identical; 510 symbols in 7.8 s. | 4ecd409 |
 
-## Reported, not changed (would change a live decision, or needs the user)
+### Orders at the paper broker
 
-1. **`forward_events.py`: "on time" is judged by the run's start time, not the write time.** The rule says a decision
-   counts only if it was written before its entry open. The code compares the open with the time the run started.
-   A run that starts at 09:10 ET and writes at 09:35 ET would be recorded as on time. It has not happened: the six
-   live decisions were written at least 42 minutes before their opens. Proposed fix: compare with the clock at the
-   moment of writing (three lines). It touches the frozen runner, so it waits for the user's yes.
-2. **`forward_events.py`: a gap longer than 3 days is never back-filled as "missed".** Discovery looks back 3 days
-   from the last run. If the PC is off for a week, releases in the gap are not in the ledger at all. The daily check
-   does alert on the missing runs.
-3. *(Fixed later the same day, row 19: the outputs proved identical.)* **`forward_events.py`: prices are fetched one ticker at a time.** The list grows with every release since the
-   start; at a few hundred names it adds minutes to each run. A batched download would be faster but changes the
-   data path of the frozen runner.
-4. **Broker mirror after a wipe-out.** If the aggressive book is ever closed, its positions at Alpaca stay open:
-   the mirror only follows pending targets. Paper only; needs a decision on what the mirror should then do.
-5. **Reader oddity seen in the app (checked later the same day: no harm done).** MKC's sales show as 17.4 million
-   dollars in the app (they are about 1.7 billion): the reader took the "17%" growth figure for the amount. The
-   code's SEC cross-check caught it and dropped the number, so the judge's fact sheet said "Revenue: not stated" plus
-   a note about the dropped figure; the judge never saw 17.4. The app shows the reader's raw number, which is
-   misleading. The reader also read "reaffirmed its outlook" as no guidance. Worth a look in the Saturday review;
-   the frozen reader is not changed here.
+| # | Where | What was wrong | Fix | Commit |
+|---|---|---|---|---|
+| 1 | `ai_picks.py` | An exit was sent for a pair whose entry never filled. JBL's entry orders expired on 30 Sep; on 7 Oct the exit would have shorted 6 JBL and bought back 9 XLK of the other pairs' hedge. | Exit orders only for entries that filled. | f208053 |
+| 10 | `app/portfolio/broker.py`, `ai_picks.py` | Class shares (BRK-B, BF-B) were sent with a dash; Alpaca only knows BRK.B. The stock order would have been rejected and the ETF hedge left open alone. | The book keeps the dash; orders, price requests and positions use the dot. | daf49b0 |
+| 22 | `app/data_ingestion/tickers.py`, `weekly_review.py` | Two wrong symbols: Fiserv was mapped to FI, which died when it went back to FISV; EQR became VMRK. Both report in late October and could not have been priced or traded. (Five more index names have no prices because the companies are gone.) | Mapping corrected and checked at Yahoo and Alpaca. The Saturday review now lists every index member without prices. | 152f081, 4404174 |
+| 6 | `broker_sync.py` | One failed order lookup aborted the sync before its record was saved, so the failure repeated every run. | Each order reports its own problem; the record is saved. | 6a7b882 |
 
-6. **Entry day in winter.** The live runner lets a release filed before 09:30 New York time enter at that day's
-   open, and the AI-picks sleeve trades that open. The scoring code (`entry_index`) uses a fixed cut-off of 13:00 UTC,
-   which is 09:00 New York in summer and 08:00 in winter. From 1 Nov, a release filed between 08:00 and 09:30 New
-   York time will be scored from the next day's open while the sleeve trades the same day's open. The score stays
-   honest (the decision is still made before the scored entry) but it will no longer measure the trade the sleeve
-   makes for those releases. Both rules were fixed before the forward test, so nothing is changed here.
+### The aggressive 2.5× book (before its first run on Mon 5 Oct)
 
-7. *(Fixed later the same day, row 24.)* **The hash-chained ledgers stop at a cut-off last line.** `app/forward/ledger.Ledger` (events, guidance,
-   long-term, themes) checks every line; a last line cut off by a power loss would make every later run fail until
-   the line is removed by hand. That strictness is the point of the ledger (nothing can be dropped silently), so it
-   is not changed here. Proposed, if the user wants it: treat only an unterminated last line as never written,
-   and say so in an alert.
+| # | Where | What was wrong | Fix | Commit |
+|---|---|---|---|---|
+| 2 | `guard.py`, `forward.py`, `forward_allocator.py` | Its −60% limit switched the shared kill switch to sell-only, which would also have stopped the frozen books and the AI-picks sleeve from buying. | The limit sets a flag on that book only. | 9633438 |
+| 3 | `forward.py` | Any error inside it failed the whole weekly run, frozen books included. | Its errors are reported, the book is put back, the run goes on. | d361aa4 |
+| 12 | `weekly_review.py`, `forward_allocator.py --status`, `desktop_export.py`, the app | A failed week of that book is stored without numbers; four readers would have crashed or shown nonsense, the Saturday review among them. | They leave such an entry out and say so. | d3e917f |
 
-8. **How to score a long-term pick that stops trading.** The first version of the scoring left such a pick out
-   of the average (kind to the result: a bankrupt pick would vanish). The 29 Sep health check refuses to score the
-   cohort at all. Neither is a good rule. Usual practice: value it at its last traded price (a buyout is then
-   counted at about the deal price, a collapse at about zero). Needs the user's yes before the first cohort closes
-   (about 30 Dec); until then such a cohort stays unscored and is flagged.
+### Monthly cohorts and reports
 
-9. **The reader sometimes takes the previous quarter for the year-ago quarter.** Seen live on MU (30 Sep): the fact
-   sheet said sales were 54,229M "vs 41,456M a year earlier (+30.8%)"; 41,456M was the quarter before, and the
-   year-ago quarter was 11,315M (the sheet's own SEC history lines show it). On past data (546 releases where the
-   reader gave a year-earlier sales figure and the SEC has one): the reader's figure is exactly the previous
-   quarter's in 3.1%, and differs from the SEC year-ago figure by more than 10% in 15.2% (part of that is banks and
-   others whose "revenue" has several definitions). The SEC tool already knows the filed year-ago number and is
-   used only when the reader gives none. Using it whenever it exists would change fact sheets and so decisions:
-   a new version to test, not a fix. The app now shows the fact sheet the judge read for every release.
+| # | Where | What was wrong | Fix | Commit |
+|---|---|---|---|---|
+| 17 | `longterm_picks.py` | Once a long-term pick stops trading before its exit (bought out, delisted), scoring raised at every run, before the new month's cohort was made: the track would have stopped for good (earliest about 30 Dec). | That cohort is reported and left unscored; the others are scored, new cohorts are made. | bc65f8b |
+| 11 | `app/sandbox/walkforward.py` | The one-token probability call behind the monthly ratings had no retry: one dropped connection in ~500 calls failed the whole cohort. | Three attempts. Answers unchanged. | 69c6574 |
+| 23 | `digest.py` | The phone digest chose records by UTC date; on the cohort day the afternoon run ends after midnight UTC and the digest would have been empty. It would have happened today. | The local day. | 8064b5d |
+| 9 | `digest.py` | A run that did its job but raised an alert was called "FAILED". | "Finished with an alert". | 8824bf9 |
+| 21 | `autorun.py` | The consensus shadow ran after the push, so its lines got their outside time stamp a run late, and its output was not logged. | It runs right after the labels, as a side step that cannot change the run's result. | 2eb11f3 |
 
-## Also fixed in this pass
+## Left for the user (also on the app's Home page, `docs/open_decisions.json`)
 
-| # | Where | What | Commit |
-|---|---|---|---|
-| 9 | `scripts/digest.py` | The phone digest called a run that did its job but raised a broker alert "FAILED". It now says "finished with an alert". | 8824bf9 |
-| 10 | `app/portfolio/broker.py`, `scripts/ai_picks.py` | Class shares (BRK-B, BF-B) were sent to Alpaca with a dash. Alpaca only knows BRK.B (read-only lookup, 1 Oct): the order would have been rejected, leaving the pair's sector-ETF short open without its stock, and one such name in a price request makes the whole request fail. Not hit yet (no class share has been picked). | The book keeps the dash; orders, price requests and positions use the broker's dot. | daf49b0 |
-| 11 | `app/sandbox/walkforward.py` | The one-token probability call behind the monthly long-term and theme ratings had no retry: one dropped connection in about 500 calls would have failed the whole cohort (75 minutes of GPU, repeated at the next run). | Three attempts, as the main call already had. Answers unchanged. | 69c6574 |
-| 12 | `scripts/weekly_review.py`, `forward_allocator.py --status`, `desktop_export.py`, `desktop/src/airp.js` | A week in which the aggressive book fails is stored as an error entry without numbers (fix 3). Four readers took `equity` from every entry: the Saturday review would have crashed, the status command too, and the app's book table would have shown broken numbers. Found by rehearsing the review on a scratch copy. | They leave such an entry out; the review says the book's last run failed. The review and the health report also skip a ledger line cut off by a crash. | d3e917f |
-| 13 | `scripts/self_improve.py`, `scripts/net_read_shadow.py` | The self-improvement versions file is rewritten after every event run, in place. Had a crash cut it off, the label shadows (which read it first) would have stopped labelling live releases with all three lenses; those labels cannot be made afterwards. | The file is written through a temporary file; if it is ever unreadable the fixed lenses still label and an alert is raised; it is never rewritten from a damaged read. A cut-off label line no longer stops the champion/challenger scoring. | 9b79e9c |
-| 14 | `scripts/forward_allocator.py`, `broker_sync.py`, `forward_events.py` | The books' state, the broker order record, the list of past releases and the price file were rewritten in place. A crash or power loss mid-write would have left half a file: the next weekly rebalance or order sync could not start, or past releases would silently drop out of scoring. | Each is now replaced in one step (`app/forward/ledger.write_atomic`). Contents are identical; the rebalance and the order mirror were rehearsed on a scratch copy. | e6e34ca |
-| 15 | `scripts/extract_events.py`, `build_features.py`, `decide_events.py`, `forward_events.py`, the label and consensus shadows | The reader's and the judge's output files are appended one line per release. A power loss during such a write leaves a cut-off last line; every later live run would then have failed at that line, so every later decision would have been missed until the file was repaired by hand, and the next record would have been glued onto the broken line. | Reads skip a cut-off line (that release is read or judged again) and appends start on a fresh line (`app/forward/ledger.open_append`). Checked: the judge's output and the live fact sheets are byte-identical before and after; new end-to-end tests of the reader and judge steps with a stub model. | 12b719a |
-| **16** | `scripts/forward_events.py` | **The most serious finding.** Since the health checks of 29 Sep, one new release that could not be decided made the whole run fail before any decision was written, and the same release would have failed every later run. A filing without a press-release exhibit is enough: 80 of 5,751 past S&P 500 earnings filings (1.4%), at least one on 12% of release days. It had not happened yet (six releases so far); in the earnings season from mid-October it would have within days, and every decision after it would have been missed. The same for a stock without a price (a renamed ticker). | The registered rule is restored: such a release is left out and the others are decided; it is tried again by the next run while its open is still ahead, then logged as missed with its reason. A broken pipeline or missing market data still fails the run. The runner's main body now has an end-to-end test (`tests/test_forward_events_main.py`); it fails on the old code with exactly this fault. Dated correction in PLAN_60_V2. | cd377e3 |
-| 17 | `scripts/longterm_picks.py` | Same kind of fault, later in the year: once a long-term pick stops trading before its exit day (bought out, delisted), scoring that cohort fails at every run, and it failed before the new month's cohort was made, so the track would have stopped for good. Earliest date: about 30 Dec. | That cohort is reported at each run and left unscored; the other cohorts are scored and new cohorts are made. No result is invented (see item 8). | bc65f8b |
-| 18 | `scripts/net_read_shadow.py` | One label that failed (after the client's own three attempts) lost every label of that run for all three lenses; labels on live releases cannot be made after their open. On a busy earnings morning that is dozens of releases. | The labels that succeeded are kept; the failed ones are reported and tried again by the next run if their open is still ahead. | 8d6809a |
-| 19 | `scripts/forward_events.py` | Prices were fetched one ticker at a time (item 3 below, first only reported). The list grows with every release; at a few hundred names that is minutes per run, twice a day, in the 45 minutes before the open. | One call for all tickers (fetched side by side; the number of requests to Yahoo is the same), the single requests kept as the fallback for any ticker the call leaves out or if it fails. Measured on the live tickers plus class shares: the saved price file is byte-identical, 4.8 s became 0.6 s. | 4ecd409 |
-| 22 | `app/data_ingestion/tickers.py` | Pricing the whole S&P 500 list (510 symbols, 7.8 s) showed two wrong symbols: Fiserv was sent to FI, a symbol that died when it went back to FISV, and EQR became VMRK. Both report in late October; their releases could not have been priced or traded (before fix 16 either one would have stopped the runner). Five more names have no prices because the companies are gone (AVB, CTRA, DAY, EA, HOLX): nothing to fix. | Mapping corrected; both symbols return prices and are tradable at the paper broker. The Saturday review now has a "Symbol check" line that names every index member without recent prices, so the next rename is seen before the company reports. | 152f081 and the next |
-| 23 | `scripts/digest.py` | The phone digest chose its records by UTC date. The afternoon run starts at 22:30 UTC; on the monthly cohort day it ends after midnight UTC, and the digest sent at its end would have been empty ("0 runs, 0 decisions"), with that run's alerts counted a day late. It would have happened today. | The digest's day is the local day (the runs' own clock). | this commit |
-| 24 | `app/forward/ledger.py` | (Item 7 below, first only reported.) The tamper-proof ledgers stopped at a half-written last line: after a power cut during a write, every later run would have failed until the line was removed by hand. This machine has had such a line before (the model cache, after the graphics card dropped out on 16 Sep). | A line that is not a whole record is skipped and the next record starts on a line of its own; the torn line stays in the file. Tamper evidence is unchanged, and tested: a whole record that is removed, damaged or edited still fails the check, because every record carries its place in the chain. The weekly rebalance's own ledger, the broker's read of it and the learning loop's files got the same treatment in the next commit. | 6f8d97a |
-| 20 | `scripts/net_read_shadow.py` | All labels of a run got one time stamp, taken after the last label. On a morning with 70 or more reports (late October) the last label comes after the 09:30 open, so every label of that morning would have counted as late and the busiest days would have dropped out of the three agents' tests. | Each label is written the moment it is made, with its own time, release by release. | this commit |
-| 21 | `scripts/autorun.py` | The consensus shadow ran after the job and after the push, so its lines got their outside time stamp only with the next run (for morning releases: after the open), and its output was not in the log. | It runs inside the event job right after the labels, as a side step whose failure cannot change the run's result; skipped when the event runner failed. Note in PLAN_60_V2. | 2eb11f3 |
+1. **"On time" is judged by the run's start, not the moment of writing.** A run that starts at 09:10 New York time
+   and writes at 09:35 would be recorded as on time. It has not happened (the six live decisions were written at
+   least 42 minutes early). Fix: three lines in the frozen runner.
+2. **A gap longer than 3 days is never back-filled as "missed".** If the PC is off for a week, releases in the gap
+   are not in the ledger at all (the daily check does alert on the missing runs).
+3. **The broker mirror after a wipe-out of the 2.5× book.** The paper book would close, its broker positions would
+   stay open. Needs a rule.
+4. **Entry day in winter (from 1 Nov).** A release filed between 08:00 and 09:30 New York time is traded at that
+   day's open but scored from the next day's (the scoring cut-off is a fixed 13:00 UTC). The score stays honest but
+   measures a slightly different trade. Both rules were fixed in advance.
+5. **How to score a long-term pick that stops trading.** Usual practice: its last traded price. Needed before the
+   first cohort closes (about 30 Dec).
+6. **The reader sometimes takes the previous quarter for the year-ago quarter.** Live on MU (30 Sep): "sales
+   54,229M vs 41,456M a year earlier (+30.8%)"; 41,456M was the quarter before, the year-ago quarter was 11,315M.
+   On 546 past releases with both figures: exactly the previous quarter in 3.1%, more than 10% away from the
+   SEC-filed year-ago figure in 15.2% (partly banks, whose revenue has several definitions). Using the SEC figure
+   whenever it exists would change what the judge sees: a new version to test (needs the graphics card).
 
-## Tests added for paths that had none
-Measured with the coverage tool: the run functions of the two monthly cohort scripts (`scripts/themes.py` 0%,
-`scripts/longterm_picks.py` 52%) and of the reader and judge steps had only ever been exercised by real runs. They
-now have end-to-end tests with a stub model (`tests/test_monthly_cohorts.py`, `tests/test_decide_events.py`): what is
-written, what is picked, that a second run in the same month does nothing, and that AI-linked themes are left out
-while the bubble gauge reads high. Also new: `tests/test_weekly_review.py`, `tests/test_forward_ledger.py`.
-Added later the same day: the event runner's main body (`tests/test_forward_events_main.py`), the labelling run, and the order mirror through one pick's whole life with a stand-in broker (`tests/test_sleeve.py`). The weekly rebalance's main body has one too (`tests/test_forward_allocator_main.py`): one ledger line and the books per run, once a day, the aggressive book at 2.5 times the frozen targets, stale prices stop it before anything is written.
-
-## Rehearsed on scratch copies (nothing live was touched)
-- Saturday's weekly review and the weekly learning review (found fix 12).
-- Monday's rebalance with the aggressive book and the order mirror (dry): 3 legs planned at 1.63× at the broker.
-- The event runner without the graphics card, twice, after the file-write changes.
-- The AI-picks sleeve day by day to 9 Oct with made-up prices and a stand-in broker: MU and ACN exits are sent on
-  the morning of 8 Oct, JBL (never filled) closes on 7 Oct with no order and no new alert, and the fill audit is
-  written when a pair closes.
-- The consensus shadow on the six live releases (they are recorded late and never scored, as planned).
+Checked and closed: MKC's sales showed as 17.4 million in the app (the reader took the "17%" growth for the
+amount). The code's SEC cross-check had dropped that number; the judge's sheet said "Revenue: not stated". The app
+now shows, for every release, the fact sheet the judge read and what the cross-check dropped.
 
 ## Noted, not changed
-- Monthly cohorts rate all cards in one go (about 490 for the long-term picks). A card that keeps failing would fail
-  the whole cohort, and the 75 minutes are repeated at the next run. Left as is on purpose: rating a failed card as
-  "unclear" would hide a model server that died half-way, and a cohort cannot be remade. If it ever happens the
-  alert names the error.
-- `scripts/learn_loop.py monthly` (first run Sat 3 Oct): if it crashed between testing a proposal and saving, the
-  next Saturday would test and register the same proposals again (duplicate registry lines; the results would be
-  identical). Its data path was checked on the real tables today without computing any test. Left as is: the loop's
-  rules were fixed with the user.
 
-## Read and found sound, second pass
-`app/portfolio/themes.py` and `scripts/themes.py` (the cards for today's first theme cohort were built on the CPU and
-look right), `app/data_ingestion/edgar.py`, `app/forward/schedule.py`, the model client in `app/sandbox/walkforward.py`,
-`scripts/research_queue.py` (no GPU job is waiting; the news crawl is its only running job), `scripts/trading_health.py`,
-the desktop server (token on every call, local address only).
+- A monthly cohort rates all its cards in one go (about 490). A card that keeps failing fails the cohort, and the
+  75 minutes repeat at the next run. Left on purpose: rating a failed card as "unclear" would hide a model server
+  that died half-way, and a cohort cannot be remade.
+- `learn_loop.py monthly` (first run Sat 3 Oct): a crash between testing a proposal and saving would make the next
+  Saturday test and register the same proposals again (identical results, duplicate registry lines). Its data path
+  was checked on the real tables without computing any test.
+- The index membership list is the 2026 list; index changes after it are not followed.
+
+## Tests added (paths that had none)
+
+Coverage showed that the main bodies of the live scripts had only ever been exercised by real runs. Now covered
+end to end, with a stand-in model or broker and synthetic data:
+`tests/test_forward_events_main.py` (the live runner), `test_decide_events.py` (reader and judge steps),
+`test_monthly_cohorts.py` (theme and long-term cohorts), `test_forward_allocator_main.py` (weekly rebalance),
+`test_sleeve.py` (order mirror through one pick's whole life), `test_net_read_shadow.py` (labelling run),
+`test_weekly_review.py`, `test_forward_ledger.py`, plus cases in `test_autorun.py`, `test_broker.py`,
+`test_digest.py`, `test_learn_loop.py`, `test_self_improve.py`, `test_tickers.py`. Desktop: 9 server tests and a
+smoke mode that opens every page and reports any that shows an error.
+
+## Rehearsed on scratch copies (nothing live was touched, no graphics card)
+
+- Saturday's weekly review and learning review (found fix 12).
+- Monday's rebalance with the aggressive book, and the order mirror (dry): 3 orders planned, 1.63× at the broker.
+- The event runner, five times, after each change to it; every step of the event job with the card off.
+- The AI-picks sleeve day by day to 9 Oct with made-up prices and a stand-in broker: MU and ACN exits go out on the
+  morning of 8 Oct; JBL (never filled) closes on 7 Oct with no order and no new alert.
+- The consensus shadow on the six live releases (recorded late, never scored, as planned).
+- The whole S&P 500 priced in one call (found fix 22).
 
 ## Read and found sound
-`app/portfolio/master.py` (calibration, Kelly sizing, the weight simulator), `app/portfolio/sleeve.py`,
-`app/portfolio/broker.py`, `app/forward/ledger.py`, `app/sandbox/events.py`, `app/sandbox/gpu_lock.py`,
-`app/signals/registry.py`, `scripts/guidance_shadow.py`, `scripts/longterm_picks.py` (rehearsed on the CPU: 489
-company cards are ready for today's first cohort). A stricter lint pass over all of `app/` and `scripts/`
-(bug-prone patterns, async misuse, naive datetimes) found nothing in live code. The test suite takes 26 s; its
-slowest tests are deliberate timeouts.
 
-## Still to read
-Library (`app/sandbox`, `app/data_ingestion`, `app/llm`), the research runners, the desktop app's server and UI,
-and the slow tests.
+`app/portfolio/master.py`, `sleeve.py`, `broker.py`, `themes.py`; `app/forward/schedule.py`;
+`app/sandbox/events.py`, `gpu_lock.py`, the model client in `walkforward.py`; `app/signals/registry.py`;
+`app/data_ingestion/edgar.py`; `scripts/guidance_shadow.py`, `themes.py`, `research_queue.py` (no GPU job waiting),
+`trading_health.py`, `failure_review.py`, `learn_loop.py`, `self_improve.py`; the desktop server (token on every
+call, local address only). A stricter lint pass over `app/` and `scripts/` found nothing in live code.
+
+## Not read line by line
+
+The research-only library (`app/sandbox/walkforward.py` beyond the model client, `agent_worker.py`, `intraday.py`,
+`jail.py`, `app/llm`), the finished trial scripts (they are the record and are not edited), and
+`scripts/warm_gdelt.py` (running).
