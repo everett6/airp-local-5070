@@ -71,6 +71,9 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 | Turn-of-the-month T1 (SPY, last day + first 3; 2008–2026) | fail | overlay Sharpe +0.30 [−0.10, +0.74]; TOM days only +1.3 bp/day above others, CI [−6.6, +9.4] |
 | SPY overnight O1 (close to next open, 2012–2026, 1 bp a side) | fail | net Sharpe +0.25 [−0.28, +0.81]; +0.73 before costs; 2 trades a night eat it |
 | Macro-announcement E1 (jobs, PPI, FOMC days; 2013–2026) | fail | net Sharpe +0.08 [−0.42, +0.66]; event days −1.9 bp/day vs other days |
+| Rebalancing pressure R1 (SPY vs 7–10y Treasuries; after the paper's sample, 2023–2026) | fail | net Sharpe −0.10 [−1.20, +0.59]; it was +0.90 [+0.52, +1.25] inside the paper's own sample |
+| Month-end Treasuries M1 (TLT, last 3 days of the month; 2019–2026) | fail, narrowly (a lead) | net Sharpe +0.51 [−0.10, +1.14]; month-end days +11.0 bp/day vs other days, CI [+1.0, +21.8] |
+| Treasury auction cycle A1 (TLT, 5 days after 10y/30y auctions; 2014–2026) | fail | net Sharpe −0.18 [−0.64, +0.27]; the effect was there in 2009–2013 and is gone since |
 | Arm B2 (arm B with the news actually gathered) | fail | +0.011 IC over arm A [−0.035, +0.062]; own IC +0.054 [−0.004, +0.114] |
 | Arm B3 (code-built evidence: last outlook + real headlines) | fail | +0.001 IC over arm A [−0.032, +0.035]; own IC +0.044 [+0.003, +0.090] |
 | Arm C (arm B + Bonsai judgement fields) | fail | −0.022 IC vs arm B [−0.065, +0.025]; `net_read` alone +0.067, to be tested on live data only (C2) |

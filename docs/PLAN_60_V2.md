@@ -1846,3 +1846,27 @@ it tests. A pass changes no book: it becomes a proposal to the user, with a forw
   pre days: block-bootstrap CI above 0 (their measure).
 - **Reported, not deciding:** 2009-01-02 .. 2013-12-31; IEF; 3 bp; by year; correlation with the core book and
   with M1.
+
+**Results (each run once, 2026-10-01 ~08:20 PDT): all three FAIL. M1 fails narrowly and is a lead.**
+
+| Test | Window | Net Sharpe [95% CI] | CAGR | The effect itself, bp a day [95% CI] | Verdict |
+|---|---|---|---|---|---|
+| R1 rebalancing pressure | 2023-03-20 .. 2026-09-25 | −0.10 [−1.20, +0.59] | −0.8% | −14.7 [−36.6, +8.1] (needs: below 0) | FAIL |
+| M1 month-end Treasuries | 2019-01-02 .. 2026-08-31 | +0.51 [−0.10, +1.14] | +2.5% | +11.0 [+1.0, +21.8] (needs: above 0) | FAIL |
+| A1 auction cycle | 2014-01-02 .. 2026-09-25 | −0.18 [−0.64, +0.27] | −1.5% | +5.2 [−3.1, +13.3] (needs: above 0) | FAIL |
+
+- **R1.** Inside the paper's sample (2007 to March 2023) the same code gives Sharpe +0.90 [+0.52, +1.25], so the
+  replication works. In the 3.5 years after their sample it earns nothing. The effect has the right sign (stocks
+  did 14.7 bp a day worse after overweight days) but the CI is wide: 751 overweight days against 133 underweight
+  ones in a rising market. Trading one day later: −0.77. With TLT as the bond leg: −0.16. Three of the last five
+  years are negative (2021, 2024, 2026). Correlation with the core book −0.08. Read: either the edge faded once
+  published or 3.5 years is too short to tell; it does not pass.
+- **M1.** The effect check passes: TLT earned +8.0 bp on month-end days against −3.0 bp on other days. The Sharpe
+  reaches 0.5 but its CI starts at −0.10, so rule 1 fails. Every year from 2006 to 2025 is positive; 2026 so far is
+  −1.62. Inside the paper's sample (2006–2018): +0.95 [+0.43, +1.45]. Reported, not deciding: IEF +0.86
+  [+0.24, +1.52], the last 5 days +0.61 [+0.01, +1.24], the last day alone +0.09; at 3 bp +0.42. Correlation with
+  the core book −0.01. It holds TLT on about 36 days a year, so the money it makes is small (+2.5% a year). No
+  variant is run. As with T1 and O1, a forward shadow is the honest next step, if the user wants one.
+- **A1.** The pattern was there in 2009–2013 (post days +22.4 bp a day above pre days, CI [+7.1, +36.3]) and is not
+  there after the paper's publication. 154 auction clusters. Correlation with M1: 0.00.
+- Registry: 42 trials. Result file: `backend/results/daytrade_test.json` (R1, M1, A1).
