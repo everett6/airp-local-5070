@@ -276,6 +276,46 @@ def d10_premarket_reversal(daily: pd.DataFrame, pre: pd.DataFrame, symbols: list
     return _short_top_long_bottom(sig, r, o.index, cost, frac, min_names)
 
 
+def d11_loo_reversal(daily: pd.DataFrame, pre: pd.DataFrame, symbols: list[str], cost: float, frac: float = 0.10,
+                     order_frac: float = 0.25, min_names: int = 20) -> pd.DataFrame:
+    """D11, opening reversal with limit-on-open orders. Each day, among the stocks with a pre-market price
+    (`pre`: Date, Ticker, pre): pm = pre / yesterday's close - 1, cut-offs = its `frac` and 1 - `frac` quantiles. The
+    `order_frac` of stocks with the highest pm get a sell order at yesterday's close x (1 + upper cut-off), the lowest
+    a buy order at yesterday's close x (1 + lower cut-off). A sell fills at the official open if the open is at or
+    above its limit, a buy if at or below; fills are closed at the close. Every order is 0.5 / (frac x stocks) of
+    capital. Returns by day: ret (net, on the whole capital), long, short (each side's net part), n_long, n_short
+    (fills), gross, net (exposure), orders (resting orders, as a multiple of capital), names. A day with fewer than
+    `min_names` pre-market prices, or with no fill, returns 0."""
+    d = daily[daily["Ticker"].isin(symbols)]
+    o = d.pivot_table(index="Date", columns="Ticker", values="Open").sort_index()
+    c = d.pivot_table(index="Date", columns="Ticker", values="Close").sort_index()
+    p = pre[pre["Ticker"].isin(symbols)].pivot_table(index="Date", columns="Ticker", values="pre")
+    prev = c.shift(1).to_numpy(float)
+    pm = p.reindex(index=o.index, columns=o.columns).to_numpy(float) / prev - 1
+    opens, r = o.to_numpy(float), (c / o - 1).to_numpy(float)
+    out = {}
+    for i, day in enumerate(o.index):
+        ok = np.isfinite(pm[i])
+        n = int(ok.sum())
+        row = {"ret": 0.0, "long": 0.0, "short": 0.0, "n_long": 0, "n_short": 0, "gross": 0.0, "net": 0.0,
+               "orders": 0.0, "names": n}
+        if n >= min_names:
+            q_lo, q_hi = np.quantile(pm[i][ok], [frac, 1 - frac])
+            k = max(1, int(n * order_frac))
+            ranked = np.flatnonzero(ok)[np.argsort(pm[i][ok], kind="stable")]
+            buys, sells = ranked[:k], ranked[-k:]
+            w = 0.5 / (frac * n)
+            traded = np.isfinite(r[i])  # an official open and close that day
+            fb = buys[traded[buys] & (opens[i][buys] <= prev[i][buys] * (1 + q_lo))]
+            fs = sells[traded[sells] & (opens[i][sells] >= prev[i][sells] * (1 + q_hi))]
+            long = float(w * (r[i][fb] - 2 * cost).sum())
+            short = float(w * (-r[i][fs] - 2 * cost).sum())
+            row.update(ret=long + short, long=long, short=short, n_long=len(fb), n_short=len(fs),
+                       gross=w * (len(fb) + len(fs)), net=w * (len(fb) - len(fs)), orders=2 * k * w)
+        out[pd.Timestamp(day)] = row
+    return pd.DataFrame.from_dict(out, orient="index")
+
+
 def darvas_signals(h: np.ndarray, lo: np.ndarray, c: np.ndarray, confirm: int = 3, year: int = 252
                    ) -> tuple[dict[int, tuple[float, float]], dict[int, float]]:
     """Darvas boxes of one stock's daily bars. Returns ({day: (top, bottom)} for breakout days (close above a

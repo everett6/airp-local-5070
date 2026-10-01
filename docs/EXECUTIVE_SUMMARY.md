@@ -66,6 +66,7 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 | Day trading D8: Darvas box breakouts, S&P 500, vs SPY (2024-07–2026-09) | fail | excess Sharpe −0.30 [−1.84, +1.22]; 13.2%/yr vs SPY 18.0% |
 | Day trading D9: opening-auction reversal, S&P 500 (2016–2026) | pass, untradable | Sharpe +0.81 [+0.21, +1.34]; Alpaca check +1.08; the signal needs the official open, unknown before the auction |
 | Day trading D10: D9 with a 09:25 pre-market signal (tradable) | fail | Sharpe −0.64 [−1.28, −0.06] |
+| Day trading D11: D9's selection with limit-on-open orders (tradable) | fail | Sharpe −0.56 [−1.29, +0.09] (98.3%); −0.95 at 2 bps; family closed |
 | Pairs trading P1 (Gatev–Goetzmann–Rouwenhorst, within sectors, 2024-07–2026-09) | fail | Sharpe −0.61 [−1.92, +0.91] at 10 bps; −0.24 before costs |
 | Crypto funding carry C1 (long spot, short perpetual; 2023-05–2026-09, vs T-bills) | fail | Sharpe −1.63; +4.06 before 2023, below cash since 2025 |
 | Turn-of-the-month T1 (SPY, last day + first 3; 2008–2026) | fail | overlay Sharpe +0.30 [−0.10, +0.74]; TOM days only +1.3 bp/day above others, CI [−6.6, +9.4] |

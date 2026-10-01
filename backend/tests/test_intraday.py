@@ -199,3 +199,43 @@ def test_d10_uses_the_premarket_price_not_the_open():
     r = I.d10_premarket_reversal(pd.DataFrame(rows), pd.DataFrame(pre), syms, cost=0.0001)
     assert len(r) == 1 and r["names"].iloc[0] == 20
     assert abs(r["ret"].iloc[0] - (0.02 - 0.0002)) < 1e-9
+
+
+def d11_case(opens: dict[int, float], closes: dict[int, float] | None = None, n: int = 20):
+    """n stocks, all closed at 100 yesterday; pre-market prices 100 + i/10 (S0 lowest); today's open and close are
+    100 unless given."""
+    rows, pre = [], []
+    for i in range(n):
+        o = opens.get(i, 100.0)
+        rows.append({"Date": pd.Timestamp("2024-07-01"), "Ticker": f"S{i}", "Open": 100.0, "Close": 100.0})
+        rows.append({"Date": pd.Timestamp("2024-07-02"), "Ticker": f"S{i}", "Open": o,
+                     "Close": (closes or {}).get(i, o)})
+        pre.append({"Date": pd.Timestamp("2024-07-02"), "Ticker": f"S{i}", "pre": 100.0 + i / 10})
+    return pd.DataFrame(rows), pd.DataFrame(pre), [f"S{i}" for i in range(n)]
+
+
+def test_d11_fills_only_orders_whose_limit_the_open_reaches():
+    # 20 stocks: cut-offs are the 10th/90th percentiles of pm = i/1000 -> limits 100.19 (buy) and 101.71 (sell).
+    # Orders: buys in S0..S4, sells in S15..S19; each 0.5 / (0.10 * 20) = 25% of capital.
+    opens = {19: 103.0, 18: 101.0, 17: 101.72, 0: 99.0, 1: 100.5, 10: 105.0, 9: 95.0}
+    closes = {19: 103.0 * 0.98, 18: 90.0, 17: 101.72, 0: 99.0 * 1.01, 1: 120.0, 10: 50.0, 9: 200.0}
+    daily, pre, syms = d11_case(opens, closes)
+    r = I.d11_loo_reversal(daily, pre, syms, cost=0.0001).loc[pd.Timestamp("2024-07-02")]
+    # sells filled: S19 (open above the limit), S17 (open just above the limit), S15/S16 not (open 100 < limit); S18 not.
+    # buys filled: S0 (99), S2..S4 (open 100 <= 100.19); S1 not (100.5). S9/S10 gapped but had no order.
+    assert (r["n_short"], r["n_long"]) == (2, 4)
+    short = 0.25 * (0.02 - 0.0002) + 0.25 * (0.0 - 0.0002)
+    long = 0.25 * (0.01 - 0.0002) + 3 * 0.25 * (0.0 - 0.0002)
+    assert abs(r["short"] - short) < 1e-9 and abs(r["long"] - long) < 1e-9 and abs(r["ret"] - short - long) < 1e-9
+    assert abs(r["gross"] - 1.5) < 1e-9 and abs(r["net"] - 0.5) < 1e-9 and abs(r["orders"] - 2.5) < 1e-9
+    first = I.d11_loo_reversal(daily, pre, syms, cost=0.0001).iloc[0]
+    assert first["ret"] == 0 and first["names"] == 0  # no previous close: no orders
+
+
+def test_d11_no_orders_without_enough_premarket_prices_and_no_fill_without_a_bar():
+    daily, pre, syms = d11_case({19: 103.0}, {19: 100.0})
+    few = I.d11_loo_reversal(daily, pre.iloc[:19], syms, cost=0.0001).loc[pd.Timestamp("2024-07-02")]
+    assert few["names"] == 19 and few["ret"] == 0 and few["orders"] == 0
+    gone = daily[~((daily["Ticker"] == "S19") & (daily["Date"] == pd.Timestamp("2024-07-02")))]
+    r = I.d11_loo_reversal(gone, pre, syms, cost=0.0001).loc[pd.Timestamp("2024-07-02")]
+    assert r["n_short"] == 0  # S19 had an order but no official open that day

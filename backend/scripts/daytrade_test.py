@@ -40,6 +40,7 @@ from app.sandbox.intraday import (
     d8_darvas,
     d9_open_reversal,
     d10_premarket_reversal,
+    d11_loo_reversal,
     sharpe,
 )
 
@@ -171,6 +172,43 @@ def run_d10(core: pd.Series) -> dict:
             res["corr_with_core"] = round(float(test["ret"].corr(core.reindex(test.index))), 3)
     return finish("D10", D10_TRIAL, D9_START, D9_END, res, res["1bp"]["both"],
                   f"2 bps: Sharpe {res['2bp']['both']['sharpe']}, median {res['1bp']['names_median']} stocks")
+
+
+D11_TRIAL, D11_LEVEL = "daytrade_open_reversal_loo", 1 - 0.05 / 3  # third trial of the opening-reversal family
+
+
+def run_d11(core: pd.Series) -> dict:
+    """D11 (D9's selection made with limit-on-open orders placed from pre-market prices): one trial, 98.3% CI."""
+    from intraday_stocks import universe
+
+    daily = pd.read_parquet(DATA / "sp500_daily_alpaca_split.parquet")
+    pre = pd.read_parquet(DATA / "sp500_premarket.parquet")
+    names = universe()
+    spy = daily[daily["Ticker"] == "SPY"].set_index("Date").sort_index()
+    spy_oc = spy["Close"] / spy["Open"] - 1
+    spy_oc.index = pd.to_datetime(spy_oc.index)
+    res: dict = {"window": [D9_START, D9_END]}
+    for bp in (1, 2):
+        test = d11_loo_reversal(daily, pre, names, bp / 1e4).loc[D9_START:D9_END]
+        res[f"{bp}bp"] = {"both": stats(test["ret"], level=D11_LEVEL), "ci95": list(stats(test["ret"])["ci"]),
+                          "long_side": stats(test["long"]), "short_side": stats(test["short"])}
+        if bp == 1:
+            one_sided = (test["n_long"] > 0) != (test["n_short"] > 0)
+            res["since_2024_07"] = stats(test.loc["2024-07-01":, "ret"])
+            res["fills_per_day"] = {"long": round(float(test["n_long"].mean()), 1),
+                                    "short": round(float(test["n_short"].mean()), 1)}
+            res["gross_mean"] = round(float(test["gross"].mean()), 3)
+            res["net_mean"] = round(float(test["net"].mean()), 3)
+            res["net_abs_mean"] = round(float(test["net"].abs().mean()), 3)
+            res["one_sided_days"] = round(float(one_sided.mean()), 3)
+            res["no_fill_days"] = round(float(((test["n_long"] + test["n_short"]) == 0).mean()), 3)
+            res["resting_orders_x_capital"] = round(float(test.loc[test["orders"] > 0, "orders"].mean()), 2)
+            res["names_median"] = int(test["names"].median())
+            res["corr_with_core"] = round(float(test["ret"].corr(core.reindex(test.index))), 3)
+            res["corr_with_spy_open_to_close"] = round(float(test["ret"].corr(spy_oc.reindex(test.index))), 3)
+    return finish("D11", D11_TRIAL, D9_START, D9_END, res, res["1bp"]["both"],
+                  f"2 bps: Sharpe {res['2bp']['both']['sharpe']}, fills a day {res['fills_per_day']}, "
+                  f"gross {res['gross_mean']}")
 
 
 P1_START, P1_END, P1_TRIAL = "2024-07-01", "2026-09-24", "pairs_ggr"
@@ -416,7 +454,7 @@ def main() -> None:
         return
     rules = a.rules.split(",")
     bars = ({s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")}
-            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "P1", "C1", "T1", "O1", "E1"} else {})
+            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "D11", "P1", "C1", "T1", "O1", "E1"} else {})
     core = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")["core"]
     f = BACKEND / "results" / "daytrade_test.json"
     out: dict = json.loads(f.read_text()) if f.exists() else {}
@@ -427,9 +465,9 @@ def main() -> None:
             out[name] = run_d5(core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
-        if name in ("D7", "D8", "D9", "D10", "P1", "C1", "T1", "O1", "E1"):
-            out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10, "P1": run_p1, "C1": run_c1,
-                         "T1": run_t1, "O1": run_o1, "E1": run_e1}[name](core)
+        if name in ("D7", "D8", "D9", "D10", "D11", "P1", "C1", "T1", "O1", "E1"):
+            out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10, "D11": run_d11, "P1": run_p1,
+                         "C1": run_c1, "T1": run_t1, "O1": run_o1, "E1": run_e1}[name](core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
         fn, start, trial = RULES[name]

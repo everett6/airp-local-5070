@@ -286,7 +286,8 @@ GROUP = {"D": "day trading", "P": "pairs", "C": "crypto carry", "T": "calendar",
          "R": "flows", "M": "flows", "A": "flows"}
 NAMES = {"D1": "Intraday momentum", "D2": "Opening-range breakout", "D3": "Noise-band VWAP", "D4": "Rest-of-day momentum",
          "D5": "End-of-day reversal", "D6": "Box theory", "D7": "Intraday periodicity", "D8": "Darvas box",
-         "D9": "Opening-auction reversal", "D10": "Pre-market reversal", "P1": "Pairs (GGR)", "C1": "Funding carry",
+         "D9": "Opening-auction reversal", "D10": "Pre-market reversal", "D11": "Limit-on-open reversal",
+         "P1": "Pairs (GGR)", "C1": "Funding carry",
          "T1": "Turn of the month", "O1": "SPY overnight", "E1": "Macro announcements",
          "R1": "Rebalancing pressure", "M1": "Month-end Treasuries", "A1": "Treasury auction cycle"}
 

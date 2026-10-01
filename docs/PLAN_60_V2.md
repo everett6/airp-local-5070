@@ -1461,6 +1461,18 @@ registry like every other trial. If it fails, the family is closed: no further v
   ladder. The stocks and the shorts are outside today's mandate, so a paper shadow also needs the user's yes.
   **If it fails:** the opening-reversal family is closed.
 
+**Result (run once, 1 Oct 2026, after the spec was pushed in `bf2d202`): FAIL.** Sharpe **−0.56**, 98.3% interval
+[−1.29, +0.09] (95%: [−1.17, −0.05]), −6.3% a year at 1 bp a side; at 2 bps −0.95. Both sides lose (long side −0.24,
+short side −0.41); since 2024-07 −0.86. The orders did fill as designed: about 20 buys and 19 sells a day out of a
+median 231 stocks with a pre-market trade, gross exposure 0.84, net +0.04 on average (0.15 in absolute terms), no
+one-sided day, resting orders 2.48× capital. Correlation with the core −0.02, with SPY open-to-close +0.05.
+
+What it means: the limit orders select the stocks whose open went *further* than the pre-market price already
+showed, and among the stocks that trade before the open that extra move does not reverse; costs are about 4% a year
+(0.84 gross × 2 bps × 252 days), so it loses about 2% a year even before them. D9's edge sits in the stocks and the moves that cannot be seen or ordered against before the auction.
+**The opening-reversal family is closed** (D9 untradable, D10 and D11 failed): no further version. Ten tradable
+day-trading rules have now failed; none is proposed for the book.
+
 ### Crypto funding carry C1 (spec fixed 2026-09-29 ~14:48 PDT, before any funding data was downloaded or viewed)
 
 The user asked for research on making more money. Not yet tested here: the crypto cash-and-carry (long BTC/ETH spot,
