@@ -35,6 +35,7 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import Collection
 from contextlib import ExitStack
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -262,14 +263,39 @@ def prices_for(tickers: set[str], start: date, end: date, save: Path) -> Prices:
     return Prices.from_long(long)
 
 
+NO_RELEASE = "no decision (no press release, fact sheet or model output)"
+
+
+def undecidable(new: pd.DataFrame, p: Prices, now: datetime, fetched: bool = False) -> dict[str, str]:
+    """Releases no decision can be made for, with the `missed` reason (docs/PLAN_60_V2.md: "late or impossible
+    decisions are logged as missed"): the filing has no press release (about 1 in 70 has none), or the stock itself
+    has no recent price. These belong to the release, not to the run: one of them must not stop the others from
+    being decided. `fetched`: the download step has run, so a release without its text on disk has none."""
+    from extract_events import text_path
+    out: dict[str, str] = {}
+    for r in new.itertuples():
+        acc, t = str(r.accession), trading_symbol(r.ticker)
+        url = getattr(r, "ex99_url", "x")
+        if pd.isna(url) or not str(url).strip() or (fetched and not text_path(acc).exists()):
+            out[acc] = NO_RELEASE
+        elif t not in p.close or p.close[t].dropna().empty:
+            out[acc] = f"no decision (no price for {t})"
+        elif (now.date() - pd.Timestamp(p.close[t].dropna().index[-1]).date()).days > 5:
+            out[acc] = f"no decision (stale price for {t})"
+    return out
+
+
 def validate_event_inputs(new: pd.DataFrame, p: Prices, now: datetime,
-                          feats: Path | None = None, logodds: dict[str, float] | None = None) -> None:
-    """Fail a forward run on missing or stale inputs before recording decisions."""
+                          feats: Path | None = None, logodds: dict[str, float] | None = None,
+                          skip: Collection[str] = ()) -> None:
+    """Fail a forward run on missing or stale inputs before recording decisions. Releases in `skip` (see
+    `undecidable`) are left out of the per-release checks."""
     if p.close.empty or "SPY" not in p.close or p.close["SPY"].dropna().empty:
         raise ValueError("event data check: no SPY closing prices")
     last = pd.Timestamp(p.close["SPY"].dropna().index[-1]).date()
     if last > now.date() or (now.date() - last).days > 5:
         raise ValueError(f"event data check: SPY close stale or future-dated ({last})")
+    new = new[~new["accession"].isin(set(skip))]
     if new.empty:
         return
     missing: list[str] = []
@@ -360,27 +386,34 @@ def main() -> None:
     tickers = {trading_symbol(t) for t in allev["ticker"]} | set(SECTOR_ETF.values()) | {"SPY"}
     px_file = d / "prices.parquet"
     p = prices_for(tickers, now.date() - timedelta(days=420), now.date(), px_file)
-    validate_event_inputs(new, p, now)
-    if len(new):
+    skip = undecidable(new, p, now)
+    validate_event_inputs(new, p, now, skip=skip)
+    if len(skip) < len(new):
         new_csv = d / "events_new.csv"
         new.to_csv(new_csv, index=False)
         feats = fact_sheets(d, new_csv, since, use_gpu, tag, px_file)
-        validate_event_inputs(new, p, now, feats=feats)
+        skip = undecidable(new, p, now, fetched=True)
+    if len(skip) < len(new):
+        validate_event_inputs(new, p, now, feats=feats, skip=skip)
         f = pd.read_csv(feats).drop_duplicates("accession")
         guidance = dict(zip(f["accession"], f["guidance"].fillna("none"), strict=True))
         if use_gpu:
             logodds = bonsai(new_csv, d / "extract.jsonl", feats, tag, since, d, px_file)
         else:
             logodds = lite(feats, new_csv, p)
-        validate_event_inputs(new, p, now, logodds=logodds)
+        validate_event_inputs(new, p, now, logodds=logodds, skip=skip)
     prio.close()
     for r in new.itertuples():
         dl = entry_deadline(str(r.accepted_utc))
         base = {"accession": r.accession, "ticker": r.ticker, "sector": r.sector, "accepted_utc": r.accepted_utc,
                 "entry_deadline": dl.isoformat(), "as_of": now.isoformat(timespec="seconds"),
                 "guidance": guidance.get(r.accession, "none")}
-        if r.accession not in logodds:
-            ledger.append("missed", **base, reason="no decision (no press release, fact sheet or model output)")
+        if r.accession in skip or r.accession not in logodds:
+            why = skip.get(str(r.accession), NO_RELEASE)
+            if now < dl:  # its open is still ahead: the next run tries again (a download or price may have failed)
+                print(f"not decidable yet, tried again next run: {r.ticker} {r.accession}: {why}", flush=True)
+                continue
+            ledger.append("missed", **base, reason=why)
         elif now >= dl:
             ledger.append("missed", **base, reason="decided after the entry open: never backfilled")
         else:

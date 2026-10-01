@@ -411,6 +411,13 @@ This replaces Tue night to Thu item 1, run in one night.
    - **Ledger:** hash-chained.
      - A decision counts only if it is written before its entry open (09:30 ET, first weekday after the SEC acceptance).
      - Late or impossible decisions are logged as `missed`, never backfilled.
+     - *Correction, 1 Oct 2026 (code review, before it ever happened live):* the input checks added on 29 Sep made the
+       whole run fail when one new release had no press release (80 of 5,751 past S&P 500 earnings filings; at least
+       one on 12% of release days) or no price for its stock, and every later run with it. That contradicted the
+       rule above. Restored: such a release is left out, the others are decided. It is tried again by the next run
+       while its entry open is still ahead (a download or price can fail once) and logged as `missed` with its
+       reason once the open has passed. The checks still fail a run when the market data or the pipeline itself is
+       broken. No score, threshold or timing rule changed; no live decision was affected.
    - **Outcomes:** once 5 trading days have passed, the release's 5-day return vs its sector is appended.
 2. **Allocator:** `forward_allocator.py` now also runs a **master+brakes** book (the adopted brakes, on its own equity).
 3. **Weekly review:** `backend/scripts/weekly_review.py` covers:
