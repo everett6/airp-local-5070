@@ -12,9 +12,22 @@ import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 BACKEND = Path(__file__).resolve().parents[1]
 FWD = BACKEND / "results" / "forward"
+LOCAL = ZoneInfo("America/Los_Angeles")  # the runs' clock (05:45 and 15:30): the digest's day is this clock's day
+
+
+def local_day(ts: object) -> date | None:
+    """The local calendar day of a record's time stamp (stored in UTC). The afternoon run starts at 22:30 UTC and,
+    on the monthly cohort day, ends after midnight UTC: by UTC date its alerts would fall into the next day and the
+    digest sent at its end would be empty."""
+    try:
+        t = datetime.fromisoformat(str(ts))
+    except ValueError:
+        return None
+    return (t if t.tzinfo else t.replace(tzinfo=UTC)).astimezone(LOCAL).date()
 
 
 def _jsonl(p: Path) -> list[dict[str, Any]]:
@@ -29,18 +42,18 @@ def _jsonl(p: Path) -> list[dict[str, Any]]:
 
 
 def build(day: date, fwd: Path = FWD, research: list[dict[str, Any]] | None = None) -> str:
-    """The digest text for `day` (UTC dates of the records)."""
+    """The digest text for the local day `day`."""
     d = day.isoformat()
-    beats = [h for h in _jsonl(fwd / "heartbeat.jsonl") if h.get("start", "").startswith(d)]
+    beats = [h for h in _jsonl(fwd / "heartbeat.jsonl") if local_day(h.get("start")) == day]
     runs = [h for h in beats if h.get("job") in ("events", "allocator")]
     # a run whose event runner finished but a later step alerted (rc 1, scoreboard present) is not a failed run
     done = [h for h in runs if h.get("rc") == 0 or (h.get("job") == "events" and h.get("missed_total") is not None)]
     bad = [h for h in runs if h not in done]
     noisy = [h for h in done if h.get("rc") != 0]
-    led = [r for r in _jsonl(fwd / "events" / "ledger.jsonl") if str(r.get("as_of", "")).startswith(d)]
+    led = [r for r in _jsonl(fwd / "events" / "ledger.jsonl") if local_day(r.get("as_of")) == day]
     dec = [r for r in led if r.get("type") == "decision"]
     missed = [r for r in led if r.get("type") == "missed"]
-    alerts = [a for a in _jsonl(fwd / "alerts.jsonl") if a.get("at", "").startswith(d) and a.get("job") != "ntfy"]
+    alerts = [a for a in _jsonl(fwd / "alerts.jsonl") if local_day(a.get("at")) == day and a.get("job") != "ntfy"]
     lines = [f"airp {d} ({(fwd / 'AUTORUN_MODE').read_text().strip() if (fwd / 'AUTORUN_MODE').exists() else 'dry'})"]
     lines.append(f"runs: {len(runs) - len(bad) - len(noisy)}/{len(runs)} clean"
                  + (f", {len(noisy)} finished with an alert" if noisy else "")
@@ -86,7 +99,7 @@ def send(text: str) -> bool:
 def main() -> None:
     sys.path.insert(0, str(BACKEND / "scripts"))
     from research_queue import status
-    text = build(datetime.now(UTC).date(), research=status())
+    text = build(datetime.now(LOCAL).date(), research=status())
     print(text)
     if "--send" in sys.argv:
         print("sent" if send(text) else "not sent (no topic or network)")

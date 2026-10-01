@@ -38,3 +38,17 @@ def test_a_run_that_finished_with_an_alert_is_not_called_failed(tmp_path):
                                       {"job": "events", "start": "2026-10-01T22:30", "rc": 0, "missed_total": 0}])
     assert "runs: 1/2 clean, 1 finished with an alert" in build(date(2026, 10, 1), tmp_path)
     assert "FAILED" not in build(date(2026, 10, 1), tmp_path)
+
+
+def test_a_run_that_ends_after_midnight_utc_is_still_in_its_own_days_digest(tmp_path):
+    """The monthly cohort run starts at 15:30 local (22:30 UTC) and ends about 75 minutes later, after midnight UTC.
+    The digest is sent at its end: by UTC date it would have been empty, and its alerts counted a day late."""
+    w(tmp_path / "heartbeat.jsonl", [{"job": "events", "start": "2026-10-01T12:45:00+00:00", "rc": 0},
+                                      {"job": "events", "start": "2026-10-01T22:30:00+00:00", "rc": 0}])
+    w(tmp_path / "events" / "ledger.jsonl", [{"type": "decision", "as_of": "2026-10-01T22:30:00+00:00",
+                                              "ticker": "NKE", "logodds": 3.0}])
+    w(tmp_path / "alerts.jsonl", [{"at": "2026-10-02T00:10:00+00:00", "job": "events", "msg": "late alert"},
+                                  {"at": "2026-10-02T13:00:00+00:00", "job": "events", "msg": "next morning"}])
+    text = build(date(2026, 10, 1), tmp_path)
+    assert "runs: 2/2 clean" in text and "decisions: 1 on time" in text and "alerts: 1 (latest: late alert)" in text
+    assert "alerts: 1 (latest: next morning)" in build(date(2026, 10, 2), tmp_path)
