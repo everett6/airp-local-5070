@@ -173,3 +173,18 @@ def test_one_failed_lookup_or_send_does_not_block_the_mirror(tmp_path: Path) -> 
     alerts = broker_sync.sync(client, alloc, out, datetime(2026, 10, 6, 12, 50, tzinfo=UTC), False, halt)
     assert len(alerts) == 2 and all("refresh uncertain" in a for a in alerts)  # reported, and the file is still saved
     assert fake.posts == 1 and json.loads((out / "orders.json").read_text())[DEC]["legs"]
+
+
+def test_class_shares_use_the_brokers_spelling() -> None:
+    """Prices and the books write BRK-B; Alpaca knows only BRK.B (checked 1 Oct 2026: BRK-B is 'asset not found' and
+    makes the whole price request fail)."""
+    assert B.symbol("BRK-B") == "BRK.B" and B.symbol("SPY") == "SPY" and B.symbol("BTC-USD") == B.CRYPTO["BTC-USD"]
+    assert B.position_asset("BRK.B") == "BRK-B" and B.position_asset("BTCUSD") == "BTC-USD"
+    seen: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(req.url.params["symbols"])
+        return httpx.Response(200, json={"trades": {"BRK.B": {"p": 500.0}, "SPY": {"p": 600.0}}})
+    c = B.Alpaca("k", "s", transport=httpx.MockTransport(handler))
+    assert c.prices(["BRK-B", "SPY"]) == {"BRK-B": 500.0, "SPY": 600.0}
+    assert seen == ["BRK.B,SPY"]

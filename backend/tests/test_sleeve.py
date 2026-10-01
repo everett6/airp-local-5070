@@ -125,3 +125,6 @@ def test_no_exit_for_an_entry_the_broker_never_filled():
                                           ai_picks.leg_dict(legs[1])]}
     out = ai_picks.due_legs(p2, DAYS[:7], late)
     assert [(x.side, x.symbol) for x in out] == [("sell", "AAA")]
+    # a class share keeps its dash in the book and gets the broker's dot in the order
+    p3 = {**p, "ticker": "BRK-B", "status": "planned", "legs": [], "entry_deadline": "2026-10-12T13:30:00+00:00"}
+    assert [(x.asset, x.symbol) for x in ai_picks.due_legs(p3, DAYS[:7], late)] == [("BRK-B", "BRK.B"), ("XLI", "XLI")]

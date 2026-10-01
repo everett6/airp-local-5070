@@ -66,7 +66,8 @@ class Leg:
 
 
 def symbol(asset: str) -> str:
-    return CRYPTO.get(asset, asset)
+    """The book's asset name as Alpaca spells it: coins from the table, class shares with a dot (BRK-B -> BRK.B)."""
+    return CRYPTO.get(asset, asset.replace("-", "."))
 
 
 def position_asset(sym: str) -> str:
@@ -74,7 +75,7 @@ def position_asset(sym: str) -> str:
     for a, s in CRYPTO.items():
         if sym.replace("/", "") == s.replace("/", ""):
             return a
-    return sym
+    return sym.replace(".", "-")
 
 
 def client_id(decided_at: str, asset: str) -> str:
@@ -167,8 +168,9 @@ class Alpaca:
         out = {}
         stocks = [a for a in assets if a not in CRYPTO]
         if stocks:
-            t = self._get(f"{DATA}/v2/stocks/trades/latest", symbols=",".join(stocks), feed="iex")["trades"]
-            out.update({a: float(t[a]["p"]) for a in stocks if a in t})
+            t = self._get(f"{DATA}/v2/stocks/trades/latest", symbols=",".join(symbol(a) for a in stocks),
+                          feed="iex")["trades"]
+            out.update({a: float(t[symbol(a)]["p"]) for a in stocks if symbol(a) in t})
         coins = [a for a in assets if a in CRYPTO]
         if coins:
             t = self._get(f"{DATA}/v1beta3/crypto/us/latest/trades", symbols=",".join(CRYPTO[a] for a in coins))

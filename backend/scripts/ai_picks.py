@@ -38,6 +38,7 @@ from app.portfolio.broker import (
     leg_from,
     opg_open,
     reconcile,
+    symbol,
 )
 from app.portfolio.guard import HALT, state
 from app.sandbox.events import Prices
@@ -59,14 +60,14 @@ def due_legs(p: dict[str, Any], days: pd.DatetimeIndex, now: datetime) -> list[L
         return []
     have = {d["client_order_id"] for d in p.get("legs", [])}
     if p["status"] == "planned" and now < datetime.fromisoformat(p["entry_deadline"]):
-        legs = [Leg(p["ticker"], p["ticker"], "buy", p["qty"], STOCK_TIF, leg_id(p["accession"], "in", "s"), 0.0),
-                Leg(p["etf"], p["etf"], "sell", p["etf_qty"], STOCK_TIF, leg_id(p["accession"], "in", "e"), 0.0)]
+        legs = [Leg(p["ticker"], symbol(p["ticker"]), "buy", p["qty"], STOCK_TIF, leg_id(p["accession"], "in", "s"), 0.0),
+                Leg(p["etf"], symbol(p["etf"]), "sell", p["etf_qty"], STOCK_TIF, leg_id(p["accession"], "in", "e"), 0.0)]
     elif p["status"] == "open":
         i = int(days.searchsorted(pd.Timestamp(p["entry_index_day"])))
         if len(days) - 1 - i < sleeve.HOLD - 1:  # the exit open is not the next one yet
             return []
-        legs = [Leg(p["ticker"], p["ticker"], "sell", p["qty"], STOCK_TIF, leg_id(p["accession"], "out", "s"), 0.0),
-                Leg(p["etf"], p["etf"], "buy", p["etf_qty"], STOCK_TIF, leg_id(p["accession"], "out", "e"), 0.0)]
+        legs = [Leg(p["ticker"], symbol(p["ticker"]), "sell", p["qty"], STOCK_TIF, leg_id(p["accession"], "out", "s"), 0.0),
+                Leg(p["etf"], symbol(p["etf"]), "buy", p["etf_qty"], STOCK_TIF, leg_id(p["accession"], "out", "e"), 0.0)]
         # close only what the broker holds: an entry leg that never filled (expired, rejected) has no exit leg,
         # or the "exit" would open a new position and eat into another pair's hedge
         legs = [x for x in legs if x.asset in entered(p)]
