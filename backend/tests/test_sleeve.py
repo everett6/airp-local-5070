@@ -128,3 +128,61 @@ def test_no_exit_for_an_entry_the_broker_never_filled():
     # a class share keeps its dash in the book and gets the broker's dot in the order
     p3 = {**p, "ticker": "BRK-B", "status": "planned", "legs": [], "entry_deadline": "2026-10-12T13:30:00+00:00"}
     assert [(x.asset, x.symbol) for x in ai_picks.due_legs(p3, DAYS[:7], late)] == [("BRK-B", "BRK.B"), ("XLI", "XLI")]
+
+
+def test_order_mirror_end_to_end_with_a_stand_in_broker(tmp_path):
+    """scripts/ai_picks.run through one pick's whole life: entry orders before the open, fills checked against the
+    simulator, exit orders on the morning of the exit day, the fill audit at the close, nothing sent twice."""
+    from app.forward.ledger import Ledger
+    events, out = tmp_path / "events", tmp_path / "ai_picks"
+    Ledger(events / "ledger.jsonl").append("decision", **{k: v for k, v in dec().items() if k != "type"}, on_time=True)
+    stock = [100.0] * 2 + [100.0, 101, 102, 103, 104, 110, 110, 110, 110, 110]  # entry open Mon 5 Oct, exit Mon 12
+    etf = [50.0] * 7 + [51.0] * 5
+
+    def bars(n: int) -> None:
+        o, _ = frames(n, stock, etf)
+        long = o.rename_axis("Date").reset_index().melt("Date", var_name="Ticker", value_name="Open")
+        long["Close"] = long["Open"]
+        long["Date"] = long["Date"].dt.date.astype(str)
+        long.to_parquet(events / "prices.parquet")
+
+    class Broker:
+        def __init__(self):
+            self.sent: list[tuple[str, float, str]] = []
+            self.fills: dict[str, float] = {}  # today's opening prints; an order waiting for the open fills at them
+
+        def submit(self, leg):
+            self.sent.append((leg.side, leg.qty, leg.symbol))
+            leg.status = "submitted"
+
+        def refresh(self, leg):
+            if leg.asset in self.fills:
+                leg.status, leg.filled_price, leg.filled_at = "filled", self.fills[leg.asset], "t"
+
+    b = Broker()
+
+    def run(n: int, now: datetime) -> tuple[list[str], dict]:
+        bars(n)
+        alerts = ai_picks.run(events, out, now, False, b, tmp_path / "HALT")
+        return alerts, __import__("json").loads((out / "book.json").read_text())["pairs"][0]
+
+    alerts, p = run(2, datetime(2026, 10, 5, 12, 45, tzinfo=UTC))  # Mon 08:45 New York: planned, orders sent
+    assert alerts == [] and p["status"] == "planned" and b.sent == [("buy", 20, "AAA"), ("sell", 40, "XLI")]
+    b.fills = {"AAA": 100.1, "XLI": 50.0}
+    alerts, p = run(3, datetime(2026, 10, 5, 22, 30, tzinfo=UTC))  # Mon evening: entered, fills match the simulator
+    assert alerts == [] and p["status"] == "open" and [x["status"] for x in p["legs"]] == ["filled", "filled"]
+    assert p["legs"][0]["gap"] == 0.001 and len(b.sent) == 2
+    b.fills = {}
+    alerts, p = run(6, datetime(2026, 10, 9, 12, 45, tzinfo=UTC))  # Fri morning: one day too early for the exit
+    assert alerts == [] and len(b.sent) == 2
+    alerts, p = run(7, datetime(2026, 10, 12, 12, 45, tzinfo=UTC))  # Mon morning of the exit day: exit orders
+    assert alerts == [] and b.sent[2:] == [("sell", 20, "AAA"), ("buy", 40, "XLI")]
+    alerts, p = run(7, datetime(2026, 10, 12, 13, 0, tzinfo=UTC))  # a second run the same morning sends nothing
+    assert len(b.sent) == 4
+    b.fills = {"AAA": 110.0, "XLI": 51.0}
+    alerts, p = run(8, datetime(2026, 10, 12, 22, 30, tzinfo=UTC))  # closed: the audit compares broker and simulator
+    assert alerts == [] and p["status"] == "closed" and p["audit_flags"] == []
+    a = p["broker_audit"]
+    assert a["entry"] == {"AAA": "filled", "XLI": "filled"} and a["exit"] == {"AAA": "filled", "XLI": "filled"}
+    assert a["broker_gross_pnl"] == round(20 * (110.0 - 100.1) - 40 * (51.0 - 50.0), 2)
+    assert a["fill_slippage"] == -2.0 and len(b.sent) == 4  # the entry fill was 10 cents worse on 20 shares

@@ -93,7 +93,7 @@ Measured with the coverage tool: the run functions of the two monthly cohort scr
 now have end-to-end tests with a stub model (`tests/test_monthly_cohorts.py`, `tests/test_decide_events.py`): what is
 written, what is picked, that a second run in the same month does nothing, and that AI-linked themes are left out
 while the bubble gauge reads high. Also new: `tests/test_weekly_review.py`, `tests/test_forward_ledger.py`.
-Still only rehearsed, not unit-tested: the `main()` bodies of `forward_events.py` and `forward_allocator.py`.
+Added later the same day: the event runner's main body (`tests/test_forward_events_main.py`), the labelling run, and the order mirror through one pick's whole life with a stand-in broker (`tests/test_sleeve.py`). Still only rehearsed, not unit-tested: the `main()` body of `forward_allocator.py`.
 
 ## Rehearsed on scratch copies (nothing live was touched)
 - Saturday's weekly review and the weekly learning review (found fix 12).
