@@ -55,6 +55,11 @@ async function createWindow() {
       await win.loadURL(`${srv.origin}/#${view}`);
       await new Promise((r) => setTimeout(r, 4500));
     }
+    const tab = process.env.AIRP_SMOKE_TAB;  // optional: a tab inside that page (e.g. "longterm" on Strategies)
+    if (/^[a-z]+$/.test(tab || '')) {
+      await win.webContents.executeJavaScript(`document.querySelector('[data-strat="${tab}"]')?.click(); 0`);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
     const scroll = Number(process.env.AIRP_SMOKE_SCROLL || 0);  // optional: scroll the page before the capture
     if (scroll > 0) {
       await win.webContents.executeJavaScript(`document.querySelector('.main-area').scrollTop = ${scroll}; 0`);

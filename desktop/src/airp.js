@@ -134,6 +134,40 @@ export function createAirp(root) {
       };
     },
 
+    // The monthly long-term picks and the theme track: the newest cohort with the AI's reasons, and every scored one.
+    longterm() {
+      const month = (c) => (/^\d{4}-\d{2}$/.test(String(c?.month)) ? c.month : null);
+      const split = (dir) => {
+        const recs = jsonl(path.join(fwd, dir, 'ledger.jsonl'));
+        return { cohort: recs.filter((r) => r.type === 'cohort').at(-1) ?? null, cohorts: recs.filter((r) => r.type === 'cohort').length,
+          results: recs.filter((r) => r.type === 'result') };
+      };
+      const pts = (xs) => (xs || []).slice(0, 3).map((x) => ({ point: x.point, quote: x.quote, verified: !!x.verified }));
+      const why = (r) => ({ reason: r?.reason ?? null, bull: pts(r?.bull), bear: pts(r?.bear) });
+      const lt = split('longterm'), th = split('themes');
+      let picks = null, themes = null;
+      if (lt.cohort) {
+        const c = lt.cohort;
+        const rated = Object.fromEntries((month(c) ? jsonl(path.join(fwd, 'longterm', `ratings_${c.month}.jsonl`)) : []).map((r) => [r.ticker, r]));
+        picks = { month: c.month, made_on: c.made_on, candidates: c.candidates ?? null, rating_counts: c.rating_counts ?? {},
+          names: (c.tickers || []).map((t, i) => ({ ticker: t, rating: c.ratings?.[i] ?? null, score: c.scores?.[i] ?? null,
+            r12: rated[t]?.r12 ?? null, ...why(rated[t]) })) };
+      }
+      if (th.cohort) {
+        const c = th.cohort;
+        const doc = (month(c) ? json(path.join(fwd, 'themes', `ratings_${c.month}.json`), {}) : {}) || {};
+        const picked = new Set(Object.values(c.picks || {}).flat()), base = new Set(Object.values(c.baseline || {}).flat());
+        themes = { month: c.month, made_on: c.made_on, bubble_risk: c.bubble_risk ?? null, risk: why(doc.risk),
+          register: String(doc.register || '').split('\n').slice(1).filter(Boolean),
+          rows: (doc.themes || []).map((r) => ({ key: r.key, label: r.label, horizon: r.horizon, ai_linked: !!r.ai_linked, rating: r.rating,
+            score: r.score ?? null, mom: r.mom ?? null, r12: r.stats?.r12 ?? null, picked: picked.has(r.key), baseline: base.has(r.key), ...why(r) })) };
+      }
+      return { picks, pickResults: lt.results.map((r) => ({ month: r.month, entry: r.entry, exit: r.exit, basket: r.basket, spy: r.spy, excess_net: r.excess_net })),
+        pickCohorts: lt.cohorts, themes, themeCohorts: th.cohorts,
+        themeResults: th.results.map((r) => ({ month: r.month, horizon: r.horizon, entry: r.entry, exit: r.exit, picks: r.picks || [],
+          excess_net: r.excess_net, baseline_excess_net: r.baseline_excess_net })) };
+    },
+
     // What the research queue's gate is waiting for: news coverage so far against the 50% it needs.
     researchExtra() {
       const warm = jsonl(path.join(backend, 'results', 'events', 'warm_gdelt.jsonl'));

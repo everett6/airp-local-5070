@@ -112,3 +112,39 @@ test('new panels on an empty airp folder do not fail', async (t) => {
   assert.equal((await (await get('/api/runs')).json()).runs.length, 1);
   assert.deepEqual((await (await get('/api/today')).json()).fills, []);
 });
+
+test('long-term picks and themes: newest cohort with reasons, results, and an empty state', async (t) => {
+  const { s, get } = await session();
+  t.after(() => s.close());
+  const empty = await (await get('/api/longterm')).json();
+  assert.equal(empty.picks, null); assert.equal(empty.themes, null); assert.deepEqual(empty.pickResults, []);
+  const fwd = path.join(s.airpRoot, 'backend', 'results', 'forward');
+  mkdirSync(path.join(fwd, 'longterm')); mkdirSync(path.join(fwd, 'themes'));
+  const line = (o) => `${JSON.stringify(o)}\n`;
+  writeFileSync(path.join(fwd, 'longterm', 'ledger.jsonl'),
+    line({ type: 'cohort', month: '2026-10', made_on: '2026-10-01', tickers: ['AAA', 'BBB'], ratings: [5, 4], scores: [4.8, 4.1], candidates: 489, rating_counts: { 5: 3, 4: 40 } })
+    + line({ type: 'result', month: '2026-10', entry: '2026-10-02', exit: '2027-01-04', basket: 0.05, spy: 0.02, priced: 10, excess_net: 0.026 }));
+  writeFileSync(path.join(fwd, 'longterm', 'ratings_2026-10.jsonl'),
+    line({ ticker: 'AAA', r12: 0.2, reason: 'orders up', bull: [{ point: 'backlog', quote: 'q', verified: true }], bear: [] }) + 'torn');
+  writeFileSync(path.join(fwd, 'themes', 'ledger.jsonl'),
+    line({ type: 'cohort', month: '2026-10', made_on: '2026-10-01', bubble_risk: 'elevated', picks: { medium: ['cyber'], long: [] }, baseline: { medium: ['semis', 'cyber'], long: ['quantum'] } }));
+  writeFileSync(path.join(fwd, 'themes', 'ratings_2026-10.json'), JSON.stringify({ register: '=== Market risk register ===\nVIX: 16.3',
+    risk: { bubble_risk: 'elevated', reason: 'capex is high', bull: [], bear: [] },
+    themes: [{ key: 'cyber', label: 'Cybersecurity', horizon: 'medium', ai_linked: false, mom: 0.1, stats: { r12: 0.2 }, rating: 4, score: 4.2, reason: 'r', bull: [], bear: [] },
+      { key: 'semis', label: 'Semiconductors', horizon: 'medium', ai_linked: true, mom: 0.7, stats: {}, rating: 3, score: 3.1 }] }));
+  const d = await (await get('/api/longterm')).json();
+  assert.equal(d.picks.month, '2026-10'); assert.equal(d.picks.candidates, 489);
+  assert.deepEqual(d.picks.names.map((n) => [n.ticker, n.rating, n.r12, n.reason]), [['AAA', 5, 0.2, 'orders up'], ['BBB', 4, null, null]]);
+  assert.equal(d.picks.names[0].bull[0].verified, true);
+  assert.equal(d.pickResults[0].excess_net, 0.026); assert.equal(d.pickCohorts, 1);
+  assert.equal(d.themes.bubble_risk, 'elevated'); assert.deepEqual(d.themes.register, ['VIX: 16.3']);
+  assert.deepEqual(d.themes.rows.map((r) => [r.key, r.picked, r.baseline]), [['cyber', true, true], ['semis', false, true]]);
+  assert.deepEqual(d.themeResults, []);
+});
+
+test('a file outside the public folder is not served', async (t) => {
+  const { s, get } = await session();
+  t.after(() => s.close());
+  assert.equal((await get('/..%2fpackage.json')).status, 404);
+  assert.equal((await get('/styles.css')).status, 200);
+});

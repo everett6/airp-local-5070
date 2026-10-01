@@ -21,6 +21,7 @@ function readBody(req) {
     let data = '';
     req.on('data', (c) => { data += c; if (data.length > 10_000) req.destroy(); });
     req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch { resolve({}); } });
+    req.on('close', () => resolve({}));  // a body cut off or too large never reaches 'end'
   });
 }
 
@@ -45,6 +46,7 @@ export async function startServer({ airpRoot, port = 0, publicDir = path.join(ap
     'GET /api/research_extra': () => airp.researchExtra(),
     'GET /api/runs': () => airp.runs(),
     'GET /api/today': () => airp.today(),
+    'GET /api/longterm': () => airp.longterm(),
     'GET /api/research': () => airp.research(),
     'GET /api/tests': () => airp.tests(),
     'GET /api/reviews': () => airp.reviews(),
@@ -91,7 +93,7 @@ export async function startServer({ airpRoot, port = 0, publicDir = path.join(ap
       if (!ok(req)) return send(res, 401, 'open the app from its launcher', 'text/plain');
       const rel = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
       const file = path.join(publicDir, rel);
-      if (!file.startsWith(publicDir) || !existsSync(file) || !statSync(file).isFile()) return send(res, 404, 'not found', 'text/plain');
+      if (!file.startsWith(publicDir + path.sep) || !existsSync(file) || !statSync(file).isFile()) return send(res, 404, 'not found', 'text/plain');
       res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
       createReadStream(file).pipe(res);
     } catch (error) {
@@ -101,7 +103,7 @@ export async function startServer({ airpRoot, port = 0, publicDir = path.join(ap
 
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
   const origin = `http://127.0.0.1:${server.address().port}`;
-  return { server, origin, launchUrl: `${origin}/launch?t=${token}`, close: () => new Promise((r) => { server.close(r); server.closeAllConnections(); }) };
+  return { server, origin, airpRoot, launchUrl: `${origin}/launch?t=${token}`, close: () => new Promise((r) => { server.close(r); server.closeAllConnections(); }) };
 }
 
 // `node src/server.js` runs it without Electron (prints the launch URL).

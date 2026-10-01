@@ -41,6 +41,42 @@ function todayCard(td) {
   return `<div class="card wide"><h3>What changed in the last ${td.hours} hours</h3><ul class="changes">${items.map((x) => `<li>${x}</li>`).join('')}</ul></div>`;
 }
 
+// The AI's reason with both sides it argued; a point whose quote is not on the card word for word is marked.
+function whyCell(x) {
+  const side = (name, xs) => (xs.length ? `<p class="tiny"><b>${name}</b> ${xs.map((q) => `${esc(q.point)}${q.verified ? '' : ' <span class="muted">(quote not found)</span>'}`).join(' · ')}</p>` : '');
+  return `${esc(x.reason || '–')}${x.bull.length || x.bear.length ? `<details><summary>Both sides it argued</summary>${side('For:', x.bull)}${side('Against:', x.bear)}</details>` : ''}`;
+}
+
+function longtermTab(d) {
+  const p = d.picks, t = d.themes, signed = (v) => (v == null ? '–' : `${v > 0 ? '+' : ''}${pct(v)}`);
+  const judged = (n) => `<p class="muted">Scored so far: <b>${n}</b>. The track is judged only after 12 scored months, and it gets no money before then.</p>`;
+  const picks = !p
+    ? '<div class="card wide"><h3>Long-term picks</h3><p class="empty">No picks yet. The first 10 are made in the afternoon run on the first weekday of the month.</p></div>'
+    : `<div class="card wide"><h3>Long-term picks · ${esc(p.month)}</h3>
+      <p>Made on <b>${esc(p.made_on)}</b> from <b>${fmt(p.candidates)}</b> company cards (each company's latest earnings report). The AI rated every card from 1 to 5; these are the 10 with the highest scores. They are held for about 3 months and compared with simply holding the market. Practice only.</p>
+      <p class="muted">How it rated all the cards: ${[5, 4, 3, 2, 1].map((k) => `${pill(`${k}: ${p.rating_counts[k] ?? 0}`)}`).join(' ')}</p>
+      <table><tr><th>Company</th><th class="num">Rating</th><th class="num">Score${help('Long-term score')}</th><th class="num">Last 12 months vs market</th><th>Why</th></tr>
+      ${p.names.map((n) => `<tr><td><b>${esc(n.ticker)}</b></td><td class="num">${esc(n.rating ?? '–')} / 5</td><td class="num">${fmt(n.score, 2)}</td><td class="num">${signed(n.r12)}</td><td>${whyCell(n)}</td></tr>`).join('')}</table></div>`;
+  const pickResults = !d.pickCohorts ? '' : `<div class="card wide"><h3>How earlier picks did</h3>${judged(d.pickResults.length)}
+      ${d.pickResults.length ? `<table><tr><th>Month</th><th>Bought</th><th>Sold</th><th class="num">The 10 picks</th><th class="num">Market</th><th class="num">Difference after costs</th></tr>
+      ${d.pickResults.map((r) => `<tr><td>${esc(r.month)}</td><td>${esc(r.entry)}</td><td>${esc(r.exit)}</td><td class="num">${signed(r.basket)}</td><td class="num">${signed(r.spy)}</td><td class="num">${signed(r.excess_net)}</td></tr>`).join('')}</table>` : '<p class="empty">The first result arrives about 3 months after the first picks.</p>'}</div>`;
+  const kind = { low: 'ok', elevated: 'warn', high: 'bad' };
+  const held = { medium: '6 months', long: '12 months' };
+  const themes = !t
+    ? '<div class="card wide"><h3>Themes</h3><p class="empty">No theme ratings yet. They are made in the same run as the long-term picks.</p></div>'
+    : `<div class="card wide"><h3>Themes · ${esc(t.month)}</h3>
+      <p>AI-bubble risk: ${pill(t.bubble_risk ?? '–', kind[t.bubble_risk] || '')} ${esc(t.risk.reason || '')}</p>
+      ${t.register.length ? `<details><summary>The numbers this reading is based on</summary><ul class="changes">${t.register.map((l) => `<li>${esc(l)}</li>`).join('')}</ul></details>` : ''}
+      <p class="muted">The AI rates each theme from 1 to 5. Up to 2 per holding period rated 4 or 5 are picked; AI-linked themes are left out while the bubble risk reads high. The yardstick is the 2 themes with the best past-year price trend: the AI's picks have to beat it.</p>
+      <table><tr><th>Theme</th><th>Held for</th><th class="num">Rating</th><th class="num">Score${help('Long-term score')}</th><th class="num">Trend vs market${help('Past-year trend')}</th><th></th><th style="width:44%">Why</th></tr>
+      ${t.rows.map((r) => `<tr><td><b>${esc(r.label)}</b>${r.ai_linked ? ' <span class="muted tiny">AI-linked</span>' : ''}</td><td style="white-space:nowrap">${esc(held[r.horizon] || r.horizon)}</td><td class="num">${esc(r.rating ?? '–')} / 5</td><td class="num">${fmt(r.score, 2)}</td><td class="num">${signed(r.mom)}</td>
+        <td>${r.picked ? pill('picked', 'lime') : ''} ${r.baseline ? pill('yardstick') : ''}</td><td>${whyCell(r)}</td></tr>`).join('')}</table></div>`;
+  const themeResults = !d.themeCohorts ? '' : `<div class="card wide"><h3>How earlier theme picks did</h3>${judged(d.themeResults.length)}
+      ${d.themeResults.length ? `<table><tr><th>Month</th><th>Held for</th><th>Picked</th><th class="num">Picks vs market, after costs</th><th class="num">Yardstick vs market</th></tr>
+      ${d.themeResults.map((r) => `<tr><td>${esc(r.month)}</td><td>${esc(held[r.horizon] || r.horizon)}</td><td>${esc(r.picks.join(', ') || 'none (stayed in the market)')}</td><td class="num">${signed(r.excess_net)}</td><td class="num">${signed(r.baseline_excess_net)}</td></tr>`).join('')}</table>` : '<p class="empty">The first result arrives 6 months after the first theme picks.</p>'}</div>`;
+  return `${plain('Once a month the AI reads every large company\'s latest earnings report and picks <b>10 stocks</b> for the next few months, and rates a fixed list of <b>big themes</b> (chips, biotech, nuclear and so on) together with the risk of an AI bubble. Both are only watched and scored. No money follows them until a year of results says they work.')}${picks}${pickResults}${themes}${themeResults}`;
+}
+
 function aggressiveCard(a) {
   if (!a) return '';
   const L = a.limits || {};
@@ -213,6 +249,8 @@ const GLOSS = {
   'Max drawdown': 'The worst fall from a high point to the next low. -27% means it once dropped by about a quarter.',
   'Drawdown': 'How far the value is below its earlier high at each moment. 0% means it is at a new high.',
   'Rolling 1-year Sharpe': 'The Sharpe score measured over the previous 12 months, so you can see good and bad stretches.',
+  'Past-year trend': 'How the theme did against the market over the past year, leaving out the latest month (12-1 momentum).',
+  'Long-term score': 'The rating from 1 to 5, weighted by how sure the AI was of each digit when it wrote it. It breaks ties between equal ratings.',
   'Log-odds': 'The AI judge\'s confidence. 0 is a coin flip; higher means it is more sure the stock will beat its sector.',
   'Pick threshold': 'The score a release needs before the system places a paper trade on it. Most releases stay below it.',
   '95% interval': 'The range the true result probably sits in. If the range crosses 0, the idea may simply not work.',
@@ -323,12 +361,7 @@ Object.assign(views, {
     const t = m.tracks, tabs = [['core', 'Core book (long-term)'], ['event', 'AI events (short-term)'], ['longterm', 'Long-term picks & themes']];
     const head = `<h2>Strategies</h2><p class="lede">How each rule set would have done on past data (2018 to today).</p>
       <div class="tabs">${tabs.map(([k, n]) => `<button class="btn ${k === stratTab ? 'on' : 'ghost'}" data-strat="${k}">${esc(n)}</button>`).join('')}</div>`;
-    if (stratTab === 'longterm') {
-      return `${head}<div class="card wide"><h3>Long-term picks (monthly, 10 names) and theme track</h3>
-        <p>Once a month the AI picks 10 stocks to hold for the long run, plus a set of big themes. The first picks are made on <b>Thu 1 Oct at 15:30</b>.</p>
-        <p>Each month's picks are later compared with simply holding the market. The track is only judged after 12 months of scored picks, and it gets no money before then.</p>
-        <p class="muted">This page fills in by itself once the first picks exist.</p></div>`;
-    }
+    if (stratTab === 'longterm') return `${head}${longtermTab(await api('longterm'))}`;
     const a = t[stratTab], spy = t.SPY, years = Object.keys(a.yearly);
     const about = stratTab === 'core'
       ? 'The <b>core book</b> is where the money is. It holds the US stock market (SPY) plus a little Bitcoin and Ether, and automatically cuts back when prices are falling. No AI is involved; it is simple, tested rules. Blue is the core book, orange is just holding the market.'
