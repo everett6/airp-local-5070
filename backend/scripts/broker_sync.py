@@ -87,7 +87,10 @@ def sync(client: Alpaca, alloc: Path, out: Path, now: datetime, dry: bool, halt_
         fills = sim_fills(alloc / "ledger.jsonl", o["book"], dec)
         for leg in legs:
             if leg.status == "submitted" and not dry:
-                client.refresh(leg)
+                try:
+                    client.refresh(leg)
+                except (BrokerError, httpx.HTTPError) as e:  # one unreadable order must not block the others
+                    alerts.append(f"broker order {leg.client_order_id} refresh uncertain: {type(e).__name__}: {e}"[:200])
             alerts += reconcile(leg, fills)
         o["legs"] = [leg_dict(x) for x in legs]
     dec = book.get("decided_at")
@@ -125,7 +128,12 @@ def sync(client: Alpaca, alloc: Path, out: Path, now: datetime, dry: bool, halt_
                 if dry:
                     print(f"broker (dry): would send {leg.side} {leg.qty} {leg.symbol} {leg.tif}")
                 else:
-                    client.submit(leg)
+                    try:
+                        client.submit(leg)
+                    except (BrokerError, httpx.HTTPError) as e:
+                        leg.status = "submitted"  # it may have reached the broker: looked up by its id next run
+                        leg.note = f"submission uncertain: {type(e).__name__}: {e}"[:160]
+                        alerts.append(f"broker leg {leg.client_order_id} {leg.note}")
                     alerts += reconcile(leg, {})
         o["legs"] = [leg_dict(x) for x in legs]
     path.write_text(json.dumps(orders, indent=1) + "\n")

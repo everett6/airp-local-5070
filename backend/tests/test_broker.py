@@ -147,3 +147,29 @@ def test_plan_sells_sgov_when_the_brakes_lift() -> None:
     by = {x.asset: x for x in legs}
     assert by["SGOV"].side == "sell" and by["SGOV"].qty == 400 and by["SGOV"].tif == "day"
     assert legs[0].asset == "SGOV"  # sells first
+
+
+def test_one_failed_lookup_or_send_does_not_block_the_mirror(tmp_path: Path) -> None:
+    """Code review, 1 Oct 2026: a lookup or send that failed used to abort the whole sync before orders.json was
+    saved, so the same failure would repeat at every run and no later decision could be mirrored."""
+    fake = FakeAlpaca()
+    client, alloc = setup(tmp_path, fake)
+    out, halt = tmp_path / "broker", tmp_path / "HALT"
+    real = fake.__call__
+
+    def flaky(req: httpx.Request) -> httpx.Response:
+        if (req.url.path == "/v2/orders" and req.method == "POST"
+                and json.loads(req.content)["symbol"] == "BTC/USD"):
+            raise httpx.ReadTimeout("timed out", request=req)
+        if req.url.path == "/v2/orders:by_client_order_id":
+            return httpx.Response(404, text="order not found")
+        return real(req)
+    client.c = httpx.Client(headers=client.c.headers, transport=httpx.MockTransport(flaky))
+    alerts = broker_sync.sync(client, alloc, out, datetime(2026, 10, 6, 12, 45, tzinfo=UTC), False, halt)  # 08:45 ET
+    legs = {d["asset"]: d for d in json.loads((out / "orders.json").read_text())[DEC]["legs"]}
+    assert legs["BTC-USD"]["status"] == "submitted" and "submission uncertain" in legs["BTC-USD"]["note"]
+    assert legs["SPY"]["status"] == "submitted" and legs["SPY"]["order_id"] == "o1"  # the other leg still went
+    assert len(alerts) == 1 and "submission uncertain" in alerts[0]
+    alerts = broker_sync.sync(client, alloc, out, datetime(2026, 10, 6, 12, 50, tzinfo=UTC), False, halt)
+    assert len(alerts) == 2 and all("refresh uncertain" in a for a in alerts)  # reported, and the file is still saved
+    assert fake.posts == 1 and json.loads((out / "orders.json").read_text())[DEC]["legs"]
