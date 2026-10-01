@@ -47,6 +47,15 @@ not about building more.
 If the go-live check says "still dry", Claude fixes the cause and you can switch by hand
 (`scripts/autonomy.sh live`) once it's clean.
 
+**Status, Thu 1 Oct 2026 (afternoon).** Live paper mode since 29 Sep (your early switch). Six earnings reports
+judged on time; two AI picks (MU, ACN) are filled at the paper broker with their hedge; the first pick (JBL) never
+filled because its opening orders expired, which is now handled (no exit is sent for it). New this week, all without
+money: the consensus of the research agents (a shadow, judged at 150 reports and 3 months), three flow-pressure
+tests (all failed; month-end Treasuries narrowly, kept as a lead), and the aggressive 2.5× book, which starts Mon
+5 Oct. A read-through of the whole live path fixed 15 faults before they could bite and left 7 items for you to
+decide (`docs/CODE_REVIEW_2026-10-01.md`). Still to come this week: tonight's first long-term and theme cohorts,
+Saturday's review (it also runs the first monthly learning loop), Monday's rebalance.
+
 ## 3. October – December 2026: collect evidence
 
 Earnings season (mid-Oct to mid-Nov) gives the live AI reads most of their releases.
