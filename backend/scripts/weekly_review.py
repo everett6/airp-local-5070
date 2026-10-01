@@ -143,6 +143,7 @@ def main() -> None:
             a = agg[-1]
             lines += ["", f"**{AGGRESSIVE}** (your decision of 30 Sep; not a tested strategy): " + (
                 "wiped out: the loan grew larger than the holdings." if a.get("wiped_out") else
+                f"its last run failed ({a['error']}); the other books were not affected." if "error" in a else
                 f"holding {a.get('gross', 0):.2f}× its equity, borrowed {a.get('borrowed', 0):,.0f}, interest paid so "
                 f"far {a.get('interest_paid', 0):,.0f}. Compare its return with 2.5× the {base} return above.")]
         eq = pd.Series({date.fromisoformat(r["data_through"]): r["books"][base]["equity"] for r in runs

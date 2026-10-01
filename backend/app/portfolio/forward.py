@@ -16,6 +16,7 @@ closed, the whole set is rejected and logged); with the kill switch on, books ar
 """
 from __future__ import annotations
 
+import copy
 import math
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
@@ -150,12 +151,13 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
     elif reducing:
         rec["reducing"] = True
     brakes: dict[str, float] = {}
-    for name, b in books.items():
+
+    def one(name: str, b: Book) -> dict[str, Any]:
+        """One book's run: charge interest, fill, mark, decide. Returns its ledger entry."""
         r: dict[str, Any] = {}
         if name in LEVERAGE:
             if b.wiped:
-                rec["books"][name] = {"equity": 0.0, "positions": {}, "wiped_out": True}
-                continue
+                return {"equity": 0.0, "positions": {}, "wiped_out": True}
             through = date.fromisoformat(b.interest_through) if b.interest_through else today
             if b.cash < 0 and today > through:  # interest on the borrowed cash for the days since the last run
                 charge = -b.cash * BORROW_RATE * (today - through).days / 365
@@ -174,16 +176,14 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
             else:
                 r["waiting_for_open_after"] = datetime.fromisoformat(b.decided_at).date().isoformat()
         if b.wiped:
-            rec["books"][name] = {"equity": 0.0, "positions": {}, "wiped_out": True}
-            continue
+            return {"equity": 0.0, "positions": {}, "wiped_out": True}
         # each position at its last known close (a missing bar must not drop the position from equity)
         px = {a: float(closes[a].loc[:last].dropna().iloc[-1]) for a in b.positions}
         r["equity"] = round(b.cash + sum(q * px[a] for a, q in b.positions.items()), 2)
         if name in LEVERAGE:
             if r["equity"] <= 0:  # the loan is larger than the holdings: the book is closed and stays closed
                 b.positions, b.cash, b.pending, b.decided_at, b.wiped = {}, 0.0, None, None, True
-                rec["books"][name] = {"equity": 0.0, "positions": {}, "wiped_out": True}
-                continue
+                return {"equity": 0.0, "positions": {}, "wiped_out": True}
             r["gross"] = round(sum(q * px[a] for a, q in b.positions.items()) / r["equity"], 3)
             r["borrowed"] = round(max(0.0, -b.cash), 2)
             r["interest_paid"] = round(b.interest, 2)
@@ -203,7 +203,18 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
                 b.pending, b.decided_at = t, now_utc.isoformat(timespec="seconds")
                 r["new_targets"] = {a: round(w, 4) for a, w in t.items()}
                 r.update(info)
-        rec["books"][name] = r
+        return r
+
+    for name, b in books.items():
+        if name not in LEVERAGE:
+            rec["books"][name] = one(name, b)
+            continue
+        saved = copy.deepcopy(b)
+        try:
+            rec["books"][name] = one(name, b)
+        except Exception as e:  # noqa: BLE001 - the aggressive book's faults are reported, never fatal
+            books[name] = saved  # as it was before this run; the frozen books above are already done
+            rec["books"][name] = {"error": f"{type(e).__name__}: {e}"[:200]}
     return rec
 
 

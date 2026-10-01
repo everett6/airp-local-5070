@@ -109,10 +109,11 @@ def validate_result(rec: dict, books: dict[str, Book]) -> None:
         raise ValueError("allocator result check: book or price sources absent")
     for name, result in rec["books"].items():
         if name in LEVERAGE:  # the user's aggressive book is separate: its faults are reported, never fatal
-            bad = [k for k in ("rejected", "rejected_at_fill", "wiped_out") if k in result]
+            bad = [k for k in ("error", "rejected", "rejected_at_fill", "wiped_out") if k in result]
             if bad:
                 rec.setdefault("aggressive_issues", []).append(f"{name}: {', '.join(bad)}")
-                print(f"AGGRESSIVE BOOK: {name}: {bad} {result.get('rejected') or result.get('rejected_at_fill') or ''}")
+                print(f"AGGRESSIVE BOOK: {name}: {bad} "
+                      f"{result.get('error') or result.get('rejected') or result.get('rejected_at_fill') or ''}")
             continue
         if "rejected" in result or "rejected_at_fill" in result:
             raise ValueError(f"allocator result check: {name} target weights rejected")
@@ -214,7 +215,7 @@ def main() -> None:
     # the aggressive book against its own limits (mandate "books" section). At its limit only THIS book stops buying
     # (its own flag): the kill switch is shared, and the frozen books must never change because of this book.
     for name in LEVERAGE:
-        if name in rec["books"] and not rec["books"][name].get("wiped_out"):
+        if "equity" in rec["books"].get(name, {}) and not rec["books"][name].get("wiped_out"):
             dd = drawdown_status(name, rec["books"][name]["equity"], books[name].peak)
             rec.setdefault("drawdown_leveraged", {})[name] = dd
             if dd.get("action") == "REDUCING":

@@ -99,7 +99,8 @@ export function createAirp(root) {
       const runs = jsonl(path.join(fwd, 'allocator', 'ledger.jsonl'));
       const limits = json(path.join(backend, 'config', 'mandate.json'), {})?.books?.[NAME] ?? null;
       const pts = (n) => runs.filter((r) => r.books?.[n]).map((r) => ({ date: r.data_through, ...r.books[n] }));
-      const agg = pts(NAME), frozen = pts('master+brakes');
+      const all = pts(NAME), frozen = pts('master+brakes');
+      const agg = all.filter((x) => x.equity != null);  // a run where this book failed has no numbers
       let peak = 0;
       for (const x of agg) peak = Math.max(peak, x.equity);
       const last = agg.at(-1) ?? null;
@@ -107,9 +108,10 @@ export function createAirp(root) {
       const next = (await timers()).find((t) => String(t.unit || t.activates).startsWith('airp-allocator'))?.next ?? null;
       const slim = (xs) => xs.map((x) => ({ date: x.date, equity: x.equity }));
       return {
-        name: NAME, limits, started: agg.length > 0, nextAllocator: next,
+        name: NAME, limits, started: all.length > 0 && !!last, nextAllocator: next,
         last: last && { date: last.date, equity: last.equity, gross: last.gross ?? null, borrowed: last.borrowed ?? null,
-          interest_paid: last.interest_paid ?? null, wiped_out: !!last.wiped_out },
+          interest_paid: last.interest_paid ?? null, wiped_out: !!last.wiped_out, reducing: !!last.reducing },
+        lastError: all.at(-1)?.error ?? null,
         drawdown: last && peak ? 1 - last.equity / peak : null,
         series: { aggressive: slim(agg), frozen: slim(frozen) },
         broker: order && { scale: order.broker_scale ?? null, gross: order.broker_gross ?? null },

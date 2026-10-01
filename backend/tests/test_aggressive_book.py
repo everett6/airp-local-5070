@@ -157,3 +157,29 @@ def test_its_drawdown_limit_stops_only_this_book_and_never_the_shared_kill_switc
     state.write_text(json.dumps(books_to_json(with_agg)))
     assert FA.resume_books(state) == [AGGRESSIVE] and FA.resume_books(state) == []
     assert books_from_json(json.loads(state.read_text()))[AGGRESSIVE].reducing is False
+
+
+def test_any_fault_inside_the_aggressive_book_is_reported_and_never_stops_the_others(monkeypatch):
+    import app.portfolio.forward as F
+    opens, closes = frames()
+    with_agg, without = new_books(), {k: v for k, v in new_books().items() if k != AGGRESSIVE}
+    run(with_agg, opens, closes, "2026-10-02")
+    run(without, opens, closes, "2026-10-02")
+    before = json.dumps(F.books_to_json({AGGRESSIVE: with_agg[AGGRESSIVE]}), sort_keys=True)
+    real = F.execute
+
+    def broken(book, *a, **kw):
+        if book.name == AGGRESSIVE:
+            book.cash = -1e9  # half-done damage, then a crash
+            raise AssertionError("cash below the credit line")
+        return real(book, *a, **kw)
+    monkeypatch.setattr(F, "execute", broken)
+    a2, w2 = run(with_agg, opens, closes, "2026-10-09"), run(without, opens, closes, "2026-10-09")
+    assert a2["books"][AGGRESSIVE] == {"error": "AssertionError: cash below the credit line"}
+    assert {k: v for k, v in a2["books"].items() if k != AGGRESSIVE} == w2["books"]
+    # the book is exactly as it was before the failed run, so the next run can try again
+    assert json.dumps(F.books_to_json({AGGRESSIVE: with_agg[AGGRESSIVE]}), sort_keys=True) == before
+    import forward_allocator as FA
+    rec = {**a2, "price_sources": {"SPY": "yahoo"}}
+    FA.validate_result(rec, with_agg)  # does not raise
+    assert rec["aggressive_issues"] == [f"{AGGRESSIVE}: error"]

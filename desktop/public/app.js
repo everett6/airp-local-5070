@@ -50,6 +50,8 @@ function aggressiveCard(a) {
   const x = a.last, dd = a.drawdown ?? 0, room = L.max_drawdown ? Math.min(100, (100 * dd) / L.max_drawdown) : 0;
   const s = a.series;
   return `<div class="card wide">${head}${x.wiped_out ? '<div class="banner bad"><b>Wiped out.</b> The loan grew larger than the holdings; this book is closed for good.</div>' : ''}
+    ${a.lastError ? `<div class="banner warn"><b>Its last weekly run failed</b> (${esc(a.lastError)}). The other books were not affected; the numbers below are from its last good run.</div>` : ''}
+    ${x.reducing ? '<div class="banner warn"><b>Past its limit: it may only sell.</b> It buys again only after you press Resume trading.</div>' : ''}
     <p class="muted">${rules} It is a what-if beside the frozen book, not a tested strategy.</p>
     <div class="kpis">${kpi('Value now', fmt(x.equity))}${kpi('Size', x.gross == null ? '–' : `${fmt(x.gross, 2)}×`, 'holdings ÷ own money')}${kpi('Borrowed', fmt(x.borrowed))}${kpi('Interest paid so far', fmt(x.interest_paid))}
       ${kpi('Fall from its peak', pct(dd), `warns at ${pct(L.alert_drawdown, 0)} · stops buying at ${pct(L.max_drawdown, 0)}`)}${kpi('Size at the broker', a.broker?.gross == null ? '–' : `${fmt(a.broker.gross, 2)}×`, 'Alpaca lends 2× on stocks, nothing on crypto')}</div>
