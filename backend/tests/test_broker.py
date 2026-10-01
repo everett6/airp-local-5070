@@ -22,7 +22,7 @@ def test_plan_sizes_sells_first_and_reduce_only() -> None:
     px = {"SPY": 600.0, "BTC-USD": 100_000.0, "ETH-USD": 4_000.0}
     legs = B.plan(DEC, {"SPY": 0.78, "BTC-USD": 0.12, "ETH-USD": 0.08}, 100_000.0, {"ETH-USD": 5.0}, px)
     by = {x.asset: x for x in legs}
-    assert by["SPY"].qty == 130 and by["SPY"].tif == "opg" and by["SPY"].side == "buy"
+    assert by["SPY"].qty == 130 and by["SPY"].tif == "day" and by["SPY"].side == "buy"
     assert by["BTC-USD"].qty == pytest.approx(0.12) and by["BTC-USD"].symbol == "BTC/USD"
     assert by["ETH-USD"].side == "sell" and by["ETH-USD"].qty == pytest.approx(3.0)
     assert legs[0].side == "sell"
@@ -139,3 +139,11 @@ def test_stale_decision_is_not_mirrored(tmp_path: Path) -> None:
     broker_sync.sync(client, alloc, out, datetime(2026, 10, 12, 12, 45, tzinfo=UTC), False, tmp_path / "H")
     o = json.loads((out / "orders.json").read_text())[DEC]
     assert fake.posts == 0 and o["legs"] == [] and "older" in o["skipped"]
+
+
+def test_plan_sells_sgov_when_the_brakes_lift() -> None:
+    px = {"SPY": 600.0, "BTC-USD": 100_000.0, "ETH-USD": 4_000.0, "SGOV": 100.0}
+    legs = B.plan(DEC, {"SPY": 0.78, "BTC-USD": 0.20}, 100_000.0, {"SPY": 65.0, "SGOV": 400.0}, px)
+    by = {x.asset: x for x in legs}
+    assert by["SGOV"].side == "sell" and by["SGOV"].qty == 400 and by["SGOV"].tif == "day"
+    assert legs[0].asset == "SGOV"  # sells first

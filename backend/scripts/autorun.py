@@ -21,6 +21,8 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import re
+import socket
 import subprocess
 import sys
 import time
@@ -45,9 +47,20 @@ DRY = {"events": ["--dir", "results/forward/events_autodry", "--start", "2026-09
        "ai_picks": ["--dry", "--events", "results/forward/events_autodry", "--dir", "results/forward/ai_picks_autodry"],
        "longterm": ["--events", "results/forward/events_autodry"],
        "self_improve": ["--dir", "results/forward/events_autodry"]}
-GO_LIVE_ON = date(2026, 10, 2)   # the dry run (from Mon 28 Sep) is judged from this day on, at the 21:00 ET check
+GO_LIVE_ON = date(2026, 10, 2)   # automatic switch date; the user explicitly selected live paper mode on 29 Sep
+LIVE_FROM = date(2026, 9, 30)    # first eligible live filing date after the user-directed early switch
 DRY_FROM = date(2026, 9, 28)
 MIN_GOOD_EVENT_RUNS = 8          # of the 10 scheduled Mon-Fri
+# steps that read the event runner's ledger; the broker, long-term and theme steps are independent and always run
+EVENT_READERS = {"scripts/ai_picks.py", "scripts/guidance_shadow.py", "scripts/net_read_shadow.py",
+                 "scripts/self_improve.py", "scripts/learn_loop.py"}
+# a step that failed for a network reason is retried once: each of these is idempotent (ledgers skip what they have
+# seen; broker orders carry client ids, so a resend is refused, not duplicated)
+RETRYABLE = {"scripts/forward_events.py", "scripts/forward_allocator.py", "scripts/broker_sync.py", "scripts/ai_picks.py"}
+TRANSIENT = re.compile(r"Temporary failure in name resolution|Name or service not known|Connection (reset|refused|"
+                       r"aborted)|timed out|HTTP (429|502|503|504)|RemoteDisconnected|ConnectTimeout|ReadTimeout|"
+                       r"URLError", re.IGNORECASE)
+RETRY_WAIT = 90
 EXPECTED = {"events": 2, "allocator_weekday": 0}  # event runs per weekday; the allocator runs Mondays
 
 
@@ -69,6 +82,19 @@ def ntfy_topic() -> str:
     return ""
 
 
+def wait_online(host: str = "www.sec.gov", tries: int = 24, pause: float = 5.0) -> bool:
+    """True once `host` accepts a connection. A catch-up run fired at boot can start before the network is up
+    (29 Sep 2026: the network came up 7 s after the run started), so jobs wait up to about 2 minutes for it."""
+    for i in range(tries):
+        try:
+            socket.create_connection((host, 443), timeout=5).close()
+            return True
+        except OSError:
+            if i < tries - 1:
+                time.sleep(pause)
+    return False
+
+
 def alert(job: str, msg: str) -> None:
     """alerts.jsonl + a desktop notification + a phone push via ntfy.sh (user-approved 2026-09-27) when a topic is set
     in backend/.env. The push carries only the job name and the message."""
@@ -81,9 +107,9 @@ def alert(job: str, msg: str) -> None:
             req = urllib.request.Request(f"https://ntfy.sh/{topic}", data=msg.encode()[:3000], method="POST",
                                          headers={"Title": f"Paper book: {job}", "Priority": "high"})
             urllib.request.urlopen(req, timeout=15).read()
-        except OSError:
+        except OSError as e:
             append("alerts.jsonl", {"at": datetime.now(UTC).isoformat(timespec="seconds"), "job": "ntfy",
-                                    "msg": "phone push failed"})
+                                    "msg": f"phone push failed ({type(e).__name__})"})
 
 
 def commands(job: str, m: str) -> list[list[str]]:
@@ -94,11 +120,14 @@ def commands(job: str, m: str) -> list[list[str]]:
     if job == "events":  # broker first: the 08:45 ET run is inside Alpaca's market-on-open window
         net_read = [PY, "scripts/net_read_shadow.py", *(DRY["net_read"] if dry else [])]  # arm C2, a shadow
         picks = [PY, "scripts/ai_picks.py", *(DRY["ai_picks"] if dry else [])]  # the untested AI-picks sleeve
+        guide = [PY, "scripts/guidance_shadow.py",
+                 "--events", "results/forward/events_autodry" if dry else "results/forward/events",
+                 "--out", "results/forward/guidance_shadow_autodry" if dry else "results/forward/guidance_shadow"]
         # long-term picks: a no-money shadow, one ledger in both modes (its first cohort, 1 Oct, falls in the dry run)
         longterm = [PY, "scripts/longterm_picks.py", *(DRY["longterm"] if dry else [])]
         themes = [PY, "scripts/themes.py"]  # the theme track and AI-bubble gauge: a shadow, one ledger in both modes
         improve = [PY, "scripts/self_improve.py", *(DRY["self_improve"] if dry else [])]  # arm F, a shadow
-        return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], net_read, picks, longterm,
+        return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], picks, guide, net_read, longterm,
                 themes, improve, [*learn, "collect", *largs]]
     if job == "allocator":
         return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])], broker]
@@ -158,6 +187,32 @@ def push(job: str) -> None:
         alert(job, f"git push failed: {p.stderr.strip()[:200]}")
 
 
+def can_inhibit() -> bool:
+    """Whether logind grants a sleep inhibitor now (right after boot, before the desktop session is active, it
+    refuses: "Failed to inhibit: Access denied")."""
+    try:
+        return subprocess.run(["systemd-inhibit", "--what=idle:sleep", "--why=paper book run", "true"],
+                              capture_output=True, timeout=30, check=False).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+INHIBIT_DENIED = ("Failed to inhibit: Access denied as the requested operation requires interactive "
+                  "authentication. However, interactive authentication has not been enabled by the calling program.")
+
+
+def step(cmd: list[str], inhibit: bool = True) -> subprocess.CompletedProcess[str]:
+    """Run once; retry bare only when logind proves the child never started."""
+    pre = ["systemd-inhibit", "--what=idle:sleep", "--why=paper book run"] if inhibit else []
+    r = subprocess.run([*pre, *cmd], cwd=BACKEND, capture_output=True, text=True, check=False, timeout=6 * 3600)
+    refused = inhibit and r.returncode != 0 and not r.stdout and r.stderr.strip() == INHIBIT_DENIED
+    if refused:
+        r = subprocess.run(cmd, cwd=BACKEND, capture_output=True, text=True, check=False, timeout=6 * 3600)
+    if not inhibit or refused:
+        r.stdout = "LEARN ALERT: sleep inhibitor refused; ran without it\n" + r.stdout
+    return r
+
+
 def run(job: str) -> int:
     m = mode()
     logs = FWD / "logs"
@@ -176,12 +231,22 @@ def run(job: str) -> int:
             append("heartbeat.jsonl", {"job": job, "mode": m, "start": start.isoformat(timespec="seconds"), "rc": -1,
                                        "skipped": "lock"})
             return 1
-        rc, out = 0, ""
+        rc, out = 0, "" if wait_online() else "(network still down after 2 minutes; ran anyway)\n"
+        inhibit = can_inhibit()
+        skip_dependents = False  # a failed event runner: its readers must not run on a half-written ledger
         for cmd in commands(job, m):
-            r = subprocess.run(["systemd-inhibit", "--what=idle:sleep", "--why=paper book run", *cmd], cwd=BACKEND,
-                               capture_output=True, text=True, check=False, timeout=6 * 3600)
+            if skip_dependents and cmd[1:2] and cmd[1] in EVENT_READERS:
+                out += f"(skipped {cmd[1]}: the event runner failed)\n"
+                continue
+            r = step(cmd, inhibit)
+            if r.returncode != 0 and cmd[1:2] and cmd[1] in RETRYABLE and TRANSIENT.search(r.stdout + r.stderr):
+                out += r.stdout + r.stderr + f"(transient failure in {cmd[1]}; retrying once in 90 s)\n"
+                time.sleep(RETRY_WAIT)
+                r = step(cmd, inhibit)
             out += r.stdout + r.stderr
             rc = rc or r.returncode
+            if r.returncode != 0 and cmd[1:2] == ["scripts/forward_events.py"]:
+                skip_dependents = True
         log.write_text(out)
     # the allocator refuses a second run on the same day with a clear message: not a failure
     if job == "allocator" and rc != 0 and "already ran today" in out:
@@ -197,7 +262,30 @@ def run(job: str) -> int:
         alert(job, f)
     if m == "live" and rc == 0 and job in ("events", "allocator", "review", "learn"):
         push(job)
+    post_run(job)
     return rc
+
+
+def post_run(job: str) -> None:
+    """After a job: let the research queue start/restart what is due, after the afternoon event run send the
+    daily digest, and after the daily check refresh the desktop app's charts. None may affect the job's result."""
+    extra = [[PY, "scripts/research_queue.py", "tick"]]
+    if job == "events" and datetime.now(ZoneInfo("America/Los_Angeles")).hour >= 12:
+        extra.append([PY, "scripts/digest.py", "--send"])
+    if job == "check":  # refresh the desktop app's chart data once a day
+        extra.append([PY, "scripts/desktop_export.py"])
+    for cmd in extra:
+        try:
+            subprocess.run(cmd, cwd=BACKEND, capture_output=True, text=True, timeout=300, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+
+def disk_low(path: Path = BACKEND, min_free_gb: float = 20.0) -> str | None:
+    """An alert when the disk holding the ledgers runs low: a full disk would break every append silently."""
+    import shutil
+    free = shutil.disk_usage(path).free / 1e9
+    return f"disk space low: {free:.1f} GB free (alert below {min_free_gb:.0f} GB)" if free < min_free_gb else None
 
 
 def check(today: date | None = None) -> list[str]:
@@ -206,9 +294,12 @@ def check(today: date | None = None) -> list[str]:
     hb = FWD / "heartbeat.jsonl"
     recs = [json.loads(x) for x in hb.read_text().splitlines()] if hb.exists() else []
     recs = [r for r in recs if r.get("mode") == m and r.get("rc") == 0]
-    if not recs:
+    if m == "live":
+        first = LIVE_FROM  # detect a missing first live run even when no live heartbeat exists
+    elif recs:
+        first = min(datetime.fromisoformat(r["start"]).astimezone(NY).date() for r in recs)
+    else:
         return []
-    first = min(datetime.fromisoformat(r["start"]).astimezone(NY).date() for r in recs)
     today = today or datetime.now(NY).date()
     gaps = []
     for i in range(1, 8):
@@ -243,11 +334,23 @@ def go_live_reasons(recs: list[dict[str, Any]], ledger: Path) -> list[str]:
         out.append("one of the last two dry event runs failed")
     if not any(r["job"] == "allocator" and r.get("rc") == 0 for r in d):
         out.append("no good dry allocator run")
-    if ledger.exists():
+    if not ledger.exists():
+        out.append("dry event ledger missing")
+    else:
         try:
             Ledger(ledger).verify()
         except LedgerError as e:
             out.append(f"dry event ledger broken: {e}")
+    allocator = FWD / "allocator_autodry" / "ledger.jsonl"
+    if not allocator.exists():
+        out.append("dry allocator ledger missing")
+    else:
+        try:
+            runs = [json.loads(line) for line in allocator.read_text().splitlines()]
+            if not runs or not all(r.get("books") and r.get("price_sources") for r in runs):
+                out.append("dry allocator ledger incomplete")
+        except (OSError, json.JSONDecodeError):
+            out.append("dry allocator ledger unreadable")
     return out
 
 
@@ -276,6 +379,10 @@ def main() -> None:
         gaps = check()
         for g in gaps:
             alert("check", "missed run: " + g)
+        low = disk_low()
+        if low:
+            alert("check", low)
+        post_run("check")
         print("\n".join(gaps) or "no missed runs")
         msg = go_live()
         if msg:

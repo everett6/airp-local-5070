@@ -9,8 +9,10 @@ without real money. Rules:
   them every call is skipped;
 - one plan per decision (`decided_at`), sized from the broker account's own equity; each leg has a client order id
   derived from the decision, so a re-run never sends an order twice;
-- SPY goes as a market-on-open order (time_in_force "opg"), the same open the simulator fills at. Alpaca refuses
-  opg orders between 09:28 and 19:00 ET, so a leg decided at 18:00 waits for the next run inside the window.
+- stock legs go as market "day" orders sent before the open (19:00-09:28 ET), so they fill at the open the simulator
+  uses. They were "opg" (market-on-open) until 30 Sep 2026, but Alpaca's paper simulator never runs a real opening
+  auction and let both opg legs of the first AI pick expire unfilled; a queued day order fills at the open instead.
+  A leg decided at 18:00 still waits for the next run inside the window.
   Crypto trades around the clock and goes at once as a market order;
 - HALTED: nothing is sent and open orders are cancelled; REDUCING: legs that would buy are dropped;
 - a gap over 0.5% between the broker's and the simulator's fill price, or a rejected / expired order, is an alert.
@@ -33,9 +35,11 @@ PAPER = "https://paper-api.alpaca.markets/v2"
 DATA = "https://data.alpaca.markets"
 NY = ZoneInfo("America/New_York")
 CRYPTO = {"BTC-USD": "BTC/USD", "ETH-USD": "ETH/USD"}
+STOCKS = ("SPY", "SGOV", "QQQ", "TLT")  # the book's stock assets: sold when a decision drops them
 GAP_ALERT = 0.005
 MIN_NOTIONAL = 10.0  # smaller legs are skipped (Alpaca's crypto minimum is about $1; a $10 floor avoids dust)
-OPG_CLOSED = (time(9, 28), time(19, 0))  # Alpaca rejects opg orders submitted in [09:28, 19:00) ET
+OPG_CLOSED = (time(9, 28), time(19, 0))  # stock legs are sent only outside [09:28, 19:00) ET, i.e. before the open
+STOCK_TIF = "day"  # queued market order that fills at the open; paper "opg" orders expire (see above)
 
 
 class BrokerError(RuntimeError):
@@ -48,7 +52,7 @@ class Leg:
     symbol: str
     side: str
     qty: float
-    tif: str               # "opg" (stock, at the open) or "gtc" (crypto, now)
+    tif: str               # STOCK_TIF (stock, at the open) or "gtc" (crypto, now)
     client_order_id: str
     ref_price: float
     status: str = "planned"  # planned → submitted → filled | rejected | canceled | expired | skipped
@@ -78,7 +82,7 @@ def client_id(decided_at: str, asset: str) -> str:
 
 
 def opg_open(now: datetime) -> bool:
-    """True when Alpaca accepts a market-on-open order now."""
+    """True when a stock leg sent now would wait for (and fill at) the next open."""
     t = now.astimezone(NY).time()
     return not OPG_CLOSED[0] <= t < OPG_CLOSED[1]
 
@@ -89,7 +93,7 @@ def plan(decided_at: str, targets: dict[str, float], equity: float, positions: d
     shares for stocks, 6 decimals for crypto, legs under $10 skipped. Assets held but absent from the targets are
     sold (the book's universe only; anything else in the account is left alone)."""
     legs = []
-    for a in sorted(set(targets) | {x for x in positions if x in targets or x in CRYPTO or x == "SPY"}):
+    for a in sorted(set(targets) | {x for x in positions if x in targets or x in CRYPTO or x in STOCKS}):
         if a not in prices:
             raise BrokerError(f"no price for {a}")
         want = equity * targets.get(a, 0.0) / prices[a]
@@ -99,7 +103,7 @@ def plan(decided_at: str, targets: dict[str, float], equity: float, positions: d
             delta = math.floor(abs(delta) * 1e6) / 1e6 * (1 if delta > 0 else -1)
         if abs(delta) * prices[a] < MIN_NOTIONAL or (reduce_only and delta > 0):
             continue
-        legs.append(Leg(a, symbol(a), "buy" if delta > 0 else "sell", abs(delta), "gtc" if a in CRYPTO else "opg",
+        legs.append(Leg(a, symbol(a), "buy" if delta > 0 else "sell", abs(delta), "gtc" if a in CRYPTO else STOCK_TIF,
                         client_id(decided_at, a), prices[a]))
     return sorted(legs, key=lambda x: x.side != "sell")
 

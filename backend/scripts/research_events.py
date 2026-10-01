@@ -232,7 +232,9 @@ async def run(args: argparse.Namespace) -> None:
             rec = await research(r, router, fetcher, ua, lookup, args.rounds, pre, args.timeout_cap,
                                  brief=args.phase == "both")
             rec["models"] = {"research": args.model, "brief": args.brief_model or args.model}
-            (OUT / f"{r.accession}.json").write_text(json.dumps(rec, indent=1, default=str) + "\n")
+            tmp = OUT / f"{r.accession}.json.tmp"  # atomic: a run stopped mid-write leaves no half file
+            tmp.write_text(json.dumps(rec, indent=1, default=str) + "\n")
+            tmp.replace(OUT / f"{r.accession}.json")
             done += 1
             rate = (time.monotonic() - t0) / done
             nf = len((rec.get("brief") or {}).get("facts", []))

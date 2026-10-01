@@ -37,6 +37,9 @@ import pandas as pd
 from app.sandbox.events import _norm
 
 TEXT = BACKEND / "data" / "events" / "text"
+SAMPLES = (("2024", "data/events/events_sp500_2024.csv", "features_sp500_2024_secchk.csv"),
+           ("2025", "data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv"))
+SAMPLE_B4 = (("b4", "data/events/events_b4_2026.csv", "features_b4_2026.csv"),)  # arm B4 (scripts/b4_prep.py)
 OUT = BACKEND / "results" / "events"
 MAX_CHARS = 10000
 FIELDS: dict[str, tuple[tuple[str, ...], str]] = {  # labels, default
@@ -363,11 +366,10 @@ async def dev() -> None:
     print("winner (score, then speed within 0.02):", res["winner"])
 
 
-async def extract(prompt: str) -> None:
+async def extract(prompt: str, samples: tuple[tuple[str, str, str], ...] = SAMPLES) -> None:
     llm = llm_client()
     try:
-        for tag, events, feats in (("2024", "data/events/events_sp500_2024.csv", "features_sp500_2024_secchk.csv"),
-                                   ("2025", "data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv")):
+        for tag, events, feats in samples:
             out = OUT / f"llm_fields_{tag}.jsonl"
             done = {json.loads(x)["accession"] for x in out.read_text().splitlines()} if out.exists() else set()
             keep = set(pd.read_csv(OUT / feats)["accession"])
@@ -387,16 +389,16 @@ async def extract(prompt: str) -> None:
 
 def research_folder(tag: str, variant: str = "") -> Path:
     """Jan's evidence folder. variant "b2": arm B2's re-gather with the news actually fetched (PLAN_60_V2 "Arm B2");
-    "b3": B2's research with the evidence rebuilt by code (scripts/b3_evidence.py, "Arm B3")."""
+    "b3": B2's research with the evidence rebuilt by code (scripts/b3_evidence.py, "Arm B3"); "b4": arm B2's gather on
+    arm B4's sample."""
     return EVIDENCE / (f"events_research_Jan-v1-4B-GGUF_Q4_K_M_v3{variant}" + ("_2024" if tag == "2024" else ""))
 
 
-async def extract_research(variant: str = "") -> None:
+async def extract_research(variant: str = "", samples: tuple[tuple[str, str, str], ...] = SAMPLES) -> None:
     """Arm B: the release plus Jan's as-of evidence; quotes may come from either."""
     llm = llm_client()
     try:
-        for tag, events, feats in (("2024", "data/events/events_sp500_2024.csv", "features_sp500_2024_secchk.csv"),
-                                   ("2025", "data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv")):
+        for tag, events, feats in samples:
             out = OUT / f"llm_fields_research{('_' + variant) if variant else ''}_{tag}.jsonl"
             done = {json.loads(x)["accession"] for x in out.read_text().splitlines()} if out.exists() else set()
             keep = set(pd.read_csv(OUT / feats)["accession"])
@@ -504,7 +506,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=("dev", "extract", "extract-research", "test", "test-research", "extract-research-b2",
                                     "test-research-b2", "extract-research-b3", "test-research-b3", "dev-judgement",
-                                    "extract-judgement", "test-judgement"))
+                                    "extract-judgement", "test-judgement", "extract-b4", "extract-research-b4",
+                                    "test-b4"))
     ap.add_argument("--prompt", default="")
     args = ap.parse_args()
     if args.cmd == "dev":
@@ -513,6 +516,13 @@ def main() -> None:
         if args.prompt not in PROMPTS:
             raise SystemExit("--prompt must be the frozen winner from `dev`")
         asyncio.run(extract(args.prompt))
+    elif args.cmd == "extract-b4":  # arm B4: arm A's frozen prompt on the B4 sample
+        asyncio.run(extract("P2", SAMPLE_B4))
+    elif args.cmd == "extract-research-b4":
+        asyncio.run(extract_research("b4", SAMPLE_B4))
+    elif args.cmd == "test-b4":
+        from llm_fields_test import b4_main
+        b4_main()
     elif args.cmd == "extract-research":
         asyncio.run(extract_research())
     elif args.cmd in ("extract-research-b2", "extract-research-b3"):

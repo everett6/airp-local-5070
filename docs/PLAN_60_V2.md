@@ -759,6 +759,77 @@ Step 1 found an outlook for 73% of 2024 releases and 98% of 2025-26; step 2 foun
   spanning 0. Reading: in these fields, the release already holds what Bonsai can use; more pre-release evidence
   does not help. The sleeve keeps its arm-A-based score (untested, 10%).
 
+### Arm B4: the research arm at 20 days, on fresh releases (spec fixed 2026-09-29 ~15:45 PDT, before any B4 label)
+
+**Why, and the honest prior.** Arm B2 at 20 days beat arm B: +0.029 [+0.009, +0.050]. That was reported, not
+deciding. The comparison that matters, B2 against the release alone (arm A) at 20 days, was only +0.010
+[−0.042, +0.055] in the same run. B3 − A at 20 days was −0.017. So the odds are poor. The user asked to run it
+anyway ("ok start", 29 Sep); this is the one run.
+
+**Sample (fresh for these arms).** The S&P 400 and 600 releases in `features_breadth_2025.csv` accepted
+2026-01-01 .. 2026-08-24: 2,851 releases, 8 months. No arm A, B, B2 or B3 label exists for them. Their EPS and
+revenue numbers were already read in the breadth test; no new Qwen run is made. Their 5-day returns were used there,
+with Bonsai's decision score, not these fields. Their 20-day returns against these fields have never been computed.
+Differences from B2, stated in advance: mid and small caps instead of the S&P 500, and a short 8-month window.
+
+**Steps (Jan-v1-4B and Bonsai-27B only).**
+1. News warm-up (`warm_news.py`, same call and cache). Stop rule as B2: if coverage is below 50%, B4 is not run.
+2. Jan: arm B2's exact gather settings (`research_events.py`, vLLM, 16 workers) into `_v3b4`, then the audit.
+3. Bonsai: arm A's frozen prompt P2 on the release (`llm_fields_b4.jsonl`), and arm B's frozen `PROMPT_R` on
+   release + Jan's evidence (`llm_fields_research_b4.jsonl`). Same 6,000 + 6,000 characters and overflow rule.
+4. Models: arm A's and arm B2's ridges, trained on the 2024 S&P 500 sample only (their existing labels, lam 10),
+   scored on the B4 sample. No refit on B4 data.
+
+**The one test (trial `llm_fields_research_b4`), 20-day return vs the sector ETF:** the monthly rank IC of
+(full B2 − full A) has a 95% CI above 0 (paired monthly bootstrap, months with ≥ 20 releases, 5,000 draws, seed 0),
+AND full B2's own 20-day IC CI is above 0. Reported, not deciding: the 5-day numbers, B2 on releases with news, and
+S&P 400 vs 600 separately.
+
+**GPU etiquette.** GPU steps pause during the live runs: 05:30–06:30 and 15:15–16:30 PDT daily, and 15:15–18:00
+on Thu 1 Oct for the first long-term and theme cohorts. A paused step resumes where it stopped.
+**If it passes:** a shadow at 0 weight in the forward test. The AI-picks sleeve changes only by the user's decision.
+
+**Outcome (2026-09-29 ~18:05 PDT): STOPPED by the pre-registered news stop rule; no test run, no trial registered.**
+After 150 of 2,851 releases the Archive had a news page for 31 (21%). The 50% floor was fixed in advance. The S&P
+500 samples had 80%: mid and small caps rarely have archived Yahoo pages. Each release took about 50 s, so a full
+warm-up would take about 40 hours. The rule was applied at 150 releases rather than 2,851, because the 95% range of
+the coverage (about 15–28%) was already far below 50%. That is a stop, not a result. Bonsai's arm A labels
+(960 done, `llm_fields_b4.jsonl`) are kept but not scored. Re-running B4 needs a different free news source; that
+would be a new spec.
+
+### Arm B4b: B4 with GDELT news (spec fixed 2026-09-29 ~21:47 PDT, before any B4b label or GDELT warm-up)
+
+**Why.** B4 was stopped because the Internet Archive had news for 21% of these mid and small caps (the rule needs
+50%). The user asked to continue B4. Its own stop rule names the remedy: a different free news source. A GDELT
+probe (DOC 2.0 API, free) got an answer for 18 of its first 30 releases, and 17 of those 18 had ≥ 3 articles in
+the 45 days before the release. Everything else is B4's spec, unchanged: sample, arms, ridges, deciding rule and
+GPU quiet windows. No returns have been looked at.
+
+**News source (frozen).**
+- Query: GDELT DOC 2.0 `mode=artlist`, the exact phrase of the cleaned company name (the rules in
+  `scripts/gdelt_probe.py`: legal suffixes dropped) plus `sourcelang:english`.
+- A one-word cleaned name gets ` (stock OR shares OR earnings OR NYSE OR Nasdaq)` added.
+- Window: 45 days before the acceptance time, ending 1 minute before it. Only articles whose `seendate` is strictly
+  before the acceptance count.
+- Paced at one request every 20 s or more, with 180 s backoff on refusals.
+- The newest 15 as-of headlines (date, domain, title) replace the Archive page as the result of Jan's `news_as_of`
+  call, stored in the same tool cache under the same key. Jan's gather (B2 settings), the evidence rules and Bonsai's
+  prompts are unchanged.
+
+**Gates before any Jan or B2 labels (both needed, else B4b stops, no test):**
+1. As-of coverage (≥ 1 headline) on at least 50% of the 2,851 releases after the warm-up.
+2. Relevance: 40 releases drawn at random (seed 0) from those with headlines. Claude reads the titles only. The top
+   headline must be about that company in at least 70% of them.
+
+**Arm A labels.** Bonsai P2 on the release alone does not depend on news, so it can continue now. Its 960 labels
+from B4 are reused (same prompt and inputs).
+**Note (22:4x PDT, before the warm-up):** the probe's 17-of-18 figure used windows shifted 7 h late: it read the
+naive UTC acceptance times as local time. It was a feasibility hint only. The gates above are measured by
+`scripts/warm_gdelt.py`, which keeps UTC (tested), and the probe is fixed too (892ecb9).
+**Test (one trial, `llm_fields_research_b4b`):** B4's rule exactly. The 20-day (B2 − A) monthly IC paired CI must be
+above 0 AND B2's own 20-day IC CI above 0.
+
+
 ### skfolio test (spec fixed 2026-09-27, before any run)
 
 Question: does sizing the book by risk (skfolio) beat the fixed 20% crypto capital cap?
@@ -1095,6 +1166,45 @@ are ever shown to Bonsai.
 - **What it can change:** only the shadow champion. It reaches the event score only through the same test as any
   lens (150 releases, 3 months, IC > 0.02, blend gain). Every version, lesson and decision is logged.
 
+
+### Arm F v2: research-grade self-improvement (spec change 2026-09-29, before any arm F reflection, challenger or data)
+
+Arm F has produced nothing yet (its first reflection needs 40 matured labels, ~early November), so its design can
+change without touching any result. v2 replaces v1's reflection and promotion rules; everything else stays (arm E's
+v0 is frozen for its own test; lessons never name companies; shadow only; every step logged).
+
+1. **Fix: anytime-valid promotion.** v1 re-ran a fixed 80% bootstrap bound on every events run; checking a fixed
+   test repeatedly ("peeking") inflates false promotions. v2 uses a betting e-process (Shafer 2021; Waudby-Smith and
+   Ramdas, JRSS-B 2024), valid at every look:
+   - Per release: x = (challenger call − champion call) × clip(5-day sector-relative return / 5%, −1, 1) / 2, in
+     [−1, 1] (calls: bullish +1, neutral 0, bearish −1). Releases are averaged by entry week (cross-sectional and
+     overlapping-window dependence; weeks are processed in order once all their outcomes are known).
+   - Wealth W = Π(1 + λ·x_week), λ predictable from past weeks only (aGRAPA: clip(mean / (var + mean²), 0, 0.5); 0
+     until 2 weeks exist). **Promote when W ≥ 20** (5% false-promotion bound, whenever it is checked), with at least
+     60 paired releases over 2+ months as a guard against a single-season fluke.
+   - The mirror process on −x: **retire early when it reaches 20** (the challenger is reliably worse); otherwise
+     retire at 200 paired releases.
+2. **Held-out reflection.** Matured calls are split by time: the older 2/3 are shown to Bonsai, the newer 1/3 are
+   kept back (validation). The summary is contrastive: per-label base rates, the 10 worst misses and the 10 best hits
+   (so lessons do not over-correct). Needs 60 matured calls (40 shown, 20 held back).
+3. **Several candidates, chosen offline.** Bonsai writes 3 lesson sets from the same summary with 3 fixed framings
+   (errors to avoid; what separated hits from misses; when it was over-confident). Each candidate prompt re-labels
+   the held-back releases (replay, same release text and quote check as arm E). The candidate with the best rank IC
+   on the held-back set becomes the challenger, only if that IC beats the champion's own IC on the same releases;
+   otherwise no challenger that month. Selection only picks what to test; the forward e-process still decides.
+4. **Lesson memory:** lessons are de-duplicated (case and punctuation ignored), at most 8 kept (newest win), each
+   stored with the version and month it came from.
+5. **Rollback guard:** once a champion above v0 exists, the same e-process runs champion vs v0 (arm E, always
+   labelled); if v0 is reliably better (W ≥ 20 on the mirror), the champion is demoted back to v0.
+6. **Audit log:** the reflection summary, the 3 candidates, their held-back ICs, the choice, and the e-values are
+   stored in bb_versions.jsonl. Each challenger is still its own registered trial (`bb_selfimprove_v<n>`).
+7. **Amendment (2026-09-29, found on synthetic unit-test data, before any arm F data):** weekly means of x are
+   small (|x| ≈ 0.1), so with bets capped at 0.5 even a challenger that is always right could not reach W = 20
+   before the 200-release retirement: the test was valid but powerless. Fix: the bet is on y = clip(week mean of x /
+   0.2, −1, 1) (H0: E[y | past] ≤ 0), and a challenger is retired after 26 scored weeks without promotion (instead of
+   200 releases), or early when the mirror process reaches 20. The 5% bound, the 60-release / 2-month guard and
+   everything else are unchanged. Consequence, stated up front: only a clearly better challenger gets promoted
+   (roughly a weekly edge of half the scale for ~3 months); small gains will not be detectable with this much data.
 ### Day-trading result (2026-09-28): **both rules FAIL**
 
 | Rule, test window (after publication) | Sharpe at 2 bps | 95% CI | CAGR | at 10 bps | hit rate |
@@ -1130,6 +1240,341 @@ FINRA's Rule 4210 amendments on 14 Apr 2026, effective 4 Jun 2026: no $25k minim
 intraday margin is checked in real time, and a margin account needs $2,000. Alpaca adopted the new framework on
 4 Jun 2026. The account-size limit on this track is gone; the results above are unchanged, since they never
 depended on it.
+
+### Day-trading round 4: box theory and intraday periodicity (spec fixed 2026-09-29 ~05:20 UTC, before any D6–D8 code ran)
+
+The user asked to try "box theory" and the other researched rules. "Box theory" means two different things, so both
+are tested; the third rule is the researched cross-sectional one that needs no new data. Each is its own trial, run
+once, on data already cached (SPY/QQQ 1-minute bars, the S&P 500 30-minute 14:30/15:30 bars, daily OHLCV). No
+parameter below was fitted to data; each comes from the source or is stated here once.
+
+**Multiple testing:** these are trials 6–8 of the day-trading track. Pass for each: annualized Sharpe of the daily
+P&L ≥ 0.5 at the costs below AND the lower bound of a **98.3%** block-bootstrap CI (21-day blocks; 95% with a
+Bonferroni split over the 3 trials of this round) above 0.
+
+- **D6, "box theory" (previous-day range; popular on social media since 2024, floor-trader support/resistance
+  lore before that)**, SPY and QQQ, equal capital, 1× per symbol, at most one trade per symbol per day:
+  - Box: yesterday's regular-session high H and low L; middle M = (H + L) / 2; width W = H − L. If today's 09:30
+    open is outside [L, H] (a gap), the box is redrawn from today's 09:30–09:59 high and low and checks start at
+    10:00; otherwise checks start with the 09:30 bar.
+  - Each minute until the 15:29 bar, while flat: close ≤ L + 0.25W → long; close ≥ H − 0.25W → short; the middle
+    is never traded. Entry at the next bar's open.
+  - Exit (at the next bar's open) when the close reaches M (target) or goes beyond the box by 0.25W (stop: close
+    < L − 0.25W for a long, > H + 0.25W for a short); otherwise at the 15:59 close. 1 bp a side.
+  - Decides on 2016-01-05 → 2026-09-25 (no publication date; no parameter was fitted). Reported: 2024-10 onward,
+    5 bps, each symbol. Trial `daytrade_box_theory`.
+- **D7, intraday periodicity** (Heston, Korajczyk and Sadka, *Journal of Finance* 2010: a stock's return in a given
+  half hour repeats in the same half hour on following days, for weeks), S&P 500 list of D5, the 15:30–16:00 slot:
+  - Signal: the mean of the stock's 15:30-bar returns (open to close) over its previous 20 full trading days (at
+    least 15 present). At 15:30: long the top 10%, short the bottom 10%, equal weight, dollar neutral, 15:30 bar
+    open to close. Half days dropped as in D5. 1 bp a side per stock; also reported at 3 bps.
+  - Decides on 2016-02 → 2026-09-25 (all after publication). Survivorship bias is small here: the rule is
+    long/short and the list is fixed. Trial `daytrade_periodicity`.
+- **D8, Darvas box** (Nicolas Darvas, *How I Made $2,000,000 in the Stock Market*, 1960): a swing rule on daily bars,
+  not a same-day rule, long only, D5's S&P 500 list:
+  - A box can start only on a day whose high is a 52-week high (≥ every high of the previous 252 days). Box top T =
+    that high once the next 3 days' highs all stay below it (a higher high first restarts the search). Box bottom B
+    = the lowest low after the top, fixed once 3 days in a row each have a low above it. While T and B are set,
+    a close above T is a breakout; a close below B before that cancels the box.
+  - Buy on a breakout at the next open; hold. The stop is B; each new box that completes above while held moves
+    the stop to its bottom. A close below the stop → sell at the next open.
+  - Portfolio: 20 slots of 5% each; the money in free slots is held in SPY. More breakouts than free slots: highest
+    close / T first. 10 bps a side per trade (stock trades, slippage included).
+  - P&L measured as the daily return of the book minus SPY's. Decides on 2024-07-01 → 2026-09-24 (the list is the
+    2024 membership, so earlier years are survivorship-biased in the rule's favour; 2016–2024-06 reported only).
+    Trial `daytrade_darvas_box`.
+- **If one passes:** a month of clean dry runs on paper, then the evidence ladder, as before. **If all fail:** the
+  track stays at 0% and no variant of D6–D8 is tried.
+
+- **Result (run once, 2026-09-29 ~05:45 UTC): all three FAIL** (Sharpe at the stated costs; 98.3% CI):
+
+  | Rule | Window | Sharpe | 98.3% CI | CAGR | Before costs | Reported |
+  |---|---|---|---|---|---|---|
+  | D6 box theory (SPY+QQQ) | 2016-01 → 2026-09 (2,695 days) | **−0.91** | [−1.58, −0.21] | −5.7% | ≈ −0.3 bp a day | SPY −0.68, QQQ −0.87; since Oct 2024 −0.51; 5 bps −4.07 |
+  | D7 intraday periodicity | 2016-02 → 2026-09 (2,658 days) | **−0.07** | [−1.09, +0.74] | −0.1% | +2.0 bp a day (long +1.0, short +2.9) | since Jul 2024 +0.57 [−1.66, +2.52]; 3 bps −8.71 |
+  | D8 Darvas box (excess vs SPY) | 2024-07 → 2026-09 (561 days) | **−0.30** | [−1.84, +1.22] | −4.7% | — | book 13.2%/yr vs SPY 18.0%; 2016–24 excess +0.08 (survivorship-biased); corr with core −0.25 |
+
+  - D6: fading yesterday's range earns about nothing before costs and trades almost every day, so it loses the
+    costs; its CI is entirely below 0 even at the stricter level. Box theory as popularly taught has no edge on
+    SPY/QQQ.
+  - D7: the periodicity effect is real before costs (+2.0 bp a day, the biggest raw edge of the eight rules), but a
+    round trip on both legs costs 2 bp a day, so it nets 0. Only a lower-cost way to trade it (e.g. closing-auction
+    orders with near-zero spread) could make it pay; that would be a new, separately registered test, not a D7
+    variant.
+  - D8: the Darvas book trailed SPY by about 5 points a year, even with the survivorship bias in its favour before
+    2024.
+  - Code review note (Codex, 2026-09-29): on a sell day the freed slot also earns SPY's overnight move, and on a buy
+    day the slot misses it. The two roughly cancel (as many buys as sells) and are far inside the CI; not re-run.
+  - Eight published day-trading rules have now failed. The track stays at 0%; no variant of D6–D8 will be tried.
+
+### Day-trading round 5: D9 opening-auction reversal (spec fixed 2026-09-29, before any D9 code ran)
+
+Why this one: D5 and D7 had real edges before costs that crossing the spread twice a day ate. D9 trades only in the
+opening and closing auctions (market-on-open in, market-on-close out), where there is no spread to cross, and has a
+stated structural cause: attention-driven retail buying at the open (Berkman, Koch, Tuttle and Zhang, "Paying
+Attention: Overnight Returns and the Hidden Cost of Buying at the Opening", *JFQA* 2012) pushes up the stocks that
+jumped overnight, and the push reverses during the day. Not a variant of D5 (a 15:00 signal, last half hour) or
+D7 (same-slot history): the signal and the window differ.
+
+- **Rule:** each day, overnight return = today's open / yesterday's close − 1 (daily bars; open and close are the
+  auction prints). Short the 10% of stocks with the highest overnight return, long the 10% with the lowest, equal
+  weight, dollar neutral (each leg half the capital); enter at the open, exit at the close. Needs 20+ stocks with
+  both prices.
+- **Universe:** D5's S&P 500 list (2024 earnings reporters). Daily OHLCV already cached.
+- **Costs:** 1 bp per side per stock (auction fills: fees, no spread); also reported at 2 bps.
+- **Test window: 2016-01-04 → 2026-09-24** (after the 2012 publication). Reported: 2024-07 onward (the list's own
+  membership period), each leg, correlation with the core.
+- **Pass (trial `daytrade_open_reversal`):** annualized Sharpe ≥ 0.5 and 95% block-bootstrap CI (21-day blocks)
+  above 0, at 1 bp a side. One trial in this round, so no Bonferroni split.
+- **If it passes:** a live paper shadow with MOO/MOC orders (placed by the existing 5:45 AM PDT events run, which is
+  before the 9:30 ET open) for a month of clean runs, then the evidence ladder. **If it fails:** no variant.
+- **Result (run once, 2026-09-29): PASS on the registered data.** 2016-01 → 2026-09, 2,697 days, median 474 stocks:
+  Sharpe **+0.81** [+0.21, +1.34] at 1 bp a side, CAGR +7.0%, hit rate 53%, worst month −7.9%; at 2 bps Sharpe
+  +0.24. Legs (gross, bp a day): long +7.2, short +2.5. Since 2024-07: +0.53 [−0.99, +1.82]. Correlation with the
+  core −0.04.
+- **Validity check (stated 2026-09-29 after the pass, before running it):** a bad opening print in the free daily
+  data would fake exactly this pattern (a false jump overnight that "reverses" by the close), and the 2024 list
+  flatters the long leg before 2024. So D9 goes to paper only if the same rule, on Alpaca's SIP daily bars (official
+  regular-session open and close, split- and dividend-adjusted; an independent source), also has Sharpe ≥ 0.5 and a
+  95% CI above 0 at 1 bp a side over the same window. Reported: the result with the top and bottom 1% of stock-day
+  open-to-close returns removed from both legs. If the check fails, the pass is treated as a data artifact.
+- **Validity check result (run once, 2026-09-29): HOLDS.** Alpaca SIP daily bars, same window: Sharpe **+1.08**
+  [+0.47, +1.63], CAGR +9.8%; legs long +8.3, short +3.5 bp a day; with the top/bottom 1% of stock-day returns
+  removed +1.70 [+1.07, +2.26], so it is not bad prints. Since 2024-07: +0.57 [−0.97, +1.87].
+- **Implementation flaw found (2026-09-29):** the signal uses the official open, which is set by the opening
+  auction itself, so a market-on-open order cannot be conditioned on it. D9 as tested is not tradable as written;
+  the paper plan above is withdrawn. A tradable version is D10.
+
+### Day-trading round 6: D10 tradable opening reversal (spec fixed 2026-09-29, before any D10 data or code)
+
+- **Rule:** as D9, but the signal is known before the open: pre-market return = the last trade at or before 09:25
+  ET (the close of Alpaca's SIP 08:00-09:25 bar, one 85-minute bar per stock) / yesterday's official close − 1.
+  Stocks without a pre-market trade in 08:00-09:25 that day are left out. Short the top 10%, long the bottom 10%,
+  equal weight, dollar neutral; enter at the official open (market-on-open), exit at the official close
+  (market-on-close). Prices: Alpaca SIP daily bars (split- and dividend-adjusted) and the pre-market bars
+  split-adjusted, with the signal's previous close taken split-adjusted too (dividend days: the ex-dividend drop is
+  in the signal, a small bias against nothing in particular; reported only).
+- **Universe, window, costs, pass:** D5's list; 2016-01-04 → 2026-09-24; 1 bp a side (also 2 bps); Sharpe ≥ 0.5 and
+  95% block-bootstrap CI above 0. Trial `daytrade_open_reversal_premarket`. Needs 20+ stocks a day.
+- **If it passes:** a live paper shadow: the existing 5:45 AM PDT events run waits until 09:25 ET, reads the
+  pre-market prices, places MOO/MOC orders on the paper account (no new timer), for a month of clean runs, then
+  the evidence ladder. **If it fails:** no variant; D9 stays an untradable finding.
+- **Result (run once, 2026-09-29 ~00:33 PDT): FAIL.** 2016-01 → 2026-09, 2,696 days, median 231 stocks with a pre-market
+  price: Sharpe **−0.64** [−1.28, −0.06] at 1 bp a side, CAGR −6.5%; at 2 bps −1.15. Legs (gross, bp a day): long
+  +0.8, short −1.8. Since 2024-07 −0.92. D9's edge exists only against the official opening auction price itself,
+  which cannot be known when a market-on-open order must be placed: the pre-market price does not predict the
+  day's reversal. D9 stays an untradable finding; no variant.
+- **Stress report (2026-09-29 late morning PDT; reported, not deciding; Alpaca data):** D9 at 1/2/3 bps a side: Sharpe
+  +1.08 / +0.53 / −0.03; positive in every year 2016–2025 (+0.26 in 2019 to +3.16 in 2017), +0.06 in 2026 so far.
+  D10 at 1/2/3 bps: −0.63 / −1.15 / −1.66; negative in 8 of 11 years. The effect lives in the auction print and needs
+  near-zero costs; neither changes the verdicts above.
+
+### Crypto funding carry C1 (spec fixed 2026-09-29 ~14:48 PDT, before any funding data was downloaded or viewed)
+
+The user asked for research on making more money. Not yet tested here: the crypto cash-and-carry (long BTC/ETH spot,
+short the perpetual future, collect the funding that leveraged longs pay). Published: Schmeling, Schrimpf and Todorov,
+"Crypto Carry", BIS WP 1087 (April 2023; *Management Science*), who already report that it fades from 2024 and is
+negative in 2025. Market-neutral, so it is judged against cash, not SPY.
+
+- **Data:** Deribit public API, `get_funding_rate_history`, hourly `interest_1h` for BTC-PERPETUAL and ETH-PERPETUAL
+  (free; Binance blocks US users). A short perpetual receives the funding when it is positive.
+- **Rule:** each Monday 00:00 UTC, per asset: if the mean hourly funding over the previous 7 days is > 0, hold the
+  carry (long spot, short perpetual, equal notional) for the next 7 days, else be flat. Half the sleeve per asset.
+  Capital per asset = spot notional + 25% margin on the perpetual, so return on capital = funding / 1.25.
+- **P&L:** daily sum of the hourly funding while held. Not modeled (reported as a limitation): changes in the
+  spot-perpetual basis (small at a weekly horizon, since funding pulls the perpetual to the index), exchange risk.
+- **Costs:** each switch in or out of an asset's carry costs 15 bps of its notional (spot 10 bps + perpetual 5 bps).
+- **Pass (trial `crypto_funding_carry`):** on **2023-05-01 → 2026-09-24** (after the BIS paper), the annualized
+  Sharpe of daily returns **in excess of the 3-month T-bill** (FRED DTB3, cached) ≥ 0.5 and its 95% block-bootstrap
+  CI (21-day blocks) above 0. Reported: each year, each asset, time in the trade, return before costs, before the
+  window.
+- **Tradability (stated now):** Deribit does not serve US residents; a pass would be a paper shadow first, and a real
+  version would need a US venue (e.g. Coinbase's US perpetual-style futures) and a mandate change by the user.
+  **If it fails:** no variant.
+- **Clarification (2026-09-29 ~14:53 PDT, before any funding data was downloaded):** "annualized" uses √365, since the
+  carry earns on every calendar day (stock tests use √252 trading days); CAGR uses 365 days a year.
+- **Result (run once, 2026-09-29 ~14:55 PDT): FAIL.** 2023-05-01 → 2026-09-24 (1,243 days): Sharpe in excess of
+  T-bills **−1.63** [−4.73, +1.37], excess CAGR −0.6%; raw carry +2.5% a year after costs (+5.0% before costs),
+  below the T-bill rate. By year (excess Sharpe): 2023 +1.96, 2024 +3.43, 2025 −7.20, 2026 −8.56. Held 86% of days
+  (BTC), 72% (ETH). Before the window (2019-04 → 2023-04): +4.06 [+1.53, +6.59]. Mean funding, annualized: BTC 10.3%
+  (2024) → 5.4% (2025) → 2.1% (2026); ETH 8.4% → 1.0% → 1.3%. The premium the BIS paper documented has been
+  arbitraged down to below cash since the spot ETFs and basis funds arrived, as the paper itself reports for 2025.
+
+### Turn-of-the-month T1 (spec fixed 2026-09-29 ~15:17 PDT, before any turn-of-month code or number)
+
+**Idea.** US stocks earn much of their return over the four trading days around the month change (Lakonishok and
+Smidt 1988; Ariel 1987; McConnell and Xu, FAJ 2008, data through 2005). **Stated cause:** month-end cash needs.
+Institutions sell near the month end to meet payments, and salaries, pensions and fund inflows are invested at the
+start of the month (Ogden 1990; Etula, Rinne, Suominen and Vaittinen, RFS 2020 "Dash for cash"). The dates are
+known in advance, so there is no look-ahead. Nothing about this effect has been computed in this repo before. The
+SPY and BIL closes in `data/trend/etf_closes.parquet` were seen before, in the trend test.
+
+**Use if it passes.** None now: the mandate caps gross exposure at 1.0, so timing can only lower the book's
+exposure. A pass makes it a candidate for timing extra exposure once the leverage ladder
+(DEV_PLAN_AUTONOMOUS Phase D) unlocks gross above 1. That change would be proposed to the user, not made.
+
+**Rule (one trial, `turn_of_month`).**
+- Data: SPY adjusted closes, `data/trend/etf_closes.parquet`. Risk-free: 3-month T-bill (`vol_target_b0.tbill()`)
+  / 252 per trading day. x_t = SPY close-to-close return minus rf.
+- Turn-of-month (TOM) days: the last trading day of a month and the first 3 trading days of the next, i.e. hold
+  from the close of the 2nd-last trading day to the close of the 3rd trading day. Trading days come from the data's
+  own index.
+- Overlay stream o_t = x_t on TOM days, 0 otherwise. Cost: 1 bp a side, taken on the entry day (the first TOM
+  day) and the exit day (the 3rd trading day).
+- Window: 2008-01-02 .. 2026-09-25 (after McConnell and Xu's sample and publication).
+
+**Pass (both needed, 95% level, one trial):**
+1. The overlay's annualized Sharpe (sqrt 252, `stats()`) is >= 0.5 AND its 21-day block-bootstrap CI is above 0.
+   This is the track's usual rule.
+2. The TOM effect itself: the mean excess on TOM days minus the mean on other days has a 95% block-bootstrap CI
+   (21-day blocks, 5000 draws, seed 0) above 0. Rule 1 alone can pass on the plain equity premium.
+
+**Reported, not deciding:** Sharpe and difference by year and for 2020-07+ (after Etula et al.); the timed book
+(SPY on TOM days, T-bills otherwise) against SPY; 3 bp costs; correlation with the core book.
+
+**Result (run once, 2026-09-29 ~15:18 PDT): FAIL.** Overlay Sharpe +0.30, CI [−0.10, +0.74], CAGR 2.1% (3 bp:
++0.24). TOM days averaged 5.5 bp of excess against 4.2 bp on other days: a difference of +1.3 bp a day, CI
+[−6.6, +9.4], over 899 TOM days. Both rules miss. The overlay's Sharpe is about what plain SPY exposure on 1 day in
+5 would give. The difference changes sign from year to year (+31 bp in 2010 and 2026, −23 bp in 2024). Since
+2020-07: overlay +0.47 [−0.28, +1.09], difference +2.4 bp [−10.4, +13.2]. Timed book (SPY on TOM days, T-bills
+otherwise): Sharpe 0.47 and CAGR 3.5%, against SPY's 0.64 and 11.3%. Correlation with the core book: 0.36. Read: the
+classic turn-of-month premium has not been there in SPY since its 2008 publication.
+
+### SPY overnight premium O1 (spec fixed 2026-09-29, evening PDT, before any O1 code or number)
+
+**Idea.** Most of the US market's return has come outside trading hours, from the close to the next open. Sources:
+Cooper, Cliff and Gulen 2008; Kelly and Clark, *J. Asset Management* 2011 (SPY overnight Sharpe about 1.27 a year
+before costs, data to 2008); Boyarchenko, Larsen and Whelan (NY Fed SR 917) on the overnight drift. **Stated cause,
+as proposed by the authors, not established:** active traders cut positions before the close because they see
+overnight risk as higher, which pushes closing prices down. Found by Codex's screen (29 Sep, papers checked on the
+web). Nothing about SPY's overnight/intraday split has been computed in this repo. D9/D10 were cross-sectional
+opening-gap reversals, a different rule.
+
+**Rule (one trial, `spy_overnight`).**
+- Data: `data/statarb/sector_etfs.parquet`, SPY Open/Close (Yahoo, adjusted for dividends and splits, so a hold over
+  an ex-date is credited with the dividend). Risk-free: `vol_target_b0.tbill()` / 252 per trading day.
+- Every trading day t with a previous close: return o_t = Open_t / Close_{t−1} − 1. Held through weekends and holidays.
+  Buy at the close (market-on-close), sell at the next open (market-on-open); dates and orders are fixed in advance.
+- Cost: 1 bp a side, 2 bp per night. Net excess x_t = o_t − 2 bp − rf_t.
+- Window: 2012-01-03 .. 2026-09-25 (after Kelly and Clark's publication).
+- Check before the test counts: on 2016+ the daily Open/Close must match `data/intraday/SPY_1min.parquet`'s first
+  09:30 open and 15:59 close to within 0.5% on 99% of days (after the adjustment ratio). If not, stop and fix the data
+  first, then run once.
+
+**Pass (95%):** the annualized Sharpe of x_t (sqrt 252, `stats()`) is ≥ 0.5 AND its 21-day block-bootstrap CI is
+above 0. This is the track's usual rule.
+
+**Reported, not deciding:** gross Sharpe; 3 bp costs; the intraday leg (open to close); buy-and-hold SPY; by year;
+2020+; correlation with the core book.
+**Use if it passes:** nothing now. Under the mandate (gross ≤ 1.0), overnight-only SPY earns less than holding SPY all
+day unless the intraday leg is ≤ 0. A pass makes it a candidate for the leverage ladder (higher Sharpe per unit of
+risk), proposed to the user, not adopted.
+
+**Result (run once, 2026-09-29 evening): FAIL.** At 1 bp a side, net excess Sharpe was +0.25, CI [−0.28, +0.81],
+CAGR 2.1%; at 3 bp it was −0.70. Before costs the overnight leg is real, +0.73 [+0.15, +1.36] (7.4% a year).
+The intraday leg was +0.35 and buy-and-hold +0.84. Two trades a night (5% a year at 1 bp a side) eat most of it.
+Since 2020: +0.14. By year the sign flips (2022 −1.5, 2024 +1.4). The data check passed: 99.3% of 2,689 days
+matched the minute bars. Correlation with the core book: 0.54. Built by Codex (6 Luna) from this spec; Claude
+reviewed and ran it.
+
+### Macro-announcement premium E1 (spec fixed 2026-09-29 evening PDT, before any E1 code, calendar or number)
+
+**Idea.** Stocks earn much more on days when scheduled macro news comes out: 11.4 bp against 1.1 bp on other days
+(Savor and Wilson, JFQA 2013). **Stated cause:** investors are paid for holding stocks through the resolution of
+macro uncertainty (inflation, jobs, the Fed); it is a risk premium, not a mispricing. Found by Codex's screen
+(29 Sep, paper checked). **Known risk:** the pre-FOMC drift alone faded after 2015 (Kurov, Wolfe and Gilbert).
+Nothing about announcement days has been computed in this repo. T1 (month turn) is a different calendar.
+
+**Rule (one trial, `macro_announcement`).**
+- Events: first releases of the **Employment Situation** (BLS) and the **PPI** (BLS), and **scheduled** FOMC
+  statement days. Unscheduled FOMC moves are excluded. For two-day meetings the statement day is the second day.
+- Dates: the Employment Situation and PPI first-release dates come from ALFRED's release-date lists (free; release
+  ids 50 and 46). Only each reference month's first release counts, not revisions. FOMC statement dates come from the
+  Fed's historical calendars (free). A date is used only if it was a scheduled release (announced ahead). Calendar
+  checks before any returns: 11–13 jobs and PPI dates a year, and 8 FOMC dates a year (2020 may differ; list any
+  exception).
+- Position: long SPY from the close of the trading day before an event day to the close of the event day. Adjacent
+  event days are merged into one holding. Otherwise T-bills (excess 0). 1 bp a side per holding.
+- Data: SPY adjusted closes (`data/trend/etf_closes.parquet`); risk-free `vol_target_b0.tbill()` / 252.
+- Window: 2013-05-01 .. 2026-09-25 (after the paper's publication).
+
+**Pass (both, 95%):**
+1. The strategy's net daily excess (0 on non-event days) has annualized Sharpe ≥ 0.5 AND a 21-day block-bootstrap
+   CI above 0.
+2. Mean SPY excess on event days minus mean on other days has a 95% block-bootstrap CI above 0 (21-day blocks,
+   5,000 draws, seed 0; `calendar_fx.diff_ci`).
+
+**Reported, not deciding:** each event type alone (diagnostic only; no subset is ever promoted), by year, 3 bp
+costs, correlation with the core book.
+**Use if it passes:** a leverage-ladder candidate only, proposed to the user. Under gross 1.0 it holds SPY on only
+about 32 days a year.
+
+**Result (run once, 2026-09-29 ~19:35 PDT): FAIL.** At 1 bp a side the net Sharpe was +0.08, CI [−0.42, +0.66],
+CAGR 0.3%; at 3 bp it was −0.11. Announcement days averaged 3.5 bp of excess against 5.4 bp on other days: a
+difference of −1.9 bp a day, CI [−13.6, +9.1], over 416 event days. The premium the paper found (+10 bp) is gone
+since publication. By type, diagnostic only: jobs +0.20, PPI −0.17, FOMC +0.10, all CIs spanning 0. Four
+jobs-report dates fell on Good Friday (market closed) and were left unmapped, as the spec says. Calendar: 12
+jobs, 12 PPI and 8 FOMC dates a year, matching BLS for 2015 and 2024; 2020 and the 2025 shutdown are documented in
+`data/macro/announcements.csv`. Built by Codex (6 Luna, session e1); Claude reviewed and ran it.
+
+### T1 and O1 forward shadows (spec fixed 2026-09-29 evening PDT, before any forward day; user: "set up the T1 and O1 shadow books")
+
+Both failed their one backtest (T1 +0.30, O1 +0.25 net). Neither is re-tested or changed. They are tracked on
+future days only, with the frozen code, and no money: `app/sandbox/calendar_fx.tom_overlay` (T1, 1 bp a side)
+and `app/sandbox/overnight.overnight_legs` / `overnight_excess` (O1, 1 bp a side). Both are excess returns over
+the 3-month T-bill.
+- **Forward window:** trading days from **2026-09-30** on. Data: SPY daily Open/Close from Yahoo (adjusted), fetched
+  fresh at each weekly review. The T-bill comes from FRED DTB3 (free).
+- **Reported every Saturday** (weekly review): days tracked, cumulative net excess return, annualized Sharpe so far
+  and its 95% CI once 60+ days exist. Reported only; nothing moves money.
+- **Verdict on 2028-09-30** (two years, about 500 nights for O1 and 100 TOM days for T1), with each test's own
+  pass rule: net Sharpe ≥ 0.5 AND 95% 21-day block-bootstrap CI above 0. A pass there is a candidate for the
+  leverage ladder only, proposed to the user. No earlier verdict, and no rule change on the way.
+
+### Core leads, forward check (spec fixed 2026-09-29, midday PDT, before any forward data)
+
+The user asked to raise the book's Sharpe. The two known ways were already tested on 2018–26 and failed narrowly,
+recorded as leads for a forward test: the 20% volatility target on B0 (Sharpe +0.06 [−0.14, +0.25]) and CVaR risk
+parity (+0.12 [−0.01, +0.23]). They are not re-tested on old data. Both break the mandate (1.0× gross, 20% crypto;
+only the user changes it), so they cannot be paper books; they are tracked as computed shadows instead.
+
+- **What:** `scripts/core_leads.py` recomputes, with the frozen code of each trial (`vol_target_b0.managed`,
+  `skfolio_test.arm_s`), the daily returns of B0, B0 + vol target and arm S, and keeps only days **from
+  2026-09-30** (the forward window; both rules use trailing data only). Reported in the Saturday review.
+- **Verdict** at the first review on or after **2027-09-30** (about 250 forward days), each lead alone, with its own
+  trial's rule: vol-matched CAGR above B0's AND the 90% block-bootstrap CI of the Sharpe difference above 0.
+  Interim numbers are reported, never judged. Trials `core_lead_voltarget_fwd`, `core_lead_riskparity_fwd`.
+- **If one passes:** it is proposed to the user as a mandate change (the only way it can trade); nothing changes on
+  its own.
+
+### Pairs trading P1 (spec fixed 2026-09-29 ~00:20 PDT, before any pairs code or data view)
+
+The user asked for pairs trading (stat-arb failed; trend following is the core; market making needs co-location and
+paid order-book data, so it is not attempted). PLAN_STATARB left pairs as a separate new trial. Rule as published
+(Gatev, Goetzmann and Rouwenhorst, *RFS* 2006), within sectors, on daily adjusted closes (cached yfinance):
+
+- **Formation** (each month start): the previous 252 trading days; stocks of D5's S&P 500 list with no missing
+  close. Prices normalized to 1 at the formation start. Within each sector, every pair's sum of squared differences
+  (SSD); the 20 pairs with the smallest SSD overall are chosen.
+- **Trading** (the next 126 trading days): when a pair's normalized spread is more than 2 formation standard
+  deviations from 0 at a close, open the next day at the close (GGR's one-day wait): long the cheaper, short the
+  dearer, equal dollars. Close at the close of the first day the spread crosses 0, or at the period's end; a pair
+  can reopen. Each portfolio's daily return = the mean over its 20 pairs (committed capital; a closed pair earns 0).
+- **Book:** 6 overlapping portfolios (one started each month); the daily return is their mean.
+- **Costs:** 10 bps per side per stock trade (both legs at open and at close).
+- **Pass (trial `pairs_ggr`):** annualized Sharpe ≥ 0.5 and a 95% block-bootstrap CI (21-day blocks) above 0 on
+  **2024-07-01 → 2026-09-24** (the list is the 2024 membership; earlier years are survivorship-biased, reported
+  only: 2016-01 → 2024-06). Reported: correlation with the core, share of days invested, 0 and 20 bps costs.
+- **If it passes:** paper sleeve after a month of clean dry runs, then the evidence ladder. **If it fails:** no
+  variant (other thresholds, cointegration tests or universes would each be a new, separately justified trial).
+- **Result (run once, 2026-09-29 ~00:30 PDT): FAIL.** 2024-07 → 2026-09 (561 days): Sharpe **−0.61** [−1.92, +0.91] at
+  10 bps, CAGR −1.7%; at 0 bps −0.24, at 20 bps −0.98; half the pairs open on a typical day. Before the window
+  (2016–2024-06, survivorship-biased): −0.37. Correlation with the core +0.08. Pairs trading in large caps has no
+  edge left even before costs, as later studies of GGR found (Do and Faff 2010).
+- **Code review note (Codex, 2026-09-29):** (1) prices are re-based to 1 at each trading period's start and the
+  2-SD test uses that spread, as common GGR replications do; the spec did not say which base, so this is recorded as
+  the implemented reading, not re-run. (2) The reported "invested" share counts an open pair on a zero-P&L day as not
+  invested, so 52% is a slight undercount; reporting only.
 
 ### Long-term picks track (spec fixed 2026-09-28, before any pick was made)
 
@@ -1204,3 +1649,39 @@ theme ratings (a theme still needs a rating of 4 or 5). A rating the quote check
 24 real cards: identical ratings, probabilities found for 21 (the other 3 were quote-check resets), scores
 among the 4s spread from 3.63 to 4.03. Parallel requests (3 / 6 / 8) gave the same answers and no speed-up (about
 9.5 s per card), so the monthly run stays at about 65–75 minutes.
+
+### Aggressive book, 2.5× (spec fixed 2026-09-30 ~21:30 PDT, before any code for it; the user's decision)
+
+**Why it exists.** On 30 Sep the user raised the target ("the baseline is 40% a year … 60% is much more desirable")
+and asked for "much more aggressive" trading. Asked to pick a size from the leverage table (the core backtest replayed
+with borrowed money: 2× = 30%/yr and a −48% worst fall, 3× = 39%/yr and −64%), the user chose **2.5×**, chose that the
+Alpaca paper account should trade this book, and chose to keep the Aschenbrenner AI-build-out lens (arm D) as an
+opinion only. This skips the Stage 4 ladder, which would have allowed leverage only from month 6 on evidence. It is the
+user's mandate decision, not something a test supports: no test has shown this book earns its risk.
+
+- **What stays frozen.** The frozen books (`master`, `master+brakes`, `SPY`, `80/20 SPY/BTC`) and every rule they use
+  are unchanged and keep running in the simulator. `master+brakes` stays the forward test's book of record and the
+  control this book is compared with.
+- **The book (`aggressive 2.5x`), in the simulator:**
+  - Starts with 100,000 paper dollars at the first allocator run after this commit (Mon 5 Oct 2026).
+  - Target weights = 2.5 × the weights `master+brakes` would hold at the same run (the same allocation and the same
+    drawdown-brake multiplier, taken from the `master+brakes` book's own drawdown), without the SGOV parking leg.
+    With no brake that is SPY 1.95, crypto up to 0.50, gross up to 2.45.
+  - Borrowing: cash may go negative down to the amount the targets need. Borrowed cash costs **5.0% a year**
+    (T-bill 4.1% on 24 Sep 2026 plus about 1%), charged for each calendar day between runs, fixed here.
+  - Same fills, costs (5 bp a side), whole shares and timing rules as the other books.
+- **Its own limits** (mandate section `books.aggressive 2.5x`, committed with this spec on the user's instruction):
+  max gross 2.5, max single weight 2.0, max crypto 0.5, **alert at 45% below its peak, limit at 60%**. The backtest's
+  worst fall at 2.5× was −57%. At the limit the kill switch goes to REDUCING for every book, as it does for the frozen
+  book at 35%. The user can change these numbers; they were not asked for separately.
+- **The Alpaca paper account** mirrors this book instead of `master+brakes`, as far as the account's rules allow.
+  The account lends 2× overnight on stocks and nothing against crypto, so the mirrored weights are scaled by
+  `min(1, 0.98 / (0.5 × stock weight + crypto weight))`. At full size that is about 0.66, or roughly **1.6× at the
+  broker against 2.5× in the simulator**. The gap is reported, not hidden. Reaching 2.5× at the broker would need
+  leveraged ETFs, which are not in the mandate.
+- **No pass rule.** This is not a trial and is not entered in the trials registry. The weekly review reports it beside
+  `master+brakes`: return, drawdown, interest paid, and whether its return is tracking 2.5× the frozen book's return
+  minus financing. Its numbers never count as evidence for the frozen book.
+- **What the backtest arithmetic says to expect** (30 Sep, `desktop_export.leverage_table`): about 35% a year, 41%
+  volatility, a −57% worst fall, a −47% worst year, a 46% chance of a 40% year, a 32% chance of a 60% year, a 25%
+  chance of a losing year and a 31% chance of a 35% fall within any year. Live results are usually worse than backtests.

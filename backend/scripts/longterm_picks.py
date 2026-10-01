@@ -17,10 +17,11 @@ import argparse
 import asyncio
 import gzip
 import json
+import math
 import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
@@ -132,7 +133,9 @@ def due(recs: list[dict[str, Any]], now: datetime) -> bool:
 def score(recs: list[dict[str, Any]], opens: pd.DataFrame) -> list[dict[str, Any]]:
     """Results for cohorts whose exit open (entry + 63 trading days) is in the data and not yet scored."""
     done = {r["month"] for r in recs if r.get("type") == "result"}
-    days = pd.DatetimeIndex(opens.index)
+    if "SPY" not in opens:
+        raise ValueError("long-term cohort: SPY open prices missing")
+    days = pd.DatetimeIndex(opens.index[opens["SPY"].notna()])
     out = []
     for c in recs:
         if c.get("type") != "cohort" or c["month"] in done:
@@ -140,10 +143,18 @@ def score(recs: list[dict[str, Any]], opens: pd.DataFrame) -> list[dict[str, Any
         i = int(days.searchsorted(pd.Timestamp(c["made_on"]) + pd.Timedelta(days=1)))
         if i + HOLD >= len(days):
             continue
-        rets = [float(opens[t].iloc[i + HOLD] / opens[t].iloc[i] - 1) for t in c["tickers"]
-                if t in opens and pd.notna(opens[t].iloc[i]) and pd.notna(opens[t].iloc[i + HOLD])]
-        spy = float(opens["SPY"].iloc[i + HOLD] / opens["SPY"].iloc[i] - 1)
-        basket = float(np.mean(rets)) if rets else 0.0
+        entry, exit_ = days[i], days[i + HOLD]
+
+        def price(t: str, day: pd.Timestamp) -> float:
+            return cast(float, opens.at[day, t])
+
+        missing = [t for t in c["tickers"] if t not in opens or not math.isfinite(price(t, entry))
+                   or not math.isfinite(price(t, exit_)) or price(t, entry) <= 0 or price(t, exit_) <= 0]
+        if missing:
+            raise ValueError(f"long-term cohort {c['month']}: missing entry/exit opens for {', '.join(missing)}")
+        rets = [price(t, exit_) / price(t, entry) - 1 for t in c["tickers"]]
+        spy = price("SPY", exit_) / price("SPY", entry) - 1
+        basket = float(np.mean(rets))
         out.append({"month": c["month"], "entry": days[i].date().isoformat(), "exit": days[i + HOLD].date().isoformat(),
                     "basket": round(basket, 5), "spy": round(spy, 5), "priced": len(rets),
                     "excess_net": round(basket - spy - 2 * COST, 5)})
@@ -158,16 +169,54 @@ def prices(tickers: set[str], now: datetime) -> tuple[pd.DataFrame, pd.DataFrame
     return (o.to_frame("SPY") if isinstance(o, pd.Series) else o), (c.to_frame("SPY") if isinstance(c, pd.Series) else c)
 
 
-def status(recs: list[dict[str, Any]]) -> dict[str, Any]:
-    res = [r for r in recs if r.get("type") == "result"]
-    x = np.array([r["excess_net"] for r in res])
+def expected_months(now: datetime) -> list[str]:
+    """Months whose first-weekday 16:00 ET cohort deadline has passed."""
+    et = now.astimezone(NY)
+    out = []
+    y, m = 2026, 10
+    while (y, m) <= (et.year, et.month):
+        first = date(y, m, 1)
+        while first.weekday() >= 5:
+            first += timedelta(days=1)
+        if et >= datetime.combine(first, datetime.min.time(), NY).replace(hour=16):
+            out.append(f"{y:04d}-{m:02d}")
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
+
+
+def status(recs: list[dict[str, Any]], now: datetime | None = None) -> dict[str, Any]:
+    now = now or datetime.now(UTC)
+    cohorts = [r for r in recs if r.get("type") == "cohort"]
+    results = [r for r in recs if r.get("type") == "result"]
+    by_month = {r["month"]: r for r in cohorts}
+    issues = []
+    if len(by_month) != len(cohorts):
+        issues.append("duplicate cohort month")
+    for c in cohorts:
+        names = c.get("tickers", [])
+        if len(names) != N_PICKS or len(set(names)) != N_PICKS:
+            issues.append(f"{c['month']}: expected {N_PICKS} distinct picks")
+    for r in results:
+        if r["month"] not in by_month or r.get("priced") != N_PICKS or not math.isfinite(
+                float(r.get("excess_net", float("nan")))):
+            issues.append(f"{r['month']}: invalid result or missing cohort")
+    scored_months = {r["month"] for r in results}
+    if len(scored_months) != len(results):
+        issues.append("duplicate result month")
+    missing = sorted(set(expected_months(now)) - set(by_month))
+    overdue = [c["month"] for c in cohorts if c["month"] not in scored_months and
+               (now.astimezone(NY).date() - date.fromisoformat(c["made_on"])).days > 110]
+    valid = [r for r in results if r["month"] in by_month and r.get("priced") == N_PICKS and
+             math.isfinite(float(r.get("excess_net", float("nan"))))]
+    x = np.array([r["excess_net"] for r in valid])
     lo80 = None
     if len(x) > 1:
         b = x[np.random.default_rng(0).integers(0, len(x), (5000, len(x)))].mean(1)
         lo80 = round(float(np.percentile(b, 20)), 5)
-    return {"cohorts": sum(r.get("type") == "cohort" for r in recs), "scored": len(res),
+    return {"cohorts": len(cohorts), "scored": len(results), "pending": sorted(set(by_month) - scored_months),
+            "missing_months": missing, "overdue_results": overdue, "issues": issues,
             "mean_excess_net": round(float(x.mean()), 5) if len(x) else None, "lo80": lo80,
-            "ready_to_judge": len(res) >= 12,
+            "ready_to_judge": len(valid) >= 12 and not issues and not missing and not overdue,
             "latest": next((r["tickers"] for r in reversed(recs) if r.get("type") == "cohort"), None)}
 
 
@@ -214,6 +263,8 @@ def run(events_dir: Path, out: Path, now: datetime, use_gpu: bool) -> None:
         finally:
             srv.stop()
     picks = choose(rated)
+    if len(picks) != N_PICKS or len({p["ticker"] for p in picks}) != N_PICKS:
+        raise ValueError(f"long-term cohort: expected {N_PICKS} distinct rated picks, got {len(picks)}")
     (out / f"ratings_{now.astimezone(NY).strftime('%Y-%m')}.jsonl").write_text(
         "".join(json.dumps(r) + "\n" for r in rated))
     led.append("cohort", month=now.astimezone(NY).strftime("%Y-%m"), made_on=now.astimezone(NY).date().isoformat(),
@@ -236,7 +287,11 @@ def main() -> None:
         if not a.status:
             run(BACKEND / a.events, out, datetime.now(UTC), not a.no_gpu)
         recs = Ledger(out / "ledger.jsonl").verify() if (out / "ledger.jsonl").exists() else []
-        print("long-term picks (shadow):", json.dumps(status(recs)))
+        report = status(recs)
+        print("long-term picks (shadow):", json.dumps(report))
+        for key in ("missing_months", "overdue_results", "issues"):
+            if report[key]:
+                print(f"LEARN ALERT: long-term picks {key}: {report[key]}")
     except Exception as e:  # noqa: BLE001 - a shadow: never fail the events job
         print(f"LEARN ALERT: long-term picks failed: {type(e).__name__}: {e}"[:300])
 

@@ -22,7 +22,9 @@ test and result; nothing here changes a registered rule. Paper money only; no pa
 | Live AI reads: net_read (C2), AI build-out lens (D), bull/bear (E) | shadow, no money | forward-only; judged at 150 releases + 3 months |
 | Long-term picks (top 10 of the S&P 500, 3 months) | shadow; first cohort Thu 1 Oct | forward-only; judged after 12 cohorts |
 | Themes by horizon + AI-bubble gauge | shadow; first cohort Thu 1 Oct | forward-only; judged after 12 six-month cohorts |
-| Day trading | **failed** (5 published rules) | D1 −1.00, D2 −0.24, D3 +0.20, D4 −1.21, D5 −1.86 Sharpe after publication |
+| Day trading | **failed** (9 tradable rules) | D1 −1.00, D2 −0.24, D3 +0.20, D4 −1.21, D5 −1.86, D6 box −0.91, D7 −0.07, D8 Darvas −0.30, D10 −0.64; D9 passed (+0.81) but can't be traded (needs the auction's own open price) |
+| Pairs trading | **failed** | P1 (GGR) −0.61 at 10 bps, −0.24 before costs |
+| Crypto funding carry | **failed** | C1 −1.63 vs T-bills after 2023 (was +4.06 before; funding now below cash) |
 | Private companies | not built | later stage |
 
 **The honest reading:** the system is well built and tests itself honestly, but so far only the core has an edge.
@@ -82,12 +84,12 @@ the weight the goal needs (see §6).
 1. **Speed** (this week): parallel Bonsai requests (§2). Expected: the 70-minute monthly run drops a lot.
 2. **Rating-probability scores** (built, needs a live check): breaks the many ties at rating 4 by Bonsai's own
    confidence. Recorded in PLAN_60_V2 before the first cohort.
-3. **Optional, needs your OK:** *B4*, the 20-day version of the research arm, tested only on 2026+ data
+3. **Stopped 29 Sep by its news rule (21% coverage on mid/small caps):** *B4*, the 20-day version of the research arm, tested only on 2026+ data
    (B2 looked better at 20 days: +0.029 [+0.009, +0.050]). Pre-registered before any run.
 4. **Optional, needs your OK (a download, and it is Qwen-based):** *Kev 4B* speed test: a local decision model
    scores all ~490 cards in minutes; Bonsai writes bull/bear only for the top 30. Adopted only if its ratings
    match Bonsai's closely.
-5. Day trading: **paused.** Five published rules died after publication. D5 (end-of-day reversal, market-neutral,
+5. Day trading: **paused.** Eight published rules failed (round 4, 29 Sep: box theory, intraday periodicity, Darvas box; the periodicity edge is +2 bp a day before costs, exactly its costs). D5 (end-of-day reversal, market-neutral,
    with a stated structural cause) was the one with a reason it can't be traded away; the effect is real before
    costs but about 0.6 bp a day, a third of its trading costs. (The $25k rule is gone since 4 Jun 2026; it was never the reason they failed.)
 6. Private companies: later stage (needs access and a data source).
@@ -114,6 +116,17 @@ the weight the goal needs (see §6).
 | Decide on B4 and the Kev test (§5) | Pre-register every new test before running it; never rig one |
 | Switch models: **Sonnet 5.5** for routine watching and fixes, **Opus 5.5** for new tests and verdicts | Report results as they are, pass or fail |
 | Only you can: add keys, switch to real money, power off (only when you say) | Never place real trades, spend money, or shut down without your command |
+
+## 7b. Mandate changes
+
+- **2026-09-29, by the user:** SGOV (0–3 month T-bill ETF) added to the mandate. The master+brakes book parks cash the
+  drawdown brakes leave idle in SGOV (only when 5% or more is idle; the 2% buffer stays cash). 2018–26 backtest
+  arithmetic: parked on 38% of days, about 35% of the book when on, +0.4% a year to the core (17.7% → 18.2%); nearer
+  +0.5–0.6% at today's T-bill rate. Not a strategy test (it moves no risk), so no trial.
+- **2026-09-29, by the user:** QQQ and TLT allowed ("widen the allowed holdings, add QQQ and TLT"). Allowed only:
+  the frozen book does not hold them, and a strategy may use them only after a pre-registered test passes. Past tests
+  that already used them (21-ETF trend sleeve, CVaR risk parity) failed and are not re-run. The broker mirror sells them
+  if a decision drops them.
 
 ## 8. Decision rules that never change
 

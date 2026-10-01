@@ -3,7 +3,7 @@
 The user's rule (28 Sep 2026): show the gap; a track's money grows only after it passes its test, always within the
 35% max drawdown. So the planner never raises a weight to chase the goal. It reports:
   - the yearly return the goal needs;
-  - the odds of reaching it with today's evidence-based weights (block bootstrap of each track's real daily returns);
+  - the odds of reaching it with today's evidence-based weights (joint block bootstrap of dated daily returns);
   - what the stock-picking tracks would have to earn, at the most weight the evidence ladder could ever give them,
     for the goal to be a coin flip;
   - each track's status and what unlocks its next step.
@@ -51,7 +51,7 @@ TRACKS = [
           "forward-only; judged against SPY and a code-only momentum pick of the same themes"),
     Track("day_trading", "Day trading (intraday, SPY/QQQ)", "failed",
           "a new rule, pre-registered and tested after its publication date",
-          "5 published rules failed after publication: D1 -1.00, D2 -0.24, D3 +0.20, D4 -1.21, D5 -1.86 (Sharpe)"),
+          "9 tradable rules failed (D1-D8, D10 -0.64); D9 +0.81 passed but needs the auction open (untradable)"),
     Track("private", "Private companies", "not_built",
           "later stage: needs accredited-investor access and a data source; not available yet"),
 ]
@@ -84,19 +84,21 @@ def weights(tracks: list[Track]) -> dict[str, float]:
 
 def simulate(returns: pd.DataFrame, w: dict[str, float], days: int, n: int = 4000, block: int = 21,
              seed: int = 0) -> np.ndarray:
-    """Paths of daily book returns: each track resampled in 21-day blocks from its own history (tracks with a
-    weight but no history earn 0). Rebalanced daily to the weights. Shape (n, days)."""
-    rng = np.random.default_rng(seed)
+    """Resample dated return vectors together so stress correlations survive each 21-day block."""
+    active = [name for name, wt in w.items() if wt and name in returns
+              and returns[name].notna().sum() >= 2 * block]
     out = np.zeros((n, days))
+    if not active:
+        return out
+    aligned = returns[active].dropna()
+    if len(aligned) < 2 * block:
+        raise ValueError("too few overlapping return days to estimate joint portfolio paths")
+    x = aligned.to_numpy(dtype=float)
+    rng = np.random.default_rng(seed)
     nb = -(-days // block)
-    for name, wt in w.items():
-        if wt == 0 or name not in returns or returns[name].notna().sum() < 2 * block:
-            continue
-        x = returns[name].dropna().to_numpy()
-        starts = rng.integers(0, len(x) - block, (n, nb))
-        idx = (starts[:, :, None] + np.arange(block)).reshape(n, -1)[:, :days]
-        out += wt * x[idx]
-    return out
+    starts = rng.integers(0, len(x) - block + 1, (n, nb))
+    idx = (starts[:, :, None] + np.arange(block)).reshape(n, -1)[:, :days]
+    return np.asarray((x[idx] * np.array([w[name] for name in active])).sum(axis=2), dtype=float)
 
 
 def outcome(goal: Goal, paths: np.ndarray) -> dict[str, Any]:
@@ -116,8 +118,11 @@ def plan(goal: Goal, returns: pd.DataFrame, tracks: list[Track] | None = None) -
     tracks = tracks or TRACKS
     days = max(1, round(goal.years * 252))
     w = weights(tracks)
-    now = outcome(goal, simulate(returns, w, days))
-    core_only = outcome(goal, simulate(returns, {"core": 1.0}, days))
+    active = [name for name, wt in w.items() if wt and name in returns
+              and returns[name].notna().sum() >= 42]
+    history = returns[active].dropna() if active else returns
+    now = outcome(goal, simulate(history, w, days))
+    core_only = outcome(goal, simulate(history, {"core": 1.0}, days))
     core_cagr = core_only["median_cagr"]
     need = {}
     for share in (LADDER["passed"], LADDER["proven"], PICKING_CAP):
@@ -133,6 +138,8 @@ def plan(goal: Goal, returns: pd.DataFrame, tracks: list[Track] | None = None) -
     return {"goal": {"start": goal.start, "target": goal.target, "by": goal.by.isoformat(),
                      "years": round(goal.years, 2), "required_cagr": round(goal.required_cagr, 4)},
             "weights": {k: round(v, 3) for k, v in w.items()},
+            "history": {"start": str(history.index.min()), "end": str(history.index.max()),
+                        "days": len(history)},
             "with_current_evidence": now, "core_only": core_only,
             "gap_cagr": round(goal.required_cagr - now["median_cagr"], 4),
             "picking_needs_cagr": need,

@@ -1,0 +1,61 @@
+{
+  "name": "airp-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Desktop dashboard for the airp paper-trading research system (monitor + kill switch).",
+  "productName": "airp",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "desktop": "electron .",
+    "test": "node --test tests/*.test.js",
+    "check": "for f in src/*.js public/*.js electron/*.js; do node --check $f || exit 1; done",
+    "dist": "electron-builder --linux deb AppImage"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "electron": "^44.5.0",
+    "electron-builder": "^26.15.3"
+  },
+  "author": {
+    "name": "everett6",
+    "email": "everett6@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/everett6/airp-local-5070",
+  "build": {
+    "appId": "io.github.everett6.airp",
+    "productName": "airp",
+    "files": [
+      "electron/**",
+      "src/**",
+      "public/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Finance",
+      "icon": "build/icon.png",
+      "synopsis": "Quant research and paper-trading dashboard",
+      "desktop": {
+        "entry": {
+          "Name": "airp",
+          "Comment": "Quant research and paper-trading dashboard",
+          "StartupWMClass": "airp"
+        }
+      }
+    }
+  },
+  "desktopName": "airp.desktop"
+}

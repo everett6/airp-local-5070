@@ -29,7 +29,8 @@ from app.sandbox.events import Prices, monthly_ic
 
 EV = BACKEND / "results" / "events"
 SAMPLES = {"2024": ("data/events/events_sp500_2024.csv", "features_sp500_2024_secchk.csv"),
-           "2025": ("data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv")}
+           "2025": ("data/events/events_sp500_2025.csv", "features_sp500_2025_secchk.csv"),
+           "b4": ("data/events/events_b4_2026.csv", "features_b4_2026.csv")}  # arm B4 (scripts/b4_prep.py)
 
 
 def load(tag: str, p: Prices) -> pd.DataFrame:
@@ -197,3 +198,60 @@ def judgement_main() -> None:
               "ic": r5["C"]["mean_ic"], "result": "pass" if out["pass"] else "fail"})
     print(json.dumps(out, indent=1, default=str))
     print("verdict (pre-registered, 5-day):", "PASS" if out["pass"] else "FAIL")
+
+
+def with_research(tag: str, labels: str, p: Prices) -> pd.DataFrame:
+    """Arm A's frame for a sample plus a research arm's labels (suffix _r)."""
+    from llm_fields import FIELDS_R
+    b = pd.DataFrame([json.loads(x) for x in (EV / labels).read_text().splitlines()])
+    b = b[["accession", "has_research", *FIELDS_R]].rename(columns={f: f"{f}_r" for f in FIELDS_R})
+    return load(tag, p).merge(b, on="accession")
+
+
+def design_r(df: pd.DataFrame) -> np.ndarray:
+    from llm_fields import FIELDS_R
+    cols = [design(df, False)]
+    for f, (labels, default) in FIELDS_R.items():
+        cols.append(np.column_stack([(df[f"{f}_r"] == v).astype(float).to_numpy() for v in labels if v != default]))
+    return np.column_stack(cols)
+
+
+def b4_score(train: pd.DataFrame, test: pd.DataFrame) -> dict:
+    """Arm B4's numbers: arm A's and arm B2's ridges fitted on `train` only, scored on `test`. Deciding: 20-day
+    (full B2 - full A) monthly IC CI above 0 AND full B2's own 20-day IC CI above 0."""
+    out: dict = {"n_train": len(train), "n_test": len(test)}
+    for h in ("fwd20", "fwd5"):
+        tr = train.dropna(subset=[h])
+        test[f"A_{h}"] = ridge(design(tr, True), tr[h].to_numpy(float), lam=10.0)(design(test, True))
+        test[f"B2_{h}"] = ridge(design_r(tr), tr[h].to_numpy(float), lam=10.0)(design_r(test))
+        out[h] = {"full_A": monthly_ic(test, f"A_{h}", h), "full_B2": monthly_ic(test, f"B2_{h}", h),
+                  "B2_minus_A": paired_diff(test, f"A_{h}", f"B2_{h}", h)}
+        if "has_news" in test:
+            out[h]["full_B2_with_news"] = monthly_ic(test[test["has_news"]], f"B2_{h}", h, min_n=10)
+        if "index" in test:
+            out[h]["by_index"] = {str(i): {"full_A": monthly_ic(g, f"A_{h}", h, min_n=10),
+                                           "full_B2": monthly_ic(g, f"B2_{h}", h, min_n=10)}
+                                  for i, g in test.groupby("index")}
+    r = out["fwd20"]
+    out["pass"] = bool(r["B2_minus_A"]["ci_lo"] > 0 and (r["full_B2"]["ci_lo"] or 0) > 0)
+    return out
+
+
+def b4_main() -> None:
+    """Arm B4 (docs/PLAN_60_V2.md "Arm B4"): one trial, llm_fields_research_b4."""
+    from llm_fields import research_folder
+    f = EV / "llm_fields_research_b4_test.json"
+    if f.exists():
+        raise SystemExit("arm B4 was already run (one trial)")
+    p = Prices.from_long(pd.read_parquet(BACKEND / "data/events/ohlcv_2023-01-01_2026-09-25.parquet"))
+    train = with_research("2024", "llm_fields_research_b2_2024.jsonl", p)
+    test = with_research("b4", "llm_fields_research_b4_b4.jsonl", p)
+    test["has_news"] = [_has_news(research_folder("b4", "b4") / f"{x}.json") for x in test["accession"]]
+    out = b4_score(train, test)
+    out["with_news"] = float(test["has_news"].mean())
+    f.write_text(json.dumps(out, indent=1, default=str) + "\n")
+    r = out["fwd20"]
+    register({"trial": "llm_fields_research_b4", "date": time.strftime("%Y-%m-%d"), "kind": "signal_ic",
+              "ic": r["full_B2"]["mean_ic"], "result": "pass" if out["pass"] else "fail"})
+    print(json.dumps(out, indent=1, default=str))
+    print("verdict (pre-registered, 20-day):", "PASS" if out["pass"] else "FAIL")

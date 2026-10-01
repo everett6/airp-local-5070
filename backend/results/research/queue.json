@@ -1,0 +1,46 @@
+[
+ {
+  "name": "b4b_gdelt_warmup",
+  "kind": "net",
+  "cmd": [
+   ".venv/bin/python",
+   "-u",
+   "scripts/warm_gdelt.py"
+  ],
+  "match": "warm_gdelt.py",
+  "done": {
+   "file": "results/events/warm_gdelt.jsonl",
+   "target": 2851,
+   "status_in": [
+    "ok",
+    "none"
+   ]
+  },
+  "note": "GDELT headlines for 2,851 releases, one request per 20 s or slower"
+ },
+ {
+  "name": "b4b_armA_labels",
+  "kind": "gpu",
+  "cmd": [
+   "scripts/bonsai_job.sh",
+   ".venv/bin/python",
+   "scripts/llm_fields.py",
+   "extract-b4"
+  ],
+  "match": "extract-b4",
+  "done": {
+   "file": "results/events/llm_fields_b4.jsonl",
+   "target": 2851
+  },
+  "note": "Bonsai P2 on the release alone (arm A)"
+ },
+ {
+  "name": "b4b_gates",
+  "kind": "gate",
+  "requires": [
+   "b4b_gdelt_warmup",
+   "b4b_armA_labels"
+  ],
+  "note": "B4b gates ready: coverage >= 50% and Claude's 40-title relevance check (>= 70%) before Jan + B2"
+ }
+]

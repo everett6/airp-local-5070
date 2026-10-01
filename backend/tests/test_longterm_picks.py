@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -38,6 +39,15 @@ def test_score_after_63_days_net_of_costs():
     assert abs(res["excess_net"] - (0.05 - 0.02 - 0.004)) < 1e-9
     assert L.score(recs + [{"type": "result", "month": "2026-10"}], opens) == []
     assert L.score(recs, opens.iloc[:60]) == []  # not matured
+
+
+def test_score_refuses_incomplete_cohort():
+    idx = pd.bdate_range("2026-10-01", periods=70)
+    opens = pd.DataFrame({"AAA": 100.0, "BBB": 100.0, "SPY": 100.0}, index=idx)
+    opens.loc[idx[64], "BBB"] = float("nan")
+    recs = [{"type": "cohort", "month": "2026-10", "made_on": "2026-10-01", "tickers": ["AAA", "BBB"]}]
+    with pytest.raises(ValueError, match="missing entry/exit opens for BBB"):
+        L.score(recs, opens)
 
 
 def test_score_breaks_rating_ties_with_bonsai_probabilities():

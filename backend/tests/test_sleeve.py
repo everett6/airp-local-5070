@@ -88,7 +88,7 @@ def test_broker_legs_timing():
     sleeve.step(st, [dec()], *frames(2), ETF, morning)
     p = st["pairs"][0]
     legs = ai_picks.due_legs(p, DAYS[:2], morning)
-    assert [(x.side, x.symbol, x.qty, x.tif) for x in legs] == [("buy", "AAA", 20, "opg"), ("sell", "XLI", 40, "opg")]
+    assert [(x.side, x.symbol, x.qty, x.tif) for x in legs] == [("buy", "AAA", 20, "day"), ("sell", "XLI", 40, "day")]
     assert ai_picks.due_legs(p, DAYS[:2], datetime(2026, 10, 5, 15, 0, tzinfo=UTC)) == []  # 11:00 ET: opg closed
     p["legs"] = [{"client_order_id": x.client_order_id} for x in legs]
     assert ai_picks.due_legs(p, DAYS[:2], morning) == []  # sent already

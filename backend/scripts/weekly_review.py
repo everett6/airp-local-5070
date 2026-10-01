@@ -25,7 +25,7 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 import pandas as pd
 
 from app.forward.ledger import Ledger
-from app.portfolio.forward import brake_multiplier
+from app.portfolio.forward import AGGRESSIVE, brake_multiplier
 
 FWD = BACKEND / "results" / "forward"
 SPREAD = 0.015
@@ -91,6 +91,13 @@ def shadow_lines(fwd: Path = FWD) -> list[str]:
                 break
     except Exception as e:  # noqa: BLE001
         out.append(f"- AI-picks sleeve: could not read ({type(e).__name__}: {e})")
+    try:
+        import guidance_shadow as G
+        f = fwd / "guidance_shadow" / "ledger.jsonl"
+        recs = Ledger(f).verify() if f.exists() else []
+        out.append(f"- guidance shadow: {json.dumps(G.status(recs))}")
+    except Exception as e:  # noqa: BLE001
+        out.append(f"- guidance shadow: could not read ({type(e).__name__}: {e})")
     for name, mod in (("longterm", "longterm_picks"), ("themes", "themes")):
         try:
             m = __import__(mod)
@@ -119,6 +126,13 @@ def main() -> None:
             lines.append(f"| {n} | {eq.iloc[0]:,.0f} | {eq.iloc[-1]:,.0f} | {eq.iloc[-1] / eq.iloc[0] - 1:+.2%} | "
                          f"{dd:.1%} | {brake_multiplier(eq.iloc[-1], eq.max()):.2f} |")
         base = "master+brakes" if any("master+brakes" in r["books"] for r in runs) else "master"
+        agg = [r["books"][AGGRESSIVE] for r in runs if AGGRESSIVE in r["books"]]
+        if agg:  # the user's 2.5x paper book (PLAN_60_V2 "Aggressive book, 2.5x"): reported, never evidence
+            a = agg[-1]
+            lines += ["", f"**{AGGRESSIVE}** (your decision of 30 Sep; not a tested strategy): " + (
+                "wiped out: the loan grew larger than the holdings." if a.get("wiped_out") else
+                f"holding {a.get('gross', 0):.2f}× its equity, borrowed {a.get('borrowed', 0):,.0f}, interest paid so "
+                f"far {a.get('interest_paid', 0):,.0f}. Compare its return with 2.5× the {base} return above.")]
         eq = pd.Series({date.fromisoformat(r["data_through"]): r["books"][base]["equity"] for r in runs
                         if base in r["books"]})
         rf_f = BACKEND / "data" / "fred_dtb3.csv"
@@ -131,6 +145,53 @@ def main() -> None:
         lines += [f"- {lev:.1f}×: {v - 1:+.2%}" for lev, v in shadows(eq, rf).items()]
     else:
         lines.append("No allocator runs yet.")
+
+    lines += ["", "## Core leads, forward check (shadows, no money; verdict from 2027-09-30)", ""]
+    try:
+        from core_leads import forward
+        f = forward()
+        if "note" in f:
+            lines.append(f"- {f['days']} forward days: {f['note']}")
+        for k in ("vol_target", "risk_parity"):
+            if k in f:
+                v = f[k]
+                lines.append(f"- {k}: Sharpe vs B0 {v['sharpe_diff']:+.2f} (90% CI {v['ci90']}), vol-matched CAGR "
+                             f"{v['cagr_vol_matched_pct']}% vs {v['b0_cagr_pct']}% over {f['days']} days"
+                             + (" (verdict due)" if f["verdict_due"] else " (interim, not judged)"))
+    except Exception as e:  # noqa: BLE001 - a report line must never fail the review
+        lines.append(f"- not available: {type(e).__name__}: {e}"[:200])
+
+    lines += ["", "## Trading health (report only)", ""]
+    try:
+        from trading_health import load
+        s4, ex = load()
+        if "sharpe" in s4:
+            lines.append(f"- Leverage gate ({s4['book']}): forward Sharpe {s4['sharpe']}, lower 80% bound "
+                         f"{s4.get('lower80', 'n/a')}, {s4['weeks']} weeks / {s4['months']} months, vol "
+                         f"{s4.get('vol_pct', 'n/a')}%, max drawdown {s4['max_drawdown_pct']}%; Stage 4 row: "
+                         f"{s4.get('stage4_row', s4.get('note', 'n/a'))}")
+        else:
+            lines.append(f"- Leverage gate ({s4['book']}): {s4.get('note', 'no data')}")
+        lines.append(f"- Paper execution: {ex['legs']} broker legs {ex['by_status']}; fill gap vs simulator "
+                     f"mean {ex['mean_abs_gap_bp'] if ex['mean_abs_gap_bp'] is not None else 'n/a'} bp, worst "
+                     f"{ex['worst_gap_bp'] if ex['worst_gap_bp'] is not None else 'n/a'} bp, "
+                     f"{ex['gaps_over_alert']} over 0.5%; {ex['problem_legs']} rejected/canceled/expired; "
+                     f"AI pairs {ex['ai_pairs']} (audit flags {ex['ai_audit_flags']})")
+    except Exception as e:  # noqa: BLE001 - a report line must never fail the review
+        lines.append(f"- not available: {type(e).__name__}: {e}"[:200])
+
+    lines += ["", "## T1 / O1 forward shadows (failed backtests, tracked on new days only; no money; verdict 2028-09-30)", ""]
+    try:
+        from calendar_shadows import forward
+        f = forward()
+        for k in ("T1", "O1"):
+            v = f[k]
+            lines.append(f"- {k}: {v['days']} days ({v['active_days']} active), net excess "
+                         f"{v['cum_net_excess_pct'] if v['cum_net_excess_pct'] is not None else 'n/a'}%, "
+                         f"Sharpe {v['sharpe'] if v['sharpe'] is not None else 'n/a'}, "
+                         f"95% CI {v['ci95'] or 'n/a'}" + (" (verdict due)" if f["verdict_due"] else ""))
+    except Exception as e:  # noqa: BLE001 - a report line must never fail the review
+        lines.append(f"- not available: {type(e).__name__}: {e}"[:200])
 
     lines += ["", "## 1-week Bonsai book (shadow, 0 weight)", ""]
     led = Ledger(FWD / "events" / "ledger.jsonl")

@@ -102,13 +102,31 @@ async def discover(since: date, now: datetime, indexes: tuple[str, ...] = ("sp50
                                        "items", "ex99_url"])
 
 
+HEAVY = ("python", "ollama", "vllm")  # compute jobs; desktop apps (file manager, browser) hold a few MiB and don't count
+HEAVY_MIB = 1024
+
+
+def gpu_busy(listing: str) -> bool:
+    """From `nvidia-smi --query-compute-apps=process_name,used_memory --format=csv,noheader,nounits`: busy if any
+    compute job (python, ollama, vllm) or any process with 1 GiB or more is on the GPU."""
+    for line in listing.strip().splitlines():
+        name, _, mem = line.rpartition(",")
+        try:
+            mib = float(mem)
+        except ValueError:
+            mib = HEAVY_MIB
+        if any(h in name.lower() for h in HEAVY) or mib >= HEAVY_MIB:
+            return True
+    return False
+
+
 def gpu_free() -> bool:
     try:
-        out = subprocess.run(["nvidia-smi", "--query-compute-apps=pid", "--format=csv,noheader"], capture_output=True,
-                             text=True, timeout=20, check=False)
+        out = subprocess.run(["nvidia-smi", "--query-compute-apps=process_name,used_memory",
+                              "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=20, check=False)
     except (OSError, subprocess.TimeoutExpired):
         return False
-    return out.returncode == 0 and not out.stdout.strip()
+    return out.returncode == 0 and not gpu_busy(out.stdout)
 
 
 def wait_gpu_free(timeout_s: float, poll_s: float = 15.0) -> bool:
@@ -143,9 +161,10 @@ class Ollama:
             self.proc.wait(timeout=60)
 
 
-def run(cmd: list[str]) -> bool:
+def run(cmd: list[str]) -> None:
+    """Stop the event run if a child fails, before recording a missed decision or a clean heartbeat."""
     print("  $", " ".join(cmd[1:]), flush=True)
-    return subprocess.run(cmd, cwd=BACKEND, check=False).returncode == 0
+    subprocess.run(cmd, cwd=BACKEND, check=True)
 
 
 def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str, prices: Path) -> Path:
@@ -155,7 +174,7 @@ def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str, pri
         srv = Ollama(11437, "/usr/share/ollama/.ollama/models", 4, d / "ollama.log")
         try:
             run([PY, "scripts/extract_events.py", "extract", "--events", str(ev_csv), "--from", since.isoformat(),
-                 "--model", "qwen3:8b", "--base-url", "http://127.0.0.1:11437", "--parallel", "4", "--out",
+                 "--to", "2099-12-31", "--model", "qwen3:8b", "--base-url", "http://127.0.0.1:11437", "--parallel", "4", "--out",
                  str(ex.relative_to(BACKEND))])
         finally:
             srv.stop()
@@ -242,6 +261,44 @@ def prices_for(tickers: set[str], start: date, end: date, save: Path) -> Prices:
     return Prices.from_long(long)
 
 
+def validate_event_inputs(new: pd.DataFrame, p: Prices, now: datetime,
+                          feats: Path | None = None, logodds: dict[str, float] | None = None) -> None:
+    """Fail a forward run on missing or stale inputs before recording decisions."""
+    if p.close.empty or "SPY" not in p.close or p.close["SPY"].dropna().empty:
+        raise ValueError("event data check: no SPY closing prices")
+    last = pd.Timestamp(p.close["SPY"].dropna().index[-1]).date()
+    if last > now.date() or (now.date() - last).days > 5:
+        raise ValueError(f"event data check: SPY close stale or future-dated ({last})")
+    if new.empty:
+        return
+    missing: list[str] = []
+    for r in new.itertuples():
+        acc = datetime.fromisoformat(str(r.accepted_utc)).replace(tzinfo=UTC)
+        if acc > now:
+            missing.append(f"{r.accession}: acceptance after run time")
+        for asset in (trading_symbol(r.ticker), SECTOR_ETF.get(str(r.sector))):
+            if asset is None or asset not in p.close or p.close[asset].dropna().empty:
+                missing.append(f"{r.accession}: no close for {asset or 'sector ETF'}")
+            elif (now.date() - pd.Timestamp(p.close[asset].dropna().index[-1]).date()).days > 5:
+                missing.append(f"{r.accession}: stale close for {asset}")
+    if feats is not None:
+        try:
+            f = pd.read_csv(feats)
+        except pd.errors.EmptyDataError as e:
+            raise ValueError("event data check: fact sheet file empty") from e
+        if not {"accession", "fact_sheet"} <= set(f.columns):
+            missing.append("fact sheet columns absent")
+        else:
+            cards = f.drop_duplicates("accession").set_index("accession")["fact_sheet"]
+            missing += [f"{a}: fact sheet absent" for a in new["accession"]
+                        if a not in cards.index or pd.isna(cards[a]) or not str(cards[a]).strip()]
+    if logodds is not None:
+        missing += [f"{a}: model score absent" for a in new["accession"]
+                    if a not in logodds or not np.isfinite(logodds[a])]
+    if missing:
+        raise ValueError("event data check: " + "; ".join(missing[:8]))
+
+
 def score(recs: list[dict[str, Any]]) -> dict[str, Any]:
     dec = {r["accession"]: r for r in recs if r["type"] == "decision" and r.get("on_time")}
     out = {r["accession"]: r["fwd5"] for r in recs if r["type"] == "outcome" and r.get("fwd5") is not None}
@@ -261,7 +318,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dir", default="results/forward/events")
     ap.add_argument("--as-of", default="", help="replay at this UTC time (dry runs only; needs a --dir of its own)")
-    ap.add_argument("--start", default="2026-10-02", help="first filing date the forward test covers")
+    ap.add_argument("--start", default="2026-09-30", help="first filing date the forward test covers")
     ap.add_argument("--no-gpu", action="store_true")
     ap.add_argument("--index", default="sp500", help="comma list: sp500 (the shadow book), sp400,sp600 (breadth)")
     ap.add_argument("--status", action="store_true")
@@ -295,23 +352,30 @@ def main() -> None:
         prio.enter_context(gpu_priority("forward_events"))
     use_gpu = not args.no_gpu and wait_gpu_free(900 if len(new) else 0)
     logodds: dict[str, float] = {}
+    guidance: dict[str, str] = {}
     source = "bonsai" if use_gpu else "lite"
     tickers = {trading_symbol(t) for t in allev["ticker"]} | set(SECTOR_ETF.values()) | {"SPY"}
     px_file = d / "prices.parquet"
     p = prices_for(tickers, now.date() - timedelta(days=420), now.date(), px_file)
+    validate_event_inputs(new, p, now)
     if len(new):
         new_csv = d / "events_new.csv"
         new.to_csv(new_csv, index=False)
         feats = fact_sheets(d, new_csv, since, use_gpu, tag, px_file)
+        validate_event_inputs(new, p, now, feats=feats)
+        f = pd.read_csv(feats).drop_duplicates("accession")
+        guidance = dict(zip(f["accession"], f["guidance"].fillna("none"), strict=True))
         if use_gpu:
             logodds = bonsai(new_csv, d / "extract.jsonl", feats, tag, since, d, px_file)
         else:
             logodds = lite(feats, new_csv, p)
+        validate_event_inputs(new, p, now, logodds=logodds)
     prio.close()
     for r in new.itertuples():
         dl = entry_deadline(str(r.accepted_utc))
         base = {"accession": r.accession, "ticker": r.ticker, "sector": r.sector, "accepted_utc": r.accepted_utc,
-                "entry_deadline": dl.isoformat(), "as_of": now.isoformat(timespec="seconds")}
+                "entry_deadline": dl.isoformat(), "as_of": now.isoformat(timespec="seconds"),
+                "guidance": guidance.get(r.accession, "none")}
         if r.accession not in logodds:
             ledger.append("missed", **base, reason="no decision (no press release, fact sheet or model output)")
         elif now >= dl:

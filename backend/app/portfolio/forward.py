@@ -8,7 +8,9 @@ Each run (scripts/forward_allocator.py) does, for every book (the allocator and 
   3. decide new targets from those closes only and leave them pending for the next run.
 Paper money only: nothing here places a real order. Books: "master" (allocate() with no stock picks),
 "master+brakes" (the same with the drawdown brakes on its own equity), "SPY" (98% SPY, bought once),
-"80/20 SPY/BTC" (rebalanced at each run).
+"80/20 SPY/BTC" (rebalanced at each run), and "aggressive 2.5x" (docs/PLAN_60_V2.md "Aggressive book, 2.5x", the
+user's decision of 2026-09-30): 2.5 times the "master+brakes" weights on borrowed paper money, with interest on the
+borrowed cash and its own mandate limits. It is a separate book: a fault in it is reported and never stops the others.
 Safety (app/portfolio/guard.py): targets are gated against the mandate when decided and again before they fill (fail
 closed, the whole set is rejected and logged); with the kill switch on, books are marked but nothing fills or is decided.
 """
@@ -27,6 +29,10 @@ from app.portfolio.guard import reduce_only as cap_to_current
 from app.portfolio.master import MasterConfig, allocate, crypto_state
 
 FRACTIONAL = ("BTC-USD", "ETH-USD")
+COST_BPS = 5.0  # assumed one-way simulator trading cost
+AGGRESSIVE = "aggressive 2.5x"
+LEVERAGE = {AGGRESSIVE: 2.5}  # book -> multiple of the master+brakes weights; these books may borrow
+BORROW_RATE = 0.05            # a year, on negative cash, per calendar day between runs (fixed in the spec)
 
 
 @dataclass
@@ -39,6 +45,9 @@ class Book:
     trades: int = 0
     costs: float = 0.0
     peak: float = 0.0                             # highest equity marked so far (drawdown brakes)
+    interest: float = 0.0                         # interest paid on borrowed cash so far (leveraged books)
+    interest_through: str | None = None           # the date interest was last charged up to
+    wiped: bool = False                           # a leveraged book whose equity reached zero: closed for good
 
 
 def fill_day(days: pd.DatetimeIndex, decided_at: str) -> pd.Timestamp | None:
@@ -48,8 +57,9 @@ def fill_day(days: pd.DatetimeIndex, decided_at: str) -> pd.Timestamp | None:
     return later[0] if len(later) else None
 
 
-def execute(book: Book, opens: pd.Series, cost_bps: float = 5.0, reduce_only: bool = False) -> dict[str, Any]:
-    """Trade the pending targets at these opens: sells first, whole shares except crypto, cash never negative.
+def execute(book: Book, opens: pd.Series, cost_bps: float = COST_BPS, reduce_only: bool = False) -> dict[str, Any]:
+    """Trade the pending targets at these opens: sells first, whole shares except crypto, cash never negative,
+    except that a leveraged book (LEVERAGE) may borrow up to (its multiple - 1) times its equity.
     `reduce_only` (trading state REDUCING): no quantity may grow, so only sells happen."""
     assert book.pending is not None
     s = cost_bps / 1e4
@@ -57,6 +67,10 @@ def execute(book: Book, opens: pd.Series, cost_bps: float = 5.0, reduce_only: bo
     if any(a not in px for a in book.positions):  # can't value the book at this open: wait for the next run
         return {"fills": [], "skipped": "no open price for a held asset; orders stay pending"}
     equity = book.cash + sum(q * px[a] for a, q in book.positions.items())
+    if book.name in LEVERAGE and equity <= 0:  # the loan exceeds the holdings at this open: closed for good
+        book.positions, book.cash, book.pending, book.decided_at, book.wiped = {}, 0.0, None, None, True
+        return {"fills": [], "wiped_out": True}
+    credit = max(0.0, (LEVERAGE.get(book.name, 1.0) - 1) * equity)  # how far cash may go below zero
     want = {a: (equity * w / (px[a] * (1 + s))) for a, w in book.pending.items() if a in px}
     want = {a: (q if a in FRACTIONAL else math.floor(q)) for a, q in want.items()}
     if reduce_only:
@@ -73,7 +87,7 @@ def execute(book: Book, opens: pd.Series, cost_bps: float = 5.0, reduce_only: bo
     for a in sorted(want):
         delta = want[a] - book.positions.get(a, 0.0)
         if delta > 0:
-            afford = book.cash / (px[a] * (1 + s))
+            afford = max(0.0, book.cash + credit) / (px[a] * (1 + s))
             q = min(delta, afford if a in FRACTIONAL else math.floor(afford))
             if q > 0:
                 book.cash -= q * px[a] * (1 + s)
@@ -82,9 +96,12 @@ def execute(book: Book, opens: pd.Series, cost_bps: float = 5.0, reduce_only: bo
                 book.trades += 1
                 fills.append({"asset": a, "qty": round(q, 8), "price": px[a]})
     book.positions = {a: q for a, q in book.positions.items() if q > 1e-12}
-    assert book.cash >= -1e-6
+    assert book.cash >= -credit - 1e-6
     book.pending = None
     return {"fills": fills}
+
+
+PARK, PARK_MIN, INVESTED = "SGOV", 0.05, 0.98  # T-bill ETF; park only real idle cash, not the 2% buffer
 
 
 def brake_multiplier(equity: float, peak: float) -> float:
@@ -97,7 +114,16 @@ def targets(name: str, close: pd.DataFrame, day: pd.Timestamp, cfg: MasterConfig
             brake: float = 1.0) -> tuple[dict[str, float] | None, dict[str, Any]]:
     if name == "master+brakes":
         a = allocate([], crypto_state(close, day, cfg.crypto_assets), cfg)
-        return {k: w * brake for k, w in a.weights.items()}, {"dropped": a.dropped, "brake": round(brake, 3)}
+        t = {k: w * brake for k, w in a.weights.items()}
+        idle = INVESTED - sum(t.values())
+        if idle >= PARK_MIN:  # cash the brakes leave idle earns T-bill yield (user, 2026-09-29)
+            t[PARK] = round(idle, 4)
+        return t, {"dropped": a.dropped, "brake": round(brake, 3), "parked": round(t.get(PARK, 0.0), 4)}
+    if name in LEVERAGE:  # `brake` here is the master+brakes book's multiplier, not this book's own
+        a = allocate([], crypto_state(close, day, cfg.crypto_assets), cfg)
+        lev = LEVERAGE[name]
+        return ({k: round(w * brake * lev, 6) for k, w in a.weights.items()},
+                {"dropped": a.dropped, "brake": round(brake, 3), "leverage": lev})
     if name == "master":
         a = allocate([], crypto_state(close, day, cfg.crypto_assets), cfg)
         return a.weights, {"dropped": a.dropped}
@@ -122,9 +148,20 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
         rec["halted"] = True
     elif reducing:
         rec["reducing"] = True
+    brakes: dict[str, float] = {}
     for name, b in books.items():
         r: dict[str, Any] = {}
-        if b.pending is not None and not halted and (bad := gate(b.pending, mandate)):
+        if name in LEVERAGE:
+            if b.wiped:
+                rec["books"][name] = {"equity": 0.0, "positions": {}, "wiped_out": True}
+                continue
+            through = date.fromisoformat(b.interest_through) if b.interest_through else today
+            if b.cash < 0 and today > through:  # interest on the borrowed cash for the days since the last run
+                charge = -b.cash * BORROW_RATE * (today - through).days / 365
+                b.cash -= charge
+                b.interest += charge
+            b.interest_through = today.isoformat()
+        if b.pending is not None and not halted and (bad := gate(b.pending, mandate, name)):
             r["rejected_at_fill"], b.pending, b.decided_at = bad, None, None  # fail closed: keep what is held
         if halted and b.pending is not None:
             r["held_by_kill_switch"] = True  # orders stay pending; nothing fills while halted
@@ -135,16 +172,29 @@ def step(books: dict[str, Book], opens: pd.DataFrame, closes: pd.DataFrame, now_
                 r.update(execute(b, pd.Series(opens.loc[fd]), reduce_only=reducing))
             else:
                 r["waiting_for_open_after"] = datetime.fromisoformat(b.decided_at).date().isoformat()
+        if b.wiped:
+            rec["books"][name] = {"equity": 0.0, "positions": {}, "wiped_out": True}
+            continue
         # each position at its last known close (a missing bar must not drop the position from equity)
         px = {a: float(closes[a].loc[:last].dropna().iloc[-1]) for a in b.positions}
         r["equity"] = round(b.cash + sum(q * px[a] for a, q in b.positions.items()), 2)
+        if name in LEVERAGE:
+            if r["equity"] <= 0:  # the loan is larger than the holdings: the book is closed and stays closed
+                b.positions, b.cash, b.pending, b.decided_at, b.wiped = {}, 0.0, None, None, True
+                rec["books"][name] = {"equity": 0.0, "positions": {}, "wiped_out": True}
+                continue
+            r["gross"] = round(sum(q * px[a] for a, q in b.positions.items()) / r["equity"], 3)
+            r["borrowed"] = round(max(0.0, -b.cash), 2)
+            r["interest_paid"] = round(b.interest, 2)
         b.peak = max(b.peak, r["equity"])
         r["positions"] = {a: round(q, 6) for a, q in b.positions.items()}
+        brakes[name] = brake_multiplier(r["equity"], b.peak)
         if b.pending is None and not halted:
-            t, info = targets(name, closes, last, cfg, b.positions, brake_multiplier(r["equity"], b.peak))
+            t, info = targets(name, closes, last, cfg, b.positions,
+                              brakes.get("master+brakes", 1.0) if name in LEVERAGE else brakes[name])
             if t is not None and reducing:
                 t = cap_to_current(t, b.positions, b.cash, px)
-            if t is not None and (bad := gate(t, mandate)):
+            if t is not None and (bad := gate(t, mandate, name)):
                 r["rejected"] = bad  # fail closed: nothing is left pending
             elif t is not None:
                 b.pending, b.decided_at = t, now_utc.isoformat(timespec="seconds")
@@ -158,7 +208,7 @@ def books_to_json(books: dict[str, Book]) -> dict[str, Any]:
     return {k: asdict(v) for k, v in books.items()}
 
 
-BOOKS = ("master", "master+brakes", "SPY", "80/20 SPY/BTC")
+BOOKS = ("master", "master+brakes", "SPY", "80/20 SPY/BTC", AGGRESSIVE)  # leveraged books last: they read the brake
 
 
 def books_from_json(d: dict[str, Any]) -> dict[str, Book]:

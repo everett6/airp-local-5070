@@ -61,6 +61,16 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 | Day trading D3: noise-area breakout + VWAP stop (2024–26, after publication) | fail | Sharpe +0.20 [−1.24, +1.20]; +0.75 before publication |
 | Day trading D4: rest-of-day intraday momentum (2021–26, after publication) | fail | Sharpe −1.21 [−2.13, −0.33] |
 | Day trading D5: end-of-day reversal, S&P 500 cross-section (2024-07–2026-09, after publication) | fail | Sharpe −1.86 [−3.65, +0.08]; +0.6 bp/day before costs, 2 bp of costs |
+| Day trading D6: "box theory", fade yesterday's range, SPY+QQQ (2016–2026) | fail | Sharpe −0.91 [−1.58, −0.21] (98.3%); ≈0 before costs |
+| Day trading D7: intraday periodicity, S&P 500, last half hour (2016–2026) | fail | Sharpe −0.07 [−1.09, +0.74]; +2.0 bp/day before 2 bp of costs |
+| Day trading D8: Darvas box breakouts, S&P 500, vs SPY (2024-07–2026-09) | fail | excess Sharpe −0.30 [−1.84, +1.22]; 13.2%/yr vs SPY 18.0% |
+| Day trading D9: opening-auction reversal, S&P 500 (2016–2026) | pass, untradable | Sharpe +0.81 [+0.21, +1.34]; Alpaca check +1.08; the signal needs the official open, unknown before the auction |
+| Day trading D10: D9 with a 09:25 pre-market signal (tradable) | fail | Sharpe −0.64 [−1.28, −0.06] |
+| Pairs trading P1 (Gatev–Goetzmann–Rouwenhorst, within sectors, 2024-07–2026-09) | fail | Sharpe −0.61 [−1.92, +0.91] at 10 bps; −0.24 before costs |
+| Crypto funding carry C1 (long spot, short perpetual; 2023-05–2026-09, vs T-bills) | fail | Sharpe −1.63; +4.06 before 2023, below cash since 2025 |
+| Turn-of-the-month T1 (SPY, last day + first 3; 2008–2026) | fail | overlay Sharpe +0.30 [−0.10, +0.74]; TOM days only +1.3 bp/day above others, CI [−6.6, +9.4] |
+| SPY overnight O1 (close to next open, 2012–2026, 1 bp a side) | fail | net Sharpe +0.25 [−0.28, +0.81]; +0.73 before costs; 2 trades a night eat it |
+| Macro-announcement E1 (jobs, PPI, FOMC days; 2013–2026) | fail | net Sharpe +0.08 [−0.42, +0.66]; event days −1.9 bp/day vs other days |
 | Arm B2 (arm B with the news actually gathered) | fail | +0.011 IC over arm A [−0.035, +0.062]; own IC +0.054 [−0.004, +0.114] |
 | Arm B3 (code-built evidence: last outlook + real headlines) | fail | +0.001 IC over arm A [−0.032, +0.035]; own IC +0.044 [+0.003, +0.090] |
 | Arm C (arm B + Bonsai judgement fields) | fail | −0.022 IC vs arm B [−0.065, +0.025]; `net_read` alone +0.067, to be tested on live data only (C2) |
