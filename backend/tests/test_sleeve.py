@@ -90,7 +90,7 @@ def test_broker_legs_timing():
     legs = ai_picks.due_legs(p, DAYS[:2], morning)
     assert [(x.side, x.symbol, x.qty, x.tif) for x in legs] == [("buy", "AAA", 20, "day"), ("sell", "XLI", 40, "day")]
     assert ai_picks.due_legs(p, DAYS[:2], datetime(2026, 10, 5, 15, 0, tzinfo=UTC)) == []  # 11:00 ET: opg closed
-    p["legs"] = [{"client_order_id": x.client_order_id} for x in legs]
+    p["legs"] = [{"client_order_id": x.client_order_id, "asset": x.asset, "status": "filled"} for x in legs]
     assert ai_picks.due_legs(p, DAYS[:2], morning) == []  # sent already
     o, c = frames(3)
     sleeve.step(st, [], o, c, ETF, morning)
@@ -98,3 +98,30 @@ def test_broker_legs_timing():
     assert ai_picks.due_legs(p, DAYS[:6], datetime(2026, 10, 9, 12, 45, tzinfo=UTC)) == []  # bars through day 5
     out = ai_picks.due_legs(p, DAYS[:7], datetime(2026, 10, 12, 12, 45, tzinfo=UTC))  # bars through entry+4
     assert [(x.side, x.symbol) for x in out] == [("sell", "AAA"), ("buy", "XLI")]
+
+
+def test_no_exit_for_an_entry_the_broker_never_filled():
+    """30 Sep 2026: both opg entry legs of the first pick expired. Its exit must not be sent (it would open a short
+    and buy back another pair's hedge), and closing it in the simulator raises no new alert."""
+    st = sleeve.new_state()
+    morning = datetime(2026, 10, 5, 12, 45, tzinfo=UTC)
+    sleeve.step(st, [dec()], *frames(2), ETF, morning)
+    p = st["pairs"][0]
+    legs = ai_picks.due_legs(p, DAYS[:2], morning)
+    for x in legs:
+        x.status = "expired"
+    p["legs"] = [ai_picks.leg_dict(x) for x in legs]
+    sleeve.step(st, [], *frames(3), ETF, morning)
+    assert p["status"] == "open"
+    late = datetime(2026, 10, 12, 12, 45, tzinfo=UTC)
+    assert ai_picks.due_legs(p, DAYS[:7], late) == []
+    first = ai_picks.audit_pair(p, legs)
+    assert any("rejected/canceled" in a for a in first)
+    sleeve.step(st, [], *frames(8), ETF, late)
+    assert p["status"] == "closed"
+    assert ai_picks.audit_pair(p, legs) == []  # nothing new: the broken entry was alerted once
+    # one leg filled, the other expired: only the filled one is closed
+    p2 = {**p, "status": "open", "legs": [{**ai_picks.leg_dict(legs[0]), "status": "filled"},
+                                          ai_picks.leg_dict(legs[1])]}
+    out = ai_picks.due_legs(p2, DAYS[:7], late)
+    assert [(x.side, x.symbol) for x in out] == [("sell", "AAA")]

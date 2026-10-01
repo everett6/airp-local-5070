@@ -47,6 +47,12 @@ def leg_id(acc: str, when: str, part: str) -> str:
     return f"airp-pk-{re.sub(r'[^0-9]', '', acc)}-{when}-{part}"
 
 
+def entered(p: dict[str, Any]) -> set[str]:
+    """The pair's assets whose entry leg filled at the broker."""
+    return {d.get("asset", "") for d in p.get("legs", [])
+            if "-in-" in d["client_order_id"] and d.get("status") == "filled"}
+
+
 def due_legs(p: dict[str, Any], days: pd.DatetimeIndex, now: datetime) -> list[Leg]:
     """The legs that should be sent now for this pair (none if they were sent already or it's not their time)."""
     if not opg_open(now):
@@ -61,6 +67,9 @@ def due_legs(p: dict[str, Any], days: pd.DatetimeIndex, now: datetime) -> list[L
             return []
         legs = [Leg(p["ticker"], p["ticker"], "sell", p["qty"], STOCK_TIF, leg_id(p["accession"], "out", "s"), 0.0),
                 Leg(p["etf"], p["etf"], "buy", p["etf_qty"], STOCK_TIF, leg_id(p["accession"], "out", "e"), 0.0)]
+        # close only what the broker holds: an entry leg that never filled (expired, rejected) has no exit leg,
+        # or the "exit" would open a new position and eat into another pair's hedge
+        legs = [x for x in legs if x.asset in entered(p)]
     else:
         return []
     return [x for x in legs if x.client_order_id not in have]
@@ -77,14 +86,15 @@ def audit_pair(p: dict[str, Any], legs: list[Leg]) -> list[str]:
                             ("out", p["status"] == "closed")):
         pair = by_phase[phase]
         assets = {x.asset for x in pair}
-        if required or pair:
-            missing = {p["ticker"], p["etf"]} - assets
+        want = {p["ticker"], p["etf"]} if phase == "in" else {x.asset for x in by_phase["in"] if x.status == "filled"}
+        if (required and want) or pair:
+            missing = want - assets
             if missing:
                 flags.append(f"{phase} hedge missing {', '.join(sorted(missing))}")
             bad = [x.asset for x in pair if x.status in ("rejected", "canceled", "expired")]
             if bad:
                 flags.append(f"{phase} hedge rejected/canceled: {', '.join(sorted(bad))}")
-            if required and len([x for x in pair if x.status == "filled"]) < 2:
+            if required and len([x for x in pair if x.status == "filled"]) < len(want):
                 flags.append(f"{phase} hedge not fully filled")
     current = set(flags)
     old = set(p.get("audit_flags", []))
@@ -122,6 +132,7 @@ def mirror(st: dict[str, Any], client: Alpaca, days: pd.DatetimeIndex, now: date
                     alerts.append(f"ai picks {p['ticker']} order refresh uncertain: {type(e).__name__}: {e}")
             when = "in" if "-in-" in leg.client_order_id else "out"
             alerts += reconcile(leg, {k: v for k, v in sims[when].items() if v})
+        p["legs"] = [leg_dict(x) for x in legs]  # due_legs reads the refreshed entry fills
         if mode != "HALTED":
             for leg in due_legs(p, days, now):
                 if mode == "REDUCING" and "-in-" in leg.client_order_id:
