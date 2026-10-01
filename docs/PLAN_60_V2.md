@@ -828,6 +828,24 @@ naive UTC acceptance times as local time. It was a feasibility hint only. The ga
 `scripts/warm_gdelt.py`, which keeps UTC (tested), and the probe is fixed too (892ecb9).
 **Test (one trial, `llm_fields_research_b4b`):** B4's rule exactly. The 20-day (B2 − A) monthly IC paired CI must be
 above 0 AND B2's own 20-day IC CI above 0.
+**Engine note (2026-09-30 ~22:30 PDT, before any B4b research label exists; the user: "do the ollama measured
+alternative and label client thing"):** Bonsai's label stages move from Ollama to the `llama-server` binary Ollama
+itself bundles, run with 3 parallel slots (`app/sandbox/llamacpp_client.py`). Ollama 0.34.0 forces this model to one
+request at a time; the measured gain is 1.63× (docs/QUANT_DASHBOARD_RESEARCH.md).
+- **Unchanged:** the model file (the same GGUF blob Ollama loads), its chat template, thinking off, JSON output,
+  temperature 0, 8,192 tokens of context per request, the output limit, the prompts, the quote check and every
+  scoring rule. Nothing is downloaded.
+- **What differs:** with 3 slots the GPU batches requests together, which changes floating-point rounding. In the
+  30 Sep benchmark one slot gave Ollama's replies exactly (24 of 24) and three slots agreed on 98.2% of fields. The
+  differences are random, not directional. Arm A's labels (made on Ollama, one at a time) are kept as they are; the
+  B2 labels will be made with 3 slots, so (B2 − A) carries that small extra noise on the B2 side. It can only make
+  the test harder to pass, never easier.
+- **Adoption check (engineering, not a trial; reads cached replies, writes no label or result file):** through the
+  new client, on 24 arm-A prompts (P2) and 24 research prompts (`PROMPT_R`) that Ollama already answered:
+  one slot must give the identical text on at least 95% of them, and three slots must parse 100% and agree on at
+  least 97% of fields. If either fails, the label stages stay on Ollama (`AIRP_LABEL_ENGINE=ollama`).
+- **Scope:** research label stages in `scripts/llm_fields.py` only. The live forward test (extractor, Bonsai judge
+  and the shadow arms) stays on Ollama, untouched.
 
 
 ### skfolio test (spec fixed 2026-09-27, before any run)
