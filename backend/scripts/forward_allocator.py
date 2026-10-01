@@ -31,6 +31,7 @@ import pandas as pd
 import yfinance as yf
 
 from app.data_ingestion import bars
+from app.forward.ledger import write_atomic
 from app.portfolio.forward import (
     COST_BPS,
     LEVERAGE,
@@ -134,7 +135,7 @@ def resume_books(state_path: Path) -> list[str]:
     for n in cleared:
         saved[n]["reducing"] = False
     if cleared:
-        state_path.write_text(json.dumps(saved, indent=1) + "\n")
+        write_atomic(state_path, json.dumps(saved, indent=1) + "\n")
     return cleared
 
 
@@ -224,7 +225,7 @@ def main() -> None:
                 print("DRAWDOWN", dd)
     with ledger.open("a") as f:
         f.write(json.dumps(rec) + "\n")
-    state_path.write_text(json.dumps(books_to_json(books), indent=1) + "\n")
+    write_atomic(state_path, json.dumps(books_to_json(books), indent=1) + "\n")
     print(json.dumps(rec, indent=1))
     if not args.no_commit and not dry:
         repo = BACKEND.parent

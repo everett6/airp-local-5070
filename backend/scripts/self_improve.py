@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 from llm_fields import FIELDS_BB, PROMPT_BB, ask, parse
 
-from app.forward.ledger import Ledger, jsonl_records
+from app.forward.ledger import Ledger, jsonl_records, write_atomic
 from app.forward.schedule import NY
 
 PORT = 11441
@@ -63,9 +63,7 @@ def versions(d: Path) -> list[dict[str, Any]]:
 def save(d: Path, vs: list[dict[str, Any]]) -> None:
     # written whole after every event run: through a temporary file, so a crash cannot leave half a file (the
     # label shadows read it before every labelling pass)
-    tmp = d / "bb_versions.jsonl.tmp"
-    tmp.write_text("".join(json.dumps(v) + "\n" for v in vs))
-    tmp.replace(d / "bb_versions.jsonl")
+    write_atomic(d / "bb_versions.jsonl", "".join(json.dumps(v) + "\n" for v in vs))
 
 
 def fname(v: int) -> str:

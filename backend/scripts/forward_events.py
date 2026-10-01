@@ -257,7 +257,9 @@ def prices_for(tickers: set[str], start: date, end: date, save: Path) -> Prices:
             frames.append(df[["Open", "High", "Low", "Close", "Volume"]].assign(Ticker=t))
     long = pd.concat(frames).rename_axis("Date").reset_index()
     long["Date"] = pd.to_datetime(long["Date"]).dt.date.astype(str)
-    long.to_parquet(save)
+    tmp = save.with_name(save.name + ".tmp")  # whole file in one step: the sleeve reads it right after this run
+    long.to_parquet(tmp)
+    tmp.replace(save)
     return Prices.from_long(long)
 
 
@@ -344,7 +346,9 @@ def main() -> None:
     new = new[~new["accession"].isin(seen)]
     ev_csv = d / "events.csv"
     allev = pd.concat([pd.read_csv(ev_csv), new]) if ev_csv.exists() else new
-    allev.drop_duplicates("accession").to_csv(ev_csv, index=False)
+    tmp = ev_csv.with_name(ev_csv.name + ".tmp")  # in one step: a cut-off file would silently lose past releases
+    allev.drop_duplicates("accession").to_csv(tmp, index=False)
+    tmp.replace(ev_csv)
     print(f"{len(new)} new releases", flush=True)
 
     prio = ExitStack()  # forward decisions can't be made later: research jobs yield the GPU (app/sandbox/gpu_lock.py)

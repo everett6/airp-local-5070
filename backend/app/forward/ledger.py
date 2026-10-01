@@ -26,6 +26,14 @@ class LedgerError(RuntimeError):
     pass
 
 
+def write_atomic(path: Path, text: str) -> None:
+    """Replace a state file in one step (temporary file, then rename): a crash or power loss mid-write leaves the
+    old file, never half of the new one. For files a later run must be able to read (books, orders)."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text)
+    tmp.replace(path)
+
+
 def jsonl_records(path: Path) -> list[dict[str, Any]]:
     """The JSON objects of a plain (not hash-chained) .jsonl file, skipping a line cut off by a crash or power loss.
     For the shadows' label files: one torn line must not stop every later run from labelling new releases."""

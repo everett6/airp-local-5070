@@ -23,6 +23,7 @@ sys.path.insert(0, str(BACKEND))
 
 import httpx
 
+from app.forward.ledger import write_atomic
 from app.portfolio.broker import (
     CRYPTO,
     Alpaca,
@@ -136,7 +137,7 @@ def sync(client: Alpaca, alloc: Path, out: Path, now: datetime, dry: bool, halt_
                         alerts.append(f"broker leg {leg.client_order_id} {leg.note}")
                     alerts += reconcile(leg, {})
         o["legs"] = [leg_dict(x) for x in legs]
-    path.write_text(json.dumps(orders, indent=1) + "\n")
+    write_atomic(path, json.dumps(orders, indent=1) + "\n")
     for dec in sorted(orders)[-1:]:  # the latest decision's legs
         for d in orders[dec]["legs"]:
             gap = "" if d["gap"] is None else f" gap {100 * d['gap']:+.2f}%"
