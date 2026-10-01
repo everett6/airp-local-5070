@@ -32,6 +32,7 @@ def test_review_is_written_when_the_aggressive_book_failed_a_week(tmp_path: Path
     monkeypatch.setattr(W, "BACKEND", tmp_path)
     monkeypatch.setattr(W, "shadow_lines", list)
     monkeypatch.setattr(W, "goal_lines", list)
+    monkeypatch.setattr(W, "symbol_lines", lambda: ["", "## Symbol check", "", "- 2 of 3 index members have prices"])
     for mod in ("core_leads", "calendar_shadows", "trading_health"):  # their own files: not this test's subject
         monkeypatch.setitem(sys.modules, mod, types.SimpleNamespace())
     W.main()
@@ -39,4 +40,13 @@ def test_review_is_written_when_the_aggressive_book_failed_a_week(tmp_path: Path
     assert "| master+brakes | 100,000 | 101,000 | +1.00% |" in text
     assert f"| {AGGRESSIVE} | 100,000 | 100,000 | +0.00% |" in text  # its last good week
     assert "its last run failed (AssertionError: cash); the other books were not affected." in text
-    assert "written to" in capsys.readouterr().out
+    assert "## Symbol check" in text and "written to" in capsys.readouterr().out
+
+
+def test_symbol_check_names_members_without_prices(monkeypatch: pytest.MonkeyPatch) -> None:
+    import forward_events
+    import pandas as pd
+    monkeypatch.setattr(forward_events, "members", lambda _y: pd.DataFrame({"ticker": ["AAA", "BRK.B", "EQR", "GONE"]}))
+    monkeypatch.setattr(forward_events, "daily_bars", lambda want, _a, _b: {t: 1 for t in want if t != "GONE"})
+    lines = W.symbol_lines()
+    assert lines[1] == "## Symbol check" and lines[3].startswith("- 3 of 4 index members have recent prices; none for GONE")

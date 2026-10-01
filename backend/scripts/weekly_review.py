@@ -67,6 +67,24 @@ def goal_lines() -> list[str]:
             *[f"- {t['label']}: {t['status'].replace('_', ' ')}, {t['weight']:.0%}" for t in res["tracks"]]]
 
 
+def symbol_lines() -> list[str]:
+    """Index members whose trading symbol returns no recent price. A renamed company shows up here before it reports
+    (found by hand on 1 Oct 2026: Fiserv and EQR); until its new symbol is in app/data_ingestion/tickers.py its
+    release cannot be priced, decided or traded."""
+    from forward_events import daily_bars, members
+
+    from app.data_ingestion.tickers import trading_symbol
+    today = datetime.now(UTC).date()
+    want = sorted({trading_symbol(t) for t in members(today.year)["ticker"]})
+    have = daily_bars(want, (today - timedelta(days=10)).isoformat(), today.isoformat())
+    gone = [t for t in want if t not in have]
+    line = f"- {len(want) - len(gone)} of {len(want)} index members have recent prices"
+    if gone:
+        line += (f"; none for {', '.join(gone)} (bought out or delisted, or renamed: a renamed one needs its new "
+                 "symbol before it reports)")
+    return ["", "## Symbol check", "", line]
+
+
 def shadow_lines(fwd: Path = FWD) -> list[str]:
     """The no-money AI tests: the three live lenses (C2, D, E), the AI-picks sleeve, long-term picks and themes.
     A section that cannot be read says so instead of stopping the review."""
@@ -230,6 +248,10 @@ def main() -> None:
     reasons = pd.Series([r["reason"] for r in missed]).value_counts() if missed else pd.Series(dtype=int)
     lines += [f"  - {n} × {why}" for why, n in reasons.items()]
     lines += shadow_lines()
+    try:
+        lines += symbol_lines()
+    except Exception as e:  # noqa: BLE001 - a report line must never fail the review
+        lines += ["", "## Symbol check", "", f"- not available: {type(e).__name__}: {e}"[:200]]
     lines += goal_lines()
     out = FWD / f"review_{datetime.now(UTC).date().isoformat()}.md"
     out.write_text("\n".join(lines) + "\n")
