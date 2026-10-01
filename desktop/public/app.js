@@ -19,12 +19,18 @@ const views = {
     const runs = o.recentRuns.filter((r) => r.job !== 'check');
     const clean = runs.slice(0, 10).filter((r) => r.rc === 0).length;
     const next = (o.timers || []).map((t) => ({ unit: t.unit || t.activates, next: t.next })).filter((t) => t.next);
-    return `<h2>Overview</h2><p class="lede">The paper book runs itself on timers; this is what it has done.</p>
+    return `<h2>Home</h2><p class="lede">Your practice-money trading system at a glance.</p>
+      <div class="banner ${o.halted ? 'bad' : clean === Math.min(10, runs.length) ? 'ok' : 'warn'}">${o.halted
+        ? '<b>Trading is stopped.</b> The kill switch is on; nothing will be bought or sold until you resume.'
+        : clean === Math.min(10, runs.length) ? '<b>Everything is running normally.</b> The system trades practice money by itself; you do not need to do anything.'
+          : `<b>Running, but ${Math.min(10, runs.length) - clean} of the last ${Math.min(10, runs.length)} runs had a problem.</b> See Alerts below for what happened.`}
+        ${next[0] ? ` Next automatic run: <b>${esc(when(Number(next.slice().sort((a, b) => a.next - b.next)[0].next) / 1000))}</b>.` : ''}</div>
+      ${plain('airp follows a fixed set of rules to invest <b>pretend money</b>. The numbers below compare the main rule set (the "core book") with simply buying the whole US market (SPY) since 2018. Hover any <b>?</b> for what a word means, or open <b>How it works</b>.')}
       ${m.missing ? '' : `<div class="kpis">
-        ${kpi('Core CAGR', pct(m.tracks.core.stats.cagr), `SPY ${pct(m.tracks.SPY.stats.cagr)}`)}
-        ${kpi('Core Sharpe', esc(m.tracks.core.stats.sharpe), `SPY ${esc(m.tracks.SPY.stats.sharpe)}`)}
-        ${kpi('Core max DD', pct(m.tracks.core.stats.max_dd), `SPY ${pct(m.tracks.SPY.stats.max_dd)}`)}
-        ${kpi('Tests passed', `${m.lab.tests.filter((x) => x.pass).length}/${m.lab.tests.length}`, 'strategy lab')}
+        ${kpi('Growth per year', pct(m.tracks.core.stats.cagr), `market (SPY) ${pct(m.tracks.SPY.stats.cagr)}`)}
+        ${kpi('Quality score (Sharpe)', esc(m.tracks.core.stats.sharpe), `market (SPY) ${esc(m.tracks.SPY.stats.sharpe)}`)}
+        ${kpi('Worst fall', pct(m.tracks.core.stats.max_dd), `market (SPY) ${pct(m.tracks.SPY.stats.max_dd)}`)}
+        ${kpi('Ideas that passed', `${m.lab.tests.filter((x) => x.pass).length}/${m.lab.tests.length}`, 'strategy lab')}
         ${kpi('Live AI decisions', m.live.decisions.length, `pick threshold ${esc(m.live.ai_threshold ?? '–')}`)}
       </div>
       <div class="card wide"><h3>Core book vs SPY · growth of 100 (backtest)</h3>${lineChart([
@@ -52,7 +58,8 @@ const views = {
     const ai = b.aiPicks;
     const legs = Object.entries(b.orders || {}).flatMap(([k, d]) => (d.legs || []).map((l) => ({ ...l, decision: k })))
       .concat((ai?.pairs || []).flatMap((p) => (p.legs || []).map((l) => ({ ...l, decision: `AI ${p.ticker}` }))));
-    return `<h2>Live book &amp; orders</h2><p class="lede">Simulator equity by weekly run; paper orders at Alpaca next to the simulator's fills.</p>
+    return `<h2>Live book &amp; orders</h2><p class="lede">What the system holds right now and the practice orders it has sent.</p>
+      ${plain('The system keeps its own record of every trade (the "simulator") and also sends the same trades to a practice account at the broker Alpaca. This page shows both, so you can see they agree. No real money is involved.')}
       <div class="card wide"><h3>Live equity by book (simulator, weekly runs)</h3>${main.length > 1
         ? lineChart(names.slice(0, 4).map((n) => ({ name: n, x: b.series[n].map((r) => r.date), y: b.series[n].map((r) => r.equity) })), { yFmt: (v) => v.toFixed(0) })
         : '<p class="empty">The first live allocator run is Mon 5 Oct 15:00; the curve starts after two weekly runs.</p>'}</div>
@@ -61,7 +68,7 @@ const views = {
           return `<tr><td>${esc(n)}</td><td class="num">${fmt(s[0].equity)}</td><td class="num">${fmt(s.at(-1).equity)}</td><td class="num">${fmt(100 * r, 2)}%</td><td class="mono">${esc(t ? Object.entries(t).map(([k, v]) => `${k} ${fmt(100 * v, 1)}%`).join(' · ') : '–')}</td></tr>`; }).join('') || '<tr><td colspan="5" class="muted">no allocator runs yet (first live run Monday)</td></tr>'}</table></div>
       <div class="card wide"><h3>AI-picks sleeve (untested, 10%)</h3>
         ${ai ? `<p class="muted">Equity ${fmt(ai.equity)} · threshold log-odds ${esc(ai.threshold)} · broker audit ${esc(ai.broker_audit_status)}</p>
-        <table><tr><th>Ticker</th><th>ETF hedge</th><th class="num">Log-odds</th><th>Entry</th><th>Status</th><th>Audit</th></tr>
+        <table><tr><th>Ticker</th><th>ETF hedge</th><th class="num">Score${help('Log-odds')}</th><th>Entry</th><th>Status</th><th>Audit</th></tr>
         ${(ai.pairs || []).map((p) => `<tr><td>${esc(p.ticker)}</td><td>${esc(p.etf)}</td><td class="num">${fmt(p.logodds, 2)}</td><td>${esc(p.entry_day)}</td><td>${pill(p.status, p.status === 'closed' ? '' : 'lime')}</td><td>${esc((p.audit_flags || []).join('; ') || 'ok')}</td></tr>`).join('')}</table>` : '<p class="empty">No AI picks yet.</p>'}</div>
       <div class="card wide"><h3>Paper broker orders</h3><table><tr><th>Decision</th><th>Symbol</th><th>Side</th><th class="num">Qty</th><th>Status</th><th class="num">Fill</th><th class="num">Simulator</th><th class="num">Gap</th></tr>
         ${legs.map((l) => `<tr><td>${esc(l.decision)}</td><td>${esc(l.symbol)}</td><td>${esc(l.side)}</td><td class="num">${esc(l.qty)}</td><td>${pill(l.status, l.status === 'filled' ? 'ok' : ['rejected', 'canceled', 'expired'].includes(l.status) ? 'bad' : '')}</td><td class="num">${fmt(l.filled_price, 2)}</td><td class="num">${fmt(l.sim_price, 2)}</td><td class="num">${l.gap == null ? '–' : `${fmt(l.gap * 1e4, 1)} bp`}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">no orders yet</td></tr>'}</table></div>`;
@@ -70,7 +77,8 @@ const views = {
   async health() {
     const h = await api('health');
     const s = h.stage4 || {}, e = h.execution || {};
-    return `<h2>Trading health</h2><p class="lede">The leverage gate (Stage 4) and paper execution quality. Report only.</p>
+    return `<h2>Trading health</h2><p class="lede">Is live trading behaving like the tests said it would?</p>
+      ${plain('Two checks. First: is the live result good enough, for long enough, to justify taking more risk later (it needs months of data, so expect "information only" for now). Second: did the practice broker fill orders at the prices the system expected.')}
       <div class="grid">
         <div class="card"><div class="label">Forward Sharpe</div><div class="stat">${esc(s.sharpe ?? '–')}</div><span class="muted">lower 80% bound ${esc(s.lower80 ?? '–')}</span></div>
         <div class="card"><div class="label">Evidence</div><div class="stat">${esc(s.weeks ?? 0)} wk</div><span class="muted">${esc(s.months ?? 0)} months · book ${esc(s.book ?? '')}</span></div>
@@ -86,7 +94,8 @@ const views = {
   async research() {
     const q = await api('research');
     if (!Array.isArray(q)) return `<h2>Research queue</h2><p class="err">${esc(q.error)}</p>`;
-    return `<h2>Research queue</h2><p class="lede">Long research jobs that restart themselves; GPU jobs only run 18:00–05:25.</p>
+    return `<h2>Research queue</h2><p class="lede">Long background jobs that test new ideas. They restart themselves.</p>
+      ${plain('These jobs gather news and have the AI label thousands of past earnings releases, to test whether research agents can improve the picks. Jobs that need the graphics card only run at night (18:00–05:25) so they never get in the way of live trading. You can pause one if the PC feels slow.')}
       <div class="grid">${q.map((j) => { const [d, t] = j.progress; const pct = t ? Math.min(100, (100 * d) / t) : 0;
         const state = j.done ? pill('done', 'ok') : j.paused ? pill('paused', 'warn') : j.running ? pill('running', 'lime') : pill(j.kind === 'gate' ? 'waiting for check' : 'queued');
         return `<div class="card wide"><div class="row"><h3 style="margin:0">${esc(j.name)}</h3>${pill(j.kind)}${state}
@@ -97,7 +106,8 @@ const views = {
   async tests() {
     const t = await api('tests');
     const pass = t.filter((x) => String(x.result).startsWith('pass')).length;
-    return `<h2>Tests</h2><p class="lede">Every pre-registered trial, run once. ${pass} passed of ${t.length}.</p>
+    return `<h2>Tests</h2><p class="lede">The full record of every experiment. ${pass} passed of ${t.length}.</p>
+      ${plain('Every idea is written down before it is tested and then run exactly once, so results cannot be cherry-picked. Most ideas fail; that is normal and it is why only tested rules trade.')}
       <div class="card wide"><table><tr><th>Date</th><th>Trial</th><th>Kind</th><th class="num">Sharpe / IC</th><th>Result</th></tr>
       ${t.map((x) => `<tr><td>${esc(x.date)}</td><td>${esc(x.trial)}</td><td>${esc(x.kind)}</td><td class="num">${esc(x.sharpe ?? x.ic ?? '')}</td><td>${pill(x.result, String(x.result).startsWith('pass') ? 'ok' : String(x.result).startsWith('fail') ? 'bad' : '')}</td></tr>`).join('')}</table></div>`;
   },
@@ -117,32 +127,92 @@ async function metrics(force = false) {
   if (!metricsCache || force) metricsCache = await api('metrics');
   return metricsCache;
 }
-const kpi = (label, value, sub = '') => `<div class="kpi"><div class="label">${esc(label)}</div><div class="stat">${value}</div><div class="sub">${sub}</div></div>`;
-const statsRow = (s) => kpi('CAGR', pct(s.cagr)) + kpi('Sharpe', esc(s.sharpe)) + kpi('Volatility', pct(s.vol)) + kpi('Max drawdown', pct(s.max_dd)) + kpi('Period', `<span style="font-size:13px">${esc(s.start?.slice(0, 7))} → ${esc(s.end?.slice(0, 7))}</span>`);
+// Plain-language meanings, shown as a "?" beside the term and listed on the How it works page.
+const GLOSS = {
+  'CAGR': 'Average growth per year. 17% means 100 became about 117 after a typical year.',
+  'Sharpe': 'Return compared with how bumpy the ride was. Under 0.5 is weak, around 1 is good, 2 is rare.',
+  'Volatility': 'How much the value swings in a typical year. Higher means a rougher ride.',
+  'Max drawdown': 'The worst fall from a high point to the next low. -27% means it once dropped by about a quarter.',
+  'Drawdown': 'How far the value is below its earlier high at each moment. 0% means it is at a new high.',
+  'Rolling 1-year Sharpe': 'The Sharpe score measured over the previous 12 months, so you can see good and bad stretches.',
+  'Log-odds': 'The AI judge\'s confidence. 0 is a coin flip; higher means it is more sure the stock will beat its sector.',
+  'Pick threshold': 'The score a release needs before the system places a paper trade on it. Most releases stay below it.',
+  '95% interval': 'The range the true result probably sits in. If the range crosses 0, the idea may simply not work.',
+  'Backtest': 'Running the rules on past data to see what would have happened. It is evidence, not a promise.',
+  'Paper trading': 'Practice trading with pretend money at a real broker. No real money can be lost.',
+  'Sector': 'The stock\'s industry group (for example technology). A pick is judged against its group, not the whole market.',
+  'SPY': 'A fund that tracks the 500 largest US companies. It is the "just buy the market" yardstick.',
+  'Pre-registered': 'The test rules were written down and published before the test ran, so the result cannot be bent afterwards.',
+};
+const help = (term, text = GLOSS[term]) => (text ? `<span class="help" tabindex="0" data-tip="${esc(text)}">?</span>` : '');
+const KPI_TERM = { 'Growth per year': 'CAGR', 'Quality score (Sharpe)': 'Sharpe', 'Worst fall': 'Max drawdown', 'Bumpiness (volatility)': 'Volatility', 'Max DD': 'Max drawdown', 'Sharpe (net)': 'Sharpe', 'SPY Sharpe': 'Sharpe', 'Above threshold': 'Pick threshold' };
+const kpi = (label, value, sub = '') => `<div class="kpi"><div class="label">${esc(label)}${help(KPI_TERM[label] || label)}</div><div class="stat">${value}</div><div class="sub">${sub}</div></div>`;
+const plain = (html) => `<div class="plain"><span class="plain-tag">In plain words</span><p>${html}</p></div>`;
+const h3 = (title, term) => `<h3>${esc(title)}${help(term || title)}</h3>`;
+const statsRow = (s) => kpi('Growth per year', pct(s.cagr)) + kpi('Quality score (Sharpe)', esc(s.sharpe)) + kpi('Bumpiness (volatility)', pct(s.vol)) + kpi('Worst fall', pct(s.max_dd)) + kpi('Period', `<span style="font-size:13px">${esc(s.start?.slice(0, 7))} → ${esc(s.end?.slice(0, 7))}</span>`);
 const noMetrics = '<p class="empty">Chart data not built yet — press “Rebuild charts”.</p>';
 let stratTab = 'core';
 
 Object.assign(views, {
+  async how() {
+    const [d, m] = await Promise.all([api('decisions').catch(() => []), metrics().catch(() => ({ missing: true }))]);
+    const thr = m?.live?.ai_threshold;
+    const ex = d.filter((r) => r.type === 'decision' && r.logodds != null).sort((a, b) => b.logodds - a.logodds)[0];
+    const step = (n, who, kind, title, text) => `<div class="step"><div class="step-n">${n}</div><div class="step-who">${esc(who)} ${pill(kind, kind === 'AI' ? 'lime' : kind === 'in testing' ? 'warn' : '')}</div><h3>${esc(title)}</h3><p>${text}</p></div>`;
+    return `<h2>How it works</h2><p class="lede">The whole system on one page, in plain words.</p>
+      ${plain('airp is a <b>practice</b> trading system. It has two parts: a simple rule-based book that holds most of the pretend money, and an AI team that reads company earnings reports and makes small practice bets. A master judge AI makes the call, and plain maths decides whether its opinion is strong enough to act on.')}
+      <div class="card wide"><h3>The AI team: from a news release to a practice trade</h3>
+        <div class="pipeline">
+          ${step(1, 'Watcher', 'code', 'Spots new earnings reports', 'Twice every weekday it checks the official SEC feed for S&amp;P 500 companies that just reported.')}
+          ${step(2, 'Reader agent', 'AI', 'Pulls out the facts', 'A small AI reads the report for sales, profit, outlook and tone. Code then checks every number is quoted word-for-word, so it cannot make things up.')}
+          ${step(3, 'Fact tools', 'algorithm', 'Adds hard numbers', 'Formulas add the company\'s filing history and how the stock has moved against its industry group.')}
+          ${step(4, 'Research agents', 'in testing', 'Gather news and opinions', 'Extra agents (a news researcher, a bull-versus-bear debate, a summary reader) form views. They are scored in the background and only count once they prove useful.')}
+          ${step(5, 'Master judge', 'AI', 'Says BUY or PASS', 'The large AI (Bonsai) reads the fact sheet and answers one word. Maths reads how sure it was and turns that into a confidence score.')}
+          ${step(6, 'Decision rule', 'algorithm', 'Acts only on strong scores', `A score above ${esc(thr ?? 'the threshold')} becomes a practice trade: buy the stock, and bet against its industry fund so only the company's own news matters.`)}
+          ${step(7, 'Scorekeeper', 'code', 'Checks who was right', 'A week later it compares the stock with its industry group and records the result. Nothing can be edited afterwards.')}
+        </div>
+        ${ex ? `<p class="muted">Latest example: <b>${esc(ex.ticker)}</b> scored <b>${fmt(ex.logodds, 2)}</b>${thr != null ? (ex.logodds >= thr ? `, above the ${esc(thr)} threshold, so it became a practice trade.` : `, below the ${esc(thr)} threshold, so no trade.`) : '.'}</p>` : ''}
+      </div>
+      <div class="split">
+        <div class="card"><h3>What it predicts (and what it does not)</h3>
+          <p>It does <b>not</b> predict a share price. It predicts one thing: <b>will this stock do better than its industry group over the next week?</b> That is an easier and more honest question.</p>
+          <p class="muted">So far the AI picks have not proven themselves on past data. That is why they trade a small pretend sleeve and why the research agents are still being tested.</p></div>
+        <div class="card"><h3>The core book (no AI)</h3>
+          <p>Most of the pretend money follows simple rules: hold the US market (SPY), add a little Bitcoin and Ether when they are rising, and cut back automatically in a big fall. Spare cash sits in short-term government bills.</p>
+          <p class="muted">${m.missing ? '' : `On past data since 2018 it grew ${pct(m.tracks.core.stats.cagr)} a year against ${pct(m.tracks.SPY.stats.cagr)} for the market, and its worst fall was ${pct(m.tracks.core.stats.max_dd)} against ${pct(m.tracks.SPY.stats.max_dd)}.`}</p></div>
+      </div>
+      <div class="card wide"><h3>Safety rules</h3><div class="rules">
+        <div><b>Pretend money only.</b> No real trades, ever, unless you change that yourself.</div>
+        <div><b>Rules are frozen.</b> The live rules cannot be tweaked after seeing results.</div>
+        <div><b>Ideas are tested once.</b> Written down first, run once, failures are kept on record.</div>
+        <div><b>Kill switch.</b> The red button (bottom left) stops all trading at once.</div>
+      </div></div>
+      <div class="card wide"><h3>Words used in this app</h3><dl class="gloss">${Object.entries(GLOSS).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
+  },
   async strategies() {
     const m = await metrics(); if (m.missing) return `<h2>Strategies</h2>${noMetrics}`;
     const t = m.tracks, tabs = [['core', 'Core book (long-term)'], ['event', 'AI events (short-term)'], ['longterm', 'Long-term picks & themes']];
-    const head = `<h2>Strategies</h2><p class="lede">Backtests with the frozen code (2018→today). Live results build up in Live book.</p>
+    const head = `<h2>Strategies</h2><p class="lede">How each rule set would have done on past data (2018 to today).</p>
       <div class="tabs">${tabs.map(([k, n]) => `<button class="btn ${k === stratTab ? 'on' : 'ghost'}" data-strat="${k}">${esc(n)}</button>`).join('')}</div>`;
     if (stratTab === 'longterm') {
       return `${head}<div class="card wide"><h3>Long-term picks (monthly, 10 names) and theme track</h3>
-        <p>The first cohorts are made on <b>Thu 1 Oct 15:30</b>. Each cohort is scored against SPY after it matures; the track is judged after 12 scored cohorts (no money until then).</p>
-        <p class="muted">This page fills in automatically as cohorts are written (results/forward/longterm, results/forward/themes).</p></div>`;
+        <p>Once a month the AI picks 10 stocks to hold for the long run, plus a set of big themes. The first picks are made on <b>Thu 1 Oct at 15:30</b>.</p>
+        <p>Each month's picks are later compared with simply holding the market. The track is only judged after 12 months of scored picks, and it gets no money before then.</p>
+        <p class="muted">This page fills in by itself once the first picks exist.</p></div>`;
     }
     const a = t[stratTab], spy = t.SPY, years = Object.keys(a.yearly);
+    const about = stratTab === 'core'
+      ? 'The <b>core book</b> is where the money is. It holds the US stock market (SPY) plus a little Bitcoin and Ether, and automatically cuts back when prices are falling. No AI is involved; it is simple, tested rules. Blue is the core book, orange is just holding the market.'
+      : 'The <b>AI events book</b> buys stocks the AI judge likes right after earnings and holds them for a week. On past data it did <b>not</b> beat doing nothing, so it only trades a small pretend sleeve while we look for a version that works.';
     const bench = stratTab === 'core';
     const eqSeries = [{ name: stratTab === 'core' ? 'Core book' : 'AI event book', x: a.dates, y: a.equity }];
     if (bench) eqSeries.push({ name: 'SPY', x: spy.dates, y: spy.equity });
-    return `${head}
+    return `${head}${plain(about)}
       <div class="kpis">${statsRow(a.stats)}${bench ? kpi('SPY Sharpe', esc(spy.stats.sharpe), `CAGR ${pct(spy.stats.cagr)} · max DD ${pct(spy.stats.max_dd)}`) : ''}</div>
-      <div class="card wide"><h3>Growth of 100</h3>${lineChart(eqSeries, { yFmt: (v) => v.toFixed(0) })}</div>
+      <div class="card wide">${h3('Growth of 100', 'Backtest')}${lineChart(eqSeries, { yFmt: (v) => v.toFixed(0) })}</div>
       <div class="split">
-        <div class="card"><h3>Drawdown</h3>${lineChart(bench ? [{ name: eqSeries[0].name, x: a.dates, y: a.drawdown }, { name: 'SPY', x: spy.dates, y: spy.drawdown }] : [{ name: eqSeries[0].name, x: a.dates, y: a.drawdown }], { yFmt: (v) => pct(v, 0), zero: true, width: 560, height: 260 })}</div>
-        <div class="card"><h3>Rolling 1-year Sharpe</h3>${lineChart(bench ? [{ name: eqSeries[0].name, x: a.dates, y: a.rolling_sharpe }, { name: 'SPY', x: spy.dates, y: spy.rolling_sharpe }] : [{ name: eqSeries[0].name, x: a.dates, y: a.rolling_sharpe }], { yFmt: (v) => v.toFixed(1), zero: true, width: 560, height: 260 })}</div>
+        <div class="card">${h3('Drawdown')}${lineChart(bench ? [{ name: eqSeries[0].name, x: a.dates, y: a.drawdown }, { name: 'SPY', x: spy.dates, y: spy.drawdown }] : [{ name: eqSeries[0].name, x: a.dates, y: a.drawdown }], { yFmt: (v) => pct(v, 0), zero: true, width: 560, height: 260 })}</div>
+        <div class="card">${h3('Rolling 1-year Sharpe')}${lineChart(bench ? [{ name: eqSeries[0].name, x: a.dates, y: a.rolling_sharpe }, { name: 'SPY', x: spy.dates, y: spy.rolling_sharpe }] : [{ name: eqSeries[0].name, x: a.dates, y: a.rolling_sharpe }], { yFmt: (v) => v.toFixed(1), zero: true, width: 560, height: 260 })}</div>
       </div>
       <div class="card wide"><h3>Return by year</h3>${barChart(years, bench ? [{ name: eqSeries[0].name, y: years.map((y) => a.yearly[y]) }, { name: 'SPY', y: years.map((y) => spy.yearly[y] ?? null) }] : [{ name: eqSeries[0].name, y: years.map((y) => a.yearly[y]) }])}</div>`;
   },
@@ -158,8 +228,9 @@ Object.assign(views, {
       <div class="kpis">${kpi('Sharpe (net)', esc(c[k].stats.sharpe))}${kpi('CAGR', pct(c[k].stats.cagr))}${kpi('Max DD', pct(c[k].stats.max_dd))}</div>
       ${lineChart([{ name: names[k], x: c[k].dates, y: c[k].equity }], { width: 560, height: 220, yFmt: (v) => v.toFixed(0) })}</div>`).join('');
     const passed = tests.filter((x) => x.pass).length;
-    return `<h2>Strategy lab</h2><p class="lede">Every pre-registered strategy test, run once on its post-publication window at 1 bp a side. ${passed} of ${tests.length} passed (Sharpe ≥ 0.5 with the 95% interval above 0).</p>
-      <div class="card wide"><h3>Net Sharpe with 95% interval</h3>${ciChart(rows, { refs: [{ v: 0.5, label: 'pass line 0.5' }] })}</div>
+    return `<h2>Strategy lab</h2><p class="lede">Trading ideas we tested, and whether they held up. ${passed} of ${tests.length} passed.</p>
+      ${plain('Each row is one idea (day trading, calendar effects, pairs, crypto). The dot is its score after costs and the line is how uncertain that score is. To pass, the dot must be right of the dashed line <b>and</b> the whole line must be right of zero. Grey rows failed, so they do not trade.')}
+      <div class="card wide">${h3('Score after costs, with its uncertainty range', '95% interval')}${ciChart(rows, { refs: [{ v: 0.5, label: 'pass line 0.5' }] })}</div>
       <div class="split">${curveCards}</div>
       <p class="muted">D9 passed but trades the official open auction, which is not tradable in practice; its tradable version (D10) failed.</p>`;
   },
@@ -168,9 +239,10 @@ Object.assign(views, {
     const [d, m] = await Promise.all([api('decisions'), metrics().catch(() => ({}))]);
     const vals = d.filter((r) => r.type === 'decision' && r.logodds != null).map((r) => Number(r.logodds));
     const thr = m?.live?.ai_threshold;
-    return `<h2>AI signals</h2><p class="lede">Bonsai-27B scores every new earnings release (log-odds of beating its sector over a week). Picks above the threshold go to the paper AI sleeve.</p>
+    return `<h2>AI picks</h2><p class="lede">What the AI judge thought of each new earnings report.</p>
+      ${plain('When a big company reports earnings, a reader AI pulls out the key numbers and the judge AI (Bonsai) gives a confidence score that the stock will beat its industry group over the next week. Only scores above the threshold become a practice trade. This part is <b>still unproven</b>: it is being tested with pretend money.')}
       <div class="kpis">${kpi('Live decisions', vals.length)}${kpi('Above threshold', vals.filter((v) => thr != null && v >= thr).length, `threshold ${esc(thr ?? '–')}`)}${kpi('Missed', d.filter((r) => r.type === 'missed').length)}</div>
-      <div class="card wide"><h3>Score distribution</h3>${histogram(vals, { mark: thr, markLabel: 'pick threshold', bins: 16 })}</div>
+      <div class="card wide">${h3('How confident the judge was (each bar counts reports)', 'Log-odds')}${histogram(vals, { mark: thr, markLabel: 'pick threshold', bins: 16 })}</div>
       <div class="card wide"><table><tr><th>Accepted</th><th>Ticker</th><th>Sector</th><th class="num">Log-odds</th><th>Guidance</th><th>Result</th></tr>
       ${d.map((r) => `<tr><td>${esc(when(r.accepted_utc ? `${r.accepted_utc}Z` : r.as_of))}</td><td>${esc(r.ticker)}</td><td>${esc(r.sector)}</td><td class="num">${fmt(r.logodds, 2)}</td><td>${esc(r.guidance || '')}</td><td>${r.type === 'missed' ? pill('missed', 'bad') : pill('on time', 'ok')}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">no live decisions yet</td></tr>'}</table></div>`;
   },
