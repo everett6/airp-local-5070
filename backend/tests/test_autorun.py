@@ -1,5 +1,6 @@
 """Autonomy runner: mode file, dry-run folders, alert scanning, missed-run check (no subprocesses run here)."""
 import json
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -252,3 +253,50 @@ def test_post_run_records_the_consensus_shadow_after_live_event_runs_only(monkey
     seen.clear()
     autorun.post_run("events")
     assert "scripts/consensus_shadow.py" not in seen
+
+
+def test_an_event_run_that_only_alerted_counts_as_run_and_is_pushed(tmp_path, monkeypatch):
+    """30 Sep / 1 Oct 2026: the event runner finished, then ai_picks raised a broker alert (exit 1). The decisions
+    were made, so it is not a missed run, and its ledger still gets its outside timestamp."""
+    monkeypatch.setattr(autorun, "FWD", tmp_path)
+    (tmp_path / "AUTORUN_MODE").write_text("live\n")
+    hb = [{"job": "events", "mode": "live", "start": "2026-09-30T12:45:00+00:00", "rc": 0, "missed_total": 0},
+          {"job": "events", "mode": "live", "start": "2026-09-30T22:30:00+00:00", "rc": 1, "missed_total": 0}]
+    (tmp_path / "heartbeat.jsonl").write_text("\n".join(json.dumps(r) for r in hb) + '\n{"job": "events", "mo')  # torn
+    assert autorun.check(today=date(2026, 10, 1)) == []
+    assert len(autorun.heartbeats()) == 2  # the torn line is skipped, not fatal
+    autorun.append("heartbeat.jsonl", {"job": "check", "mode": "live", "rc": 0})
+    assert autorun.heartbeats()[-1]["job"] == "check"  # and the next record starts on its own line
+
+    scoreboard = '{\n "decisions": 2,\n "missed": 0\n}\n'
+    steps = [["py", "scripts/forward_events.py"], ["py", "scripts/ai_picks.py"]]
+    results = {"scripts/forward_events.py": (0, scoreboard), "scripts/ai_picks.py": (1, "BROKER ALERT: x\n")}
+    monkeypatch.setattr(autorun, "BACKEND", tmp_path)
+    monkeypatch.setattr(autorun, "wait_online", lambda: True)
+    monkeypatch.setattr(autorun, "can_inhibit", lambda: False)
+    monkeypatch.setattr(autorun, "commands", lambda job, mode: steps)
+    monkeypatch.setattr(autorun, "alert", lambda *a: None)
+    monkeypatch.setattr(autorun, "post_run", lambda job: None)
+    monkeypatch.setattr(autorun, "step", lambda cmd, inhibit: subprocess.CompletedProcess(cmd, *results[cmd[1]], ""))
+    pushed = []
+    monkeypatch.setattr(autorun, "push", pushed.append)
+    assert autorun.run("events") == 1 and pushed == ["events"]
+    results["scripts/forward_events.py"] = (1, "KeyError\n")  # the runner itself failed: nothing is pushed
+    assert autorun.run("events") == 1 and pushed == ["events"]
+
+
+def test_a_hung_step_and_a_missing_notifier_do_not_kill_the_run(tmp_path, monkeypatch):
+    monkeypatch.setattr(autorun, "FWD", tmp_path)
+
+    def hang(cmd, inhibit):
+        raise subprocess.TimeoutExpired(cmd, 6 * 3600)
+    monkeypatch.setattr(autorun, "step", hang)
+    r = autorun.safe_step(["py", "scripts/forward_events.py"], False)
+    assert r.returncode == 124 and "TimeoutExpired" in r.stderr
+
+    def no_notifier(cmd, **kw):
+        raise FileNotFoundError("notify-send")
+    monkeypatch.setattr(autorun.subprocess, "run", no_notifier)
+    monkeypatch.setattr(autorun, "ntfy_topic", lambda: "")
+    autorun.alert("events", "something")  # must not raise
+    assert json.loads((tmp_path / "alerts.jsonl").read_text())["msg"] == "something"

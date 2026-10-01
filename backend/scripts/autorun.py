@@ -70,9 +70,33 @@ def mode() -> str:
 
 
 def append(name: str, rec: dict[str, Any]) -> None:
+    """One JSON line; starts a fresh line if a crash left the last one cut off, so the new record is not glued to it."""
     FWD.mkdir(parents=True, exist_ok=True)
-    with (FWD / name).open("a") as f:
-        f.write(json.dumps(rec) + "\n")
+    p = FWD / name
+    torn = p.exists() and p.stat().st_size > 0 and not p.read_bytes().endswith(b"\n")
+    with p.open("a") as f:
+        f.write(("\n" if torn else "") + json.dumps(rec) + "\n")
+
+
+def heartbeats() -> list[dict[str, Any]]:
+    """Every readable heartbeat line. A line cut off by a crash or power loss is skipped: one bad line must not stop
+    every later run from recording itself."""
+    hb = FWD / "heartbeat.jsonl"
+    out = []
+    for line in hb.read_text().splitlines() if hb.exists() else []:
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(rec, dict):
+            out.append(rec)
+    return out
+
+
+def completed(r: dict[str, Any]) -> bool:
+    """A run that did its job: a clean exit, or an event run whose runner finished (it printed its scoreboard, so
+    `missed_total` is set) while a later step raised an alert, e.g. a paper-broker order that did not fill."""
+    return r.get("rc") == 0 or (r.get("job") == "events" and r.get("missed_total") is not None)
 
 
 def ntfy_topic() -> str:
@@ -99,8 +123,11 @@ def alert(job: str, msg: str) -> None:
     """alerts.jsonl + a desktop notification + a phone push via ntfy.sh (user-approved 2026-09-27) when a topic is set
     in backend/.env. The push carries only the job name and the message."""
     append("alerts.jsonl", {"at": datetime.now(UTC).isoformat(timespec="seconds"), "job": job, "msg": msg})
-    subprocess.run(["notify-send", "-u", "critical", f"Paper book: {job}", msg], check=False,
-                   capture_output=True, timeout=10)
+    try:  # no desktop session (or no notify-send) must never stop the run that is alerting
+        subprocess.run(["notify-send", "-u", "critical", f"Paper book: {job}", msg], check=False,
+                       capture_output=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
     topic = ntfy_topic()
     if topic:
         try:
@@ -155,9 +182,7 @@ def missed_total(out: str) -> int | None:
 
 
 def last_heartbeat(job: str, m: str) -> dict[str, Any]:
-    hb = FWD / "heartbeat.jsonl"
-    recs = [json.loads(x) for x in hb.read_text().splitlines()] if hb.exists() else []
-    return next((r for r in reversed(recs) if r.get("job") == job and r.get("mode") == m), {})
+    return next((r for r in reversed(heartbeats()) if r.get("job") == job and r.get("mode") == m), {})
 
 
 def scan(job: str, out: str, prev_missed: int | None) -> list[str]:
@@ -177,12 +202,16 @@ def push(job: str) -> None:
     """Commit only the forward-test folder (nothing else that may be staged), then push whatever is unpushed; the
     allocator makes its own commit, which this push also carries."""
     git = ["git", "-C", str(REPO)]
-    subprocess.run([*git, "add", "backend/results/forward"], check=False, capture_output=True)
-    subprocess.run([*git, "commit", "-q", "-m", f"autorun {job} {datetime.now(UTC):%Y-%m-%d %H:%M} UTC", "--",
-                    "backend/results/forward"], check=False, capture_output=True, text=True)
-    p = subprocess.run([*git, "push", "-q"], check=False, capture_output=True, text=True, timeout=120,
-                       env={"GIT_SSH_COMMAND": f"ssh -i {Path.home()}/.ssh/id_ed25519_github", "HOME": str(Path.home()),
-                            "PATH": "/usr/bin:/bin"})
+    try:
+        subprocess.run([*git, "add", "backend/results/forward"], check=False, capture_output=True, timeout=120)
+        subprocess.run([*git, "commit", "-q", "-m", f"autorun {job} {datetime.now(UTC):%Y-%m-%d %H:%M} UTC", "--",
+                        "backend/results/forward"], check=False, capture_output=True, text=True, timeout=120)
+        p = subprocess.run([*git, "push", "-q"], check=False, capture_output=True, text=True, timeout=120,
+                           env={"GIT_SSH_COMMAND": f"ssh -i {Path.home()}/.ssh/id_ed25519_github",
+                                "HOME": str(Path.home()), "PATH": "/usr/bin:/bin"})
+    except subprocess.TimeoutExpired as e:
+        alert(job, f"git did not answer in 120 s ({' '.join(e.cmd[3:5]) if isinstance(e.cmd, list) else 'git'})")
+        return
     if p.returncode != 0:
         alert(job, f"git push failed: {p.stderr.strip()[:200]}")
 
@@ -213,6 +242,15 @@ def step(cmd: list[str], inhibit: bool = True) -> subprocess.CompletedProcess[st
     return r
 
 
+def safe_step(cmd: list[str], inhibit: bool) -> subprocess.CompletedProcess[str]:
+    """`step`, with a step that hangs past its time limit or cannot start turned into a failed step: the run still
+    writes its log, heartbeat and alert instead of dying without a trace."""
+    try:
+        return step(cmd, inhibit)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return subprocess.CompletedProcess(cmd, 124, "", f"{cmd[1] if cmd[1:2] else cmd[0]}: {type(e).__name__}: {e}"[:300] + "\n")
+
+
 def run(job: str) -> int:
     m = mode()
     logs = FWD / "logs"
@@ -238,11 +276,11 @@ def run(job: str) -> int:
             if skip_dependents and cmd[1:2] and cmd[1] in EVENT_READERS:
                 out += f"(skipped {cmd[1]}: the event runner failed)\n"
                 continue
-            r = step(cmd, inhibit)
+            r = safe_step(cmd, inhibit)
             if r.returncode != 0 and cmd[1:2] and cmd[1] in RETRYABLE and TRANSIENT.search(r.stdout + r.stderr):
                 out += r.stdout + r.stderr + f"(transient failure in {cmd[1]}; retrying once in 90 s)\n"
                 time.sleep(RETRY_WAIT)
-                r = step(cmd, inhibit)
+                r = safe_step(cmd, inhibit)
             out += r.stdout + r.stderr
             rc = rc or r.returncode
             if r.returncode != 0 and cmd[1:2] == ["scripts/forward_events.py"]:
@@ -253,14 +291,17 @@ def run(job: str) -> int:
         rc = 0
     end = datetime.now(UTC)
     prev = last_heartbeat(job, m).get("missed_total")
-    append("heartbeat.jsonl", {"job": job, "mode": m, "start": start.isoformat(timespec="seconds"),
-                               "end": end.isoformat(timespec="seconds"), "rc": rc, "log": str(log.relative_to(BACKEND)),
-                               "missed_total": missed_total(out) if job == "events" else None})
+    beat = {"job": job, "mode": m, "start": start.isoformat(timespec="seconds"),
+            "end": end.isoformat(timespec="seconds"), "rc": rc, "log": str(log.relative_to(BACKEND)),
+            "missed_total": missed_total(out) if job == "events" else None}
+    append("heartbeat.jsonl", beat)
     if rc != 0:
         alert(job, f"failed (exit {rc}); log {log.name}: {out.strip().splitlines()[-1][:200] if out.strip() else ''}")
     for f in scan(job, out, prev):
         alert(job, f)
-    if m == "live" and rc == 0 and job in ("events", "allocator", "review", "learn"):
+    # push after every completed run: an event run whose runner finished has a whole ledger even when a later step
+    # alerted, and the push is what gives its decisions an outside timestamp before their results are known
+    if m == "live" and completed(beat) and job in ("events", "allocator", "review", "learn"):
         push(job)
     post_run(job)
     return rc
@@ -294,9 +335,7 @@ def disk_low(path: Path = BACKEND, min_free_gb: float = 20.0) -> str | None:
 def check(today: date | None = None) -> list[str]:
     """Weekdays in the last 7 days whose expected runs are missing from the heartbeat (in this mode)."""
     m = mode()
-    hb = FWD / "heartbeat.jsonl"
-    recs = [json.loads(x) for x in hb.read_text().splitlines()] if hb.exists() else []
-    recs = [r for r in recs if r.get("mode") == m and r.get("rc") == 0]
+    recs = [r for r in heartbeats() if r.get("mode") == m and completed(r)]
     if m == "live":
         first = LIVE_FROM  # detect a missing first live run even when no live heartbeat exists
     elif recs:
@@ -363,9 +402,7 @@ def go_live(today: date | None = None) -> str | None:
     today = today or datetime.now(NY).date()
     if mode() != "dry" or today < GO_LIVE_ON:
         return None
-    hb = FWD / "heartbeat.jsonl"
-    recs = [json.loads(x) for x in hb.read_text().splitlines()] if hb.exists() else []
-    reasons = go_live_reasons(recs, FWD / "events_autodry" / "ledger.jsonl")
+    reasons = go_live_reasons(heartbeats(), FWD / "events_autodry" / "ledger.jsonl")
     if reasons:
         return "still in DRY mode: " + "; ".join(reasons) + ". Fix, or switch by hand: scripts/autonomy.sh live"
     (FWD / "AUTORUN_MODE").write_text("live\n")
