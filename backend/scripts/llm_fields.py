@@ -12,7 +12,8 @@
 Bonsai reads each earnings press release and labels 7 things code cannot compute from the numbers, each with an
 exact quote. Code keeps a non-default label only if its quote is word for word in the release. The prompt is chosen on
 extraction quality (parse rate, verified quotes, agreement with keyword labels), never on stock returns.
-Needs Bonsai on Ollama at :11435 for dev/extract (a manual `ollama serve`, not a service).
+dev/extract start Bonsai themselves (the bundled llama-server, 3 slots); with AIRP_LABEL_ENGINE=ollama they need
+Bonsai on Ollama at :11435 (a manual `ollama serve`, not a service).
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ import argparse
 import asyncio
 import gzip
 import json
+import os
 import re
 import sys
 import time
@@ -340,10 +342,25 @@ def quality(recs: list[dict[str, Any]], wall: float) -> dict[str, float]:
     return {k: round(v, 4) for k, v in q.items()}
 
 
+def bonsai(num_predict: int) -> Any:
+    """Bonsai for the label stages (PLAN_60_V2, B4b "Engine note", 2026-09-30): the llama-server binary Ollama bundles,
+    3 requests at once; the client starts and stops the server itself. AIRP_LABEL_ENGINE=ollama goes back to Ollama on
+    :11435 (one request at a time, a manual `ollama serve`)."""
+    engine = os.environ.get("AIRP_LABEL_ENGINE", "llamacpp")
+    if engine == "ollama":
+        from app.sandbox.walkforward import OllamaLLM
+        return OllamaLLM("bonsai-27b:latest", base_url="http://127.0.0.1:11435", concurrency=3, num_ctx=8192,
+                         num_predict=num_predict, cache=True, require_gpu=True)
+    if engine != "llamacpp":
+        raise SystemExit(f"AIRP_LABEL_ENGINE must be llamacpp or ollama, not {engine!r}")
+    from app.sandbox.llamacpp_client import LlamaServerLLM
+    print("label engine: llama-server, 3 slots", flush=True)
+    return LlamaServerLLM("bonsai-27b:latest", slots=3, num_ctx=8192, num_predict=num_predict, cache=True,
+                          require_gpu=True, log=OUT / "llama_server.log")
+
+
 def llm_client() -> Any:
-    from app.sandbox.walkforward import OllamaLLM
-    return OllamaLLM("bonsai-27b:latest", base_url="http://127.0.0.1:11435", concurrency=3, num_ctx=8192,
-                     num_predict=700, cache=True, require_gpu=True)
+    return bonsai(700)
 
 
 async def dev() -> None:
@@ -428,9 +445,7 @@ async def extract_research(variant: str = "", samples: tuple[tuple[str, str, str
 
 
 def llm_client_j() -> Any:
-    from app.sandbox.walkforward import OllamaLLM
-    return OllamaLLM("bonsai-27b:latest", base_url="http://127.0.0.1:11435", concurrency=3, num_ctx=8192,
-                     num_predict=1000, cache=True, require_gpu=True)
+    return bonsai(1000)
 
 
 def _user_j(acc: str, tag: str) -> tuple[str, str, bool] | None:

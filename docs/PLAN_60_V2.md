@@ -846,6 +846,17 @@ request at a time; the measured gain is 1.63× (docs/QUANT_DASHBOARD_RESEARCH.md
   least 97% of fields. If either fails, the label stages stay on Ollama (`AIRP_LABEL_ENGINE=ollama`).
 - **Scope:** research label stages in `scripts/llm_fields.py` only. The live forward test (extractor, Bonsai judge
   and the shadow arms) stays on Ollama, untouched.
+- **Adoption check result (2026-09-30 ~22:35 PDT): PASS, adopted.** One slot: 48 of 48 replies identical to
+  Ollama's (P2 24/24, `PROMPT_R` 24/24). Three slots: 48 of 48 parsed, 99.2% of fields equal (label and quote), and
+  99.7% of the labels code keeps after the quote check. A second three-slot pass gave 98.1%, so the batching noise is
+  about 1 to 2% of fields from run to run.
+- **Correction to the speed figure.** On a freshly started server the gain is **1.38× on P2 (5.59 → 4.06 s per
+  release) and 1.25× on `PROMPT_R` (5.84 → 4.66 s)**, not 1.63×. The 30 Sep benchmark re-ran the same prompts on one
+  server, so part of each prompt came from the server's prompt cache (1,664 new prompt tokens per request then,
+  2,430 on a fresh server), which flattered the three-slot number. Reading the prompt is the limit: the GPU reads
+  about 1,000 to 1,200 tokens a second whatever the slot count. Smaller GPU steps (256 and 128 tokens) were timed and
+  are slower (4.13 / 4.76 s and 4.33 / 5.01 s), so the step stays at 1,024. The B2 label stage (2,851 releases)
+  should take about 3.7 hours instead of 4.6.
 
 
 ### skfolio test (spec fixed 2026-09-27, before any run)

@@ -38,6 +38,7 @@ LOCAL = ZoneInfo("America/Los_Angeles")  # the live runs' clock (05:45 / 15:30 P
 
 PY = ".venv/bin/python"
 DEFAULT_JOBS: list[dict[str, Any]] = [  # B4b (docs/PLAN_60_V2.md "Arm B4b"); later steps are added after its gates
+    # (llm_fields.py label jobs added later need no bonsai_job.sh: they start their own llama-server, 3 slots)
     {"name": "b4b_gdelt_warmup", "kind": "net", "cmd": [PY, "-u", "scripts/warm_gdelt.py"], "match": "warm_gdelt.py",
      "done": {"file": "results/events/warm_gdelt.jsonl", "target": 2851, "status_in": ["ok", "none"]},
      "note": "GDELT headlines for 2,851 releases, one request per 20 s or slower"},

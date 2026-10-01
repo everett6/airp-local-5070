@@ -71,10 +71,24 @@ live book, and no trial was run or registered.
   | 6 | 4.03 | 1.39x | 30/36 | 97.2% |
 
   One slot reproduces Ollama exactly, so the request format is equivalent; the differences at 3 and 6 slots are
-  floating-point effects of batching. Three slots is the sweet spot. No crash in about 110 requests.
-  **Not switched yet:** the label client speaks Ollama's API, so it needs a small OpenAI-style client and a launcher,
-  and a registered arm labelled this way differs from a one-slot arm in about 2% of fields (random, not directional).
-  To be adopted with a dated note in PLAN_60_V2 when the next label stage starts.
+  floating-point effects of batching. No crash in about 110 requests.
+- **Adopted for the research label stages (30 Sep, late evening).** `app/sandbox/llamacpp_client.py` starts the
+  bundled server itself with 3 slots, stops it when the stage ends or the forward runner wants the GPU, and the
+  server dies with the label job (checked with `timeout` and with `kill -9`). `scripts/llm_fields.py` uses it by
+  default; `AIRP_LABEL_ENGINE=ollama` goes back. The live forward test stays on Ollama. Dated note and the check's
+  thresholds: PLAN_60_V2, B4b "Engine note".
+- **The honest gain is 1.25× to 1.4×, not 1.63×.** Through the real client on a freshly started server (24 prompts
+  each):
+
+  | Prompt | 1 slot, s per release | 3 slots | Speed | 3 slots: fields equal to Ollama's |
+  |---|---|---|---|---|
+  | P2 (arm A, release alone) | 5.59 | 4.06 | 1.38x | 98.2% |
+  | `PROMPT_R` (release + research evidence) | 5.84 | 4.66 | 1.25x | 97.9% to 100% |
+
+  The table above came from re-running the same prompts on one server, so its three-slot row had prompt-cache hits
+  (1,664 new prompt tokens per request against 2,430 on a fresh server). Reading the prompt is the limit: about
+  1,000 to 1,200 tokens a second on this GPU whatever the slot count, and the research prompts are longer. Smaller
+  GPU steps (`-b 256`, `-b 128`) were timed and are slower.
 - **The news crawl is the real bottleneck.** GDELT's DOC API limiter is stricter than its documented one request per
   5 s; at the current rate the 2,851-release warm-up needs about 400 more hours. Faster sources (GDELT on BigQuery,
   grouped OR queries) change the frozen B4b news query, so they need a new pre-registration and, for BigQuery, the

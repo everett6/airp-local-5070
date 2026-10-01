@@ -33,6 +33,9 @@ start_ollama() {
     setsid ollama serve >> results/events/ollama_b4.log 2>&1 &
   SRV=$!; until curl -s -m 2 127.0.0.1:11435/api/tags > /dev/null; do
     kill -0 "$SRV" 2>/dev/null || { LOG "ollama exited"; tail -20 results/events/ollama_b4.log; SRV=""; return 1; }; sleep 2; done; }
+# Bonsai label stages: llm_fields.py starts and stops its own llama-server (3 slots; PLAN_60_V2 B4b "Engine note").
+# AIRP_LABEL_ENGINE=ollama goes back to Ollama, which this script then serves.
+bonsai_srv() { if [ "${AIRP_LABEL_ENGINE:-llamacpp}" = ollama ]; then start_ollama; else SRV=""; fi; }
 start_vllm() {
   MAX_SEQS=${MAX_SEQS:-16} GPU_UTIL=${GPU_UTIL:-0.85} setsid "$ROOT/scripts/vllm_serve.sh" >> results/events/vllm_b4.log 2>&1 &
   SRV=$!; until curl -s -m 2 127.0.0.1:8000/v1/models > /dev/null; do
@@ -60,7 +63,7 @@ gpu_stage() {
 }
 
 [ -f data/events/events_b4_2026.csv ] || $PY scripts/b4_prep.py
-gpu_stage "Bonsai arm A labels (P2)" start_ollama $PY scripts/llm_fields.py extract-b4 || { LOG "arm A labels failed"; exit 1; }
+gpu_stage "Bonsai arm A labels (P2)" bonsai_srv $PY scripts/llm_fields.py extract-b4 || { LOG "arm A labels failed"; exit 1; }
 N=$(grep -c '"sample": "b4"' results/events/warm_news.jsonl 2>/dev/null || echo 0)
 if ! pgrep -f "[w]arm_news.py b4" > /dev/null && [ "$N" -lt 2851 ]; then
   LOG "starting the news warm-up ($N of 2851 done)"; setsid $PY scripts/warm_news.py b4 >> results/events/warm_news_b4.log 2>&1 &
@@ -77,7 +80,7 @@ gpu_stage "Jan gather (_v3b4)" start_vllm $PY scripts/research_events.py --featu
   --events data/events/events_b4_2026.csv --run-tag _v3b4 --backend vllm --workers 16 --phase gather \
   || { LOG "Jan gather failed"; exit 1; }
 $PY scripts/research_audit.py results/events_research_Jan-v1-4B-GGUF_Q4_K_M_v3b4 | tail -3
-gpu_stage "Bonsai arm B2 labels (PROMPT_R)" start_ollama $PY scripts/llm_fields.py extract-research-b4 \
+gpu_stage "Bonsai arm B2 labels (PROMPT_R)" bonsai_srv $PY scripts/llm_fields.py extract-research-b4 \
   || { LOG "arm B4 research labels failed"; exit 1; }
 LOG "code scores arm B4 (pre-registered, one trial)"
 $PY scripts/llm_fields.py test-b4 2>&1 | tee results/events/llm_fields_research_b4_test.txt
