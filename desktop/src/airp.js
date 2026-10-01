@@ -69,6 +69,30 @@ export function createAirp(root) {
           guidance: r.guidance, accepted_utc: r.accepted_utc, as_of: r.as_of, reason: r.reason }));
     },
 
+    // Each live release with what every agent said about it: the reader's checked numbers, the three opinion agents
+    // (scored in the background, not yet used) and the judge's score. Read-only joins of airp's own ledgers.
+    team(limit = 30) {
+      const ev = path.join(fwd, 'events');
+      const by = (file) => Object.fromEntries(jsonl(path.join(ev, file)).map((r) => [r.accession, r]));
+      const extract = by('extract.jsonl'), net = by('net_read.jsonl'), bb = by('bull_bear.jsonl'), lens = by('ai_lens.jsonl');
+      const led = jsonl(path.join(ev, 'ledger.jsonl'));
+      const outcome = Object.fromEntries(led.filter((r) => r.type === 'outcome').map((r) => [r.accession, r]));
+      const pts = (xs) => (xs || []).slice(0, 3).map((x) => ({ point: x.point, quote: x.quote, verified: !!x.verified }));
+      return led.filter((r) => r.type === 'decision').slice(-limit).reverse().map((r) => {
+        const x = extract[r.accession] || {}, n = net[r.accession], b = bb[r.accession], l = lens[r.accession];
+        return {
+          accession: r.accession, ticker: r.ticker, sector: r.sector, accepted_utc: r.accepted_utc, source: r.source,
+          logodds: r.logodds, on_time: r.on_time, guidance: r.guidance,
+          reader: { revenue: x.revenue ?? null, eps: x.eps ?? null, adj_eps: x.adj_eps ?? null, guidance: x.guidance ?? null,
+            tone: x.tone ?? null, highlights: (x.highlights || []).slice(0, 3), rejected: x.rejected || [], period_end: x.period_end ?? null },
+          net_read: n ? { read: n.net_read, conviction: n.fields?.conviction ?? null, fields: n.fields || {} } : null,
+          bull_bear: b ? { read: b.bb_read, bull: pts(b.bull), bear: pts(b.bear) } : null,
+          ai_lens: l ? { read: l.ai_read, exposure: l.fields?.ai_exposure ?? null } : null,
+          outcome: outcome[r.accession] ? { excess: outcome[r.accession].fwd5 ?? null } : null,
+        };
+      });
+    },
+
     health: () => runJson('trading_health.py'),
     metrics() { return json(path.join(backend, 'results', 'desktop', 'metrics.json'), null); },
     rebuildMetrics: () => run('desktop_export.py', [], 600_000),

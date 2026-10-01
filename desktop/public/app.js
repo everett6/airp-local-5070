@@ -1,5 +1,5 @@
 // airp desktop UI: plain modules, no framework. Every value is escaped before it reaches the page.
-import { attachHover, barChart, ciChart, histogram, lineChart, pct } from './charts.js';
+import { attachHover, barChart, ciChart, fanChart, heatmap, histogram, lineChart, pct, PALETTE, scatter, shareBars, stackArea } from './charts.js';
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (n, d = 0) => (n == null || Number.isNaN(n) ? '–' : Number(n).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d }));
@@ -142,6 +142,23 @@ const GLOSS = {
   'Paper trading': 'Practice trading with pretend money at a real broker. No real money can be lost.',
   'Sector': 'The stock\'s industry group (for example technology). A pick is judged against its group, not the whole market.',
   'SPY': 'A fund that tracks the 500 largest US companies. It is the "just buy the market" yardstick.',
+  'Sortino': 'Like the Sharpe score, but it only counts the bad swings as risk. Higher is better.',
+  'Calmar': 'Yearly growth divided by the worst fall. Above 0.5 is decent; it says how much pain bought the gain.',
+  'VaR 95%': 'On a bad day (the worst 1 day in 20) the loss is at least this big.',
+  'CVaR 95%': 'The average loss on those worst 1-in-20 days. It shows how bad "bad" usually is.',
+  'Beta': 'How much it moves when the market moves. 1 means in step with the market; 0.7 means about 70% as much.',
+  'Alpha': 'Yearly return left over after removing what simply came from moving with the market.',
+  'Correlation': 'How closely two things move together. 1 = always together, 0 = unrelated, -1 = opposite.',
+  'Up capture': 'Share of the market\'s gains it kept in months the market rose. 0.96 = it kept 96%.',
+  'Down capture': 'Share of the market\'s losses it took in months the market fell. Lower is better.',
+  'Rank correlation (IC)': 'Whether higher AI scores went with better results. 0 = no link, 0.05 is a weak but real link, 0.1 is strong for stocks.',
+  'Hit rate': 'How often the pick beat its industry group. 50% is a coin flip.',
+  'Risk contribution': 'How much of the portfolio\'s total swings each holding causes. A small holding can cause a big share if it is jumpy.',
+  'Diversification ratio': 'Above 1 means the holdings partly cancel each other\'s swings. 1 means no benefit from mixing.',
+  'Independent bets': 'How many truly separate risks the portfolio holds. 3 holdings that move together count as fewer than 3.',
+  'Chance it is real (PSR)': 'The probability the true Sharpe score is above zero, given how long and how bumpy the record is.',
+  'Bootstrap cone': 'We reshuffle real past months 2,000 times to see the range of years that history could have produced. A what-if, not a forecast.',
+  'Drawdown brake': 'A safety rule: after a 10% fall the book cuts its positions to two-thirds, after 20% to half, until it recovers.',
   'Pre-registered': 'The test rules were written down and published before the test ran, so the result cannot be bent afterwards.',
 };
 const help = (term, text = GLOSS[term]) => (text ? `<span class="help" tabindex="0" data-tip="${esc(text)}">?</span>` : '');
@@ -151,6 +168,35 @@ const plain = (html) => `<div class="plain"><span class="plain-tag">In plain wor
 const h3 = (title, term) => `<h3>${esc(title)}${help(term || title)}</h3>`;
 const statsRow = (s) => kpi('Growth per year', pct(s.cagr)) + kpi('Quality score (Sharpe)', esc(s.sharpe)) + kpi('Bumpiness (volatility)', pct(s.vol)) + kpi('Worst fall', pct(s.max_dd)) + kpi('Period', `<span style="font-size:13px">${esc(s.start?.slice(0, 7))} → ${esc(s.end?.slice(0, 7))}</span>`);
 const noMetrics = '<p class="empty">Chart data not built yet — press “Rebuild charts”.</p>';
+
+function tearSheet(a, name, bench) {
+  const t = a.tear; if (!t) return '';
+  const s = t.stats, row = (label, value, term) => `<div><span>${esc(label)}${help(term || label)}</span><b>${value}</b></div>`;
+  const dd = t.drawdowns.map((d) => `<tr><td>${esc(d.start)}</td><td>${esc(d.trough)}</td><td>${d.recovered ? esc(d.recovered) : pill('still under', 'warn')}</td><td class="num">${pct(d.depth)}</td><td class="num">${fmt(d.days)}</td></tr>`).join('');
+  const c = t.cone, h = t.month_hist, mid = h.edges.slice(0, -1).map((e, i) => (i % 2 ? '' : `${(((e + h.edges[i + 1]) / 2) * 100).toFixed(0)}%`));
+  const roll = [{ name: `${name} 6-month volatility`, x: t.rolling.dates, y: t.rolling.vol }];
+  return `<div class="card wide"><h3>Full scorecard</h3><div class="statgrid">
+      ${row('Sortino', esc(s.sortino))}${row('Calmar', esc(s.calmar))}${row('Chance it is real (PSR)', pct(s.psr, 1))}
+      ${row('VaR 95%', pct(s.var95, 2))}${row('CVaR 95%', pct(s.cvar95, 2))}${row('Best day', pct(s.best_day), 'x')}
+      ${row('Worst day', pct(s.worst_day), 'x')}${row('Best month', pct(s.best_month), 'x')}${row('Worst month', pct(s.worst_month), 'x')}
+      ${row('Days that went up', pct(s.pos_days, 0), 'x')}${row('Months that went up', pct(s.pos_months, 0), 'x')}${row('Average up month', pct(s.avg_up_month), 'x')}
+      ${row('Average down month', pct(s.avg_down_month), 'x')}${row('Longest time below a high', `${fmt(s.longest_underwater_days)} trading days`, 'x')}
+      ${s.beta != null ? row('Beta', esc(s.beta)) + row('Alpha', pct(s.alpha)) + row('Correlation', esc(s.corr)) + row('Up capture', esc(s.up_capture)) + row('Down capture', esc(s.down_capture)) : ''}
+    </div></div>
+    <div class="card wide"><h3>Every month's return (%)</h3><p class="muted">Blue months gained, orange months lost; stronger colour means a bigger move. The last column is the whole year.</p>${heatmap(t.monthly.years, t.monthly.cells)}</div>
+    <div class="split">
+      <div class="card">${h3('The five worst falls', 'Max drawdown')}<table><tr><th>From high</th><th>Lowest point</th><th>Back to high</th><th class="num">Fall</th><th class="num">Days</th></tr>${dd}</table></div>
+      <div class="card"><h3>How months were spread</h3><p class="muted">Each bar counts months with a return in that range.</p>${barChart(mid, [{ name: 'months', y: h.counts }], { width: 560, height: 230, yFmt: (v) => v.toFixed(0) })}</div>
+    </div>
+    <div class="split">
+      <div class="card">${h3('Bumpiness over time (6-month volatility)', 'Volatility')}${lineChart(roll, { width: 560, height: 240, yFmt: (v) => pct(v, 0) })}</div>
+      ${t.rolling.beta ? `<div class="card">${h3('How tied to the market (6-month beta)', 'Beta')}${lineChart([{ name: `${name} beta to ${bench}`, x: t.rolling.dates, y: t.rolling.beta }], { width: 560, height: 240, yFmt: (v) => v.toFixed(1), zero: true })}</div>` : ''}
+    </div>
+    <div class="card wide">${h3('What could the next 12 months look like?', 'Bootstrap cone')}
+      <div class="kpis">${kpi('Middle outcome', `${c.p50.at(-1).toFixed(0)}`, '100 today')}${kpi('Chance of ending lower', pct(c.prob_loss, 0), 'after 12 months')}${kpi('Chance of a 20%+ fall', pct(c.prob_dd20, 0), 'at some point in the year')}${kpi('Typical worst dip', pct(c.median_dd, 0), 'during the year')}</div>
+      ${fanChart(c)}<p class="muted">Dark band: the middle half of ${fmt(c.paths)} reshuffled histories. Light band: all but the best and worst 5%. Built only from this book's own past, so it cannot see events that never happened in it.</p></div>`;
+}
+
 let stratTab = 'core';
 
 Object.assign(views, {
@@ -214,7 +260,8 @@ Object.assign(views, {
         <div class="card">${h3('Drawdown')}${lineChart(bench ? [{ name: eqSeries[0].name, x: a.dates, y: a.drawdown }, { name: 'SPY', x: spy.dates, y: spy.drawdown }] : [{ name: eqSeries[0].name, x: a.dates, y: a.drawdown }], { yFmt: (v) => pct(v, 0), zero: true, width: 560, height: 260 })}</div>
         <div class="card">${h3('Rolling 1-year Sharpe')}${lineChart(bench ? [{ name: eqSeries[0].name, x: a.dates, y: a.rolling_sharpe }, { name: 'SPY', x: spy.dates, y: spy.rolling_sharpe }] : [{ name: eqSeries[0].name, x: a.dates, y: a.rolling_sharpe }], { yFmt: (v) => v.toFixed(1), zero: true, width: 560, height: 260 })}</div>
       </div>
-      <div class="card wide"><h3>Return by year</h3>${barChart(years, bench ? [{ name: eqSeries[0].name, y: years.map((y) => a.yearly[y]) }, { name: 'SPY', y: years.map((y) => spy.yearly[y] ?? null) }] : [{ name: eqSeries[0].name, y: years.map((y) => a.yearly[y]) }])}</div>`;
+      <div class="card wide"><h3>Return by year</h3>${barChart(years, bench ? [{ name: eqSeries[0].name, y: years.map((y) => a.yearly[y]) }, { name: 'SPY', y: years.map((y) => spy.yearly[y] ?? null) }] : [{ name: eqSeries[0].name, y: years.map((y) => a.yearly[y]) }])}</div>
+      ${tearSheet(a, eqSeries[0].name, 'SPY')}`;
   },
 
   async lab() {
@@ -231,20 +278,73 @@ Object.assign(views, {
     return `<h2>Strategy lab</h2><p class="lede">Trading ideas we tested, and whether they held up. ${passed} of ${tests.length} passed.</p>
       ${plain('Each row is one idea (day trading, calendar effects, pairs, crypto). The dot is its score after costs and the line is how uncertain that score is. To pass, the dot must be right of the dashed line <b>and</b> the whole line must be right of zero. Grey rows failed, so they do not trade.')}
       <div class="card wide">${h3('Score after costs, with its uncertainty range', '95% interval')}${ciChart(rows, { refs: [{ v: 0.5, label: 'pass line 0.5' }] })}</div>
+      <div class="card wide"><h3>The detail behind each test</h3><p class="muted">"Score by trading cost" shows the same idea at cheap and expensive trading: an idea that only works when trading is free is not real. "Before it was published" is the score on the years before the idea became widely known.</p>
+        <table><tr><th>Test</th><th>Tested on</th><th class="num">Days</th><th class="num">Score by trading cost</th><th class="num">Before it was published</th><th class="num">Up days</th><th class="num">Worst month</th><th class="num">Moves with core book${help('Correlation')}</th><th>Verdict</th></tr>
+        ${tests.map((x) => `<tr><td>${esc(x.id)} · ${esc(x.name)}</td><td>${esc((x.window || []).map((d) => String(d).slice(0, 7)).join(' → '))}</td><td class="num">${fmt(x.days)}</td>
+          <td class="num">${Object.entries(x.costs || {}).map(([c, v]) => `${esc(c)}: ${v == null ? '–' : fmt(v, 2)}`).join(' · ') || fmt(x.sharpe, 2)}</td><td class="num">${x.before_sharpe == null ? '–' : fmt(x.before_sharpe, 2)}</td>
+          <td class="num">${x.hit_rate == null ? '–' : pct(x.hit_rate, 0)}</td><td class="num">${x.worst_month == null ? '–' : pct(x.worst_month)}</td><td class="num">${x.corr_core == null ? '–' : fmt(x.corr_core, 2)}</td><td>${x.pass ? pill('passed', 'ok') : pill('failed', 'bad')}</td></tr>`).join('')}</table></div>
       <div class="split">${curveCards}</div>
       <p class="muted">D9 passed but trades the official open auction, which is not tradable in practice; its tradable version (D10) failed.</p>`;
   },
 
+
+  async risk() {
+    const m = await metrics(); if (m.missing || !m.portfolio || m.portfolio.error) return `<h2>Portfolio &amp; risk</h2>${m.portfolio?.error ? `<p class="err">${esc(m.portfolio.error)}</p>` : noMetrics}`;
+    const f = m.portfolio, names = { SPY: 'US stocks (SPY)', 'BTC-USD': 'Bitcoin', 'ETH-USD': 'Ether', Cash: 'Cash / T-bills' };
+    const colors = [PALETTE[0], PALETTE[1], PALETTE[2], '#55554c'], order = ['SPY', 'BTC-USD', 'ETH-USD', 'Cash'];
+    return `<h2>Portfolio &amp; risk</h2><p class="lede">What the core book holds, and where its risk really comes from.</p>
+      ${plain('Money and risk are not the same thing. Crypto is a small slice of the money but a big slice of the swings, because it jumps around far more than stocks. This page shows both views, how the mix changed over time, and how the safety brake stepped in.')}
+      <div class="kpis">${kpi('Bumpiness (volatility)', pct(f.port_vol), 'expected swings per year')}${kpi('Diversification ratio', esc(f.div_ratio))}${kpi('Independent bets', esc(f.eff_bets), `out of ${f.assets.length} holdings`)}
+        ${kpi('Drawdown brake', f.brake >= 1 ? 'off' : `${pct(f.brake, 0)} size`, `on for ${pct(f.brake_days, 0)} of days since 2018`)}${kpi('Trades since 2018', fmt(f.trades), `costs paid: ${pct(f.cost_paid_pct, 1)} of starting money`)}</div>
+      <div class="split">
+        <div class="card"><h3>Where the money is today</h3>${shareBars(order.map((a) => ({ label: names[a], v: f.now[a] ?? 0 })), colors)}</div>
+        <div class="card">${h3('Where the risk comes from today', 'Risk contribution')}${shareBars(f.assets.map((a) => ({ label: names[a], v: f.risk_contrib[a], note: `swings ${pct(f.asset_vol[a], 0)} a year on its own` })), colors)}</div>
+      </div>
+      <div class="card wide"><h3>How the mix changed over time</h3><p class="muted">Grey is cash. It grows when crypto is in a downtrend or when the drawdown brake cuts positions.</p>${stackArea(f.dates, order.map((a) => ({ name: names[a], y: f.weights[a] })), { colors })}</div>
+      <div class="card wide">${h3('How the holdings move together (last 12 months)', 'Correlation')}${heatmap(f.assets.map((a) => names[a]), f.corr, { cols: f.assets.map((a) => names[a]), total: false, fmt: (v) => v.toFixed(2), unit: '', max: 1 })}
+        <p class="muted">1.00 means two holdings always move together and 0 means they are unrelated. ${f.corr[1][2] >= 0.8 ? 'Bitcoin and Ether move almost as one, so together they act like a single bet. ' : ''}The lower the stock-to-crypto numbers, the more mixing them smooths the ride.</p></div>`;
+  },
+
   async signals() {
-    const [d, m] = await Promise.all([api('decisions'), metrics().catch(() => ({}))]);
+    const [d, m, team] = await Promise.all([api('decisions'), metrics().catch(() => ({})), api('team').catch(() => [])]);
     const vals = d.filter((r) => r.type === 'decision' && r.logodds != null).map((r) => Number(r.logodds));
-    const thr = m?.live?.ai_threshold;
-    return `<h2>AI picks</h2><p class="lede">What the AI judge thought of each new earnings report.</p>
-      ${plain('When a big company reports earnings, a reader AI pulls out the key numbers and the judge AI (Bonsai) gives a confidence score that the stock will beat its industry group over the next week. Only scores above the threshold become a practice trade. This part is <b>still unproven</b>: it is being tested with pretend money.')}
+    const thr = m?.live?.ai_threshold, ai = m?.ai && !m.ai.error ? m.ai : null;
+    const tone = (v) => pill(v ?? 'no view', v === 'bullish' || v === 'positive' || v === 'raised' ? 'ok' : v === 'bearish' || v === 'negative' || v === 'lowered' ? 'bad' : '');
+    const num = (x, unit = '', d = 2) => (x?.q == null ? 'not found' : `${unit === 'M' ? '$' : ''}${fmt(x.q, d)}${unit}${x.prior != null ? ` <span class="muted">(a year ago ${fmt(x.prior, d)}, ${x.prior ? `${x.q >= x.prior ? '+' : ''}${pct(x.q / x.prior - 1, 0)}` : '–'})</span>` : ''}`);
+    const pts = (xs) => (xs.length ? `<ul>${xs.map((x) => `<li>${esc(x.point)}${x.verified ? '' : ' <span class="muted">(quote not verified)</span>'}</li>`).join('')}</ul>` : '<p class="muted">none given</p>');
+    const card = (r) => `<div class="team-card"><div class="team-head"><span class="tk">${esc(r.ticker)}</span><span class="muted">${esc(r.sector)} · ${esc(when(r.accepted_utc ? `${r.accepted_utc}Z` : null))}</span>
+        ${thr != null && r.logodds >= thr ? pill('practice trade', 'lime') : pill('no trade')}${r.outcome?.excess != null ? pill(`result ${pct(r.outcome.excess)} vs sector`, r.outcome.excess > 0 ? 'ok' : 'bad') : pill('result due in a week', 'warn')}</div>
+      <div class="agents">
+        <div class="agent"><div class="who"><span>Reader agent · checked facts</span>${tone(r.reader.tone)}</div>
+          Sales ${num(r.reader.revenue, 'M', 0)}<br>Profit per share ${num(r.reader.eps)}<br>Outlook: ${tone(r.reader.guidance)}
+          ${r.reader.rejected.length ? `<br><span class="muted">${r.reader.rejected.length} number(s) thrown out: not found word-for-word</span>` : ''}</div>
+        <div class="agent"><div class="who"><span>Summary agent · in testing</span>${tone(r.net_read?.read)}</div>
+          ${r.net_read ? `Conviction: ${esc(r.net_read.conviction ?? '–')}<br>Margins: ${esc(r.net_read.fields.margin ?? '–')} · Demand: ${esc(r.net_read.fields.demand ?? '–')}<br>Earnings quality: ${esc(r.net_read.fields.earnings_quality ?? '–')}` : '<span class="muted">not run</span>'}</div>
+        <div class="agent"><div class="who"><span>Bull case · in testing</span></div>${r.bull_bear ? pts(r.bull_bear.bull) : '<span class="muted">not run</span>'}</div>
+        <div class="agent"><div class="who"><span>Bear case · in testing</span>${r.bull_bear ? pill(`debate verdict: ${r.bull_bear.read ?? 'none'}`, r.bull_bear.read === 'bullish' ? 'ok' : r.bull_bear.read === 'bearish' ? 'bad' : '') : ''}</div>${r.bull_bear ? pts(r.bull_bear.bear) : '<span class="muted">not run</span>'}</div>
+        <div class="agent"><div class="who"><span>AI-theme agent · in testing</span>${tone(r.ai_lens?.read)}</div>${r.ai_lens ? `AI exposure: ${esc(r.ai_lens.exposure ?? '–')}` : '<span class="muted">not run</span>'}</div>
+        <div class="agent verdict"><div class="who"><span>Master judge · decides</span>${pill(r.logodds > 0 ? 'BUY' : 'PASS', r.logodds > 0 ? 'ok' : '')}</div>
+          Confidence score <b>${fmt(r.logodds, 2)}</b>${thr != null ? `<br><span class="muted">needs ${esc(thr)} to trade</span>` : ''}</div>
+      </div></div>`;
+    const b = ai?.buckets || [];
+    return `<h2>AI picks</h2><p class="lede">What the AI team thought of each new earnings report, and how well that has worked.</p>
+      ${plain('When a big company reports earnings, a reader AI pulls out the key numbers and the judge AI (Bonsai) gives a confidence score that the stock will beat its industry group over the next week. Only scores above the threshold become a practice trade. The other agents give opinions that are scored in the background. This part is <b>still unproven</b>: it trades pretend money only.')}
       <div class="kpis">${kpi('Live decisions', vals.length)}${kpi('Above threshold', vals.filter((v) => thr != null && v >= thr).length, `threshold ${esc(thr ?? '–')}`)}${kpi('Missed', d.filter((r) => r.type === 'missed').length)}</div>
+      <h3>The team's view on each report</h3>
+      <div class="team">${team.map(card).join('') || '<p class="empty">No live reports yet.</p>'}</div>
       <div class="card wide">${h3('How confident the judge was (each bar counts reports)', 'Log-odds')}${histogram(vals, { mark: thr, markLabel: 'pick threshold', bins: 16 })}</div>
-      <div class="card wide"><table><tr><th>Accepted</th><th>Ticker</th><th>Sector</th><th class="num">Log-odds</th><th>Guidance</th><th>Result</th></tr>
-      ${d.map((r) => `<tr><td>${esc(when(r.accepted_utc ? `${r.accepted_utc}Z` : r.as_of))}</td><td>${esc(r.ticker)}</td><td>${esc(r.sector)}</td><td class="num">${fmt(r.logodds, 2)}</td><td>${esc(r.guidance || '')}</td><td>${r.type === 'missed' ? pill('missed', 'bad') : pill('on time', 'ok')}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">no live decisions yet</td></tr>'}</table></div>`;
+      ${ai ? `<h2>Does the judge's score mean anything?</h2><p class="lede">Evidence from ${fmt(ai.n)} past earnings reports (2024 to 2026).</p>
+      ${plain(`Each past report got a score, and we then looked at how the stock did against its industry group over the next 5 days. A useful judge should show <b>higher scores going with better results</b>. The link is there but weak: reports above the threshold beat their group ${pct(ai.above.hit, 0)} of the time against ${pct(ai.below.hit, 0)} for the rest. The threshold was chosen on this same data, so the live results are the real test.`)}
+      <div class="kpis">${kpi('Reports scored', fmt(ai.n))}${kpi('Rank correlation (IC)', esc(ai.ic))}${kpi('Hit rate above threshold', pct(ai.above.hit, 1), `${fmt(ai.above.n)} reports`)}${kpi('Hit rate below', pct(ai.below.hit, 1), `${fmt(ai.below.n)} reports`)}
+        ${kpi('Avg result above', pct(ai.above.excess, 2), '5 days vs sector')}${kpi('Avg result below', pct(ai.below.excess, 2), '5 days vs sector')}</div>
+      <div class="split">
+        <div class="card"><h3>Average 5-day result by score group</h3><p class="muted">Reports sorted into 10 equal groups, lowest score on the left.</p>${barChart(b.map((x) => String(x.score)), [{ name: 'avg result vs sector', y: b.map((x) => x.excess) }], { width: 560, height: 240, yFmt: (v) => pct(v, 1) })}</div>
+        <div class="card">${h3('How often each group beat its sector', 'Hit rate')}<p class="muted">Above 50% is better than a coin flip.</p>${barChart(b.map((x) => String(x.score)), [{ name: 'hit rate minus 50%', y: b.map((x) => x.hit - 0.5) }], { width: 560, height: 240, yFmt: (v) => `${((v + 0.5) * 100).toFixed(0)}%` })}</div>
+      </div>
+      <div class="card wide">${h3('Was the link there every month?', 'Rank correlation (IC)')}<p class="muted">Bars above zero are months where higher scores did go with better results.</p>${barChart(ai.monthly_ic.map((x) => x.month.slice(2)), [{ name: 'monthly IC', y: ai.monthly_ic.map((x) => x.ic) }], { yFmt: (v) => v.toFixed(2) })}</div>
+      <div class="card wide"><h3>Every dot is one past report</h3>${scatter(ai.scatter, { mark: thr, markLabel: 'pick threshold', xLabel: 'judge confidence score  →', yFmt: (v) => pct(v, 0) })}<p class="muted">Up is better (the stock beat its sector over 5 days). The cloud is wide: any single pick is close to a coin flip, the edge only shows on average.</p></div>
+      <div class="card wide"><h3>By industry group</h3><table><tr><th>Sector</th><th class="num">Reports</th><th class="num">Avg score</th><th class="num">Avg 5-day result</th><th class="num">Hit rate</th></tr>
+        ${ai.sectors.map((x) => `<tr><td>${esc(x.sector)}</td><td class="num">${fmt(x.n)}</td><td class="num">${fmt(x.score, 2)}</td><td class="num">${pct(x.excess, 2)}</td><td class="num">${pct(x.hit, 0)}</td></tr>`).join('')}</table></div>` : ''}`;
   },
 });
 

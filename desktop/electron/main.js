@@ -47,7 +47,12 @@ async function createWindow() {
     const view = process.env.AIRP_SMOKE_VIEW;  // optional: open one page first (e.g. "lab")
     if (/^[a-z]+$/.test(view || '')) {
       await win.loadURL(`${srv.origin}/#${view}`);
-      await new Promise((r) => setTimeout(r, 2500));
+      await new Promise((r) => setTimeout(r, 4500));
+    }
+    const scroll = Number(process.env.AIRP_SMOKE_SCROLL || 0);  // optional: scroll the page before the capture
+    if (scroll > 0) {
+      await win.webContents.executeJavaScript(`document.querySelector('.main-area').scrollTop = ${scroll}; 0`);
+      await new Promise((r) => setTimeout(r, 600));
     }
     writeFileSync(process.env.AIRP_SMOKE_SCREENSHOT, (await win.webContents.capturePage()).toPNG());
     app.quit();

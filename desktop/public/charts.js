@@ -130,3 +130,75 @@ export function attachHover(root) {
     svg.querySelector('.hit').addEventListener('mouseleave', () => { tip.hidden = true; xh.setAttribute('visibility', 'hidden'); });
   });
 }
+
+// Month-by-month table (rows = years, columns = months) as a diverging heatmap: blue above zero, orange below,
+// fading to the neutral surface at zero. Every cell prints its value, so colour is never the only signal.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export function heatmap(rowLabels, cells, opts = {}) {
+  const cols = opts.cols || MONTHS, fmt = opts.fmt || ((v) => (v * 100).toFixed(1));
+  const max = opts.max || Math.max(0.0001, ...cells.flat().filter((v) => v != null).map(Math.abs));
+  const bg = (v) => (v == null ? 'transparent' : `rgba(${v >= 0 ? '57,135,229' : '217,89,38'},${(0.08 + 0.72 * Math.min(1, Math.abs(v) / max)).toFixed(2)})`);
+  const total = (row) => { const xs = row.filter((v) => v != null); return xs.length ? xs.reduce((a, v) => a * (1 + v), 1) - 1 : null; };
+  const head = `<tr><th></th>${cols.map((c) => `<th class="num">${esc(c)}</th>`).join('')}${opts.total === false ? '' : '<th class="num">Year</th>'}</tr>`;
+  const body = rowLabels.map((r, i) => `<tr><th>${esc(r)}</th>${cells[i].map((v, j) => `<td class="num" style="background:${bg(v)}" title="${esc(r)} ${esc(cols[j])}: ${v == null ? 'no data' : `${esc(fmt(v))}${opts.unit ?? '%'}`}">${v == null ? '' : esc(fmt(v))}</td>`).join('')}${
+    opts.total === false ? '' : `<td class="num heat-total">${total(cells[i]) == null ? '' : esc(fmt(total(cells[i])))}</td>`}</tr>`).join('');
+  return `<div class="heat-wrap"><table class="heat">${head}${body}</table></div>`;
+}
+
+// Fan chart for the bootstrap cone: 5-95% band, 25-75% band and the median, by month ahead.
+export function fanChart(c, opts = {}) {
+  const W = opts.width || 900, H = opts.height || 260, L = 56, R = 120, T = 14, B = 30, n = c.months.length;
+  const lo = Math.min(...c.p5), hi = Math.max(...c.p95), pad = (hi - lo) * 0.06;
+  const X = (i) => L + (i / (n - 1)) * (W - L - R), Y = (v) => T + (1 - (v - (lo - pad)) / (hi + pad - (lo - pad))) * (H - T - B);
+  const band = (a, b) => `${a.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join('')}${b.map((v, i) => `L${X(n - 1 - i).toFixed(1)},${Y(b[n - 1 - i]).toFixed(1)}`).join('')}Z`;
+  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Range of outcomes over the next 12 months">`;
+  for (const t of niceTicks(lo - pad, hi + pad, 5)) svg += `<line x1="${L}" x2="${W - R}" y1="${Y(t)}" y2="${Y(t)}" stroke="${t === 100 ? ZERO : GRID}"/><text x="${L - 8}" y="${Y(t) + 4}" fill="${MUTED}" font-size="11" text-anchor="end">${t}</text>`;
+  c.months.forEach((m, i) => { if (i % 2 === 0) svg += `<text x="${X(i)}" y="${H - 8}" fill="${MUTED}" font-size="11" text-anchor="middle">${m === 0 ? 'today' : `+${m} mo`}</text>`; });
+  svg += `<path d="${band(c.p95, c.p5)}" fill="${PALETTE[0]}" opacity=".16"/><path d="${band(c.p75, c.p25)}" fill="${PALETTE[0]}" opacity=".3"/>`;
+  svg += `<path d="${c.p50.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join('')}" fill="none" stroke="${PALETTE[0]}" stroke-width="2"/>`;
+  for (const [k, label] of [['p95', 'best 5%'], ['p75', ''], ['p50', 'middle'], ['p25', ''], ['p5', 'worst 5%']]) {
+    if (label) svg += `<text x="${W - R + 8}" y="${Y(c[k][n - 1]) + 4}" fill="${INK}" font-size="11">${label} ${c[k][n - 1].toFixed(0)}</text>`;
+  }
+  c.months.forEach((m, i) => { svg += `<rect x="${X(i) - 12}" y="${T}" width="24" height="${H - T - B}" fill="transparent"><title>${m === 0 ? 'Today' : `${m} months ahead`}: worst 5% ${c.p5[i]}, middle ${c.p50[i]}, best 5% ${c.p95[i]}</title></rect>`; });
+  return `<div class="chart-wrap">${svg}</svg></div>`;
+}
+
+// Stacked area of shares that sum to 1 (allocation through time). series = [{ name, y }], fixed colour order.
+export function stackArea(dates, series, opts = {}) {
+  const W = opts.width || 900, H = opts.height || 240, L = 56, R = 20, T = 10, B = 26, n = dates.length;
+  const X = (i) => L + (i / (n - 1)) * (W - L - R), Y = (v) => T + (1 - v) * (H - T - B);
+  const colors = opts.colors || PALETTE;
+  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">`, base = new Array(n).fill(0);
+  series.forEach((s, k) => {
+    const top = s.y.map((v, i) => base[i] + (v || 0));
+    const d = `${top.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join('')}${base.map((_, i) => `L${X(n - 1 - i).toFixed(1)},${Y(base[n - 1 - i]).toFixed(1)}`).join('')}Z`;
+    svg += `<path d="${d}" fill="${colors[k]}" stroke="#181816" stroke-width="1"><title>${esc(s.name)}</title></path>`;
+    base = top;
+  });
+  for (const t of [0, 0.25, 0.5, 0.75, 1]) svg += `<line x1="${L}" x2="${W - R}" y1="${Y(t)}" y2="${Y(t)}" stroke="#181816" opacity=".35"/><text x="${L - 8}" y="${Y(t) + 4}" fill="${MUTED}" font-size="11" text-anchor="end">${t * 100}%</text>`;
+  let last = '';
+  dates.forEach((d, i) => { const y = d.slice(0, 4); if (y !== last && i) svg += `<text x="${X(i)}" y="${H - 8}" fill="${MUTED}" font-size="11" text-anchor="middle">${y}</text>`; last = y; });
+  const legend = `<div class="legend">${series.map((s, k) => `<span><i style="background:${colors[k]}"></i>${esc(s.name)}</span>`).join('')}</div>`;
+  return `<div class="chart-wrap">${legend}${svg}</svg></div>`;
+}
+
+// Scatter of [x, y] points with a zero line and an optional vertical marker (score vs what happened next).
+export function scatter(points, opts = {}) {
+  const W = opts.width || 900, H = opts.height || 280, L = 56, R = 20, T = 14, B = 34;
+  const xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
+  const x0 = Math.min(...xs, opts.mark ?? Infinity), x1 = Math.max(...xs, opts.mark ?? -Infinity), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const X = (v) => L + ((v - x0) / (x1 - x0 || 1)) * (W - L - R), Y = (v) => T + (1 - (v - y0) / (y1 - y0 || 1)) * (H - T - B);
+  const yFmt = opts.yFmt || ((v) => pct(v, 0));
+  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">`;
+  for (const t of niceTicks(y0, y1, 5)) svg += `<line x1="${L}" x2="${W - R}" y1="${Y(t)}" y2="${Y(t)}" stroke="${t === 0 ? ZERO : GRID}"/><text x="${L - 8}" y="${Y(t) + 4}" fill="${MUTED}" font-size="11" text-anchor="end">${esc(yFmt(t))}</text>`;
+  for (const t of niceTicks(x0, x1, 8)) svg += `<text x="${X(t)}" y="${H - 16}" fill="${MUTED}" font-size="11" text-anchor="middle">${t}</text>`;
+  if (opts.xLabel) svg += `<text x="${(L + W - R) / 2}" y="${H - 2}" fill="${MUTED}" font-size="11" text-anchor="middle">${esc(opts.xLabel)}</text>`;
+  for (const p of points) svg += `<circle cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="2.5" fill="${PALETTE[0]}" opacity=".55"/>`;
+  if (opts.mark != null) svg += `<line x1="${X(opts.mark)}" x2="${X(opts.mark)}" y1="${T}" y2="${H - B}" stroke="${INK}" stroke-dasharray="4 3"/><text x="${X(opts.mark) + 4}" y="${T + 10}" fill="${INK}" font-size="11">${esc(opts.markLabel || '')}</text>`;
+  return `<div class="chart-wrap">${svg}</svg></div>`;
+}
+
+// Horizontal share bars (risk contribution, allocation today): rows = [{ label, v (0..1), note }].
+export function shareBars(rows, colors = PALETTE) {
+  return `<div class="shares">${rows.map((r, k) => `<div class="share"><span>${esc(r.label)}</span><div class="share-track"><i style="width:${Math.max(0, Math.min(1, r.v)) * 100}%;background:${colors[k % colors.length]}"></i></div><b>${esc(pct(r.v, 0))}</b>${r.note ? `<em>${esc(r.note)}</em>` : ''}</div>`).join('')}</div>`;
+}
