@@ -237,3 +237,18 @@ def test_a_real_failure_or_unsafe_step_is_not_retried(tmp_path, monkeypatch):
     assert rc == 1 and calls == ["scripts/forward_events.py"]
     rc, calls = _run_with(tmp_path, monkeypatch, [["py", "scripts/learn_loop.py"]], [(1, "HTTP 503")])
     assert rc == 1 and calls == ["scripts/learn_loop.py"]
+
+
+def test_post_run_records_the_consensus_shadow_after_live_event_runs_only(monkeypatch):
+    seen = []
+    monkeypatch.setattr(autorun.subprocess, "run", lambda cmd, **kw: seen.append(cmd[1]))
+    monkeypatch.setattr(autorun, "mode", lambda: "live")
+    autorun.post_run("events")
+    assert "scripts/consensus_shadow.py" in seen and seen[0] == "scripts/research_queue.py"
+    seen.clear()
+    autorun.post_run("check")
+    assert "scripts/consensus_shadow.py" not in seen
+    monkeypatch.setattr(autorun, "mode", lambda: "dry")
+    seen.clear()
+    autorun.post_run("events")
+    assert "scripts/consensus_shadow.py" not in seen

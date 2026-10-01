@@ -267,9 +267,12 @@ def run(job: str) -> int:
 
 
 def post_run(job: str) -> None:
-    """After a job: let the research queue start/restart what is due, after the afternoon event run send the
-    daily digest, and after the daily check refresh the desktop app's charts. None may affect the job's result."""
+    """After a job: let the research queue start/restart what is due, after an event run record the consensus
+    shadow, after the afternoon event run send the daily digest, and after the daily check refresh the desktop app's
+    charts. None may affect the job's result."""
     extra = [[PY, "scripts/research_queue.py", "tick"]]
+    if job == "events" and mode() == "live":  # the consensus shadow (PLAN_60_V2): CPU only, reads the agents' labels
+        extra.append([PY, "scripts/consensus_shadow.py"])
     if job == "events" and datetime.now(ZoneInfo("America/Los_Angeles")).hour >= 12:
         extra.append([PY, "scripts/digest.py", "--send"])
     if job == "check":  # refresh the desktop app's chart data once a day

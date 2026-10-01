@@ -81,6 +81,18 @@ def shadow_lines(fwd: Path = FWD) -> list[str]:
     except Exception as e:  # noqa: BLE001
         out.append(f"- live lenses: could not read ({type(e).__name__}: {e})")
     try:
+        import consensus_shadow as CS
+        st = CS.status(fwd / "events", fwd / "consensus")
+        parts = []
+        for k in ("eq", "rw"):
+            c = st[f"consensus_{k}"]
+            parts.append(f"{k} IC " + ("—" if c["mean_ic"] is None else f"{c['mean_ic']:+.3f}")
+                         + f" (80% bound {c['ic_lo80']})")
+        out.append(f"- consensus of the agents (equal and record-weighted): {st['scored']} scored releases, "
+                   + ", ".join(parts) + "; judged at 150 releases and 3 months")
+    except Exception as e:  # noqa: BLE001
+        out.append(f"- consensus: could not read ({type(e).__name__}: {e})")
+    try:
         from app.portfolio import sleeve as S
         for name in ("ai_picks", "ai_picks_autodry"):
             f = fwd / name / "book.json"
