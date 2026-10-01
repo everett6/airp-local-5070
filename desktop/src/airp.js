@@ -219,6 +219,10 @@ export function createAirp(root) {
         tests: jsonl(path.join(backend, 'results', 'trials_registry.jsonl')).filter((r) => String(r.date) >= day)
           .map((r) => ({ trial: r.trial || r.name, result: r.result ?? r.verdict, sharpe: r.sharpe_ann ?? null })),
         runs: jsonl(path.join(fwd, 'heartbeat.jsonl')).filter((b) => fresh(b.start)).map((b) => ({ job: b.job, rc: b.rc, start: b.start })),
+        // the monthly cohorts, when they were made in this period
+        longterm: jsonl(path.join(fwd, 'longterm', 'ledger.jsonl')).filter((r) => r.type === 'cohort' && fresh(r.written_at)).map((r) => ({ month: r.month, tickers: r.tickers || [] })).at(-1) ?? null,
+        themes: jsonl(path.join(fwd, 'themes', 'ledger.jsonl')).filter((r) => r.type === 'cohort' && fresh(r.written_at))
+          .map((r) => ({ month: r.month, bubble_risk: r.bubble_risk ?? null, picks: Object.values(r.picks || {}).flat() })).at(-1) ?? null,
       };
     },
 

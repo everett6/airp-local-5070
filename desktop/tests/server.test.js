@@ -140,6 +140,12 @@ test('long-term picks and themes: newest cohort with reasons, results, and an em
   assert.equal(d.themes.bubble_risk, 'elevated'); assert.deepEqual(d.themes.register, ['VIX: 16.3']);
   assert.deepEqual(d.themes.rows.map((r) => [r.key, r.picked, r.baseline]), [['cyber', true, true], ['semis', false, true]]);
   assert.deepEqual(d.themeResults, []);
+  // a cohort written in the last 24 hours shows on Home; an older one does not
+  assert.equal((await (await get('/api/today')).json()).longterm, null);
+  writeFileSync(path.join(fwd, 'themes', 'ledger.jsonl'),
+    line({ type: 'cohort', month: '2026-11', written_at: new Date().toISOString(), bubble_risk: 'high', picks: { medium: ['cyber'], long: ['nuclear'] } }));
+  const td = await (await get('/api/today')).json();
+  assert.deepEqual(td.themes, { month: '2026-11', bubble_risk: 'high', picks: ['cyber', 'nuclear'] });
 });
 
 test('a file outside the public folder is not served', async (t) => {

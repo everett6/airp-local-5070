@@ -34,6 +34,8 @@ function todayCard(td) {
   if (td.fills.length) items.push(`${plural(td.fills.length, 'practice order')} filled at the broker: ${td.fills.map((f) => `${esc(f.side)} ${esc(f.qty)} ${esc(f.symbol)} at ${fmt(f.price, 2)}`).join(' · ')}`);
   if (td.outcomes.length) items.push(`${plural(td.outcomes.length, 'earlier pick')} got a one-week result`);
   if (td.tests.length) items.push(`${plural(td.tests.length, 'strategy test')} finished: ${td.tests.map((t) => `${esc(t.trial)} ${pill(t.result, String(t.result).startsWith('pass') ? 'ok' : String(t.result).startsWith('fail') ? 'bad' : '')}`).join(' ')}`);
+  if (td.longterm) items.push(`This month's <b>10 long-term picks</b> were made: ${esc(td.longterm.tickers.join(', '))} (see Strategies → Long-term picks & themes)`);
+  if (td.themes) items.push(`Themes rated: AI-bubble risk ${pill(td.themes.bubble_risk ?? '–', { low: 'ok', elevated: 'warn', high: 'bad' }[td.themes.bubble_risk] || '')}, picked ${esc(td.themes.picks.join(', ') || 'none')}`);
   if (td.alerts.length) items.push(`${plural(td.alerts.length, 'alert')}, the latest: ${esc(td.alerts.at(-1).msg)}`);
   if (td.missed) items.push(`${plural(td.missed, 'report')} missed (not decided before the market opened)`);
   const bad = td.runs.filter((r) => r.rc !== 0).length;
