@@ -59,6 +59,15 @@ test and its own commit.
    counted at about the deal price, a collapse at about zero). Needs the user's yes before the first cohort closes
    (about 30 Dec); until then such a cohort stays unscored and is flagged.
 
+9. **The reader sometimes takes the previous quarter for the year-ago quarter.** Seen live on MU (30 Sep): the fact
+   sheet said sales were 54,229M "vs 41,456M a year earlier (+30.8%)"; 41,456M was the quarter before, and the
+   year-ago quarter was 11,315M (the sheet's own SEC history lines show it). On past data (546 releases where the
+   reader gave a year-earlier sales figure and the SEC has one): the reader's figure is exactly the previous
+   quarter's in 3.1%, and differs from the SEC year-ago figure by more than 10% in 15.2% (part of that is banks and
+   others whose "revenue" has several definitions). The SEC tool already knows the filed year-ago number and is
+   used only when the reader gives none. Using it whenever it exists would change fact sheets and so decisions:
+   a new version to test, not a fix. The app now shows the fact sheet the judge read for every release.
+
 ## Also fixed in this pass
 
 | # | Where | What | Commit |

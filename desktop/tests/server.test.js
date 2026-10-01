@@ -154,3 +154,16 @@ test('a file outside the public folder is not served', async (t) => {
   assert.equal((await get('/..%2fpackage.json')).status, 404);
   assert.equal((await get('/styles.css')).status, 200);
 });
+
+test('each release carries the fact sheet the judge read and what the SEC check dropped', async (t) => {
+  const { s, get } = await session();
+  t.after(() => s.close());
+  const ev = path.join(s.airpRoot, 'backend', 'results', 'events');
+  mkdirSync(ev, { recursive: true });
+  writeFileSync(path.join(s.airpRoot, 'backend', 'results', 'forward', 'events', 'ledger.jsonl'), '{"type":"decision","accession":"a1","ticker":"MKC","logodds":-1.2}\n');
+  writeFileSync(path.join(ev, 'decide_bonsai-27b_latest_forward_h5.jsonl'),
+    `${JSON.stringify({ accession: 'a1', prompt_user: 'Company: MKC\nRevenue: not stated\nSEC cross-check: the release\'s revenue (17.4M as read) was dropped: it does not match the SEC-filed scale.' })}\n`);
+  const [r] = await (await get('/api/team')).json();
+  assert.match(r.sheet, /Revenue: not stated/);
+  assert.deepEqual(r.dropped, ["the release's revenue (17.4M as read) was dropped: it does not match the SEC-filed scale."]);
+});

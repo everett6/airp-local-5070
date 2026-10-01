@@ -502,14 +502,16 @@ Object.assign(views, {
       <div class="agents">
         <div class="agent"><div class="who"><span>Reader agent · checked facts</span>${tone(r.reader.tone)}</div>
           Sales ${num(r.reader.revenue, 'M', 0)}<br>Profit per share ${num(r.reader.eps)}<br>Outlook: ${tone(r.reader.guidance)}
-          ${r.reader.rejected.length ? `<br><span class="muted">${r.reader.rejected.length} number(s) thrown out: not found word-for-word</span>` : ''}</div>
+          ${r.reader.rejected.length ? `<br><span class="muted">${r.reader.rejected.length} number(s) thrown out: not found word-for-word</span>` : ''}
+          ${(r.dropped || []).map((x) => `<br><span class="warn-text">Not passed to the judge: ${esc(x)}</span>`).join('')}</div>
         <div class="agent"><div class="who"><span>Summary agent · in testing</span>${tone(r.net_read?.read)}</div>
           ${r.net_read ? `Conviction: ${esc(r.net_read.conviction ?? '–')}<br>Margins: ${esc(r.net_read.fields.margin ?? '–')} · Demand: ${esc(r.net_read.fields.demand ?? '–')}<br>Earnings quality: ${esc(r.net_read.fields.earnings_quality ?? '–')}` : '<span class="muted">not run</span>'}</div>
         <div class="agent"><div class="who"><span>Bull case · in testing</span></div>${r.bull_bear ? pts(r.bull_bear.bull) : '<span class="muted">not run</span>'}</div>
         <div class="agent"><div class="who"><span>Bear case · in testing</span>${r.bull_bear ? pill(`debate verdict: ${r.bull_bear.read ?? 'none'}`, r.bull_bear.read === 'bullish' ? 'ok' : r.bull_bear.read === 'bearish' ? 'bad' : '') : ''}</div>${r.bull_bear ? pts(r.bull_bear.bear) : '<span class="muted">not run</span>'}</div>
         <div class="agent"><div class="who"><span>Aschenbrenner AI build-out view · in testing</span>${tone(r.ai_lens?.read)}</div>${r.ai_lens ? `AI exposure: ${esc(r.ai_lens.exposure ?? '–')}` : '<span class="muted">not run</span>'}</div>
         <div class="agent verdict"><div class="who"><span>Master judge · decides</span>${pill(r.logodds > 0 ? 'BUY' : 'PASS', r.logodds > 0 ? 'ok' : '')}</div>
-          Confidence score <b>${fmt(r.logodds, 2)}</b>${thr != null ? `<br><span class="muted">needs ${esc(thr)} to trade</span>` : ''}</div>
+          Confidence score <b>${fmt(r.logodds, 2)}</b>${thr != null ? `<br><span class="muted">needs ${esc(thr)} to trade</span>` : ''}
+          ${r.sheet ? `<details><summary>The fact sheet it read</summary><pre class="sheet">${esc(r.sheet)}</pre></details>` : ''}</div>
       </div></div>`;
     const b = ai?.buckets || [];
     return `<h2>AI picks</h2><p class="lede">What the AI team thought of each new earnings report, and how well that has worked.</p>

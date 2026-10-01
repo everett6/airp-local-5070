@@ -78,6 +78,9 @@ export function createAirp(root) {
       const led = jsonl(path.join(ev, 'ledger.jsonl'));
       const outcome = Object.fromEntries(led.filter((r) => r.type === 'outcome').map((r) => [r.accession, r]));
       const pts = (xs) => (xs || []).slice(0, 3).map((x) => ({ point: x.point, quote: x.quote, verified: !!x.verified }));
+      // the fact sheet the judge actually read (after the code's SEC cross-check), kept by the judge step
+      const sheets = Object.fromEntries(jsonl(path.join(backend, 'results', 'events', 'decide_bonsai-27b_latest_forward_h5.jsonl'))
+        .map((x) => [x.accession, String(x.prompt_user || '')]));
       return led.filter((r) => r.type === 'decision').slice(-limit).reverse().map((r) => {
         const x = extract[r.accession] || {}, n = net[r.accession], b = bb[r.accession], l = lens[r.accession];
         return {
@@ -89,6 +92,8 @@ export function createAirp(root) {
           bull_bear: b ? { read: b.bb_read, bull: pts(b.bull), bear: pts(b.bear) } : null,
           ai_lens: l ? { read: l.ai_read, exposure: l.fields?.ai_exposure ?? null } : null,
           outcome: outcome[r.accession] ? { excess: outcome[r.accession].fwd5 ?? null } : null,
+          sheet: (sheets[r.accession] || '').slice(0, 2500) || null,
+          dropped: (sheets[r.accession] || '').split('\n').filter((l) => l.startsWith('SEC cross-check:')).map((l) => l.slice(17).trim()),
         };
       });
     },
