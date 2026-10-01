@@ -250,9 +250,9 @@ BAR_COLS = ["Open", "High", "Low", "Close", "Volume"]
 
 
 def daily_bars(tickers: list[str], start: str, end: str) -> dict[str, pd.DataFrame]:
-    """Each ticker's daily bars from Yahoo: one request for all of them, then one by one for any that request left
-    out (the only path until 1 Oct 2026). Both return the same numbers (compared on the live tickers that day); the
-    list grows with every release, and hundreds of single requests twice a day invite Yahoo's rate limit."""
+    """Each ticker's daily bars from Yahoo: one call for all of them (yfinance fetches them side by side), then one
+    by one for any that call left out (the only path until 1 Oct 2026). Both return the same numbers (compared on
+    the live tickers that day). The list grows with every release: one by one, a few hundred names take minutes."""
     import yfinance as yf
     out: dict[str, pd.DataFrame] = {}
     if len(tickers) > 1:
@@ -260,7 +260,7 @@ def daily_bars(tickers: list[str], start: str, end: str) -> dict[str, pd.DataFra
             both = yf.download(tickers, start=start, end=end, auto_adjust=True, progress=False, group_by="ticker",
                                threads=True)
         except Exception as e:  # noqa: BLE001 - whatever the batch does, the one-by-one path below still runs
-            print(f"prices: the batched request failed ({type(e).__name__}); fetching one by one", flush=True)
+            print(f"prices: the batched call failed ({type(e).__name__}); fetching one by one", flush=True)
             both = pd.DataFrame()
         have = set(both.columns.get_level_values(0)) if isinstance(both.columns, pd.MultiIndex) else set()
         for t in tickers:

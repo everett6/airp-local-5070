@@ -125,7 +125,7 @@ def test_a_release_whose_fact_sheet_is_missing_still_fails_the_run(runner: dict[
         runner["run"]("2026-10-01T22:30:00")
 
 
-def test_prices_come_from_one_request_with_the_single_requests_as_fallback(monkeypatch: pytest.MonkeyPatch,
+def test_prices_come_from_one_call_with_the_single_requests_as_fallback(monkeypatch: pytest.MonkeyPatch,
                                                                            capsys: pytest.CaptureFixture[str]) -> None:
     import yfinance
 
@@ -156,4 +156,4 @@ def test_prices_come_from_one_request_with_the_single_requests_as_fallback(monke
     state["fail"] = True
     got = FE.daily_bars(["AAA", "BBB"], "2026-09-01", "2026-09-08")
     assert calls == [["AAA", "BBB"], "AAA", "BBB"] and sorted(got) == ["AAA", "BBB"]
-    assert "the batched request failed (RuntimeError)" in capsys.readouterr().out
+    assert "the batched call failed (RuntimeError)" in capsys.readouterr().out
