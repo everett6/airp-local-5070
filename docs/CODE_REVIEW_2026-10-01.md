@@ -49,7 +49,8 @@ test and its own commit.
 | # | Where | What | Commit |
 |---|---|---|---|
 | 9 | `scripts/digest.py` | The phone digest called a run that did its job but raised a broker alert "FAILED". It now says "finished with an alert". | 8824bf9 |
-| 10 | `app/portfolio/broker.py`, `scripts/ai_picks.py` | Class shares (BRK-B, BF-B) were sent to Alpaca with a dash. Alpaca only knows BRK.B (read-only lookup, 1 Oct): the order would have been rejected, leaving the pair's sector-ETF short open without its stock, and one such name in a price request makes the whole request fail. Not hit yet (no class share has been picked). | The book keeps the dash; orders, price requests and positions use the broker's dot. | this commit |
+| 10 | `app/portfolio/broker.py`, `scripts/ai_picks.py` | Class shares (BRK-B, BF-B) were sent to Alpaca with a dash. Alpaca only knows BRK.B (read-only lookup, 1 Oct): the order would have been rejected, leaving the pair's sector-ETF short open without its stock, and one such name in a price request makes the whole request fail. Not hit yet (no class share has been picked). | The book keeps the dash; orders, price requests and positions use the broker's dot. | daf49b0 |
+| 11 | `app/sandbox/walkforward.py` | The one-token probability call behind the monthly long-term and theme ratings had no retry: one dropped connection in about 500 calls would have failed the whole cohort (75 minutes of GPU, repeated at the next run). | Three attempts, as the main call already had. Answers unchanged. | this commit |
 
 ## Read and found sound
 `app/portfolio/master.py` (calibration, Kelly sizing, the weight simulator), `app/portfolio/sleeve.py`,

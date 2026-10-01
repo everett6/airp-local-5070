@@ -210,3 +210,36 @@ def test_llm_accepts_answers_computed_on_gpu(tmp_path, monkeypatch):
     _, llm = _mock_ollama(tmp_path, monkeypatch, size_vram=1000)
     assert asyncio.run(llm("s", "u")) == '{"p_up": 0.6}'
     assert len(llm._cache) == 1
+
+
+def test_next_token_probs_retries_a_dropped_connection(tmp_path, monkeypatch):
+    """The monthly cohorts make ~500 of these calls in one go; one network error used to fail the whole cohort."""
+    import asyncio
+
+    import httpx
+    import pytest
+
+    from app.sandbox import walkforward as wf
+
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] <= fail:
+            raise httpx.ConnectError("dropped")
+        return httpx.Response(200, json={"logprobs": [{"token": "4", "logprob": 0.0, "top_logprobs": [
+            {"token": "4", "logprob": -0.2231}, {"token": "5", "logprob": -1.6094}]}]})
+
+    async def no_sleep(_s: float) -> None:
+        return None
+
+    monkeypatch.setattr(wf, "RESULTS", tmp_path)
+    monkeypatch.setattr(wf.asyncio, "sleep", no_sleep)
+    llm = wf.OllamaLLM("m")
+    llm._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    fail = 2
+    probs = asyncio.run(llm.next_token_probs("s", "u", '{"x": {"label": "', ("4", "5")))
+    assert calls["n"] == 3 and round(probs["4"], 2) == 0.8 and round(probs["5"], 2) == 0.2
+    calls["n"], fail = 0, 3
+    with pytest.raises(httpx.ConnectError):
+        asyncio.run(llm.next_token_probs("s", "u", "p", ("4", "5")))

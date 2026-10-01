@@ -265,8 +265,15 @@ class OllamaLLM:
         }
         await self._yield_to_priority()
         async with self._sem:
-            r = await self._client.post(f"{self.base_url}/api/chat", json=body)
-            r.raise_for_status()
+            for attempt in range(3):  # as __call__: one dropped connection must not fail a whole cohort
+                try:
+                    r = await self._client.post(f"{self.base_url}/api/chat", json=body)
+                    r.raise_for_status()
+                    break
+                except httpx.HTTPError:
+                    if attempt == 2:
+                        raise
+                    await asyncio.sleep(2)
         return word_probabilities(r.json().get("logprobs") or [], words)
 
     async def _yield_to_priority(self, poll_s: float = 15.0) -> None:
