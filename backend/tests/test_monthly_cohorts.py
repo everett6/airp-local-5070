@@ -176,3 +176,62 @@ def test_a_pick_that_stopped_trading_does_not_stop_later_cohorts(tmp_path: Path,
     assert "LEARN ALERT: long-term cohort 2026-05: missing entry/exit opens for T13" in text
     with pytest.raises(ValueError, match="missing entry/exit opens for T13"):  # the check itself is unchanged
         LT.score(recs[:2], gone)
+
+
+def test_a_cut_off_rating_run_resumes_and_makes_the_same_cohort(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                                stubs: None, capsys: pytest.CaptureFixture[str]) -> None:
+    """1 Oct 2026: a restart an hour into the rating lost 449 finished ratings. Each rating is now saved as made."""
+    names = [f"T{i:02d}" for i in range(14)]
+    ev = pd.DataFrame({"cik": range(14), "ticker": names, "sector": "Industrials",
+                       "accession": [f"a{i}" for i in range(14)], "t": pd.Timestamp("2026-09-15", tz="UTC")})
+    cards = [{"ticker": t, "cik": i, "accession": f"a{i}", "r12": 0.01 * i,
+              "card": f"Company: {t} (Industrials)\nrevenue rose", "source": f"Company: {t} (Industrials)\nrevenue rose"}
+             for i, t in enumerate(names)]
+    monkeypatch.setattr(LT, "releases", lambda _d: ev)
+    monkeypatch.setattr(LT, "cards", lambda _ev, _now, _closes: cards)
+    monkeypatch.setattr(LT, "prices", lambda tickers, _now: _prices(set(tickers) | {"SPY"}))
+    StubLLM.best = tuple(f"{t} " for t in names[:3])
+    whole = tmp_path / "whole"
+    LT.run(tmp_path / "events", whole, NOW, use_gpu=True)  # the cohort an uninterrupted run makes
+    asked: list[str] = []
+
+    class PowerCut(Exception):
+        pass
+
+    class Dies(StubLLM):
+        async def __call__(self, system: str, user: str, mode: str | None = None) -> str:
+            if len(asked) == 9:
+                raise PowerCut  # the PC goes down at the tenth card
+            asked.append(user.splitlines()[0])
+            return await super().__call__(system, user, mode)
+
+    class Counts(StubLLM):
+        async def __call__(self, system: str, user: str, mode: str | None = None) -> str:
+            asked.append(user.splitlines()[0])
+            return await super().__call__(system, user, mode)
+
+    monkeypatch.setattr(walkforward, "OllamaLLM", Dies)
+    out = tmp_path / "longterm"
+    with pytest.raises(PowerCut):
+        LT.run(tmp_path / "events", out, NOW, use_gpu=True)
+    partial = out / "ratings_2026-10.partial.jsonl"
+    assert not (out / "ledger.jsonl").exists() and len(partial.read_text().splitlines()) == 9
+    with partial.open("a") as f:
+        f.write('{"ticker": "T09", "rat')  # and the line being written is cut off
+    asked.clear()
+    monkeypatch.setattr(walkforward, "OllamaLLM", Counts)
+    LT.run(tmp_path / "events", out, NOW + pd.Timedelta(minutes=5), use_gpu=True)
+    assert "9 of 14 ratings kept" in capsys.readouterr().out and len(asked) == 5
+    a, b = Ledger(whole / "ledger.jsonl").verify()[0], Ledger(out / "ledger.jsonl").verify()[0]
+    assert all(a[k] == b[k] for k in ("tickers", "ratings", "scores", "rating_counts", "candidates"))
+    ra, rb = [[json.loads(x) for x in (d / "ratings_2026-10.jsonl").read_text().splitlines()] for d in (whole, out)]
+    assert ra == rb and not partial.exists()
+    # a card that changed since it was rated (a new day's returns, a newer release) is rated again
+    saved = [{**r, "card_key": LT.card_key(c)} for r, c in zip(rb, cards, strict=True)]
+    changed = [{**cards[0], "card": cards[0]["card"] + " again"}, *cards[1:]]
+    part2 = tmp_path / "p2.jsonl"
+    part2.write_text("".join(json.dumps(r) + "\n" for r in saved))
+    asked.clear()
+    import asyncio
+    again = asyncio.run(LT.rate(Counts(), changed, part2))
+    assert len(asked) == 1 and asked[0].startswith("Company: T00") and again[1:] == rb[1:]

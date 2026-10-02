@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import gzip
+import hashlib
 import json
 import math
 import sys
@@ -41,7 +42,7 @@ from llm_fields import (
 )
 
 from app.data_ingestion.tickers import trading_symbol
-from app.forward.ledger import Ledger
+from app.forward.ledger import Ledger, jsonl_records, open_append
 from app.forward.schedule import NY
 from app.sandbox.gpu_lock import gpu_priority
 
@@ -100,17 +101,35 @@ def cards(ev: pd.DataFrame, now: datetime, closes: pd.DataFrame) -> list[dict[st
     return out
 
 
-async def rate(llm: Any, cs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def card_key(c: dict[str, Any]) -> str:
+    return hashlib.sha256(f"{c['ticker']}|{c['accession']}|{c['card']}".encode()).hexdigest()[:16]
+
+
+async def rate(llm: Any, cs: list[dict[str, Any]], partial: Path | None = None) -> list[dict[str, Any]]:
+    """Rate every card. With `partial`, each rating is saved as it is made, and a run that was cut off (1 Oct 2026:
+    449 of 490 ratings lost to a restart) picks up where it stopped: a saved rating is reused only when its card is
+    exactly the one the model would be shown again."""
+    kept = {r["card_key"]: r for r in jsonl_records(partial) if "card_key" in r} if partial else {}
+
     async def one(c: dict[str, Any]) -> dict[str, Any]:
+        key = card_key(c)
+        if key in kept:
+            return {k: v for k, v in kept[key].items() if k != "card_key"}
         reply, overflow = await ask(llm, PROMPT_LT, c["card"])
         raw = parse(reply)
         v = verify(raw, c["source"], FIELDS_LT)
         rating = int(v["outlook_6m"])
         ev, probs = await rating_score(llm, PROMPT_LT, c["card"], reply, "outlook_6m", raw, rating)
-        return {"ticker": c["ticker"], "accession": c["accession"], "r12": c["r12"], "rating": rating,
-                "score": round(ev, 4), "probs": probs,
-                "parsed": v["parsed"], "overflow": overflow, "reason": str((raw or {}).get("reason", ""))[:300],
-                **theses(raw, c["source"])}
+        r = {"ticker": c["ticker"], "accession": c["accession"], "r12": c["r12"], "rating": rating,
+             "score": round(ev, 4), "probs": probs,
+             "parsed": v["parsed"], "overflow": overflow, "reason": str((raw or {}).get("reason", ""))[:300],
+             **theses(raw, c["source"])}
+        if partial:
+            with open_append(partial) as f:
+                f.write(json.dumps({**r, "card_key": key}) + "\n")
+        return r
+    if kept:
+        print(f"long-term picks: {sum(card_key(c) in kept for c in cs)} of {len(cs)} ratings kept from a cut-off run")
     return list(await asyncio.gather(*(one(c) for c in cs)))
 
 
@@ -263,6 +282,7 @@ def run(events_dir: Path, out: Path, now: datetime, use_gpu: bool) -> None:
         print("LEARN ALERT: long-term picks: a cohort is due but the GPU is off; it will be made next run")
         return
     cs = cards(ev, now, closes)
+    partial = out / f"ratings_{now.astimezone(NY).strftime('%Y-%m')}.partial.jsonl"
     with gpu_priority("longterm_picks"):
         if not wait_gpu_free(900):
             print("LEARN ALERT: long-term picks: the GPU stayed busy; the cohort will be made next run")
@@ -274,7 +294,7 @@ def run(events_dir: Path, out: Path, now: datetime, use_gpu: bool) -> None:
 
             async def go() -> list[dict[str, Any]]:
                 try:
-                    return await rate(llm, cs)
+                    return await rate(llm, cs, partial)
                 finally:
                     await llm.unload()
             rated = asyncio.run(go())
@@ -289,6 +309,7 @@ def run(events_dir: Path, out: Path, now: datetime, use_gpu: bool) -> None:
                made_at=now.isoformat(timespec="seconds"), tickers=[p["ticker"] for p in picks],
                ratings=[p["rating"] for p in picks], scores=[p.get("score") for p in picks], candidates=len(cs),
                rating_counts={str(k): int(v) for k, v in pd.Series([r["rating"] for r in rated]).value_counts().items()})
+    partial.unlink(missing_ok=True)  # the cohort is in the ledger: the saved ratings have done their job
     print(f"long-term picks: cohort {now.astimezone(NY).strftime('%Y-%m')} from {len(cs)} cards: "
           + ", ".join(f"{p['ticker']}({p['rating']})" for p in picks))
 
