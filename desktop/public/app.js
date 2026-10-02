@@ -107,6 +107,20 @@ function aggressiveCard(a) {
     ${s.aggressive.length > 1 ? lineChart([{ name: 'Aggressive 2.5×', x: s.aggressive.map((r) => r.date), y: s.aggressive.map((r) => r.equity) }, { name: 'Frozen book', x: s.frozen.map((r) => r.date), y: s.frozen.map((r) => r.equity) }], { height: 200, yFmt: (v) => v.toFixed(0) }) : '<p class="empty">The chart starts after two weekly runs.</p>'}</div>`;
 }
 
+function monthEndCard(w) {
+  if (!w) return '';
+  const head = '<h3>Being watched on new data · month-end Treasuries (no money)</h3>';
+  const what = 'Long Treasury bonds have tended to rise in the last 3 trading days of a month, when big funds must buy. In the test on past data (M1 below) the effect was there, but not surely enough to pass. So the same rule is now recorded on months nobody has seen, starting October 2026, and judged once after 24 months. Nothing is bought.';
+  if (w.verdict) return `<div class="card wide">${head}<p class="muted">${what}</p><p>${w.verdict.pass ? pill('passed', 'ok') : pill('failed', 'bad')} after ${fmt(w.months)} months: score ${fmt(w.verdict.sharpe, 2)}; month-end days beat other days by ${fmt(w.verdict.diff_bp, 1)} bp a day (cautious estimate ${fmt(w.verdict.diff_lo80_bp, 1)}).</p></div>`;
+  const used = Math.min(100, 100 * w.months / w.target);
+  return `<div class="card wide">${head}<p class="muted">${what}</p>
+    <div class="kpis">${kpi('Months recorded', `${fmt(w.months)} of ${fmt(w.target)}`, 'verdict after the last one')}${kpi('Average month-end gain', w.mean_net == null ? '–' : pct(w.mean_net, 2), 'TLT above T-bills, after costs')}${kpi('Months it gained', w.hit_rate == null ? '–' : pct(w.hit_rate, 0))}</div>
+    <div class="bar"><span style="width:${used.toFixed(1)}%"></span></div>
+    ${w.rows.length ? `<table><tr><th>Month</th><th>Days held</th><th class="num">Gain over those days</th><th class="num">An average other day that month</th></tr>
+      ${w.rows.map((r) => `<tr><td>${esc(r.month)}</td><td>${esc(r.days.map((d) => String(d).slice(5)).join(', '))}</td><td class="num">${pct(r.net, 2)}</td><td class="num">${r.other_mean == null ? '–' : pct(r.other_mean, 2)}</td></tr>`).join('')}</table>`
+      : '<p class="empty">The first month (October 2026) is recorded in early November.</p>'}</div>`;
+}
+
 function consensusCard(c) {
   if (!c) return '';
   const head = '<h3>Master algorithm · combines every agent (in testing, no money)</h3>';
@@ -394,7 +408,7 @@ Object.assign(views, {
   },
 
   async lab() {
-    const m = await metrics(); if (m.missing) return `<h2>Strategy lab</h2>${noMetrics}`;
+    const [m, watch] = await Promise.all([metrics(), api('month_end').catch(() => null)]); if (m.missing) return `<h2>Strategy lab</h2>${noMetrics}`;
     const tests = m.lab.tests;
     const order = ['day trading', 'calendar', 'flows', 'pairs', 'crypto carry'];
     const rows = tests.slice().sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || (b.sharpe ?? -9) - (a.sharpe ?? -9))
@@ -408,13 +422,14 @@ Object.assign(views, {
     return `<h2>Strategy lab</h2><p class="lede">Trading ideas we tested, and whether they held up. ${passed} of ${tests.length} passed.</p>
       ${plain('Each row is one idea (day trading, calendar effects, money flows of big funds, pairs, crypto). The dot is its score after costs and the line is how uncertain that score is. To pass, the dot must be right of the dashed line <b>and</b> the whole line must be right of zero. Grey rows failed, so they do not trade.')}
       <div class="card wide">${h3('Score after costs, with its uncertainty range', '95% interval')}${ciChart(rows, { refs: [{ v: 0.5, label: 'pass line 0.5' }] })}</div>
+      ${monthEndCard(watch)}
       <div class="card wide"><h3>The detail behind each test</h3><p class="muted">"Score by trading cost" shows the same idea at cheap and expensive trading: an idea that only works when trading is free is not real. "Before it was published" is the score on the years before the idea became widely known.</p>
         <table><tr><th>Test</th><th>Tested on</th><th class="num">Days</th><th class="num">Score by trading cost</th><th class="num">Before it was published</th><th class="num">Up days</th><th class="num">Worst month</th><th class="num">Moves with core book${help('Correlation')}</th><th>Verdict</th></tr>
         ${tests.map((x) => `<tr><td>${esc(x.id)} · ${esc(x.name)}</td><td>${esc((x.window || []).map((d) => String(d).slice(0, 7)).join(' → '))}</td><td class="num">${fmt(x.days)}</td>
           <td class="num">${Object.entries(x.costs || {}).map(([c, v]) => `${esc(c)}: ${v == null ? '–' : fmt(v, 2)}`).join(' · ') || fmt(x.sharpe, 2)}</td><td class="num">${x.before_sharpe == null ? '–' : fmt(x.before_sharpe, 2)}</td>
           <td class="num">${x.hit_rate == null ? '–' : pct(x.hit_rate, 0)}</td><td class="num">${x.worst_month == null ? '–' : pct(x.worst_month)}</td><td class="num">${x.corr_core == null ? '–' : fmt(x.corr_core, 2)}</td><td>${x.pass ? pill('passed', 'ok') : pill('failed', 'bad')}</td></tr>`).join('')}</table></div>
       <div class="split">${curveCards}</div>
-      <p class="muted">D9 passed but trades the official open auction, which is not tradable in practice; its tradable version (D10) failed.</p>`;
+      <p class="muted">D9 passed but trades the official open auction, which is not tradable in practice; its two tradable versions (D10, D11) failed.</p>`;
   },
 
 

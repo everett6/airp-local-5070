@@ -139,6 +139,21 @@ export function createAirp(root) {
       };
     },
 
+    // The month-end Treasuries shadow (M1 on new data, no money): one line per finished month, judged once at 24.
+    monthEnd() {
+      const lines = jsonl(path.join(fwd, 'm1', 'ledger.jsonl'));
+      const months = lines.filter((r) => r.type === 'month' && Number.isFinite(r.net));
+      const v = lines.find((r) => r.type === 'verdict') ?? null;
+      return {
+        first: '2026-10', target: 24, months: months.length,
+        mean_net: months.length ? months.reduce((a, r) => a + r.net, 0) / months.length : null,
+        hit_rate: months.length ? months.filter((r) => r.net > 0).length / months.length : null,
+        verdict: v && { pass: !!v.pass, sharpe: v.sharpe ?? null, diff_bp: v.diff_bp ?? null, diff_lo80_bp: v.diff_lo80_bp ?? null },
+        rows: months.slice().reverse().map((r) => ({ month: r.month, days: r.days || [], net: r.net,
+          other_mean: r.other_n ? r.other_sum / r.other_n : null })),
+      };
+    },
+
     // The monthly long-term picks and the theme track: the newest cohort with the AI's reasons, and every scored one.
     longterm() {
       const month = (c) => (/^\d{4}-\d{2}$/.test(String(c?.month)) ? c.month : null);

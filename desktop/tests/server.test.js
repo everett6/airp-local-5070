@@ -179,3 +179,20 @@ test('open decisions come from docs/open_decisions.json; a missing or broken fil
   writeFileSync(path.join(s.airpRoot, 'docs', 'open_decisions.json'), '{not json');
   assert.deepEqual(await (await get('/api/open_decisions')).json(), []);
 });
+
+test('month-end Treasuries shadow: empty before the first month, then one row per month and the verdict', async (t) => {
+  const { s, get } = await session();
+  t.after(() => s.close());
+  const w0 = await (await get('/api/month_end')).json();
+  assert.equal(w0.months, 0); assert.equal(w0.mean_net, null); assert.deepEqual(w0.rows, []); assert.equal(w0.verdict, null);
+  const dir = path.join(s.airpRoot, 'backend', 'results', 'forward', 'm1');
+  mkdirSync(dir, { recursive: true });
+  const lines = [{ type: 'month', month: '2026-10', days: ['2026-10-28', '2026-10-29', '2026-10-30'], net: 0.006, other_sum: -0.019, other_n: 19 },
+    { type: 'month', month: '2026-11', days: ['2026-11-25', '2026-11-27', '2026-11-30'], net: -0.002, other_sum: 0.02, other_n: 16 }];
+  writeFileSync(path.join(dir, 'ledger.jsonl'), lines.map((x) => JSON.stringify(x)).join('\n') + '\n{"type": "month", "mon');
+  const w = await (await get('/api/month_end')).json();
+  assert.equal(w.months, 2); assert.equal(w.hit_rate, 0.5); assert.ok(Math.abs(w.mean_net - 0.002) < 1e-12);
+  assert.equal(w.rows[0].month, '2026-11'); assert.ok(Math.abs(w.rows[1].other_mean + 0.001) < 1e-12);
+  writeFileSync(path.join(dir, 'ledger.jsonl'), JSON.stringify(lines[0]) + '\n' + JSON.stringify({ type: 'verdict', pass: false, sharpe: 0.31, diff_bp: 4.2, diff_lo80_bp: -1.1 }) + '\n');
+  assert.deepEqual((await (await get('/api/month_end')).json()).verdict, { pass: false, sharpe: 0.31, diff_bp: 4.2, diff_lo80_bp: -1.1 });
+});
