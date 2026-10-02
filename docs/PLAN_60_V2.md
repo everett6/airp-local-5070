@@ -2176,3 +2176,21 @@ v1 stays; the Micron fault stays a known limit, and a release hit by rule 2 or 3
 the evidence file without changing what the judge sees. One run; no second version of this step. A reader that
 reads period, units and basis itself (a new prompt or model) is a separate, larger project scored on the
 extraction benchmark; it is not started here.
+
+**Result (1 Oct 2026, ~22:10 PDT; spec `f4c60d0`, code `4e93c4a`, both pushed before the run; one run): PASS.**
+- **Truer figures.** Against the comparative each company later filed for the same quarter: year-earlier revenue
+  right on 91.0% of fact sheets under v1 and **92.0%** under v2 (1,427 checked); year-earlier EPS 81.1% → **82.2%**
+  (1,966 checked). All **35** figures replaced under rule 2 (14 revenue, 21 EPS) match the later filing (needed:
+  80%).
+- **No worse for the judge.** 3,160 releases, 26 months. Monthly rank IC v1 +0.0664, v2 **+0.0677**; d = +0.0013,
+  95% interval [−0.0036, +0.0067], above the −0.01 margin. Scores agree closely (rank correlation 0.996; 0.7% of
+  BUY/PASS calls flip). By sample: 2024 +0.027 → +0.031; 2025–26 +0.100 → +0.099.
+- **Reported, not deciding.** 286 scored fact sheets change (rule 2: 35 figures; rule 3: 266 notes). On those 286
+  alone the pooled rank IC is −0.001 under v1 and −0.037 under v2: on the sheets it touches, v2 did not help the
+  judge and may have hurt a little; with 286 releases this is well inside noise, and the registered measure over
+  all releases is unchanged. Worth watching forward, not a reason to hold v2: the pass rule was truer figures at
+  no measurable cost, and that is what it shows.
+- **Consequence, as registered:** the live runner builds v2 fact sheets from the next run (`SHEET_VERSION = 2` in
+  `forward_events.py`); each decision stores `sheet_version`. A replay of the 30 Sep – 1 Oct releases writes
+  Micron's sheet as "Revenue: 54,229M vs 11,315M a year earlier (+379.3%)" with the correction stated. The judge,
+  the threshold and everything else are unchanged. Registry: `factsheet_v2_reconciled`, pass.

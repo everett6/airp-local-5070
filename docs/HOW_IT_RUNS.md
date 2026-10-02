@@ -41,6 +41,9 @@ their own `*_autodry` folders and never touch git.
    holiday calendar (`app/forward/schedule.py`). The deadline is 09:30 New York on that session and is stored
    with the decision (`entry_session`). **On time** is judged on the clock just before the line is written
    (`decided_at`), not on the run's start (`as_of`).
+   **Fact sheet version 2** (live since its check passed on 1 Oct): the reader's year-earlier revenue and EPS
+   are reconciled with the SEC-filed quarters before the judge sees them (`app/sandbox/reconcile.py`); each
+   decision stores `sheet_version`.
 3. `ai_picks.py`: the AI-picks sleeve's paper orders for decisions above the threshold. Exits follow what the
    broker actually holds: a part fill is closed for what it filled, and a pair whose exit run was missed is closed
    at the next order window (a late exit, alerted once).

@@ -301,6 +301,8 @@ def test_the_fact_sheet_version_reaches_the_builder(monkeypatch: pytest.MonkeyPa
 
 def test_the_fact_sheet_version_is_stored_with_the_decision(runner: dict[str, Any],
                                                             monkeypatch: pytest.MonkeyPatch) -> None:
+    assert FE.SHEET_VERSION == 2  # live since its check passed (results/events/factsheet_v2_check.json)
+    monkeypatch.setattr(FE, "SHEET_VERSION", 1)
     recs = runner["run"]("2026-10-01T22:30:00")
     assert "sheet_version" not in next(r for r in recs if r["type"] == "decision")  # version 1: the record as it was
     monkeypatch.setattr(FE, "SHEET_VERSION", 2)

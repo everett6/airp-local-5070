@@ -58,9 +58,9 @@ from app.tools.gateway import _read_env_file
 
 PY = str(BACKEND / ".venv" / "bin" / "python")
 H = 5
-# The fact sheet the judge reads. 2 = year-earlier revenue and EPS reconciled with the SEC-filed quarters; it goes
-# live only if its registered check passes (PLAN_60_V2 "Fact sheet v2", scripts/factsheet_v2_check.py).
-SHEET_VERSION = 1
+# The fact sheet the judge reads. 2 = year-earlier revenue and EPS reconciled with the SEC-filed quarters; live since
+# its registered check passed on 1 Oct 2026 (PLAN_60_V2 "Fact sheet v2", results/events/factsheet_v2_check.json).
+SHEET_VERSION = 2
 
 
 def entry_deadline(accepted_utc: str) -> datetime:

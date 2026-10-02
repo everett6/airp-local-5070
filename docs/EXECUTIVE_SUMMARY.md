@@ -114,6 +114,12 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
 - **Month-end Treasuries shadow (started 1 Oct 2026 on the user's yes; no money):** the M1 rule (TLT over the last
   3 trading days of each month) is recorded month by month from October 2026 and judged once at 24 months
   (`results/forward/m1/ledger.jsonl`; spec in PLAN_60_V2 "M1 forward shadow"). First line: early November.
+- **Fact sheet v2 (1 Oct 2026, registered check, run once): pass, live from 2 Oct.** The reader's year-earlier
+  revenue and EPS are reconciled with the SEC-filed quarters (the previous quarter taken for the year-earlier one
+  is replaced; other differences are stated). On 3,175 past releases the figures are right more often (revenue
+  91.0% → 92.0%, EPS 81.1% → 82.2%; all 35 replaced figures right) and the judge's rank IC is unchanged (+0.066 →
+  +0.068, difference +0.001 [−0.004, +0.007]). The same evening, on the user's yes: one entry session for
+  decisions, orders and scoring, and on time judged when a decision is written.
 - **Name-hiding check of the AI judge (1 Oct 2026, validity test, run once): no evidence of memory.** 3,160 past
   releases re-scored with company, ticker and dates hidden: rank IC +0.069 masked against +0.066 unmasked
   (difference +0.003, 95% interval [−0.008, +0.013]); 5.8% of calls flip. The judge's backtest edge comes from the
