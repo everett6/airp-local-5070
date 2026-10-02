@@ -1961,3 +1961,30 @@ it tests. A pass changes no book: it becomes a proposal to the user, with a forw
 - **A1.** The pattern was there in 2009–2013 (post days +22.4 bp a day above pre days, CI [+7.1, +36.3]) and is not
   there after the paper's publication. 154 auction clusters. Correlation with M1: 0.00.
 - Registry: 42 trials. Result file: `backend/results/daytrade_test.json` (R1, M1, A1).
+
+### M1 forward shadow: month-end Treasuries on new data (spec fixed 2026-10-01 ~17:30 PDT, the user's yes the same day; before any shadow code ran and before any forward month exists)
+
+M1 failed narrowly in its backtest (effect there, Sharpe interval not clear of 0). The user asked for the forward
+watch. **No money, no orders, nothing in the book changes.** It is the same rule on months nobody has seen.
+
+- **Rule (M1's, unchanged):** TLT. The last 3 trading days of each calendar month: hold from the close of the
+  4th-last trading day to the month's last close. Daily excess = TLT total return (adjusted close) − the 3-month
+  T-bill rate / 252. Cost: 1 bp on the entry day and 1 bp on the exit day.
+- **Forward months:** October 2026 onward. September 2026's month-end (28–30 Sep) fell after the backtest's data
+  and before this registration; it is left out of both.
+- **Record:** one line per finished month in `results/forward/m1/ledger.jsonl`, written by
+  `scripts/m1_shadow.py` at the first scheduled run after the next month's first trading day has closed (a month is
+  finished only when the data shows a later month, as in the backtest). The line holds the three days, each day's
+  excess return, the month's net overlay return, and the sum and count of excess returns on the month's other
+  days. Lines are appended once and never rewritten. Prices: Yahoo adjusted closes; T-bill: FRED DTB3 (both free).
+  It runs as a side step of the existing event runs (no new timer; its exit code never counts) and downloads
+  only when a month is due.
+- **Verdict (one trial, `treasury_month_end_forward`), at the first weekly review with 24 finished forward months
+  (October 2026 – September 2028):** pass needs both: (1) the net overlay's annualized Sharpe over all days of
+  those months ≥ 0.5; (2) the mean excess on month-end days minus the mean on other days, with months resampled
+  whole (5,000 draws, seed 0): the 80% one-sided lower bound above 0 (the shadows' usual bound). Nothing is judged
+  earlier, and the shadow is not stopped early for a bad stretch: it costs nothing.
+- **Stated now:** with about 72 month-end days the test is weak; a true Sharpe of 0.5 passes it less than half the
+  time. A pass is a proposal to the user (TLT is in the mandate), followed by the evidence ladder; it moves no
+  money by itself. A fail closes the month-end idea. Reported at each weekly review, not deciding: months so far,
+  mean net return per month, hit rate.
