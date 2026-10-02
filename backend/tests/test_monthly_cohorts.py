@@ -182,6 +182,8 @@ def test_a_pick_that_stopped_trading_is_priced_at_its_last_trade(tmp_path: Path,
                     for t in names[4:14]])
     assert may["basket"] == round(float(want), 5) and "priced_at_last_trade" not in recs[3]
     assert "LEARN ALERT" not in capsys.readouterr().out
+    # too early to tell: with fewer than 5 trading days after the exit day the cohort waits
+    assert LT.score(recs[:1], gone.iloc[:len(gone) - 56 + 3]) == []
     never = opens.copy()
     never["T13"] = np.nan  # no open at the entry either: nothing to price it from
     with pytest.raises(ValueError, match="missing entry opens for T13"):

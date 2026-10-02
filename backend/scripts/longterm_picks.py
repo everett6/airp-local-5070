@@ -149,6 +149,9 @@ def due(recs: list[dict[str, Any]], now: datetime) -> bool:
     return late or (et.date() == first_weekday and et.hour >= 16)
 
 
+STOPPED_AFTER = 5  # trading days without an open after the exit day before a pick counts as no longer trading
+
+
 def score(recs: list[dict[str, Any]], opens: pd.DataFrame) -> list[dict[str, Any]]:
     """Results for cohorts whose exit open (entry + 63 trading days) is in the data and not yet scored."""
     done = {r["month"] for r in recs if r.get("type") == "result"}
@@ -173,18 +176,31 @@ def score(recs: list[dict[str, Any]], opens: pd.DataFrame) -> list[dict[str, Any
         missing = [t for t in c["tickers"] if not good(t, entry)]
         if missing:
             raise ValueError(f"long-term cohort {c['month']}: missing entry opens for {', '.join(missing)}")
-        # a pick that stopped trading before the exit (bought out, delisted) is priced at its last open on or before
-        # the exit day (PLAN_60_V2, "Rule changes after the records were checked", 2); the result names such picks
+        # a pick that stopped trading before the exit (bought out, delisted: no open on the exit day nor in the 5
+        # trading days after it) is priced at its last open on or before the exit day (PLAN_60_V2, "Rule changes
+        # after the records were checked", 2); the result names such picks. A bar missing on the exit day alone is a
+        # data fault and still raises.
         last_trade: dict[str, str] = {}
         exits: dict[str, float] = {}
+        gaps, wait = [], False
         for t in c["tickers"]:
             if good(t, exit_):
                 exits[t] = price(t, exit_)
                 continue
-            seen = opens[t].loc[entry:exit_].dropna()
-            seen = seen[seen > 0]
-            exits[t] = float(seen.iloc[-1])  # the entry open at the least: it was checked above
-            last_trade[t] = pd.Timestamp(seen.index[-1]).date().isoformat()
+            after = opens[t].iloc[opens.index.get_loc(exit_) + 1:]
+            if len(days[days > exit_]) < STOPPED_AFTER:
+                wait = True  # too early to tell a stock that stopped trading from a bar missing in the data
+            elif (after.dropna() > 0).any():
+                gaps.append(t)  # it trades again later: the exit day's bar is missing, a data fault
+            else:
+                seen = opens[t].loc[entry:exit_].dropna()
+                seen = seen[seen > 0]
+                exits[t] = float(seen.iloc[-1])  # the entry open at the least: it was checked above
+                last_trade[t] = pd.Timestamp(seen.index[-1]).date().isoformat()
+        if gaps:
+            raise ValueError(f"long-term cohort {c['month']}: missing entry/exit opens for {', '.join(gaps)}")
+        if wait:
+            continue
         rets = [exits[t] / price(t, entry) - 1 for t in c["tickers"]]
         spy = price("SPY", exit_) / price("SPY", entry) - 1
         basket = float(np.mean(rets))

@@ -2213,6 +2213,9 @@ section fixes the rule-level faults that were still open. Each is a change to a 
    in the data on or before the exit day (usual practice; a cash buyout sits at the deal price), the result records
    which picks were priced this way, and a pick with no open at the *entry* still leaves the cohort unscored. No
    cohort has closed yet (the first was due 1 Oct).
+   *Made exact while coding, the same night:* "stopped trading" means no open on the exit day and none in the 5
+   trading days after it; the cohort waits for those 5 days. A pick that trades again after a missing exit-day bar
+   is a data fault and still raises, as before.
 3. **Not changed, after checking:** "a gap longer than 3 days is never back-filled as missed" (open since the code
    review) was wrong: the runner looks back to three days before its last run, however long ago that was, so
    releases published while the PC was off are found by the next run and logged as missed. Checked by a replay
