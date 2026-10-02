@@ -2194,3 +2194,28 @@ extraction benchmark; it is not started here.
   `forward_events.py`); each decision stores `sheet_version`. A replay of the 30 Sep – 1 Oct releases writes
   Micron's sheet as "Revenue: 54,229M vs 11,315M a year earlier (+379.3%)" with the correction stated. The judge,
   the threshold and everything else are unchanged. Registry: `factsheet_v2_reconciled`, pass.
+
+
+### Rule changes after the records were checked (the user's "fix it all", 2026-10-01 ~23:30 PDT; written before the code)
+
+The user pasted both parts of the second outside review again and gave permission to do them, take the steps they
+need and fix what they show. Both parts were already built the same evening ("Outside review, second part"); this
+section fixes the rule-level faults that were still open. Each is a change to a rule fixed earlier.
+
+1. **A judge answer that cannot be used is a missed release, not a failed run.** If Bonsai's answer for a release
+   has neither BUY nor PASS among its likely first words, no log-odds exist for it. Until now the run failed
+   ("model score absent"), and so did every later run for three days because the answer is cached; outcomes and the
+   run record were not written. From now: that release is logged as missed ("no usable judge answer") once its
+   open has passed, the others are decided, and the run completes with an alert line. A release with a fact sheet
+   for which the judge wrote *nothing* still fails the run: that means the pipeline broke.
+2. **A long-term pick that stops trading is priced at its last trade.** A pick bought out or delisted before its
+   exit has no open on the exit day and its cohort could not be scored. From now: its exit price is its last open
+   in the data on or before the exit day (usual practice; a cash buyout sits at the deal price), the result records
+   which picks were priced this way, and a pick with no open at the *entry* still leaves the cohort unscored. No
+   cohort has closed yet (the first was due 1 Oct).
+3. **Not changed, after checking:** "a gap longer than 3 days is never back-filled as missed" (open since the code
+   review) was wrong: the runner looks back to three days before its last run, however long ago that was, so
+   releases published while the PC was off are found by the next run and logged as missed. Checked by a replay
+   from a ledger whose last run was 11 days old. The research agents' as-of guard reads the SEC list's time as
+   New York clock time plus a margin, so it can refuse a filing a few hours too long but cannot show one early;
+   it stays as it is.
