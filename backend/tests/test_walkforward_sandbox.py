@@ -243,3 +243,66 @@ def test_next_token_probs_retries_a_dropped_connection(tmp_path, monkeypatch):
     calls["n"], fail = 0, 3
     with pytest.raises(httpx.ConnectError):
         asyncio.run(llm.next_token_probs("s", "u", "p", ("4", "5")))
+
+
+def test_cached_answers_are_filed_under_the_weights_that_gave_them(tmp_path, monkeypatch):
+    """Outside review, 1 Oct 2026: the cache key held the model's name, so new weights behind `m:latest` replayed the
+    old weights' answers. Old keys are served only for the digest recorded for the model (or with no server to ask)."""
+    import asyncio
+    import hashlib
+    import json as _json
+
+    import httpx
+
+    from app.sandbox import walkforward as wf
+
+    monkeypatch.setattr(wf, "RESULTS", tmp_path)
+    digests = tmp_path / "model_digests.json"
+    digests.write_text(_json.dumps({"models": {"m:latest": "aaa"}}))
+    monkeypatch.setattr(wf, "MODEL_DIGESTS", digests)
+    old_key = hashlib.sha256(b"m\0s\0u").hexdigest()
+    (tmp_path / "llm_cache_m.jsonl").write_text(_json.dumps({"k": old_key, "v": "old weights"}) + "\n")
+    served = {"digest": "aaa", "chats": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            if served["digest"] is None:
+                raise httpx.ConnectError("no server", request=request)
+            return httpx.Response(200, json={"models": [{"name": "m:latest", "digest": served["digest"]}]})
+        if request.url.path == "/api/ps":
+            return httpx.Response(200, json={"models": [{"name": "m", "model": "m", "size": 9, "size_vram": 9}]})
+        served["chats"] += 1
+        return httpx.Response(200, json={"message": {"content": f"weights {served['digest']}"}, "prompt_eval_count": 1})
+
+    def ask(digest, **kw) -> str:
+        served["digest"] = digest
+        llm = wf.OllamaLLM("m", **kw)
+        llm._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        return asyncio.run(llm("s", "u"))
+
+    assert ask("aaa") == "old weights" and served["chats"] == 0          # the recorded weights: the old answer
+    assert ask(None) == "old weights" and served["chats"] == 0           # no server: a replay from the cache alone
+    assert ask("bbb") == "weights bbb" and served["chats"] == 1          # new weights behind the name: asked again
+    assert ask("bbb") == "weights bbb" and served["chats"] == 1          # ...and that answer is cached for them
+    assert ask("aaa") == "old weights" and served["chats"] == 1          # nothing was overwritten
+    assert ask("bbb", num_predict=999) == "weights bbb" and served["chats"] == 2  # another output length: its own key
+    lines = [_json.loads(x) for x in (tmp_path / "llm_cache_m.jsonl").read_text().splitlines()]
+    assert [x.get("d") for x in lines] == [None, "bbb", "bbb"]
+    # a model with no recorded digest never gets an old-key answer once the server names its weights
+    (tmp_path / "llm_cache_n.jsonl").write_text(_json.dumps({"k": hashlib.sha256(b"n\0s\0u").hexdigest(), "v": "?"}) + "\n")
+    served["digest"] = "aaa"
+    llm = wf.OllamaLLM("n")
+    llm._client = httpx.AsyncClient(transport=httpx.MockTransport(
+        lambda r: httpx.Response(200, json={"models": [{"name": "n", "digest": "zzz", "size": 9, "size_vram": 9}],
+                                            "message": {"content": "fresh"}, "prompt_eval_count": 1})))
+    assert asyncio.run(llm("s", "u")) == "fresh"
+
+
+def test_the_recorded_digests_cover_the_live_models():
+    from app.sandbox import walkforward as wf
+
+    for model in ("bonsai-27b:latest", "qwen3:8b"):  # the judge and the reader of the scheduled runs
+        d = wf.recorded_digest(model)
+        assert d and len(d) == 64 and int(d, 16) >= 0
+    assert wf.recorded_digest("bonsai-27b") == wf.recorded_digest("bonsai-27b:latest")
+    assert wf.recorded_digest("never-installed") is None

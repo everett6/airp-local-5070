@@ -71,6 +71,17 @@ RESULTS = BACKEND / "results"
 FUND_PATH = BACKEND / "data" / "edgar" / "fundamentals.json"
 MARKET = "SPY"
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
+MODEL_DIGESTS = BACKEND / "config" / "model_digests.json"  # each model's weights on 1 Oct 2026 (see the file's note)
+
+
+def recorded_digest(model: str) -> str | None:
+    """The digest the model had when the answers cached under the old keys were given."""
+    try:
+        models = json.loads(MODEL_DIGESTS.read_text())["models"]
+    except (OSError, ValueError, KeyError):
+        return None
+    d = models.get(model) or models.get(model + ":latest")
+    return str(d) if d else None
 LOOKBACK = 120
 
 
@@ -147,6 +158,27 @@ class OllamaLLM:
         self.cache_hits = 0
         self.context_overflows = 0
         self.updown_no_mass = 0
+        self.digest: str | None = None  # the weights behind `model` on this server, asked once (see fingerprint)
+        self._digest_lock: asyncio.Lock | None = None
+        self._digest_asked = False
+
+    async def fingerprint(self) -> str | None:
+        """Ollama's digest of this model on this server: it changes when the weights behind the name do (a new pull
+        of `bonsai-27b:latest`). None when the server cannot say (not running: a replay from the cache alone)."""
+        if self._digest_lock is None:
+            self._digest_lock = asyncio.Lock()
+        async with self._digest_lock:
+            if not self._digest_asked:
+                self._digest_asked = True
+                try:
+                    r = await self._client.get(f"{self.base_url}/api/tags", timeout=5)
+                    names = {self.model, self.model + ":latest"}
+                    self.digest = next((str(m["digest"]).removeprefix("sha256:") for m in r.json().get("models", [])
+                                        if (m.get("name") in names or m.get("model") in names) and m.get("digest")),
+                                       None)
+                except Exception:  # noqa: BLE001 - no server, or a stand-in without /api/tags: unknown, not fatal
+                    self.digest = None
+        return self.digest
 
     native_tools: list[dict[str, Any]] | None = None  # set for models trained on native tool calls (Jan-v1)
 
@@ -183,12 +215,22 @@ class OllamaLLM:
         ctx += f"\0mode={mode}" if mode else ""
         native = self._use_native_tools(system, user, mode)
         ctx += "\0native_tools_v5" if native else ""  # v5: calls pulled from prose; retry when none
-        key = hashlib.sha256(f"{self.model}\0{system}\0{user}{ctx}".encode()).hexdigest()
-        if self.use_cache and key in self._cache:
-            self.cache_hits += 1
-            if mode == "updown" and '"mass": 0.0' in self._cache[key]:
-                self.updown_no_mass += 1  # count replayed answers too, so the report is the same on a re-run
-            return self._cache[key]
+        # An answer is filed under the weights that gave it, not under the model's name (PLAN_60_V2, "Outside
+        # review, second part", rule 4). Answers cached before 1 Oct 2026 keep their old key and are served only
+        # while the model still has the digest recorded for it that day, or when no server is there to ask.
+        old_key = hashlib.sha256(f"{self.model}\0{system}\0{user}{ctx}".encode()).hexdigest()
+        digest = await self.fingerprint() if self.use_cache else None
+        key = hashlib.sha256(f"w2\0{digest or 'unknown'}\0np={self.num_predict}\0{self.model}\0{system}\0{user}{ctx}"
+                             .encode()).hexdigest()
+        if self.use_cache:
+            hit = self._cache.get(key)
+            if hit is None and (digest is None or digest == recorded_digest(self.model)):
+                hit = self._cache.get(old_key)
+            if hit is not None:
+                self.cache_hits += 1
+                if mode == "updown" and '"mass": 0.0' in hit:
+                    self.updown_no_mass += 1  # count replayed answers too, so the report is the same on a re-run
+                return hit
         body: dict[str, Any] = {
             "model": self.model, "stream": False, "think": False, "format": "json",
             # an empty system prompt is left out (template-driven models such as NuExtract take only a user turn)
@@ -251,7 +293,7 @@ class OllamaLLM:
         self.calls += 1
         if self.use_cache and text.strip():  # an empty reply is a glitch, not an answer: don't replay it
             self._cache[key] = text
-            _append_line(self._cache_path, json.dumps({"k": key, "v": text}))
+            _append_line(self._cache_path, json.dumps({"k": key, "v": text, "d": (digest or "unknown")[:12]}))
         return text
 
     async def next_token_probs(self, system: str, user: str, prefix: str, words: tuple[str, ...]) -> dict[str, float]:
