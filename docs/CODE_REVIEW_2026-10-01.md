@@ -133,29 +133,43 @@ each filing's own index page (rule 6 in the plan; 5b5f839). None of the seven li
 filed before 08:00 or after 16:00 New York. Unfixed, a release filed between 09:30 and 13:30 would have been logged
 as missed (2.7% of the history), and one read 4 hours late would have been entered a day late as if on time.
 
+### After the records were checked (1 Oct, late night; the user pasted both parts of the second review again)
+
+Both parts were already built. Six of that work's files had disappeared from the working folder at 22:53 (committed
+in git, deleted on disk); they were restored from git and the suite passed again. Each record was then run and read
+against the review's wording. What that turned up, and what was done:
+
+| Found | Done | Commit |
+|---|---|---|
+| The benchmark's default run could not find the reader records of 6 of its 12 releases (they sat in a file that was gone) | The live reader's 12 records are kept with the benchmark; the baseline (42 of 65) reruns without the graphics card | d959128 |
+| Evidence files did not know the evening's new fields | They carry the entry session and its rule, the decision time, the fact-sheet version and, for version 2, each figure's period, units, basis and source | d959128 |
+| A judge answer with neither BUY nor PASS failed the run, and every run for 3 days (cached) | That release is logged as missed, the others are decided; a judge that wrote nothing still fails the run | d959128 |
+| A long-term pick that stops trading left its cohort unscored | Priced at its last trade once it has had no open for 5 trading days after the exit; a single missing bar is still a data fault | d959128, 5ff8787 |
+| A wiped-out 2.5× book would have left its positions open at the broker | The mirror sells that book's assets once and alerts; the AI-picks pairs are not touched | 3a5e0be |
+| "A gap longer than 3 days is never back-filled" (this page, earlier) | Wrong: replayed from a ledger 11 days old, the runner found 15 releases and logged 14 as missed. No change | – |
+| Research tools read the SEC list's acceptance time | The as-of guard adds a 5-hour margin to it, so it can refuse a filing too long but never show one early; history files are built long after filing, when the list is right. No change | – |
+| The records were not in the app | A Records page | 5b5d931 |
+| No account view or evidence file existed yet | Written once by hand (7 evidence files, marked as added later; the account reconciles to the share) | – |
+
+**The reader is the weak link.** Revenue is missing on 1,473 of 3,175 past fact sheets (46%) and EPS on 965 (30%).
+The code check rejected 763 revenue and 538 EPS figures the reader returned, mostly rightly: the number was not in
+the quote it gave (Nike: 112,000 for "$11.2 billion"; Micron: the previous quarter's EPS offered as the year-earlier
+one). Bonsai with the same prompt scores 47 of 65 on the benchmark against 42, with 3 wrong figures against 2. A
+better reader needs a new prompt and its own registered test; it is on the list below.
+
 ## Left for the user (also on the app's Home page, `docs/open_decisions.json`)
 
-1. **"On time" is judged by the run's start, not the moment of writing.** A run that starts at 09:10 New York time
-   and writes at 09:35 would be recorded as on time. It has not happened (the six live decisions were written at
-   least 42 minutes early). Fix: three lines in the frozen runner.
-2. **A gap longer than 3 days is never back-filled as "missed".** If the PC is off for a week, releases in the gap
-   are not in the ledger at all (the daily check does alert on the missing runs).
-3. **The broker mirror after a wipe-out of the 2.5× book.** The paper book would close, its broker positions would
-   stay open. Needs a rule.
-4. **Entry day in winter (from 1 Nov).** A release filed between 08:00 and 09:30 New York time is traded at that
-   day's open but scored from the next day's (the scoring cut-off is a fixed 13:00 UTC). The score stays honest but
-   measures a slightly different trade. Both rules were fixed in advance.
-5. **How to score a long-term pick that stops trading.** Usual practice: its last traded price. Needed before the
-   first cohort closes (about 30 Dec).
-6. **The reader sometimes takes the previous quarter for the year-ago quarter.** Live on MU (30 Sep): "sales
-   54,229M vs 41,456M a year earlier (+30.8%)"; 41,456M was the quarter before, the year-ago quarter was 11,315M.
-   On 546 past releases with both figures: exactly the previous quarter in 3.1%, more than 10% away from the
-   SEC-filed year-ago figure in 15.2% (partly banks, whose revenue has several definitions). Using the SEC figure
-   whenever it exists would change what the judge sees: a new version to test (needs the graphics card).
+1. **Restart the app** to see the Records page.
+2. **Google Cloud project ID** for the news archive (the crawl has about 330 hours left the slow way).
+3. **Check the benchmark's hand labels** (12 releases, 65 figures; `backend/benchmarks/extraction/gold.json`).
+4. **A better reader?** New prompt (one quote per figure, units stated), scored on the benchmark, then tested on
+   past releases like fact sheet v2; about 3 hours of graphics-card time.
+5. **A clean-install test** downloads 1–2 GB of Python packages.
+6. **Structured step results** in the runner instead of reading printed text: a weekend job with rehearsals.
 
-Checked and closed: MKC's sales showed as 17.4 million in the app (the reader took the "17%" growth for the
-amount). The code's SEC cross-check had dropped that number; the judge's sheet said "Revenue: not stated". The app
-now shows, for every release, the fact sheet the judge read and what the cross-check dropped.
+Decided and done on 1 Oct, no longer open: on time judged at the write; one entry session for orders and scoring;
+fact sheet v2 (passed its check, live); an unusable judge answer; the delisted pick; the wiped-out book's broker
+positions.
 
 ## Noted, not changed
 
