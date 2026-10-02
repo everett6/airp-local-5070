@@ -77,6 +77,9 @@ def members(year: int, indexes: tuple[str, ...] = ("sp500",)) -> pd.DataFrame:
     return m[(m["year"] == y) & m["index"].isin(indexes) & m["cik"].notna()].drop_duplicates("cik")
 
 
+LOOKUPS: dict[str, Any] = {}  # the last discovery's coverage: companies asked, failed at first, still unread
+
+
 async def discover(since: date, now: datetime, indexes: tuple[str, ...] = ("sp500",)) -> pd.DataFrame:
     from build_events import Sec, company_events, ex99_url
     ua = _read_env_file(BACKEND / ".env").get("SEC_USER_AGENT", "")
@@ -91,6 +94,14 @@ async def discover(since: date, now: datetime, indexes: tuple[str, ...] = ("sp50
             batch = await asyncio.gather(*(company_events(sec, int(c), since.isoformat(), now.date().isoformat())
                                            for c in mem["cik"].iloc[i:i + 50]))
             found += [e for b in batch for e in b]
+        # a company whose filing list could not be read is not "no release": ask once more, then say so
+        first = sorted(sec.failed)
+        sec.failed.clear()
+        for b in await asyncio.gather(*(company_events(sec, c, since.isoformat(), now.date().isoformat())
+                                        for c in first)):
+            found += b
+        LOOKUPS.update(companies=len(mem), failed_first=len(first),
+                       unread=sorted(str(info[c].ticker) for c in sec.failed))
         found = [e for e in found if datetime.fromisoformat(e["accepted_utc"]).replace(tzinfo=UTC) <= now]
         urls = await asyncio.gather(*(ex99_url(sec, e) for e in found))
     finally:
@@ -395,6 +406,10 @@ def main() -> None:
     print(f"run as of {now.isoformat(timespec='minutes')}; filings since {since}", flush=True)
 
     new = asyncio.run(discover(since, now, tuple(args.index.split(","))))
+    if LOOKUPS.get("unread"):
+        print(f"LEARN ALERT: discovery incomplete: the filing lists of {len(LOOKUPS['unread'])} of "
+              f"{LOOKUPS['companies']} companies could not be read twice ({', '.join(LOOKUPS['unread'][:8])}); "
+              "a release of theirs is looked for again next run", flush=True)
     new = new[~new["accession"].isin(seen)]
     ev_csv = d / "events.csv"
     allev = pd.concat([pd.read_csv(ev_csv), new]) if ev_csv.exists() else new
@@ -462,7 +477,7 @@ def main() -> None:
         ledger.append("outcome", accession=r["accession"], entry=days[i].date().isoformat(),
                       fwd5=None if f5 is None else round(f5, 5), as_of=now.isoformat(timespec="seconds"))
     ledger.append("run", as_of=now.isoformat(timespec="seconds"), new=len(new), source=source,
-                  gpu=use_gpu)
+                  gpu=use_gpu, **({"lookups": dict(LOOKUPS)} if LOOKUPS else {}))
     print(json.dumps(score(ledger.verify()), indent=1))
 
 

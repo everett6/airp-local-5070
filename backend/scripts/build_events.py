@@ -69,6 +69,7 @@ class Sec:
         self.client = httpx.AsyncClient(headers={"User-Agent": ua}, timeout=60, follow_redirects=True)
         self.lock = asyncio.Lock()
         self.last = 0.0
+        self.failed: set[int] = set()  # companies whose filing list could not be read (not the same as "no filing")
 
     async def get(self, url: str) -> httpx.Response | None:
         for attempt in range(4):
@@ -94,6 +95,7 @@ class Sec:
 async def company_events(sec: Sec, cik: int, start: str, end: str) -> list[dict[str, Any]]:
     r = await sec.get(f"https://data.sec.gov/submissions/CIK{cik:010d}.json")
     if r is None:
+        sec.failed.add(cik)
         return []
     sub = r.json()
     blocks = [sub["filings"]["recent"]]

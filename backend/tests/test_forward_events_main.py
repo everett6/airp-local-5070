@@ -157,3 +157,40 @@ def test_prices_come_from_one_call_with_the_single_requests_as_fallback(monkeypa
     got = FE.daily_bars(["AAA", "BBB"], "2026-09-01", "2026-09-08")
     assert calls == [["AAA", "BBB"], "AAA", "BBB"] and sorted(got) == ["AAA", "BBB"]
     assert "the batched call failed (RuntimeError)" in capsys.readouterr().out
+
+
+def test_a_company_lookup_that_fails_is_retried_and_reported_not_taken_for_no_release(monkeypatch: pytest.MonkeyPatch
+                                                                                     ) -> None:
+    """A failed SEC request used to look exactly like "no earnings filing" (review of 1 Oct 2026)."""
+    import asyncio
+    from datetime import UTC, date, datetime
+
+    import build_events
+
+    calls: dict[int, int] = {}
+
+    class Sec:
+        def __init__(self, _ua: str) -> None:
+            self.failed: set[int] = set()
+            self.client = type("C", (), {"aclose": staticmethod(lambda: asyncio.sleep(0))})()
+
+    async def company_events(sec: Any, cik: int, _start: str, _end: str) -> list[dict[str, Any]]:
+        calls[cik] = calls.get(cik, 0) + 1
+        if cik == 3 or (cik == 2 and calls[cik] == 1):  # 3 never answers; 2 answers the second time
+            sec.failed.add(cik)
+            return []
+        return [{"cik": cik, "accession": f"a{cik}", "filed": "2026-10-01", "accepted_utc": "2026-10-01T20:05:00",
+                 "items": "2.02", "primary": "x.htm"}] if cik == 2 else []
+
+    async def ex99_url(_sec: Any, e: dict[str, Any]) -> str:
+        return f"u{e['cik']}"
+
+    monkeypatch.setattr(build_events, "Sec", Sec)
+    monkeypatch.setattr(build_events, "company_events", company_events)
+    monkeypatch.setattr(build_events, "ex99_url", ex99_url)
+    monkeypatch.setattr(FE, "_read_env_file", lambda _p: {"SEC_USER_AGENT": "test"})
+    monkeypatch.setattr(FE, "members", lambda _y, _i=(): pd.DataFrame(
+        {"cik": [1, 2, 3], "ticker": ["AAA", "BBB", "CCC"], "index": "sp500", "sector": IT}))
+    found = asyncio.run(FE.discover(date(2026, 9, 28), datetime(2026, 10, 1, 22, 30, tzinfo=UTC)))
+    assert list(found["ticker"]) == ["BBB"] and calls == {1: 1, 2: 2, 3: 2}
+    assert FE.LOOKUPS == {"companies": 3, "failed_first": 2, "unread": ["CCC"]}

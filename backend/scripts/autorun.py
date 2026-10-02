@@ -406,6 +406,30 @@ def disk_low(path: Path = BACKEND, min_free_gb: float = 20.0) -> str | None:
     return f"disk space low: {free:.1f} GB free (alert below {min_free_gb:.0f} GB)" if free < min_free_gb else None
 
 
+def unanchored(repo: Path = REPO, ref: str = "@{upstream}") -> list[str]:
+    """Ledgers that no longer extend their pushed copy. A hash chain shows a change inside it, but not a missing
+    end: with its last records removed it still verifies. The copy on GitHub is the outside anchor: every ledger
+    under results/forward must begin with exactly the bytes that were last pushed."""
+    git = ["git", "-C", str(repo)]
+    try:
+        names = subprocess.run([*git, "ls-tree", "-r", "--name-only", ref, "backend/results/forward"],
+                               capture_output=True, text=True, timeout=60, check=True).stdout.splitlines()
+        bad = []
+        for name in names:
+            if not name.endswith("ledger.jsonl"):
+                continue
+            pushed = subprocess.run([*git, "cat-file", "blob", f"{ref}:{name}"], capture_output=True, timeout=60,
+                                    check=True).stdout
+            local = repo / name
+            if not local.exists():
+                bad.append(f"{name}: pushed, but missing here")
+            elif not local.read_bytes().startswith(pushed):
+                bad.append(f"{name}: does not extend its pushed copy (records removed or changed)")
+        return bad
+    except (OSError, subprocess.SubprocessError) as e:
+        return [f"ledger anchor check could not run ({type(e).__name__})"]
+
+
 def check(today: date | None = None) -> list[str]:
     """Weekdays in the last 7 days whose expected runs are missing from the heartbeat (in this mode)."""
     m = mode()
@@ -498,6 +522,9 @@ def main() -> None:
         low = disk_low()
         if low:
             alert("check", low)
+        if mode() == "live":
+            for x in unanchored():
+                alert("check", "ledger anchor: " + x)
         post_run("check")
         print("\n".join(gaps) or "no missed runs")
         msg = go_live()

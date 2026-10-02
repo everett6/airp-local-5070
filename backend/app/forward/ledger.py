@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TextIO
@@ -30,7 +31,10 @@ def write_atomic(path: Path, text: str) -> None:
     """Replace a state file in one step (temporary file, then rename): a crash or power loss mid-write leaves the
     old file, never half of the new one. For files a later run must be able to read (books, orders)."""
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(text)
+    with tmp.open("w") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())  # on disk before the rename: a power loss must not leave an empty new file
     tmp.replace(path)
 
 
@@ -98,4 +102,6 @@ class Ledger:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open_append(self.path) as f:  # after a cut-off line the new record starts on a line of its own
             f.write(json.dumps(rec, sort_keys=True, default=str) + "\n")
+            f.flush()
+            os.fsync(f.fileno())  # a record that was reported as written survives a power loss
         return rec

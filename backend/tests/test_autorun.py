@@ -404,3 +404,31 @@ def test_a_run_marks_itself_while_it_works_and_keeps_its_log_so_far(tmp_path, mo
     beat = json.loads((tmp_path / "heartbeat.jsonl").read_text().splitlines()[-1])
     assert beat["resumed_from"] == "2026-10-01T22:30:54+00:00" and beat["rc"] == 0
     assert next(tmp_path.glob("logs/*.log")).read_text().startswith("(resumed at boot")
+
+
+def test_a_ledger_that_lost_its_last_record_no_longer_extends_its_pushed_copy(tmp_path):
+    """Removing the last record leaves a chain that still verifies (review of 1 Oct 2026): the pushed copy catches it."""
+    import subprocess
+
+    from app.forward.ledger import Ledger
+    origin, repo = tmp_path / "origin.git", tmp_path / "repo"
+    subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+    subprocess.run(["git", "clone", "-q", str(origin), str(repo)], check=True, capture_output=True)
+    git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
+    path = repo / "backend" / "results" / "forward" / "events" / "ledger.jsonl"
+    led = Ledger(path)
+    for i in range(3):
+        led.append("decision", accession=f"a{i}")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-q", "-m", "run"], check=True)
+    subprocess.run([*git, "push", "-q", "-u", "origin", "HEAD"], check=True, capture_output=True)
+    assert autorun.unanchored(repo) == []
+    led.append("decision", accession="a3")  # a later, unpushed record: still an extension
+    assert autorun.unanchored(repo) == []
+    lines = path.read_text().splitlines(keepends=True)
+    path.write_text("".join(lines[:2]))  # the pushed third record and the new fourth are gone
+    assert len(led.verify()) == 2  # the chain itself cannot tell
+    assert "does not extend its pushed copy" in autorun.unanchored(repo)[0]
+    path.unlink()
+    assert "missing here" in autorun.unanchored(repo)[0]
+    assert "could not run" in autorun.unanchored(tmp_path / "nowhere")[0]
