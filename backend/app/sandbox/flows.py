@@ -4,6 +4,7 @@ Pure functions of dates and returns; every signal for day t+1 uses data through 
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -69,3 +70,52 @@ def overlay(excess: pd.Series, on: pd.Series, cost: float = 1e-4) -> pd.Series:
     entry = on & ~on.shift(1, fill_value=False)
     exit_ = on & ~on.shift(-1, fill_value=False)
     return excess.where(on, 0.0) - cost * (entry.astype(float) + exit_.astype(float))
+
+
+def month_end_records(close: pd.Series, rf_annual: pd.Series, first_month: str, cost: float = 1e-4,
+                      n: int = 3) -> list[dict[str, Any]]:
+    """M1's rule month by month, for the forward shadow. `close`: adjusted daily closes; `rf_annual`: the T-bill
+    rate as a fraction a year. One record per finished month from `first_month` ("2026-10") on: the last `n`
+    trading days, each day's excess return, the month's net overlay return (their sum less `cost` on the entry and
+    on the exit day) and the sum and count of the excess returns on the month's other days. A month is finished
+    only when `close` holds a later month."""
+    close = close.dropna().sort_index()
+    idx = pd.DatetimeIndex(close.index)
+    excess = close.pct_change() - rf_annual.reindex(idx, method="ffill").fillna(0.0) / 252
+    on = month_end_days(idx, n)
+    month = pd.Series(idx.to_period("M").astype(str), index=idx)
+    out: list[dict[str, Any]] = []
+    for m in sorted(set(month[on.to_numpy()])):
+        mine = (month == m).to_numpy()
+        days, other = excess[mine & on.to_numpy()], excess[mine & ~on.to_numpy()].dropna()
+        if m < first_month or len(days) != n or days.isna().any():
+            continue
+        out.append({"month": m, "days": [d.date().isoformat() for d in days.index],
+                    "excess": [round(float(x), 6) for x in days],
+                    "net": round(float(days.sum()) - 2 * cost, 6),
+                    "other_sum": round(float(other.sum()), 6), "other_n": len(other)})
+    return out
+
+
+def month_end_verdict(recs: list[dict[str, Any]], draws: int = 5000, seed: int = 0, n: int = 3
+                      ) -> dict[str, float]:
+    """The shadow's two numbers over its months: the net overlay's annualized Sharpe over all days (0 on the other
+    days) and the mean excess on month-end days minus the mean on other days, with its 80% one-sided lower bound
+    (months resampled whole)."""
+    me = np.array([sum(r["excess"]) for r in recs], dtype=float)
+    net = np.array([r["net"] for r in recs], dtype=float)
+    osum = np.array([r["other_sum"] for r in recs], dtype=float)
+    on_ = np.array([r["other_n"] for r in recs], dtype=float)
+    days = float(on_.sum() + n * len(recs))
+    cost = (me - net) / 2  # per entry/exit day
+    daily = np.concatenate([np.array(r["excess"], dtype=float) for r in recs])
+    daily[0::n] -= cost
+    daily[n - 1::n] -= cost
+    mean = daily.sum() / days
+    var = ((daily - mean) ** 2).sum() / days + (days - len(daily)) / days * mean ** 2
+    rng = np.random.default_rng(seed)
+    pick = rng.integers(0, len(recs), (draws, len(recs)))
+    diff = me[pick].sum(1) / (n * len(recs)) - osum[pick].sum(1) / on_[pick].sum(1)
+    return {"months": len(recs), "sharpe": round(float(mean / np.sqrt(var) * np.sqrt(252)), 3),
+            "diff_bp": round(float(me.sum() / (n * len(recs)) - osum.sum() / on_.sum()) * 1e4, 2),
+            "diff_lo80_bp": round(float(np.percentile(diff, 20)) * 1e4, 2)}

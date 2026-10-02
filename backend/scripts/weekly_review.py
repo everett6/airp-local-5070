@@ -111,6 +111,14 @@ def shadow_lines(fwd: Path = FWD) -> list[str]:
     except Exception as e:  # noqa: BLE001
         out.append(f"- consensus: could not read ({type(e).__name__}: {e})")
     try:
+        import m1_shadow as M1
+        st = M1.status(fwd / "m1")
+        mean = "—" if st["mean_net_bp"] is None else f"{st['mean_net_bp']:+.1f} bp a month, hit rate {st['hit_rate']:.0%}"
+        out.append(f"- month-end Treasuries (shadow, no money): {st['months']} of {M1.MONTHS_TO_JUDGE} months, {mean}"
+                   + ("; READY TO JUDGE (run by Claude, once)" if st["ready_to_judge"] and not st["verdict"] else ""))
+    except Exception as e:  # noqa: BLE001
+        out.append(f"- month-end Treasuries shadow: could not read ({type(e).__name__}: {e})")
+    try:
         from app.portfolio import sleeve as S
         for name in ("ai_picks", "ai_picks_autodry"):
             f = fwd / name / "book.json"

@@ -53,9 +53,10 @@ DRY_FROM = date(2026, 9, 28)
 MIN_GOOD_EVENT_RUNS = 8          # of the 10 scheduled Mon-Fri
 # steps that read the event runner's ledger; the broker, long-term and theme steps are independent and always run
 CONSENSUS = "scripts/consensus_shadow.py"
+M1_SHADOW = "scripts/m1_shadow.py"  # month-end Treasuries, a no-money shadow (the user's yes, 1 Oct 2026)
 EVENT_READERS = {"scripts/ai_picks.py", "scripts/guidance_shadow.py", "scripts/net_read_shadow.py",
                  "scripts/self_improve.py", "scripts/learn_loop.py", CONSENSUS}
-SIDE_STEPS = {CONSENSUS}  # recorded in the log, but their exit code never becomes the job's result
+SIDE_STEPS = {CONSENSUS, M1_SHADOW}  # recorded in the log, but their exit code never becomes the job's result
 # a step that failed for a network reason is retried once: each of these is idempotent (ledgers skip what they have
 # seen; broker orders carry client ids, so a resend is refused, not duplicated)
 RETRYABLE = {"scripts/forward_events.py", "scripts/forward_allocator.py", "scripts/broker_sync.py", "scripts/ai_picks.py"}
@@ -160,8 +161,9 @@ def commands(job: str, m: str) -> list[list[str]]:
         # the consensus shadow (PLAN_60_V2), live only, CPU: right after the agents' labels, so its lines are
         # written (and pushed with this run) before the open even when a later step takes long
         consensus = [] if dry else [[PY, CONSENSUS]]
+        m1 = [] if dry else [[PY, M1_SHADOW]]  # live only, CPU; downloads only when a month is due; a side step
         return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], picks, guide, net_read,
-                *consensus, longterm, themes, improve, [*learn, "collect", *largs]]
+                *consensus, longterm, themes, *m1, improve, [*learn, "collect", *largs]]
     if job == "allocator":
         return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])], broker]
     if job == "review":

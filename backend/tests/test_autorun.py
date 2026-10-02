@@ -313,3 +313,11 @@ def test_an_empty_yahoo_answer_is_retried_once(tmp_path, monkeypatch):
                 "yfinance.exceptions.YFRateLimitError: Too Many Requests. Rate limited."):
         rc, calls = _run_with(tmp_path, monkeypatch, [["py", "scripts/forward_events.py"]], [(1, msg), (0, "")])
         assert rc == 0 and calls == ["scripts/forward_events.py"] * 2
+
+
+def test_m1_shadow_is_a_side_step_of_live_event_runs_only():
+    live = [c[1] for c in autorun.commands("events", "live")]
+    assert live.count("scripts/m1_shadow.py") == 1 and "scripts/m1_shadow.py" in autorun.SIDE_STEPS
+    assert live.index("scripts/m1_shadow.py") > live.index("scripts/forward_events.py")
+    assert "scripts/m1_shadow.py" not in [c[1] for c in autorun.commands("events", "dry")]
+    assert "scripts/m1_shadow.py" not in autorun.EVENT_READERS  # it reads no event file: runs even if the runner failed
