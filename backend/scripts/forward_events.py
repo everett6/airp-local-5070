@@ -35,8 +35,8 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Collection
-from contextlib import ExitStack
+from collections.abc import Callable, Collection, Iterator
+from contextlib import ExitStack, contextmanager
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -179,17 +179,73 @@ def run(cmd: list[str]) -> None:
     subprocess.run(cmd, cwd=BACKEND, check=True)
 
 
+TIMING: dict[str, float] = {}  # this run's stages, in seconds (written into the ledger's `run` record)
+
+
+@contextmanager
+def stage(name: str) -> Iterator[None]:
+    """Time one stage of the run. A stage that fails is still timed: a slow failure is what a busy morning looks like."""
+    t0 = time.monotonic()
+    try:
+        yield
+    finally:
+        TIMING[name] = round(TIMING.get(name, 0.0) + time.monotonic() - t0, 1)
+        print(f"  stage {name}: {TIMING[name]:.1f}s", flush=True)
+
+
+def by_deadline(new: pd.DataFrame, now: datetime) -> pd.DataFrame:
+    """The releases in the order they are worked on: the nearest entry open first, the ones whose open has already
+    passed last (they can only be logged as missed). Every later step keeps this order, so on a morning with more
+    releases than time the ones that can still be traded are read and judged first."""
+    if new.empty:
+        return new
+    dl = new["accepted_utc"].map(lambda a: entry_deadline(str(a)))
+    key = pd.DataFrame({"late": [d <= now for d in dl], "dl": [d.isoformat() for d in dl],
+                        "acc": new["accepted_utc"].astype(str)}, index=new.index)
+    return new.loc[key.sort_values(["late", "dl", "acc"], kind="stable").index]
+
+
+def judge_while_writing(cmd: list[str], out: Path, on_decision: Callable[[str, float], None] | None,
+                        poll_s: float = 2.0) -> None:
+    """Run the judge and hand each decision over as soon as its line is in `out`, instead of after the last one: a
+    run that is cut off, or whose judge fails half-way, has still recorded the decisions it had. Same failure rule
+    as `run`: a judge that exits non-zero stops the event run."""
+    print("  $", " ".join(cmd[1:]), flush=True)
+    told = {r["accession"] for r in jsonl_records(out)}  # earlier runs' lines are not this run's news
+
+    def hand_over() -> None:
+        for r in jsonl_records(out):
+            if r["accession"] not in told:
+                told.add(r["accession"])
+                if on_decision is not None and not r.get("censored"):
+                    on_decision(r["accession"], float(r["logodds"]))
+    proc = subprocess.Popen(cmd, cwd=BACKEND)
+    try:
+        while proc.poll() is None:
+            time.sleep(poll_s)
+            hand_over()
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        proc.wait()
+        hand_over()
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
+
+
 def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str, prices: Path) -> Path:
     ex = d / "extract.jsonl"
-    run([PY, "scripts/extract_events.py", "fetch", "--events", str(ev_csv), "--from", since.isoformat()])
+    with stage("download"):
+        run([PY, "scripts/extract_events.py", "fetch", "--events", str(ev_csv), "--from", since.isoformat()])
     if use_gpu:
-        srv = Ollama(11437, "/usr/share/ollama/.ollama/models", 4, d / "ollama.log")
-        try:
-            run([PY, "scripts/extract_events.py", "extract", "--events", str(ev_csv), "--from", since.isoformat(),
-                 "--to", "2099-12-31", "--model", "qwen3:8b", "--base-url", "http://127.0.0.1:11437", "--parallel", "4", "--out",
-                 str(ex.relative_to(BACKEND))])
-        finally:
-            srv.stop()
+        with stage("read"):
+            srv = Ollama(11437, "/usr/share/ollama/.ollama/models", 4, d / "ollama.log")
+            try:
+                run([PY, "scripts/extract_events.py", "extract", "--events", str(ev_csv), "--from", since.isoformat(),
+                     "--to", "2099-12-31", "--model", "qwen3:8b", "--base-url", "http://127.0.0.1:11437", "--parallel", "4",
+                     "--out", str(ex.relative_to(BACKEND))])
+            finally:
+                srv.stop()
     else:  # no reader: the fact sheet keeps only the SEC-filed and price parts (lite reads those)
         done = {x["accession"] for x in jsonl_records(ex)}
         with open_append(ex) as f:
@@ -197,20 +253,24 @@ def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str, pri
                 if r.accession not in done:
                     f.write(json.dumps({"accession": r.accession, "ticker": r.ticker, "cik": int(r.cik),
                                         "accepted_utc": r.accepted_utc, "model": "none"}) + "\n")
-    run([PY, "scripts/build_features.py", "--events", str(ev_csv), "--extract", str(ex), "--name", tag,
-         "--prices", str(prices), "--live"])
+    with stage("fact sheet"):
+        run([PY, "scripts/build_features.py", "--events", str(ev_csv), "--extract", str(ex), "--name", tag,
+             "--prices", str(prices), "--live"])
     return BACKEND / "results" / "events" / f"features_{tag}.csv"
 
 
-def bonsai(ev_csv: Path, ex: Path, feats: Path, tag: str, since: date, d: Path, prices: Path) -> dict[str, float]:
+def bonsai(ev_csv: Path, ex: Path, feats: Path, tag: str, since: date, d: Path, prices: Path,
+           on_decision: Callable[[str, float], None] | None = None) -> dict[str, float]:
+    """The judge's log-odds per release. `on_decision` is called for each one as soon as the judge has written it."""
+    p = BACKEND / "results" / "events" / f"decide_bonsai-27b_latest_{tag}_h{H}.jsonl"
     srv = Ollama(11435, str(Path.home() / ".ollama" / "models"), 3, d / "ollama.log")
     try:
-        run([PY, "scripts/decide_events.py", "--events", str(ev_csv), "--extract", str(ex), "--features", str(feats),
+        judge_while_writing(
+            [PY, "scripts/decide_events.py", "--events", str(ev_csv), "--extract", str(ex), "--features", str(feats),
              "--tag", tag, "--horizon", str(H), "--explain", "0", "--from", since.isoformat(), "--to", "2099-12-31",
-             "--prices", str(prices), "--live"])
+             "--prices", str(prices), "--live"], p, on_decision)
     finally:
         srv.stop()
-    p = BACKEND / "results" / "events" / f"decide_bonsai-27b_latest_{tag}_h{H}.jsonl"
     return {r["accession"]: float(r["logodds"]) for r in jsonl_records(p) if not r.get("censored")}
 
 
@@ -404,13 +464,16 @@ def main() -> None:
                 if runs else date.fromisoformat(args.start))
     tag = "forward" if not args.as_of else "forward_" + d.name
     print(f"run as of {now.isoformat(timespec='minutes')}; filings since {since}", flush=True)
+    t_run = time.monotonic()
 
-    new = asyncio.run(discover(since, now, tuple(args.index.split(","))))
+    TIMING.clear()
+    with stage("discovery"):
+        new = asyncio.run(discover(since, now, tuple(args.index.split(","))))
     if LOOKUPS.get("unread"):
         print(f"LEARN ALERT: discovery incomplete: the filing lists of {len(LOOKUPS['unread'])} of "
               f"{LOOKUPS['companies']} companies could not be read twice ({', '.join(LOOKUPS['unread'][:8])}); "
               "a release of theirs is looked for again next run", flush=True)
-    new = new[~new["accession"].isin(seen)]
+    new = by_deadline(new[~new["accession"].isin(seen)], now)
     ev_csv = d / "events.csv"
     allev = pd.concat([pd.read_csv(ev_csv), new]) if ev_csv.exists() else new
     tmp = ev_csv.with_name(ev_csv.name + ".tmp")  # in one step: a cut-off file would silently lose past releases
@@ -418,16 +481,46 @@ def main() -> None:
     tmp.replace(ev_csv)
     print(f"{len(new)} new releases", flush=True)
 
+    rows = {str(r.accession): r for r in new.itertuples()}
+    written: set[str] = set()
+
+    def record(r: Any, lo: float | None) -> None:
+        """One release's ledger line: its decision, or why there is none."""
+        dl = entry_deadline(str(r.accepted_utc))
+        base = {"accession": r.accession, "ticker": r.ticker, "sector": r.sector, "accepted_utc": r.accepted_utc,
+                "entry_deadline": dl.isoformat(), "as_of": now.isoformat(timespec="seconds"),
+                "guidance": guidance.get(r.accession, "none")}
+        if r.accession in skip or lo is None:
+            why = skip.get(str(r.accession), NO_RELEASE)
+            if now < dl:  # its open is still ahead: the next run tries again (a download or price may have failed)
+                print(f"not decidable yet, tried again next run: {r.ticker} {r.accession}: {why}", flush=True)
+                return
+            ledger.append("missed", **base, reason=why)
+        elif now >= dl:
+            ledger.append("missed", **base, reason="decided after the entry open: never backfilled")
+        else:
+            ledger.append("decision", **base, source=source, logodds=round(float(lo), 4), on_time=True)
+        written.add(str(r.accession))
+
+    def write_early(acc: str, lo: float) -> None:
+        """Called while the judge is still working: an on-time decision goes into the ledger the moment it exists."""
+        r = rows.get(acc)
+        if r is not None and acc not in written and acc not in skip and np.isfinite(lo) \
+                and now < entry_deadline(str(r.accepted_utc)):
+            record(r, lo)
+
     prio = ExitStack()  # forward decisions can't be made later: research jobs yield the GPU (app/sandbox/gpu_lock.py)
     if len(new) and not args.no_gpu:
         prio.enter_context(gpu_priority("forward_events"))
-    use_gpu = not args.no_gpu and wait_gpu_free(900 if len(new) else 0)
+    with stage("gpu wait"):
+        use_gpu = not args.no_gpu and wait_gpu_free(900 if len(new) else 0)
     logodds: dict[str, float] = {}
     guidance: dict[str, str] = {}
     source = "bonsai" if use_gpu else "lite"
     tickers = {trading_symbol(t) for t in allev["ticker"]} | set(SECTOR_ETF.values()) | {"SPY"}
     px_file = d / "prices.parquet"
-    p = prices_for(tickers, now.date() - timedelta(days=420), now.date(), px_file)
+    with stage("prices"):
+        p = prices_for(tickers, now.date() - timedelta(days=420), now.date(), px_file)
     skip = undecidable(new, p, now)
     validate_event_inputs(new, p, now, skip=skip)
     if len(skip) < len(new):
@@ -440,27 +533,16 @@ def main() -> None:
         f = pd.read_csv(feats).drop_duplicates("accession")
         guidance = dict(zip(f["accession"], f["guidance"].fillna("none"), strict=True))
         if use_gpu:
-            logodds = bonsai(new_csv, d / "extract.jsonl", feats, tag, since, d, px_file)
+            with stage("judge"):
+                logodds = bonsai(new_csv, d / "extract.jsonl", feats, tag, since, d, px_file, write_early)
         else:
-            logodds = lite(feats, new_csv, p)
+            with stage("judge"):
+                logodds = lite(feats, new_csv, p)
         validate_event_inputs(new, p, now, logodds=logodds, skip=skip)
     prio.close()
     for r in new.itertuples():
-        dl = entry_deadline(str(r.accepted_utc))
-        base = {"accession": r.accession, "ticker": r.ticker, "sector": r.sector, "accepted_utc": r.accepted_utc,
-                "entry_deadline": dl.isoformat(), "as_of": now.isoformat(timespec="seconds"),
-                "guidance": guidance.get(r.accession, "none")}
-        if r.accession in skip or r.accession not in logodds:
-            why = skip.get(str(r.accession), NO_RELEASE)
-            if now < dl:  # its open is still ahead: the next run tries again (a download or price may have failed)
-                print(f"not decidable yet, tried again next run: {r.ticker} {r.accession}: {why}", flush=True)
-                continue
-            ledger.append("missed", **base, reason=why)
-        elif now >= dl:
-            ledger.append("missed", **base, reason="decided after the entry open: never backfilled")
-        else:
-            ledger.append("decision", **base, source=source, logodds=round(float(logodds[r.accession]), 4),
-                          on_time=True)
+        if r.accession not in written:
+            record(r, logodds.get(str(r.accession)))
 
     # outcomes: only bars dated before the run's date
     days = pd.DatetimeIndex(p.open.index)
@@ -477,7 +559,8 @@ def main() -> None:
         ledger.append("outcome", accession=r["accession"], entry=days[i].date().isoformat(),
                       fwd5=None if f5 is None else round(f5, 5), as_of=now.isoformat(timespec="seconds"))
     ledger.append("run", as_of=now.isoformat(timespec="seconds"), new=len(new), source=source,
-                  gpu=use_gpu, **({"lookups": dict(LOOKUPS)} if LOOKUPS else {}))
+                  gpu=use_gpu, **({"lookups": dict(LOOKUPS)} if LOOKUPS else {}),
+                  timing={**TIMING, "total": round(time.monotonic() - t_run, 1)})
     print(json.dumps(score(ledger.verify()), indent=1))
 
 

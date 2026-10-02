@@ -77,6 +77,7 @@ def runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         FE.main()
         return Ledger(tmp_path / "ev" / "ledger.jsonl").verify()
     state["run"] = run
+    state["dir"] = tmp_path / "ev"
     return state
 
 
@@ -194,3 +195,61 @@ def test_a_company_lookup_that_fails_is_retried_and_reported_not_taken_for_no_re
     found = asyncio.run(FE.discover(date(2026, 9, 28), datetime(2026, 10, 1, 22, 30, tzinfo=UTC)))
     assert list(found["ticker"]) == ["BBB"] and calls == {1: 1, 2: 2, 3: 2}
     assert FE.LOOKUPS == {"companies": 3, "failed_first": 2, "unread": ["CCC"]}
+
+
+def test_the_nearest_open_is_worked_on_first() -> None:
+    """Outside review, second part: on a morning with more releases than time, the ones that can still be traded
+    come first and the ones whose open has passed come last."""
+    from datetime import UTC, datetime
+    now = datetime(2026, 10, 5, 12, 45, tzinfo=UTC)  # Mon 08:45 New York
+    new = pd.DataFrame({"accession": ["late", "tomorrow", "today2", "today1"],
+                        "accepted_utc": ["2026-10-02T11:00:00",    # Fri before the open: its open is long gone
+                                         "2026-10-05T14:00:00",    # filed after today's open (a replay): tomorrow's
+                                         "2026-10-05T11:30:00", "2026-10-02T20:30:00"]})  # both enter at 09:30 today
+    assert list(FE.by_deadline(new, now)["accession"]) == ["today1", "today2", "tomorrow", "late"]
+    assert FE.by_deadline(new.iloc[:0], now).empty
+
+
+def test_decisions_are_handed_over_while_the_judge_is_still_working(tmp_path: Path) -> None:
+    out = tmp_path / "decide.jsonl"
+    out.write_text('{"accession": "old", "logodds": 1.0}\n')  # an earlier run's line is not handed over again
+    script = tmp_path / "judge.py"
+    script.write_text(
+        "import json, sys, time\n"
+        f"f = open({str(out)!r}, 'a')\n"
+        "for a, lo, c in (('a', 2.5, False), ('b', 0.0, True), ('c', -1.0, False)):\n"
+        "    f.write(json.dumps({'accession': a, 'logodds': lo, 'censored': c}) + '\\n'); f.flush(); time.sleep(0.3)\n"
+        "sys.exit(int(sys.argv[1]))\n")
+    seen: list[tuple[str, float, int]] = []
+
+    def on(acc: str, lo: float) -> None:
+        seen.append((acc, lo, len(out.read_text().splitlines())))
+    FE.judge_while_writing([sys.executable, str(script), "0"], out, on, poll_s=0.05)
+    assert [(a, lo) for a, lo, _ in seen] == [("a", 2.5), ("c", -1.0)]  # the censored answer is no decision
+    assert seen[0][2] < 4  # the first was handed over before the judge had written the last
+    seen.clear()
+    out.write_text("")
+    with pytest.raises(FE.subprocess.CalledProcessError):  # a judge that fails still stops the run...
+        FE.judge_while_writing([sys.executable, str(script), "3"], out, on, poll_s=0.05)
+    assert [a for a, _, _ in seen] == ["a", "c"]           # ...after handing over what it had decided
+
+
+def test_a_judge_that_dies_half_way_leaves_its_decisions_in_the_ledger(runner: dict[str, Any],
+                                                                       monkeypatch: pytest.MonkeyPatch) -> None:
+    def dies(_ev: Path, _ex: Path, _feats: Path, *rest: Any) -> dict[str, float]:
+        rest[-1]("a", 3.5)          # the judge wrote AAA's decision...
+        rest[-1]("d", 3.5)          # ...and DDD's, whose open has passed: never written as a decision
+        raise FE.subprocess.CalledProcessError(1, ["decide_events.py"])
+    monkeypatch.setattr(FE, "bonsai", dies)
+    with pytest.raises(FE.subprocess.CalledProcessError):
+        runner["run"]("2026-10-01T22:30:00")
+    recs = Ledger(runner["dir"] / "ledger.jsonl").verify()
+    assert [(r["type"], r["accession"]) for r in recs] == [("decision", "a")] and recs[0]["on_time"]
+    monkeypatch.undo()
+
+
+def test_the_run_record_says_how_long_each_stage_took(runner: dict[str, Any]) -> None:
+    recs = runner["run"]("2026-10-01T22:30:00")
+    t = recs[-1]["timing"]
+    assert {"discovery", "gpu wait", "prices", "judge", "total"} <= set(t) and all(v >= 0 for v in t.values())
+    assert [r["accession"] for r in recs if r["type"] == "decision"] == ["a"]  # written once, not twice
