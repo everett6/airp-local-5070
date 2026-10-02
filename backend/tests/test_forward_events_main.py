@@ -284,3 +284,26 @@ def test_a_decision_stores_its_session_and_the_three_times(runner: dict[str, Any
     a = next(r for r in recs if r["type"] == "decision")
     assert a["entry_session"] == "2026-10-02" and a["entry_deadline"] == "2026-10-02T09:30:00-04:00"
     assert a["as_of"] == "2026-10-01T22:30:00+00:00" and a["decided_at"] >= a["as_of"] and "written_at" in a
+
+
+def test_the_fact_sheet_version_reaches_the_builder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from datetime import date
+    cmds: list[list[str]] = []
+    monkeypatch.setattr(FE, "run", lambda cmd: cmds.append(cmd))
+    (tmp_path / "ev.csv").write_text("accession,ticker,cik,accepted_utc\n")
+    for version, want in ((1, []), (2, ["--sheet-version", "2"])):
+        cmds.clear()
+        monkeypatch.setattr(FE, "SHEET_VERSION", version)
+        FE.fact_sheets(tmp_path, tmp_path / "ev.csv", date(2026, 10, 1), False, "t", tmp_path / "px")
+        build = next(c for c in cmds if "scripts/build_features.py" in c)
+        assert build[build.index("--live") + 1:] == want
+
+
+def test_the_fact_sheet_version_is_stored_with_the_decision(runner: dict[str, Any],
+                                                            monkeypatch: pytest.MonkeyPatch) -> None:
+    recs = runner["run"]("2026-10-01T22:30:00")
+    assert "sheet_version" not in next(r for r in recs if r["type"] == "decision")  # version 1: the record as it was
+    monkeypatch.setattr(FE, "SHEET_VERSION", 2)
+    runner["priced"].append("CCC")
+    recs = runner["run"]("2026-10-02T12:45:00")
+    assert [r["sheet_version"] for r in recs if r["type"] == "decision" and r["accession"] == "c"] == [2]

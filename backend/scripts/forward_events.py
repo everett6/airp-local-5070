@@ -58,6 +58,9 @@ from app.tools.gateway import _read_env_file
 
 PY = str(BACKEND / ".venv" / "bin" / "python")
 H = 5
+# The fact sheet the judge reads. 2 = year-earlier revenue and EPS reconciled with the SEC-filed quarters; it goes
+# live only if its registered check passes (PLAN_60_V2 "Fact sheet v2", scripts/factsheet_v2_check.py).
+SHEET_VERSION = 1
 
 
 def entry_deadline(accepted_utc: str) -> datetime:
@@ -304,7 +307,8 @@ def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str, pri
                                         "accepted_utc": r.accepted_utc, "model": "none"}) + "\n")
     with stage("fact sheet"):
         run([PY, "scripts/build_features.py", "--events", str(ev_csv), "--extract", str(ex), "--name", tag,
-             "--prices", str(prices), "--live"])
+             "--prices", str(prices), "--live",
+             *(["--sheet-version", str(SHEET_VERSION)] if SHEET_VERSION > 1 else [])])
     return BACKEND / "results" / "events" / f"features_{tag}.csv"
 
 
@@ -550,7 +554,8 @@ def main() -> None:
         base = {"accession": r.accession, "ticker": r.ticker, "sector": r.sector, "accepted_utc": r.accepted_utc,
                 "entry_deadline": dl.isoformat(), "entry_session": dl.date().isoformat(),
                 "as_of": now.isoformat(timespec="seconds"), "decided_at": at.isoformat(timespec="seconds"),
-                "guidance": guidance.get(r.accession, "none")}
+                "guidance": guidance.get(r.accession, "none"),
+                **({"sheet_version": SHEET_VERSION} if SHEET_VERSION > 1 else {})}
         if r.accession in skip or lo is None:
             why = skip.get(str(r.accession), NO_RELEASE)
             if at < dl:  # its open is still ahead: the next run tries again (a download or price may have failed)
