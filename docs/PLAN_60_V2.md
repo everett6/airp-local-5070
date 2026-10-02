@@ -1988,3 +1988,74 @@ watch. **No money, no orders, nothing in the book changes.** It is the same rule
   time. A pass is a proposal to the user (TLT is in the mandate), followed by the evidence ladder; it moves no
   money by itself. A fail closes the month-end idea. Reported at each weekly review, not deciding: months so far,
   mean net return per month, hit rate.
+
+### Outside review, second part: rule changes and new records (spec fixed 2026-10-01 ~20:45 PDT, the user's yes the same day, before any code for them)
+
+A second outside review found five faults and asked for seven records. All five faults were reproduced on made-up
+data before anything was changed. Three of the fixes change a rule that was fixed in advance, so the new rules are
+written here first. **No signal has been proposed or tested yet** (the first monthly loop is due Sat 3 Oct;
+`results/forward/signals/registry.json` does not exist), and no AI-picks pair has reached its exit, so no result
+recorded so far depends on the old rules.
+
+**1. AI-picks broker mirror: what was filled is what is closed (changes the mirror, not the simulator).**
+The simulator stays the book of record and its rules are unchanged. At the broker:
+- every order's filled quantity is kept, whatever its final status (a 10-share order that filled 4 and was then
+  cancelled counts as 4 held);
+- a pair's broker exposure, per asset, is entry quantity filled minus exit quantity filled;
+- exit orders are sent for exactly that exposure at the first order window from the scheduled exit on, **whatever
+  the simulator's status of the pair** (open and due, already closed, or skipped after its entry filled). An exit
+  order that ends unfilled or part-filled is replaced at the next window by a new order for the rest (a new client
+  order id, `-r2`, `-r3`, ...; never while an earlier exit order is still working);
+- a part-filled entry is not topped up: what filled is held and closed on schedule, and the uneven hedge is an alert;
+- an exit sent after its scheduled open is a **late exit**: one alert, recorded on the pair, and that pair's
+  broker-versus-simulator slippage is reported apart from the on-time pairs. The simulator's P&L for the pair is
+  not changed by anything the broker does.
+
+**2. Learning loop: a score uses only what was known when the release was decided (replaces "percentile rank of the
+field within the entry month").** A term is now the field's percentile among **all releases accepted strictly
+before this one** (the 2024–26 history and earlier live releases; ties count half; missing values 0.5; fewer than
+100 earlier releases: no score). Indicators ("guidance=raised") are ranked the same way. For live releases the
+per-field percentiles are stored with the release's fields when it is collected, and shadow and promoted signals
+are evaluated on the stored values. The blend with Bonsai's score and the promoted sleeve's "top fifth" use the
+same rule: the percentile of the value among earlier values, above 0.8 for the top fifth. Train (2024) and holdout
+(2025–26) tests use the same scoring; the first 100 releases of 2024 carry no score. Monthly ICs are computed as
+before. Nothing else in the menu, the budget or the thresholds changes.
+
+**3. Learning loop: a fixed lifetime error budget (replaces "p < 0.05 / (holdout tests ever run)" and the weekly
+promotion check).**
+- Holdout test number k passes only if its one-sided p < **0.05 / (k (k + 1))**. These sum to less than 0.05 over
+  any number of tests (the old thresholds summed to 0.155 over 12). The first test now needs p < 0.025.
+- Promotion is checked at **four fixed looks** per signal, not weekly: the first weekly review on or after day
+  90, 120, 150 and 180 of its shadow period at which it has at least 100 scored live releases. Look j passes if
+  the blend gain's one-sided lower bound at level **0.20 / (j (j + 1))** (0.10, 0.033, 0.017, 0.01; together under
+  0.20) is above 0 and its IC is positive. Each look is written into the signal's history when it is spent.
+  Retirement at 180 days and after promotion is unchanged (stopping early for a bad record needs no correction).
+- These bounds are per signal. They assume months are exchangeable (the bootstrap resamples months) and say
+  nothing about the choice among many candidates beyond the holdout budget above.
+
+**4. Model answers are filed under the weights that gave them.** A cached answer's key gains the model's digest
+(from the local Ollama) and the output-length setting. Answers already cached keep their keys and are served
+only while the model's digest is the one recorded for them on 1 Oct 2026 (`backend/config/model_digests.json`,
+written once from the models installed that day). A model whose weights change gets new keys; nothing is deleted.
+
+**5. New records (no money, no change to any decision rule).**
+- *AI contribution* (`scripts/ai_contribution.py`, weekly review): the AI-picks sleeve replayed on the forward
+  ledger with its real scores, against the same sleeve (same slots, sizing, costs, holding period, run times) fed
+  the same scores **shuffled among the on-time decisions** (500 seeded shuffles), and against "take every on-time
+  release while a slot is free". Reported: net return of each, the AI's return minus the shuffled mean, the share
+  of shuffles the AI beats, turnover, mean gross exposure, pairs traded. A description, not a test: it decides
+  nothing and the sleeve's 3-month review rule stands.
+- *Funnel* (`scripts/funnel.py`): for every release since 30 Sep 2026, the last stage it reached (eligible,
+  discovered, downloaded, extracted, scored before the deadline, selected, submitted, filled, closed, evaluated)
+  and the reason it stopped.
+- *Evidence bundle*: one file per decision with the hashes of the release text and fact sheet, retrieval times,
+  the fact sheet itself, model digests, prompt version, inference settings, code version and the intended entry
+  session; written by a step after the runner, which the runner's ledger record does not depend on.
+- *Stage timings*: the runner records how long each stage took and the time left to each release's deadline.
+  Releases whose open is nearest are decided first and each decision is written to the ledger as soon as it
+  exists (today all are written at the end).
+- *Account view* (`scripts/account_view.py`): gross and net exposure, leverage, buying power and the difference
+  from the two books' intended positions, read from the paper account. Read-only.
+- *Extraction benchmark*: hand-checked figures for a fixed set of hard releases (banks, odd fiscal years, losses,
+  changed guidance, heavy tables), scored on period, units, accounting basis and correctly reported absence. A
+  reader or prompt change is scored on it before it goes live. The benchmark is a yardstick, not a trial.
