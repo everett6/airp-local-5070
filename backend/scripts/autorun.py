@@ -56,7 +56,14 @@ CONSENSUS = "scripts/consensus_shadow.py"
 M1_SHADOW = "scripts/m1_shadow.py"  # month-end Treasuries, a no-money shadow (the user's yes, 1 Oct 2026)
 EVENT_READERS = {"scripts/ai_picks.py", "scripts/guidance_shadow.py", "scripts/net_read_shadow.py",
                  "scripts/self_improve.py", "scripts/learn_loop.py", CONSENSUS}
-SIDE_STEPS = {CONSENSUS, M1_SHADOW}  # recorded in the log, but their exit code never becomes the job's result
+# records added after the outside review of 1 Oct 2026 (docs/PLAN_60_V2.md, "Outside review, second part"): they
+# read what the run wrote and decide nothing, so they are side steps and run in live mode only
+EVIDENCE = "scripts/evidence_bundle.py"    # one evidence file per decision, in the run that made it
+ACCOUNT = "scripts/account_view.py"        # the paper account across both books (read-only at the broker)
+FUNNEL = "scripts/funnel.py"               # weekly: where every release stopped, and why
+CONTRIBUTION = "scripts/ai_contribution.py"  # weekly: the AI's picks against the same sleeve dealt at random
+# recorded in the log, but their exit code never becomes the job's result
+SIDE_STEPS = {CONSENSUS, M1_SHADOW, EVIDENCE, ACCOUNT, FUNNEL, CONTRIBUTION}
 # a step that failed for a network reason is retried once: each of these is idempotent (ledgers skip what they have
 # seen; broker orders carry client ids, so a resend is refused, not duplicated)
 RETRYABLE = {"scripts/forward_events.py", "scripts/forward_allocator.py", "scripts/broker_sync.py", "scripts/ai_picks.py"}
@@ -167,16 +174,19 @@ def commands(job: str, m: str) -> list[list[str]]:
         # written (and pushed with this run) before the open even when a later step takes long
         consensus = [] if dry else [[PY, CONSENSUS]]
         m1 = [] if dry else [[PY, M1_SHADOW]]  # live only, CPU; downloads only when a month is due; a side step
+        # before the long steps, so the evidence files and the account view are pushed with the decisions
+        records = [] if dry else [[PY, EVIDENCE], [PY, ACCOUNT]]
         return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], picks, guide, net_read,
-                *consensus, longterm, themes, *m1, improve, [*learn, "collect", *largs]]
+                *consensus, *records, longterm, themes, *m1, improve, [*learn, "collect", *largs]]
     if job == "allocator":
         return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])], broker]
     if job == "review":
         # the monthly loop rides on the Saturday review (it runs once per calendar month); never in dry mode, because
         # its proposals register trials
         monthly = [] if dry else [[*learn, "monthly"]]
+        records = [] if dry else [[PY, FUNNEL, "--sweep"], [PY, CONTRIBUTION], [PY, EVIDENCE, "--check"]]
         return [[PY, "scripts/weekly_review.py"], [PY, "scripts/failure_review.py"], *monthly,
-                [*learn, "review", *largs]]
+                [*learn, "review", *largs], *records]
     if job == "learn":  # proposals register trials: never in dry mode
         return [] if dry else [[*learn, "monthly"]]
     raise SystemExit(f"unknown job {job}")

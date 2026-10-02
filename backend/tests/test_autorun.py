@@ -243,7 +243,7 @@ def test_a_real_failure_or_unsafe_step_is_not_retried(tmp_path, monkeypatch):
 def test_consensus_shadow_runs_right_after_the_labels_in_live_event_runs_only():
     live = [c[1] for c in autorun.commands("events", "live")]
     i = live.index("scripts/consensus_shadow.py")
-    assert live[i - 1] == "scripts/net_read_shadow.py" and live[i + 1] == "scripts/longterm_picks.py"
+    assert live[i - 1] == "scripts/net_read_shadow.py" and i < live.index("scripts/longterm_picks.py")
     assert "scripts/consensus_shadow.py" not in [c[1] for c in autorun.commands("events", "dry")]
     for job in ("allocator", "review"):
         assert "scripts/consensus_shadow.py" not in [c[1] for c in autorun.commands(job, "live")]
@@ -432,3 +432,20 @@ def test_a_ledger_that_lost_its_last_record_no_longer_extends_its_pushed_copy(tm
     path.unlink()
     assert "missing here" in autorun.unanchored(repo)[0]
     assert "could not run" in autorun.unanchored(tmp_path / "nowhere")[0]
+
+
+def test_the_review_records_are_live_only_side_steps_that_cannot_change_a_run() -> None:
+    """Outside review, second part: evidence files, the account view, the funnel and the AI-contribution report."""
+    live = [c[1] for c in autorun.commands("events", "live")]
+    i, j = live.index("scripts/evidence_bundle.py"), live.index("scripts/account_view.py")
+    assert live.index("scripts/forward_events.py") < i < j < live.index("scripts/longterm_picks.py")  # pushed early
+    assert live.index("scripts/ai_picks.py") < j
+    review = autorun.commands("review", "live")
+    assert [c[1:] for c in review[-3:]] == [["scripts/funnel.py", "--sweep"], ["scripts/ai_contribution.py"],
+                                            ["scripts/evidence_bundle.py", "--check"]]
+    new = {"scripts/evidence_bundle.py", "scripts/account_view.py", "scripts/funnel.py", "scripts/ai_contribution.py"}
+    assert new <= autorun.SIDE_STEPS and not new & autorun.EVENT_READERS and not new & autorun.RETRYABLE
+    for job in ("events", "review", "allocator"):
+        assert not new & {c[1] for c in autorun.commands(job, "dry") if c[1:2]}
+    for name in new:
+        assert (autorun.BACKEND / name).exists()
