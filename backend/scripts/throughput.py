@@ -9,6 +9,9 @@ From the ledger alone. Per run: the seconds each stage took (the runner records 
 decision (work), the two together (latency from the SEC's acceptance), and how much time was left before its open
 (slack). Median and worst of each. A decision written with under 10 minutes to spare is an alert: the next busy
 morning it will be late.
+
+The seven decisions of 30 Sep and 1 Oct 2026 carry an acceptance time 4 hours early (the SEC list's New York clock
+time; see docs/PLAN_60_V2.md, rule 6), so their queue wait and latency read 4 hours too long. Later ones are right.
 """
 from __future__ import annotations
 
