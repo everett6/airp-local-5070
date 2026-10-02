@@ -72,12 +72,16 @@ Code: `app/signals/registry.py` (rules and budget), `scripts/learn_loop.py` (col
 
 | Step | When | Rule |
 |---|---|---|
-| Collect | after every event run | the live releases' fields as they were at decision time → `results/forward/signals/live_features.csv` |
+| Collect | after every event run | the live releases' fields as they were at decision time → `results/forward/signals/live_features.csv`, and each field's percentile among the releases accepted before it → `live_pit.csv` (stored once, never rewritten) |
 | Propose | first Saturday review of each month (live mode only) | Bonsai proposes 5 recipes from the fixed menu (EPS and revenue growth, momentum, Bonsai's log-odds, guidance, tone; optional sector filter; ≤ 3 terms, ±1 each, no fitted weights). GPU busy or bad reply → seeded draw of untried recipes. A recipe tried before is refused |
 | Train test | same run | 2024 only: mean monthly IC ≥ 0.02 and its 95% CI above 0 |
-| Holdout test | same run | 2025-26, once per recipe: mean IC ≥ 0.02, one-sided p < 0.05 / (holdout tests ever run), and blending it with Bonsai's score beats the score alone (paired 95% CI above 0) |
-| Shadow | weekly review | scored on live releases, no money. Promoted after ≥ 90 days and ≥ 100 scored releases if the live blend gain's 80% lower bound is above 0 and its IC is positive; retired at 180 days otherwise |
+| Holdout test | same run | 2025-26, once per recipe: mean IC ≥ 0.02, one-sided p < 0.05 / (k (k + 1)) for holdout test number k (under 0.05 over any number of tests; was 0.05 / k until 1 Oct 2026), and blending it with Bonsai's score beats the score alone (paired 95% CI above 0) |
+| Shadow | weekly review | scored on live releases, no money. Promotion is looked at four times, not weekly: the first review on or after day 90, 120, 150 and 180 with ≥ 100 scored releases. Look j passes if the live blend gain's one-sided lower bound (Student's t over months) at level 0.20 / (j (j + 1)) is above 0 and its IC is positive; retired at 180 days otherwise |
 | Promoted | weekly review | a 10% paper sleeve (long the top fifth of live releases by the blended score, 5-day holds, 0.4% costs); at most 2 signals (20%). Retired if its live blend gain since promotion turns negative (≥ 100 releases) |
+
+Scores use only what was known when a release was accepted: each term is the field's percentile among earlier
+releases (history and live), not within its month (changed 1 Oct 2026 after the outside review, before any signal
+existed; `docs/PLAN_60_V2.md`, "Outside review, second part").
 
 Every train and holdout test is registered in `results/trials_registry.jsonl`. The loop can add or retire signals
 only; it can't change the master book, the mandate, the kill switch, these thresholds or its budget. Promotions and

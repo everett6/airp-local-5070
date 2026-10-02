@@ -2030,8 +2030,13 @@ promotion check).**
   the blend gain's one-sided lower bound at level **0.20 / (j (j + 1))** (0.10, 0.033, 0.017, 0.01; together under
   0.20) is above 0 and its IC is positive. Each look is written into the signal's history when it is spent.
   Retirement at 180 days and after promotion is unchanged (stopping early for a bad record needs no correction).
-- These bounds are per signal. They assume months are exchangeable (the bootstrap resamples months) and say
-  nothing about the choice among many candidates beyond the holdout budget above.
+- These bounds are per signal. They treat months as independent draws and say nothing about the choice among
+  many candidates beyond the holdout budget above.
+- **Amended the same evening, before the code was finished and before any signal exists:** the promotion bound is
+  Student's t over the monthly gains (at least 3 months), not the bootstrap. Writing the test showed why: a look
+  after 90 days has three or four months, and a bootstrap of so few cannot give a strict bound (when every month
+  is positive it passes at any level). On made-up data with no edge the bootstrap passed a 10% look 7 times in 40.
+  The holdout and train tests keep their bootstrap (they have 12 or more months).
 
 **4. Model answers are filed under the weights that gave them.** A cached answer's key gains the model's digest
 (from the local Ollama) and the output-length setting. Answers already cached keep their keys and are served
