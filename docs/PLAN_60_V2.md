@@ -1856,6 +1856,15 @@ checks the backtests it was built on.
   threshold and the forward test are not changed by this check.
 - **Built now, run later.** It needs about an hour of GPU time, so it waits for the user's go.
 
+**Result (the user gave the go on 1 Oct; scored 3,175 masked fact sheets in about 35 minutes of GPU time, verdict
+run once): no evidence of memory.** 3,160 releases with a 5-day result, 26 months. Monthly rank IC unmasked
+**+0.066**, masked **+0.069**; d = +0.003, 95% interval [−0.008, +0.013], so the judge does not do worse with the
+company, ticker and dates hidden. Masked and unmasked scores agree closely (rank correlation 0.975; 5.8% of BUY /
+PASS calls flip). By sample: 2024 +0.027 unmasked / +0.022 masked; 2025–26 +0.100 / +0.110. What this says: the
+judge's backtest edge comes from what the fact sheet says, not from recognising the company. What it does not say:
+that the edge is large enough to trade (the event tests' own verdicts stand), nor anything about the reader's
+step, which sees the full release. Nothing in the live book changes.
+
 
 ### Three flow-pressure tests on SPY and Treasuries: R1, M1, A1 (specs fixed 2026-10-01 ~08:00 PDT, before any code or number for them)
 

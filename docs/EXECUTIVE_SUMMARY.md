@@ -111,6 +111,10 @@ Everything runs on one RTX 5070 (12 GB). Nothing here is investment advice.
   - a price calendar bug;
   - live fact sheets being dropped because the entry bar does not exist yet.
   Both are fixed; the second dry run decided 6 of 6 releases on time.
+- **Name-hiding check of the AI judge (1 Oct 2026, validity test, run once): no evidence of memory.** 3,160 past
+  releases re-scored with company, ticker and dates hidden: rank IC +0.069 masked against +0.066 unmasked
+  (difference +0.003, 95% interval [−0.008, +0.013]); 5.8% of calls flip. The judge's backtest edge comes from the
+  fact sheet, not from recognising the company. It does not make the edge larger; the live book is unchanged.
 - **Code review of 1 Oct 2026, before the earnings season** (`docs/CODE_REVIEW_2026-10-01.md`): 24 faults fixed on
   the live path, none of which had cost a decision yet. The most serious: since 29 Sep, one filing without a
   press release (1.4% of past filings, at least one on 12% of release days) would have failed the whole live run
