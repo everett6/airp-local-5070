@@ -2222,3 +2222,9 @@ section fixes the rule-level faults that were still open. Each is a change to a 
    from a ledger whose last run was 11 days old. The research agents' as-of guard reads the SEC list's time as
    New York clock time plus a margin, so it can refuse a filing a few hours too long but cannot show one early;
    it stays as it is.
+4. **If the mirrored 2.5× book is ever wiped out, the mirror sells its holdings at the broker** (added 23:55 PDT,
+   before the code). In the simulator a wiped-out book is closed for good and makes no more decisions, so the
+   mirror, which only follows decisions, would have left its positions open in the paper account. From now: once
+   the book is marked wiped, the mirror plans one set of sell orders for that book's assets (SPY, SGOV, BTC, ETH;
+   the AI-picks sleeve's pairs are not touched), sends them like any other orders and alerts. Nothing is bought
+   back and no other book is mirrored in its place until the user decides. Paper money only.
