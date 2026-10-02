@@ -29,6 +29,7 @@ import time
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
@@ -104,6 +105,8 @@ async def company_events(sec: Sec, cik: int, start: str, end: str) -> list[dict[
             extra = await sec.get(f"https://data.sec.gov/submissions/{f['name']}")
             if extra is not None:
                 blocks.append(extra.json())
+            else:  # an older page of the list could not be read: the company's filings in the window are not all
+                sec.failed.add(cik)  # known, which is not "no release" (seen in the 1 Oct 2026 rehearsal replay)
     out = []
     for b in blocks:
         for i, form in enumerate(b["form"]):
@@ -115,14 +118,24 @@ async def company_events(sec: Sec, cik: int, start: str, end: str) -> list[dict[
     return out
 
 
-async def ex99_url(sec: Sec, ev: dict[str, Any]) -> str:
-    acc = ev["accession"]
-    idx = f"https://www.sec.gov/Archives/edgar/data/{ev['cik']}/{acc.replace('-', '')}/{acc}-index.htm"
-    r = await sec.get(idx)
-    if r is None:
-        return ""
+NY = ZoneInfo("America/New_York")
+
+
+def index_accepted_utc(html: str) -> str | None:
+    """The acceptance time on a filing's index page ("Accepted", New York clock time), as naive UTC. This page is
+    the source to trust: the same field in the filing list (`acceptanceDateTime`) was the New York clock time
+    labelled as UTC on the day of filing and 4 or 5 hours late for other filings (checked 1 Oct 2026)."""
+    m = re.search(r"Accepted</div>\s*<div[^>]*>\s*(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\s*<", html)
+    if not m:
+        return None
+    t = datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=NY)
+    return t.astimezone(UTC).replace(tzinfo=None).isoformat(timespec="seconds")
+
+
+def index_ex99(html: str) -> str:
+    """The press release's address from a filing's index page: the first EX-99 exhibit."""
     # the document table: description, link, type; take the first EX-99 exhibit (the press release)
-    rows = re.findall(r"<tr[^>]*>(.*?)</tr>", r.text, flags=re.DOTALL | re.IGNORECASE)
+    rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, flags=re.DOTALL | re.IGNORECASE)
     for row in rows:
         if re.search(r">\s*EX-99(\.1)?\s*<", row, flags=re.IGNORECASE) or re.search(r">\s*EX-99\.01\s*<", row, flags=re.IGNORECASE):
             m = re.search(r'href="(/Archives/edgar/data/[^"]+\.(?:htm|html|txt))"', row, flags=re.IGNORECASE)
@@ -134,6 +147,21 @@ async def ex99_url(sec: Sec, ev: dict[str, Any]) -> str:
             if m:
                 return "https://www.sec.gov" + m.group(1)
     return ""
+
+
+async def filing_index(sec: Sec, ev: dict[str, Any]) -> tuple[str, str | None]:
+    """A filing's press-release address and its acceptance time (naive UTC), both from its index page; ("", None)
+    when the page could not be read."""
+    acc = ev["accession"]
+    idx = f"https://www.sec.gov/Archives/edgar/data/{ev['cik']}/{acc.replace('-', '')}/{acc}-index.htm"
+    r = await sec.get(idx)
+    if r is None:
+        return "", None
+    return index_ex99(r.text), index_accepted_utc(r.text)
+
+
+async def ex99_url(sec: Sec, ev: dict[str, Any]) -> str:
+    return (await filing_index(sec, ev))[0]
 
 
 async def run(args: argparse.Namespace) -> None:

@@ -130,7 +130,8 @@ class OllamaLLM:
         self.model = model
         self.num_predict = num_predict
         self.num_ctx = num_ctx
-        self.use_cache = cache
+        # AIRP_LLM_CACHE=off: a timing rehearsal must wait for the model, not replay yesterday's answers
+        self.use_cache = cache and os.environ.get("AIRP_LLM_CACHE", "").lower() != "off"
         self.base_url = (base_url or os.environ.get("AIRP_OLLAMA_URL") or DEFAULT_OLLAMA_URL).rstrip("/")
         self._sem = asyncio.Semaphore(concurrency)
         self._concurrency = concurrency

@@ -78,10 +78,33 @@ def members(year: int, indexes: tuple[str, ...] = ("sp500",)) -> pd.DataFrame:
 
 
 LOOKUPS: dict[str, Any] = {}  # the last discovery's coverage: companies asked, failed at first, still unread
+LIST_TIME_SLACK = timedelta(hours=6)
+
+
+def true_times(found: list[dict[str, Any]], pages: list[tuple[str, str | None]], now: datetime
+               ) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
+    """Each release with the acceptance time of its own index page (docs/PLAN_60_V2.md, "Outside review, second
+    part", rule 6), then only those accepted by `now`. The filing list's time (`acceptanceDateTime`) was 4 hours
+    early for every live release of 30 Sep and 1 Oct 2026 (the New York clock time labelled UTC) and 4 or 5 hours
+    late for others, and the entry day hangs on it. It is kept only where the index page gave no time; the returned
+    counts say how often that happened and how often the two differed."""
+    kept, urls, differed, from_list = [], [], 0, []
+    for e, (url, accepted) in zip(found, pages, strict=True):
+        e = dict(e)
+        if accepted is None:
+            from_list.append(e["accession"])
+        else:
+            differed += accepted != e["accepted_utc"]
+            e["accepted_utc"] = accepted
+        if datetime.fromisoformat(e["accepted_utc"]).replace(tzinfo=UTC) <= now:
+            kept.append(e)
+            urls.append(url)
+    return kept, urls, {"times_checked": len(found) - len(from_list), "times_differed": differed,
+                        "times_from_list": from_list}
 
 
 async def discover(since: date, now: datetime, indexes: tuple[str, ...] = ("sp500",)) -> pd.DataFrame:
-    from build_events import Sec, company_events, ex99_url
+    from build_events import Sec, company_events, filing_index
     ua = _read_env_file(BACKEND / ".env").get("SEC_USER_AGENT", "")
     if not ua:
         raise SystemExit("set SEC_USER_AGENT in backend/.env")
@@ -102,10 +125,15 @@ async def discover(since: date, now: datetime, indexes: tuple[str, ...] = ("sp50
             found += b
         LOOKUPS.update(companies=len(mem), failed_first=len(first),
                        unread=sorted(str(info[c].ticker) for c in sec.failed))
-        found = [e for e in found if datetime.fromisoformat(e["accepted_utc"]).replace(tzinfo=UTC) <= now]
-        urls = await asyncio.gather(*(ex99_url(sec, e) for e in found))
+        # the list's time can be hours off either way (see true_times): keep what could be before `now`, then let
+        # each filing's own index page say when it was accepted
+        found = [e for e in found if datetime.fromisoformat(e["accepted_utc"]).replace(tzinfo=UTC)
+                 <= now + LIST_TIME_SLACK]
+        pages = await asyncio.gather(*(filing_index(sec, e) for e in found))
     finally:
         await sec.client.aclose()
+    found, urls, times = true_times(found, pages, now)
+    LOOKUPS.update(times)
     rows = [{"cik": e["cik"], "ticker": info[e["cik"]].ticker, "index": info[e["cik"]].index,
              "sector": info[e["cik"]].sector,
              "accession": e["accession"], "accepted_utc": e["accepted_utc"], "filed": e["filed"],
@@ -211,14 +239,29 @@ def judge_while_writing(cmd: list[str], out: Path, on_decision: Callable[[str, f
     run that is cut off, or whose judge fails half-way, has still recorded the decisions it had. Same failure rule
     as `run`: a judge that exits non-zero stops the event run."""
     print("  $", " ".join(cmd[1:]), flush=True)
-    told = {r["accession"] for r in jsonl_records(out)}  # earlier runs' lines are not this run's news
+    pos = out.stat().st_size if out.exists() else 0  # earlier runs' lines are not this run's news
+    told: set[str] = set()
 
     def hand_over() -> None:
-        for r in jsonl_records(out):
-            if r["accession"] not in told:
-                told.add(r["accession"])
+        """Read the complete lines the judge has added since the last look (the file grows for months: no re-read)."""
+        nonlocal pos
+        if not out.exists():
+            return
+        with out.open("rb") as f:
+            f.seek(pos)
+            chunk = f.read()
+        end = chunk.rfind(b"\n") + 1  # a line still being written waits for the next look
+        pos += end
+        for raw in chunk[:end].splitlines():
+            try:
+                r = json.loads(raw)
+                acc, lo = str(r["accession"]), float(r["logodds"])
+            except (ValueError, KeyError, TypeError):
+                continue  # a torn line: the final read after the judge (jsonl_records) deals with it
+            if acc not in told:
+                told.add(acc)
                 if on_decision is not None and not r.get("censored"):
-                    on_decision(r["accession"], float(r["logodds"]))
+                    on_decision(acc, lo)
     proc = subprocess.Popen(cmd, cwd=BACKEND)
     try:
         while proc.poll() is None:
@@ -473,6 +516,12 @@ def main() -> None:
         print(f"LEARN ALERT: discovery incomplete: the filing lists of {len(LOOKUPS['unread'])} of "
               f"{LOOKUPS['companies']} companies could not be read twice ({', '.join(LOOKUPS['unread'][:8])}); "
               "a release of theirs is looked for again next run", flush=True)
+    if LOOKUPS.get("times_differed") or LOOKUPS.get("times_from_list"):
+        print(f"acceptance times: {LOOKUPS.get('times_checked', 0)} read from the filings' index pages, "
+              f"{LOOKUPS.get('times_differed', 0)} differed from the SEC's list", flush=True)
+    if LOOKUPS.get("times_from_list"):
+        print(f"LEARN ALERT: {len(LOOKUPS['times_from_list'])} release(s) kept the SEC list's acceptance time (their "
+              "index page gave none); that time can be hours off, and the entry day depends on it", flush=True)
     new = by_deadline(new[~new["accession"].isin(seen)], now)
     ev_csv = d / "events.csv"
     allev = pd.concat([pd.read_csv(ev_csv), new]) if ev_csv.exists() else new
