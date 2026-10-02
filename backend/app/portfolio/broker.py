@@ -15,7 +15,9 @@ without real money. Rules:
   A leg decided at 18:00 still waits for the next run inside the window.
   Crypto trades around the clock and goes at once as a market order;
 - HALTED: nothing is sent and open orders are cancelled; REDUCING: legs that would buy are dropped;
-- a gap over 0.5% between the broker's and the simulator's fill price, or a rejected / expired order, is an alert.
+- a gap over 0.5% between the broker's and the simulator's fill price, or a rejected / expired order, is an alert;
+- the quantity an order filled is kept whatever its final status: an order that filled 4 of 10 and was then
+  cancelled leaves 4 shares in the account, and `held()` says so.
 The planning and reconciling functions take plain data, so they are tested without the network.
 """
 from __future__ import annotations
@@ -57,12 +59,27 @@ class Leg:
     ref_price: float
     status: str = "planned"  # planned → submitted → filled | rejected | canceled | expired | skipped
     order_id: str | None = None
+    filled_qty: float | None = None  # what the broker filled so far; None on records written before 1 Oct 2026
     filled_price: float | None = None
     filled_at: str | None = None
     sim_price: float | None = None
     gap: float | None = None
     note: str = ""
     alerted: bool = False
+
+
+UNFILLED = ("rejected", "canceled", "expired")  # final without a full fill (part of it may still have filled)
+
+
+def held_qty(status: str, qty: float, filled_qty: float | None) -> float:
+    """The quantity an order put into the account: its recorded fill, or (older records) all of it if it filled."""
+    if filled_qty is not None:
+        return float(filled_qty)
+    return float(qty) if status == "filled" else 0.0
+
+
+def held(leg: Leg) -> float:
+    return held_qty(leg.status, leg.qty, leg.filled_qty)
 
 
 def symbol(asset: str) -> str:
@@ -114,8 +131,9 @@ def reconcile(leg: Leg, sim_fills: dict[str, float]) -> list[str]:
     alerts: list[str] = []
     if leg.alerted:
         return alerts
-    if leg.status in ("rejected", "canceled", "expired"):
-        alerts.append(f"broker order {leg.client_order_id} {leg.status} {leg.note}".strip())
+    if leg.status in UNFILLED:
+        part = f" after filling {held(leg):g} of {leg.qty:g}" if held(leg) > 0 else ""
+        alerts.append(f"broker order {leg.client_order_id} {leg.status}{part} {leg.note}".strip())
     if leg.status == "filled" and leg.asset in sim_fills and leg.filled_price and leg.gap is None:
         leg.sim_price = sim_fills[leg.asset]
         leg.gap = round(leg.filled_price / leg.sim_price - 1, 6)
@@ -192,12 +210,15 @@ class Alpaca:
         o = self._get(f"{PAPER}/orders:by_client_order_id", client_order_id=leg.client_order_id)
         leg.order_id = o.get("id")
         st = o.get("status", "")
+        got = float(o.get("filled_qty") or 0.0)
+        if (got > 0 or st == "filled") and o.get("filled_avg_price") is not None:
+            leg.filled_price, leg.filled_at = float(o["filled_avg_price"]), o.get("filled_at") or leg.filled_at
         if st == "filled":
-            leg.status, leg.filled_price, leg.filled_at = "filled", float(o["filled_avg_price"]), o.get("filled_at")
-        elif st in ("rejected", "canceled", "expired"):
-            leg.status = st
-        else:
-            leg.status = "submitted"
+            leg.status, leg.filled_qty = "filled", got or float(leg.qty)
+        elif st in (*UNFILLED, "done_for_day"):  # final; whatever filled before it ended stays in the account
+            leg.status, leg.filled_qty = ("expired" if st == "done_for_day" else st), got
+        else:  # still working (new, accepted, partially_filled, ...)
+            leg.status, leg.filled_qty = "submitted", got
 
     def cancel_all(self) -> None:
         r = self.c.delete(f"{PAPER}/orders")

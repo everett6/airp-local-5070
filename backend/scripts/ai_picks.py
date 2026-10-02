@@ -31,9 +31,12 @@ from app.forward.ledger import Ledger
 from app.portfolio import sleeve
 from app.portfolio.broker import (
     STOCK_TIF,
+    UNFILLED,
     Alpaca,
     BrokerError,
     Leg,
+    held,
+    held_qty,
     leg_dict,
     leg_from,
     opg_open,
@@ -48,73 +51,137 @@ def leg_id(acc: str, when: str, part: str) -> str:
     return f"airp-pk-{re.sub(r'[^0-9]', '', acc)}-{when}-{part}"
 
 
+MAX_EXIT_TRIES = 5  # an exit that five orders could not complete is left to the user (alerted)
+
+
+def _phase(d: dict[str, Any]) -> str:
+    return "in" if "-in-" in d["client_order_id"] else "out"
+
+
+def _held(p: dict[str, Any], d: dict[str, Any]) -> float:
+    """What this order put into (or took out of) the account, in shares."""
+    full = p["qty"] if d.get("asset") == p["ticker"] else p["etf_qty"]
+    return held_qty(d.get("status", ""), d.get("qty", full), d.get("filled_qty"))
+
+
+def exposure(p: dict[str, Any]) -> dict[str, float]:
+    """Per asset, the shares this pair still has at the broker: entry fills minus exit fills. A part-filled order
+    counts for what it filled, whatever its final status."""
+    out: dict[str, float] = {}
+    for d in p.get("legs", []):
+        q = _held(p, d)
+        if q:
+            a = d.get("asset", "")
+            out[a] = out.get(a, 0.0) + (q if _phase(d) == "in" else -q)
+    return {a: q for a, q in out.items() if q > 1e-9}
+
+
 def entered(p: dict[str, Any]) -> set[str]:
-    """The pair's assets whose entry leg filled at the broker."""
-    return {d.get("asset", "") for d in p.get("legs", [])
-            if "-in-" in d["client_order_id"] and d.get("status") == "filled"}
+    """The pair's assets with any entry fill at the broker."""
+    return {d.get("asset", "") for d in p.get("legs", []) if _phase(d) == "in" and _held(p, d) > 0}
+
+
+def exit_due(p: dict[str, Any], days: pd.DatetimeIndex) -> bool:
+    """The pair's scheduled exit open is the next one, or is already behind it."""
+    if p["status"] == "open":
+        i = int(days.searchsorted(pd.Timestamp(p["entry_index_day"])))
+        return len(days) - 1 - i >= sleeve.HOLD - 1
+    return p["status"] in ("closed", "skipped")  # closed in the simulator, or never opened there after its entry filled
 
 
 def due_legs(p: dict[str, Any], days: pd.DatetimeIndex, now: datetime) -> list[Leg]:
-    """The legs that should be sent now for this pair (none if they were sent already or it's not their time)."""
+    """The legs that should be sent now for this pair (none if they were sent already or it's not their time).
+
+    Entries follow the simulator's plan. Exits follow the broker: whatever the pair still holds there is closed
+    from its scheduled exit on, even if the simulator closed the pair runs ago (a missed run) or never opened it,
+    and an exit order that ended short is followed by a new one for the rest (docs/PLAN_60_V2.md, "Outside
+    review, second part", rule 1)."""
     if not opg_open(now):
         return []
     have = {d["client_order_id"] for d in p.get("legs", [])}
     if p["status"] == "planned" and now < datetime.fromisoformat(p["entry_deadline"]):
         legs = [Leg(p["ticker"], symbol(p["ticker"]), "buy", p["qty"], STOCK_TIF, leg_id(p["accession"], "in", "s"), 0.0),
                 Leg(p["etf"], symbol(p["etf"]), "sell", p["etf_qty"], STOCK_TIF, leg_id(p["accession"], "in", "e"), 0.0)]
-    elif p["status"] == "open":
-        i = int(days.searchsorted(pd.Timestamp(p["entry_index_day"])))
-        if len(days) - 1 - i < sleeve.HOLD - 1:  # the exit open is not the next one yet
-            return []
-        legs = [Leg(p["ticker"], symbol(p["ticker"]), "sell", p["qty"], STOCK_TIF, leg_id(p["accession"], "out", "s"), 0.0),
-                Leg(p["etf"], symbol(p["etf"]), "buy", p["etf_qty"], STOCK_TIF, leg_id(p["accession"], "out", "e"), 0.0)]
-        # close only what the broker holds: an entry leg that never filled (expired, rejected) has no exit leg,
-        # or the "exit" would open a new position and eat into another pair's hedge
-        legs = [x for x in legs if x.asset in entered(p)]
-    else:
+        return [x for x in legs if x.client_order_id not in have]
+    if p["status"] == "planned" or not exit_due(p, days):
         return []
+    legs = []
+    # close only what the broker holds: an entry leg that never filled (expired, rejected) has no exit leg,
+    # or the "exit" would open a new position and eat into another pair's hedge
+    for asset, part, side in ((p["ticker"], "s", "sell"), (p["etf"], "e", "buy")):
+        left = exposure(p).get(asset, 0.0)
+        outs = [d for d in p.get("legs", []) if _phase(d) == "out" and d.get("asset") == asset]
+        if left <= 0 or any(d.get("status") in ("submitted", "planned") for d in outs) or len(outs) >= MAX_EXIT_TRIES:
+            continue  # nothing held, an exit order is still working, or enough tries
+        cid = leg_id(p["accession"], "out", part) + (f"-r{len(outs) + 1}" if outs else "")
+        legs.append(Leg(asset, symbol(asset), side, int(left) if float(left).is_integer() else left, STOCK_TIF,
+                        cid, 0.0))
     return [x for x in legs if x.client_order_id not in have]
+
+
+def late_exit(p: dict[str, Any], leg: Leg) -> bool:
+    """An exit order sent after the pair's scheduled exit open: the simulator has already closed (or skipped) the
+    pair, or this order replaces one that ended short."""
+    return "-out-" in leg.client_order_id and (p["status"] != "open" or "-r" in leg.client_order_id.split("-out-")[1])
 
 
 def audit_pair(p: dict[str, Any], legs: list[Leg]) -> list[str]:
     """Record both-leg status and fill slippage for one paper pair; alert on a broken hedge."""
-    if p["status"] == "skipped":
+    if p["status"] == "skipped" and not legs:
         return []
     flags: list[str] = []
     by_phase: dict[str, list[Leg]] = {phase: [x for x in legs if f"-{phase}-" in x.client_order_id]
                                             for phase in ("in", "out")}
-    for phase, required in (("in", p["status"] in ("open", "closed")),
-                            ("out", p["status"] == "closed")):
-        pair = by_phase[phase]
-        assets = {x.asset for x in pair}
-        want = {p["ticker"], p["etf"]} if phase == "in" else {x.asset for x in by_phase["in"] if x.status == "filled"}
-        if (required and want) or pair:
-            missing = want - assets
-            if missing:
-                flags.append(f"{phase} hedge missing {', '.join(sorted(missing))}")
-            bad = [x.asset for x in pair if x.status in ("rejected", "canceled", "expired")]
-            if bad:
-                flags.append(f"{phase} hedge rejected/canceled: {', '.join(sorted(bad))}")
-            if required and len([x for x in pair if x.status == "filled"]) < len(want):
-                flags.append(f"{phase} hedge not fully filled")
+    left = exposure({**p, "legs": [leg_dict(x) for x in legs]})
+    pair = by_phase["in"]
+    if p["status"] in ("open", "closed", "skipped") or pair:
+        missing = {p["ticker"], p["etf"]} - {x.asset for x in pair}
+        if missing and p["status"] != "skipped":
+            flags.append(f"in hedge missing {', '.join(sorted(missing))}")
+        bad = [x.asset for x in pair if x.status in UNFILLED]
+        if bad:
+            flags.append(f"in hedge rejected/canceled: {', '.join(sorted(bad))}")
+        part = [f"{x.asset} {held(x):g} of {x.qty:g}" for x in pair if x.status in UNFILLED and held(x) > 0]
+        if part:
+            flags.append(f"in hedge part-filled: {', '.join(sorted(part))}")
+        if p["status"] in ("open", "closed") and len([x for x in pair if x.status == "filled"]) < 2:
+            flags.append("in hedge not fully filled")
+        if p["status"] == "skipped" and left:
+            flags.append("entry filled at the broker but the simulator skipped the pair")
+    pair = by_phase["out"]
+    if p["status"] in ("closed", "skipped") or pair:
+        missing = set(left) - {x.asset for x in pair}
+        if missing and p["status"] in ("closed", "skipped"):
+            flags.append(f"out hedge missing {', '.join(sorted(missing))}")
+        short = {x.asset for x in pair if x.status in UNFILLED} & set(left)  # cleared once a later order closes it
+        if short:
+            flags.append(f"out hedge rejected/canceled: {', '.join(sorted(short))}")
+        if p["status"] in ("closed", "skipped") and left:
+            flags.append("out hedge not fully filled")
+        stuck = [a for a in left if len([x for x in pair if x.asset == a]) >= MAX_EXIT_TRIES]
+        if stuck:
+            flags.append(f"exit gave up after {MAX_EXIT_TRIES} orders, still held: {', '.join(sorted(stuck))}")
+    if p.get("late_exit"):
+        flags.append("late exit")
     current = set(flags)
     old = set(p.get("audit_flags", []))
     p["audit_flags"] = sorted(current)
     p["broker_audit"] = {"entry": {x.asset: x.status for x in by_phase["in"]},
-                         "exit": {x.asset: x.status for x in by_phase["out"]}}
-    if p["status"] == "closed" and all(len(by_phase[k]) == 2 and
-                                        all(x.status == "filled" and x.filled_price for x in by_phase[k])
-                                        for k in ("in", "out")):
-        entry = {x.asset: float(x.filled_price) for x in by_phase["in"] if x.filled_price}
-        exit_ = {x.asset: float(x.filled_price) for x in by_phase["out"] if x.filled_price}
-        q, h = p["qty"], p["etf_qty"]
-        broker_gross = q * (exit_[p["ticker"]] - entry[p["ticker"]]) - h * (exit_[p["etf"]] - entry[p["etf"]])
-        sim_cost = sleeve.COST * (q * (p["entry_open"] + p["exit_open"]) +
-                                  h * (p["etf_entry_open"] + p["etf_exit_open"]))
-        sim_gross = p["pnl"] + sim_cost
-        p["broker_audit"].update(broker_gross_pnl=round(broker_gross, 2),
-                                 simulator_net_pnl=p["pnl"], assumed_sim_cost=round(sim_cost, 2),
-                                 fill_slippage=round(broker_gross - sim_gross, 2))
+                         "exit": {x.asset: x.status for x in by_phase["out"]},
+                         "held": {a: (int(q) if float(q).is_integer() else q) for a, q in sorted(left.items())}}
+    fills = [x for x in legs if held(x) > 0]
+    if p["status"] in ("closed", "skipped") and fills and not left and all(x.filled_price for x in fills):
+        # what the broker's fills made, all of them: buys cost, sells pay
+        broker_gross = sum((1 if x.side == "sell" else -1) * held(x) * float(x.filled_price or 0.0) for x in fills)
+        p["broker_audit"].update(broker_gross_pnl=round(broker_gross, 2), late=bool(p.get("late_exit")))
+        ins = {x.asset: held(x) for x in by_phase["in"]}
+        if p["status"] == "closed" and ins == {p["ticker"]: float(p["qty"]), p["etf"]: float(p["etf_qty"])}:
+            q, h = p["qty"], p["etf_qty"]  # the broker traded the simulator's shares: the two can be compared
+            sim_cost = sleeve.COST * (q * (p["entry_open"] + p["exit_open"]) +
+                                      h * (p["etf_entry_open"] + p["etf_exit_open"]))
+            sim_gross = p["pnl"] + sim_cost
+            p["broker_audit"].update(simulator_net_pnl=p["pnl"], assumed_sim_cost=round(sim_cost, 2),
+                                     fill_slippage=round(broker_gross - sim_gross, 2))
     return [f"ai picks {p['ticker']} {flag}" for flag in sorted(current - old)]
 
 
@@ -138,6 +205,8 @@ def mirror(st: dict[str, Any], client: Alpaca, days: pd.DatetimeIndex, now: date
             for leg in due_legs(p, days, now):
                 if mode == "REDUCING" and "-in-" in leg.client_order_id:
                     continue
+                if late_exit(p, leg) and not p.get("late_exit"):
+                    p["late_exit"] = now.isoformat(timespec="seconds")  # audit_pair raises the alert, once
                 if dry:
                     print(f"ai picks (dry): would send {leg.side} {leg.qty} {leg.symbol} at the open")
                     leg.status = "dry"

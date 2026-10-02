@@ -14,9 +14,14 @@ def pair(status="open"):
             "etf_exit_open": 51.0, "pnl": 72.0}
 
 
-def leg(phase, asset, status="filled", price=100.0):
-    return Leg(asset, asset, "buy", 10, "opg", f"airp-pk-a-{phase}-{asset}", price,
-               status=status, filled_price=price if status == "filled" else None)
+def leg(phase, asset, status="filled", price=100.0, got=None, cid=""):
+    """An order as the mirror sends it: the stock is bought in and sold out, the ETF the other way round."""
+    qty = 10 if asset == "AAA" else 20
+    side = "buy" if (asset == "AAA") == (phase == "in") else "sell"
+    got = (qty if status == "filled" else 0) if got is None else got
+    return Leg(asset, asset, side, qty, "day",
+               cid or f"airp-pk-a-{phase}-{asset}", price, status=status, filled_qty=got,
+               filled_price=price if got else None)
 
 
 def test_one_sided_entry_alerts_once_then_clears():
