@@ -1,4 +1,4 @@
-"""Stage D: forward paper test of the SPY + crypto-trend allocator. Run it BY HAND, about once a week.
+"""Stage D: forward paper test of the SPY + crypto-trend allocator. Started by autorun on Mondays (or by hand).
 
     python scripts/forward_allocator.py            # fetch prices, fill last run's orders, decide, log, git commit
     python scripts/forward_allocator.py --status   # print the ledger so far, change nothing
@@ -6,7 +6,7 @@
     python scripts/forward_allocator.py --reduce "reason"  # reduce-only: positions may shrink, never grow
     python scripts/forward_allocator.py --resume   # kill switch off (the only way to turn it off)
 
-Paper money only. Free Yahoo prices. Nothing runs on its own (no service, no timer). Each run appends one line to
+Paper money only. Free Yahoo prices. Since 29 Sep 2026 autorun.py starts it (docs/HOW_IT_RUNS.md). Each run appends a line to
 results/forward/allocator/ledger.jsonl and saves the books in state.json; both are committed to git by the run itself
 so a result can't be edited after the fact (--no-commit to skip; pushing is left to you). Timing rules are in
 app/portfolio/forward.py: orders are filled at the first open after the run's UTC date, never at a price seen before

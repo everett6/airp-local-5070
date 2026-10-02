@@ -40,8 +40,9 @@ Every quarter each S&P 500 company files an **earnings press release** with the 
    [`docs/WEEK_PLAN.md`](docs/WEEK_PLAN.md)), and results that only show up afterwards are marked as leads, not
    findings.
 
-Everything runs locally: Jan on vLLM (FP4 on the 5070's tensor cores), Bonsai on Ollama. Nothing runs as a
-background service; every run is started by hand.
+Everything runs locally: Jan on vLLM (FP4 on the 5070's tensor cores), Bonsai on Ollama. Since 29 Sep 2026 the
+paper book runs by itself on four systemd user timers; how, when and what it writes is in
+[`docs/HOW_IT_RUNS.md`](docs/HOW_IT_RUNS.md), the one current description of the running system.
 
 ## How much money could it make?
 
@@ -201,7 +202,8 @@ Read-only view of the forward test: each book's holdings, live equity, today's m
 and brake level (marked at Yahoo's latest prices every minute); orders waiting to fill; every fill;
 the AI picks (open picks' return vs sector so far, closed picks' 5-day result, missed releases);
 and run health (last runs, weekdays with no run, ledger hash check). It never trades or writes: the
-books change only when `forward_allocator.py` / `forward_events.py` are run by hand.
+books change only when `forward_allocator.py` / `forward_events.py` run (on their timers, see
+`docs/HOW_IT_RUNS.md`, or by hand).
 
 A local-first AI investment research platform: runs against **your own GPUs**
 (no cloud LLM API keys required) and includes a **point-in-time sandbox** for
@@ -322,8 +324,8 @@ Everything below was re-run for this repo; claims inherited from upstream that w
   NOT PASSED; each replays identically from its committed cache with no GPU (`scripts/reproduce.py`).
 - **Forward test (2026-09-27):** `scripts/forward_allocator.py` (SPY + crypto books, with and without brakes) and
   `scripts/forward_events.py` (new S&P 500 releases → Bonsai's 1-week score, logged before the open in a
-  hash-chained ledger) are ready; `scripts/weekly_review.py` summarizes both. Run by hand: the event runner twice
-  each weekday (about 08:45 ET and evening). A dry run over 8-25 Sep 2026 found and fixed two bugs; the second dry
+  hash-chained ledger) are ready; `scripts/weekly_review.py` summarizes both. Since 29 Sep they run on timers
+  (`docs/HOW_IT_RUNS.md`): the event runner twice each weekday (08:45 and 18:30 ET). A dry run over 8-25 Sep 2026 found and fixed two bugs; the second dry
   run decided 6 of 6 releases on time. Starts Mon 5 Oct.
 - **Forward test (v1, older):** hash-chained ledger verified by the dashboard and by tests; first decision logged on time.
   **Paused 2026-09-16:** the hourly timer was uninstalled at the owner's request, so weeks from 2026-09-21 are not

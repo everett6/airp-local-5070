@@ -76,6 +76,18 @@ Numbers are the order of discovery.
 | 25 | `longterm_picks.py` | Ratings were only written at the end: 449 finished ratings of the first cohort were lost. | Each rating is saved as made; a cut-off run reuses a saved rating only when its card is unchanged. | 30cefca |
 | 26 | `autorun.py`, `airp-resume.service` | A run killed by a restart left no heartbeat, no log, no push and no digest, and nothing ran until the next slot (`Persistent=true` only covers a slot missed while the PC was off). | A run marks itself in `running.json` and writes its log after every step. At boot `autorun.py resume` (a one-shot service, not a timer) finishes a cut-off event run: within 6 hours, not within 30 minutes of the next slot, never while another run works; otherwise it only alerts. | this commit |
 
+### Outside review pasted by the user (1 Oct, evening): seven points, all confirmed against the code
+
+| Point | Verdict | What was done |
+|---|---|---|
+| On-time uses the run's start time | true; already open question "on-time-rule" | left for the user (changes the frozen runner's record) |
+| Entry time differs between orders (09:30 New York) and scoring (13:00 UTC); holidays | true; already "winter-entry" | left for the user; needed before 1 Nov |
+| Figures validated for presence, not meaning (period, units, basis) | true; related to "reader-prior" | a new reader version to pre-register and test; left for the user |
+| A failed SEC lookup looks like "no filing" | true | failed lookups are retried once, counted in the run record (`lookups`), and alerted if still unread (5e7baeb) |
+| A chain with its end removed still verifies; no write durability | true | daily check compares every ledger with its pushed copy; records and state files are synced to disk (5e7baeb) |
+| pandas, Parquet engine, yfinance missing from the base install | true | declared; `requirements.lock`; `tests/test_runtime_deps.py`. A clean-install test needs a download: left for the user |
+| Docs still say "run by hand"; alerts parsed from console text | true | `docs/HOW_IT_RUNS.md` is the one current description; README and docstrings corrected. Structured step results: proposed, left for the user |
+
 ## Left for the user (also on the app's Home page, `docs/open_decisions.json`)
 
 1. **"On time" is judged by the run's start, not the moment of writing.** A run that starts at 09:10 New York time

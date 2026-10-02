@@ -1,5 +1,8 @@
 # AIRP Architecture
 
+> This is the September 2026 design of the research platform's layers. For what runs today (timers, the event
+> run's steps, ledgers, restarts), read [`HOW_IT_RUNS.md`](HOW_IT_RUNS.md).
+
 ## 0. System diagram
 
 ```mermaid

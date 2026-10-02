@@ -18,6 +18,12 @@ dependencies = [
   "tenacity>=8.5",
   # Report rendering
   "jinja2>=3.1",
+  # The scheduled paper-book runs (scripts/autorun.py and everything it starts): tables, Parquet price files,
+  # free Yahoo prices. These were missing here although the live path cannot start without them
+  # (tests/test_runtime_deps.py keeps this list honest; requirements.lock pins the versions in use).
+  "pandas>=2.2",
+  "pyarrow>=15",
+  "yfinance>=0.2.40",
 ]
 
 [project.optional-dependencies]
@@ -33,7 +39,11 @@ graph = [
 # Dashboards: `streamlit run app/dashboard/app.py` (walk-forward lab), `app/dashboard/portfolio.py` (paper portfolio)
 ui = [
   "streamlit>=1.40",
-  "yfinance>=0.2.40",
+]
+# Research-only tests (scripts/skfolio_test.py); never imported by a scheduled run
+research = [
+  "skfolio>=0.5",
+  "cvxpy>=1.5",
 ]
 dev = [
   "pytest>=8.3",
