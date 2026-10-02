@@ -196,3 +196,25 @@ test('month-end Treasuries shadow: empty before the first month, then one row pe
   writeFileSync(path.join(dir, 'ledger.jsonl'), JSON.stringify(lines[0]) + '\n' + JSON.stringify({ type: 'verdict', pass: false, sharpe: 0.31, diff_bp: 4.2, diff_lo80_bp: -1.1 }) + '\n');
   assert.deepEqual((await (await get('/api/month_end')).json()).verdict, { pass: false, sharpe: 0.31, diff_bp: 4.2, diff_lo80_bp: -1.1 });
 });
+
+test('records: every record is null or empty until its script has written it, then read as written', async (t) => {
+  const { s, get } = await session();
+  t.after(() => s.close());
+  const r0 = await (await get('/api/records')).json();
+  assert.deepEqual(r0, { funnel: null, contribution: null, throughput: null, account: null, evidence: [], benchmark: null });
+  const be = path.join(s.airpRoot, 'backend', 'results'), fwd = path.join(be, 'forward');
+  for (const d of [path.join(fwd, 'events', 'evidence'), path.join(fwd, 'account'), path.join(be, 'events')]) mkdirSync(d, { recursive: true });
+  writeFileSync(path.join(fwd, 'funnel.json'), JSON.stringify({ at: 'x', stages: { eligible: 7, discovered: 7 }, stopped: [], rows: [{ big: 1 }] }));
+  writeFileSync(path.join(fwd, 'account', 'view.json'), JSON.stringify({ equity: 100, alerts: [] }));
+  writeFileSync(path.join(fwd, 'events', 'evidence', 'index.jsonl'), JSON.stringify({ accession: 'a-1', sha256: 'h', at: '2026-10-02T06:00:00+00:00' }) + '\n'
+    + JSON.stringify({ accession: '../../x', sha256: 'h', at: 'y' }) + '\n{"cut off');
+  writeFileSync(path.join(fwd, 'events', 'evidence', 'a-1.json'), JSON.stringify({ ticker: 'NKE', entry: { session: '2026-10-02' }, backfilled: true,
+    fact_sheet: { text: 's', version: 2 }, ledger: { logodds: -2.86 }, code: { commit: '0123456789abcdef' } }));
+  writeFileSync(path.join(be, 'events', 'bench_reader_live_score.json'), JSON.stringify({ fields: 65, right: 42, cases: 12, outcomes: { missed: 21 },
+    rows: [{ ticker: 'MU', fields: { 'revenue.q': 'correct', 'revenue.prior': 'wrong_period', 'adj_eps.q': 'correct_absent' } }] }));
+  const r = await (await get('/api/records')).json();
+  assert.equal(r.funnel.stages.eligible, 7); assert.equal(r.funnel.rows, undefined); assert.equal(r.account.equity, 100);
+  assert.deepEqual(r.evidence[1], { accession: 'a-1', at: '2026-10-02T06:00:00+00:00', ticker: 'NKE', session: '2026-10-02', backfilled: true, sheet_version: 2, has_sheet: true, logodds: -2.86, commit: '0123456' });
+  assert.equal(r.evidence[0].ticker, null);  // an index line that names a path outside the folder is not opened
+  assert.deepEqual(r.benchmark.rows, [{ ticker: 'MU', wrong: ['revenue.prior: wrong_period'] }]);
+});

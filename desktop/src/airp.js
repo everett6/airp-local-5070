@@ -201,6 +201,31 @@ export function createAirp(root) {
       };
     },
 
+    // The records kept beside the books (PLAN_60_V2 "Outside review, second part"): where every release stopped,
+    // what the AI's choice adds, how long decisions take, the whole paper account, the evidence files, and the
+    // reader's score on the hand-labelled benchmark. Each is written by its own script; a missing file is null.
+    records() {
+      const ev = path.join(fwd, 'events', 'evidence');
+      const bundles = jsonl(path.join(ev, 'index.jsonl')).map((x) => {
+        const b = /^[\w-]+$/.test(String(x.accession)) ? json(path.join(ev, `${x.accession}.json`), null) : null;
+        return { accession: x.accession, at: x.at, ticker: b?.ticker ?? null, session: b?.entry?.session ?? null,
+          backfilled: !!b?.backfilled, sheet_version: b?.fact_sheet?.version ?? null, has_sheet: !!b?.fact_sheet,
+          logodds: b?.ledger?.logodds ?? null, commit: b?.code?.commit ? String(b.code.commit).slice(0, 7) : null };
+      }).reverse();
+      const slim = (f) => (f ? { ...f, rows: undefined } : null);
+      const bench = json(path.join(backend, 'results', 'events', 'bench_reader_live_score.json'), null);
+      return {
+        funnel: slim(json(path.join(fwd, 'funnel.json'), null)),
+        contribution: json(path.join(fwd, 'ai_contribution.json'), null),
+        throughput: json(path.join(fwd, 'throughput.json'), null),
+        account: json(path.join(fwd, 'account', 'view.json'), null),
+        evidence: bundles,
+        benchmark: bench && { fields: bench.fields, right: bench.right, cases: bench.cases, outcomes: bench.outcomes,
+          rows: (bench.rows || []).map((r) => ({ ticker: r.ticker,
+            wrong: Object.entries(r.fields || {}).filter(([, v]) => !String(v).startsWith('correct')).map(([k, v]) => `${k}: ${v}`) })) },
+      };
+    },
+
     // Every scheduled run with the alerts it raised, newest first.
     async runs(limit = 200) {
       const alerts = jsonl(path.join(fwd, 'alerts.jsonl'));

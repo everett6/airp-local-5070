@@ -244,6 +244,53 @@ const views = {
         ${r.runs.map((x) => `<tr><td>${esc(when(x.start))}</td><td>${esc(JOBS[x.job] || x.job)}</td><td>${esc(x.mode === 'live' ? 'live' : 'rehearsal')}</td><td class="num">${took(x.seconds)}</td><td>${x.rc === 0 ? pill('clean', 'ok') : x.skipped ? pill('skipped', 'warn') : pill('problem', 'bad')}</td><td>${x.alerts.length ? x.alerts.map(esc).join('<br>') : x.gaps ? `${esc(x.gaps)} gap(s)` : '<span class="muted">nothing</span>'}</td></tr>`).join('')}</table></div>`;
   },
 
+  async records() {
+    const r = await api('records');
+    const none = (what) => `<p class="empty">${esc(what)}</p>`;
+    const money = (v) => fmt(v);
+    const dur = (x) => (x == null ? '–' : x < 90 ? `${fmt(x)} s` : x < 5400 ? `${fmt(x / 60)} min` : `${fmt(x / 3600, 1)} h`);
+    const STAGE = { eligible: 'Published', discovered: 'Found', downloaded: 'Downloaded', extracted: 'Read', scored_on_time: 'Scored before its open', evaluated: 'Result known',
+      selected: 'Picked', submitted: 'Order sent', filled: 'Filled', closed: 'Closed' };
+    const chain = (st) => Object.entries(st || {}).map(([k, v]) => `<div class="kpi"><div class="label">${esc(STAGE[k] || k)}</div><div class="stat">${fmt(v)}</div></div>`).join('<span class="muted" style="align-self:center">→</span>');
+    const why = (rows, head) => (rows?.length ? `<table><tr><th>${esc(head)}</th><th>Why</th><th class="num">Reports</th></tr>${rows.map((x) => `<tr><td>${esc(STAGE[x.after] || x.after)}</td><td>${esc(x.why)}</td><td class="num">${fmt(x.releases)}</td></tr>`).join('')}</table>` : '');
+    const f = r.funnel, c = r.contribution, t = r.throughput, a = r.account, b = r.benchmark;
+    const funnel = !f ? none('Written by the next weekly run.') : `<p class="muted">Every earnings report since the live test began, and how far each one got. A report that drops out is listed with the reason, so the results cannot quietly describe only the easy ones. As of ${esc(when(f.at))}.</p>
+      <div class="kpis">${chain(f.stages)}</div>${why(f.stopped, 'Stopped after')}${why(f.waiting, 'Waiting after')}
+      <h4>Of the scored reports, the AI-picks trades</h4><div class="kpis">${chain(f.trade_stages)}</div>${why(f.trade_stopped, 'Stopped after')}${why(f.trade_waiting, 'Waiting after')}`;
+    const row = (name, x) => `<tr><td>${esc(name)}</td><td class="num">${pct(x.net_return, 2)}</td><td class="num">${fmt(x.pairs)}</td><td class="num">${fmt(x.turnover, 2)}×</td><td class="num">${fmt(x.mean_gross_exposure, 2)}×</td></tr>`;
+    const contrib = !c ? none('Written by the next weekly run.') : `<p class="muted">The same small book traded three ways with identical timing, sizes and costs: with the AI's real scores, with the same scores dealt out at random, and buying every report. Only the choice of stocks differs, so the gap is what the AI adds. ${esc(c.note || '')}</p>
+      <table><tr><th>Version</th><th class="num">Return after costs</th><th class="num">Trades</th><th class="num">Turnover</th><th class="num">Average size</th></tr>
+        ${row("AI's picks", c.ai)}${row('Every report', c.every_release)}
+        <tr><td>Scores dealt at random (${fmt(c.shuffled.deals)} deals)</td><td class="num">${pct(c.shuffled.mean_net_return, 2)} <span class="muted">(${pct(c.shuffled.p05, 2)} to ${pct(c.shuffled.p95, 2)})</span></td><td class="num">${fmt(c.shuffled.mean_pairs, 1)}</td><td></td><td></td></tr></table>
+      <div class="kpis">${kpi('AI minus random', `${fmt(100 * c.ai_minus_shuffled, 2)} pts`, 'return after costs')}${kpi('Random deals the AI beats', pct(c.share_of_deals_ai_beats, 0), '50% would be chance')}${kpi('Replay matches the live book', c.replay_matches_live_book ? 'yes' : 'NO')}</div>`;
+    const pd = t?.per_decision_seconds, sl = t?.slack_before_open_seconds;
+    const through = !t ? none('Written by the next weekly run.') : `<p class="muted">How long a report waits for a run, how long the run takes to decide it, and how much time is left before the market opens. A decision with under 10 minutes to spare raises an alert.</p>
+      <div class="kpis">${kpi('Time left before the open', dur(sl?.median), `least ${dur(sl?.least)} · ${fmt(sl?.n)} decisions`)}${kpi('Work per decision', dur(pd?.work?.median), `worst ${dur(pd?.work?.worst)}`)}${kpi('Wait for a run to start', dur(pd?.queue_wait?.median), `worst ${dur(pd?.queue_wait?.worst)}`)}${kpi('Too late to trade', fmt(t.missed_because_late))}</div>
+      ${Object.keys(t.stage_seconds || {}).length ? `<table><tr><th>Stage</th><th class="num">Usual</th><th class="num">Worst</th><th class="num">Runs</th></tr>${Object.entries(t.stage_seconds).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${dur(v.median)}</td><td class="num">${dur(v.worst)}</td><td class="num">${fmt(v.n)}</td></tr>`).join('')}</table>` : '<p class="tiny muted">Stage-by-stage times appear after the next live run (they are recorded since 1 Oct).</p>'}
+      <p class="tiny muted">The waits of the seven decisions of 30 Sep and 1 Oct read 4 hours too long: their stored filing time was 4 hours early (fixed since).</p>
+      ${(t.tight || []).length ? `<p class="err">${fmt(t.tight.length)} decision(s) had under 10 minutes to spare.</p>` : ''}`;
+    const account = !a ? none('Written by the next earnings run.') : `<p class="muted">The paper account at the broker as a whole. The mirrored book and the AI picks are kept in separate files but share one account, one borrowing limit and some hedges. Any position neither book can explain raises an alert. As of ${esc(when(a.at))}.</p>
+      <div class="kpis">${kpi('Account value', money(a.equity))}${kpi('Total invested', `${fmt(a.leverage, 2)}×`, `${money(a.gross)} long plus short`)}${kpi('Net market exposure', `${fmt(a.net_leverage, 3)}×`, money(a.net))}${kpi('Buying power left', money(a.buying_power))}${kpi('AI picks share', pct(a.sleeve?.gross_share, 1), `limit ${pct(a.sleeve?.target_share, 0)} · ${fmt(a.sleeve?.open_pairs)} open`)}</div>
+      ${(a.alerts || []).length ? `<p class="err">${a.alerts.map(esc).join('<br>')}</p>` : '<p class="tiny muted">Every position is explained by one of the two books.</p>'}
+      ${Object.keys(a.shared_hedges || {}).length ? `<p class="tiny muted">Hedges shared by more than one pick: ${Object.entries(a.shared_hedges).map(([k, v]) => `${esc(k)} ${fmt(v.qty)} for ${esc((v.pairs || []).join(', '))}`).join('; ')}</p>` : ''}
+      <table><tr><th>Asset</th><th class="num">At the broker</th><th class="num">Mirrored book</th><th class="num">AI picks</th><th class="num">Unexplained</th><th class="num">Value</th></tr>
+        ${(a.positions || []).map((x) => `<tr><td>${esc(x.asset)}</td><td class="num">${fmt(x.broker_qty, 2)}</td><td class="num">${fmt(x.mirror_qty, 2)}</td><td class="num">${fmt(x.sleeve_qty, 2)}</td><td class="num">${x.unexplained_qty ? `<b>${fmt(x.unexplained_qty, 2)}</b>` : '0'}</td><td class="num">${money(x.market_value)}</td></tr>`).join('')}</table>`;
+    const evidence = !r.evidence.length ? none('Written by the next earnings run.') : `<p class="muted">One file per decision with what is needed to rebuild it: the press release's fingerprint and download time, what the reader took from it, the exact fact sheet the judge saw, both models' versions, the code version and the entry day. Checked weekly against the files on disk.</p>
+      <table><tr><th>Stock</th><th>Entry day</th><th class="num">Score</th><th>Fact sheet</th><th>Code</th><th>Written</th></tr>
+        ${r.evidence.map((x) => `<tr><td>${esc(x.ticker || x.accession)}</td><td>${esc(x.session || '–')}</td><td class="num">${x.logodds == null ? '–' : fmt(x.logodds, 2)}</td><td>${x.has_sheet ? `version ${esc(x.sheet_version ?? 1)}` : '–'}</td><td>${esc(x.commit || '–')}</td><td>${esc(when(x.at))}${x.backfilled ? ' <span class="muted">(added later)</span>' : ''}</td></tr>`).join('')}</table>`;
+    const bench = !b ? none('Not scored yet.') : `<p class="muted">Twelve hard earnings reports (banks, odd fiscal years, losses, changed guidance, dense tables) with ${fmt(b.fields)} figures labelled by hand from the text. It scores the reader on the right period, units and accounting basis, and on saying "not stated" when a figure is absent. The labels were made by the AI assistant and still need a person's check.</p>
+      <div class="kpis">${kpi('Figures right', `${fmt(b.right)} of ${fmt(b.fields)}`, pct(b.right / b.fields, 0))}${kpi('Stated but not found', fmt(b.outcomes?.missed ?? 0))}${kpi('From the wrong period', fmt(b.outcomes?.wrong_period ?? 0))}${kpi('Made up', fmt(b.outcomes?.invented ?? 0))}</div>
+      <table><tr><th>Report</th><th>What the reader got wrong</th></tr>${b.rows.map((x) => `<tr><td>${esc(x.ticker)}</td><td>${x.wrong.length ? esc(x.wrong.join(', ')) : '<span class="muted">all right</span>'}</td></tr>`).join('')}</table>`;
+    return `<h2>Records</h2><p class="lede">Checks kept beside the books: nothing here trades or decides anything.</p>
+      ${plain('Good returns can hide problems: reports that were never seen, an AI that adds nothing, decisions made too close to the open, positions nobody can explain. Each card below is one record that would show such a problem.')}
+      <div class="card wide">${h3('Where every report ended up', 'Funnel')}${funnel}</div>
+      <div class="card wide">${h3("What the AI's choice adds", 'AI contribution')}${contrib}</div>
+      <div class="card wide">${h3('How fast decisions are made', 'Throughput')}${through}</div>
+      <div class="card wide">${h3('The whole paper account', 'Account view')}${account}</div>
+      <div class="card wide">${h3('Evidence kept for each decision', 'Evidence')}${evidence}</div>
+      <div class="card wide">${h3('How well the reader reads', 'Extraction benchmark')}${bench}</div>`;
+  },
+
   async tests() {
     const t = await api('tests');
     const pass = t.filter((x) => String(x.result).startsWith('pass')).length;
