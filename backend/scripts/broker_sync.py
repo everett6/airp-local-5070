@@ -26,6 +26,7 @@ import httpx
 from app.forward.ledger import jsonl_records, write_atomic
 from app.portfolio.broker import (
     CRYPTO,
+    STOCKS,
     Alpaca,
     BrokerError,
     leg_dict,
@@ -111,12 +112,23 @@ def sync(client: Alpaca, alloc: Path, out: Path, now: datetime, dry: bool, halt_
         print(f"broker: planned {len(legs)} leg(s) for the decision of {dec} on equity {equity:,.0f}"
               + (f" at {scale:.0%} of the {name} weights (gross {sum(want.values()):.2f}x; the account's margin limit)"
                  if scale < 1 else ""))
+    wiped = f"wiped-{name}"  # PLAN_60_V2 "Rule changes after the records were checked", 4
+    if book.get("wiped") and wiped not in orders and mode != "HALTED":
+        # the simulator closed this book for good and will decide nothing more: sell what it holds at the broker
+        # (the book's own assets only; the AI-picks sleeve's pairs are not touched) and buy nothing back
+        pos = client.positions()
+        px = client.prices(sorted(a for a in pos if a in CRYPTO or a in STOCKS))
+        legs = plan(wiped, {}, 0.0, pos, px)
+        orders[wiped] = {"book": name, "planned_at": now.isoformat(timespec="seconds"), "equity": 0.0, "targets": {},
+                         "flatten": True, "legs": [leg_dict(x) for x in legs]}
+        alerts.append(f"the {name} book was wiped out in the simulator: {len(legs)} sell order(s) planned to close "
+                      "its holdings at the broker; nothing is bought back")
     for dec, o in orders.items():  # send what may go now
         legs = [leg_from(d) for d in o["legs"]]
         for leg in legs:
             if leg.status != "planned" or mode == "HALTED":
                 continue
-            if book.get("decided_at") != dec or not book.get("pending"):
+            if not o.get("flatten") and (book.get("decided_at") != dec or not book.get("pending")):
                 leg.status, leg.note = "skipped", "the simulator already filled or replaced this decision"
                 alerts.append(f"broker leg {leg.client_order_id} was never sent before the simulator filled")
                 leg.alerted = True

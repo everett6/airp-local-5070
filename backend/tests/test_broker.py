@@ -188,3 +188,34 @@ def test_class_shares_use_the_brokers_spelling() -> None:
     c = B.Alpaca("k", "s", transport=httpx.MockTransport(handler))
     assert c.prices(["BRK-B", "SPY"]) == {"BRK-B": 500.0, "SPY": 600.0}
     assert seen == ["BRK.B,SPY"]
+
+
+def test_a_wiped_out_book_is_sold_at_the_broker_and_the_sleeve_is_left_alone(tmp_path: Path) -> None:
+    """The simulator closes a wiped-out 2.5x book for good and decides nothing more; the mirror only followed
+    decisions, so its positions would have stayed open in the paper account."""
+    class Holding(FakeAlpaca):
+        def __call__(self, req: httpx.Request) -> httpx.Response:
+            if req.url.path == "/v2/positions":
+                return httpx.Response(200, json=[{"symbol": "SPY", "qty": "130"}, {"symbol": "BTCUSD", "qty": "0.2"},
+                                                 {"symbol": "MU", "qty": "20"}, {"symbol": "XLK", "qty": "-9"}])
+            return super().__call__(req)
+
+    fake = Holding()
+    client = B.Alpaca("k", "s", transport=httpx.MockTransport(fake))
+    alloc, out, halt = tmp_path / "alloc", tmp_path / "broker", tmp_path / "HALT"
+    alloc.mkdir()
+    name = broker_sync.AGGRESSIVE
+    (alloc / "state.json").write_text(json.dumps({name: {"pending": None, "decided_at": None, "wiped": True,
+                                                         "positions": {}, "cash": 0.0}}))
+    alerts = broker_sync.sync(client, alloc, out, datetime(2026, 10, 12, 22, 5, tzinfo=UTC), False, halt)  # Mon evening
+    o = json.loads((out / "orders.json").read_text())[f"wiped-{name}"]
+    legs = {d["asset"]: d for d in o["legs"]}
+    assert set(legs) == {"SPY", "BTC-USD"} and all(d["side"] == "sell" for d in legs.values())  # not MU, not XLK
+    assert (legs["SPY"]["qty"], legs["BTC-USD"]["qty"]) == (130, 0.2)
+    assert legs["BTC-USD"]["status"] == "submitted" and legs["SPY"]["status"] == "planned"  # crypto now, SPY at the open
+    assert len(alerts) == 1 and "wiped out" in alerts[0] and fake.posts == 1
+    alerts = broker_sync.sync(client, alloc, out, datetime(2026, 10, 13, 12, 45, tzinfo=UTC), False, halt)  # 08:45 ET
+    legs = {d["asset"]: d for d in json.loads((out / "orders.json").read_text())[f"wiped-{name}"]["legs"]}
+    assert legs["SPY"]["status"] == "submitted" and fake.posts == 2 and alerts == []
+    broker_sync.sync(client, alloc, out, datetime(2026, 10, 13, 22, 5, tzinfo=UTC), False, halt)
+    assert fake.posts == 2  # planned once, sent once
