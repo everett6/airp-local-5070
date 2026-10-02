@@ -2119,3 +2119,13 @@ scored trade was still a day away. They also disagree on market holidays.
   next session's open (as it is scored) instead of the same morning's; in summer a release accepted between 09:00
   and 09:30 is no longer logged as missed but decided for the next session; a decision is never due on a holiday.
 - Not changed: the judge, the reader, the threshold, the 5-day horizon, the sector benchmark, the schedule.
+
+**Done the same evening (after this text was pushed in `4ef4da6`).** `app/forward/schedule.py`: `nyse_holidays`,
+`is_session`, `entry_session`; the runner's `entry_deadline` and price-feature cutoff ("bars strictly before the
+entry day") and the outcome's entry all use it. Checks: the calendar against SPY's exchange days 2009-01-02 →
+2026-09-24 (4,459 days): no difference except the four unscheduled closures (29–30 Oct 2012, 5 Dec 2018, 9 Jan
+2025); the entry session against the scored entry day of all 16,647 history releases: equal except 7 releases
+around 9 Jan 2025, which the outcome handles (first trading day from the session on). A replay of the 1 Oct
+afternoon run from an empty scratch ledger wrote NKE's decision with `entry_session` 2026-10-02, `as_of` 22:35:00
+and `decided_at` 22:36:45 UTC. Tests: the window where the old rules disagreed (summer and winter), holidays,
+outcomes on a closed day, and a run that starts before the open and ends after it (logged as missed).

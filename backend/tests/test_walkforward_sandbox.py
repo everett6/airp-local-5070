@@ -311,7 +311,7 @@ def test_the_recorded_digests_cover_the_live_models():
 def test_the_cache_can_be_switched_off_for_a_timing_rehearsal(tmp_path, monkeypatch):
     import asyncio
 
-    wf, llm = _mock_ollama(tmp_path, monkeypatch, size_vram=1000)
+    _wf, llm = _mock_ollama(tmp_path, monkeypatch, size_vram=1000)
     asyncio.run(llm("s", "u"))
     assert llm.calls == 1 and (tmp_path / "llm_cache_m.jsonl").exists()
     monkeypatch.setenv("AIRP_LLM_CACHE", "off")

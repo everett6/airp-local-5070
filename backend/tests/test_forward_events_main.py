@@ -257,3 +257,30 @@ def test_the_run_record_says_how_long_each_stage_took(runner: dict[str, Any]) ->
     t = recs[-1]["timing"]
     assert {"discovery", "gpu wait", "prices", "judge", "total"} <= set(t) and all(v >= 0 for v in t.values())
     assert [r["accession"] for r in recs if r["type"] == "decision"] == ["a"]  # written once, not twice
+
+
+def test_on_time_is_judged_when_the_line_is_written_not_when_the_run_started(runner: dict[str, Any],
+                                                                              monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run that starts before the open and finishes after it used to record a late decision as on time."""
+    state = {"t": 1000.0}
+    monkeypatch.setattr(FE.time, "monotonic", lambda: state["t"])
+    real = FE.bonsai
+
+    def slow_judge(*a: Any, **k: Any) -> dict[str, float]:
+        out = real(*a[:7])       # no early writes: the judge only answers at the end
+        state["t"] += 50 * 60    # ...50 minutes later
+        return out
+
+    monkeypatch.setattr(FE, "bonsai", slow_judge)
+    recs = runner["run"]("2026-10-02T12:45:00")  # Fri 08:45 New York; "a" is due at 09:30
+    got = {r["accession"]: r for r in recs if r["type"] in ("decision", "missed")}
+    assert (got["a"]["type"], got["a"]["reason"]) == ("missed", "decided after the entry open: never backfilled")
+    assert got["a"]["as_of"] == "2026-10-02T12:45:00+00:00" and got["a"]["decided_at"] == "2026-10-02T13:35:00+00:00"
+    assert got["a"]["entry_session"] == "2026-10-02"
+
+
+def test_a_decision_stores_its_session_and_the_three_times(runner: dict[str, Any]) -> None:
+    recs = runner["run"]("2026-10-01T22:30:00")
+    a = next(r for r in recs if r["type"] == "decision")
+    assert a["entry_session"] == "2026-10-02" and a["entry_deadline"] == "2026-10-02T09:30:00-04:00"
+    assert a["as_of"] == "2026-10-01T22:30:00+00:00" and a["decided_at"] >= a["as_of"] and "written_at" in a

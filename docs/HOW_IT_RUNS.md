@@ -36,6 +36,11 @@ their own `*_autodry` folders and never touch git.
    worked on first and each decision is written the moment the judge has it. A release's acceptance time is read
    from its filing's index page (the SEC's filing list was hours off; `docs/PLAN_60_V2.md`, rule 6). The `run`
    record holds the seconds each stage took.
+   **Entry rule (one for decisions, orders and scoring):** a release accepted before 13:00 UTC on a trading
+   session enters at that session's open, anything later at the next session's; sessions follow the exchange's
+   holiday calendar (`app/forward/schedule.py`). The deadline is 09:30 New York on that session and is stored
+   with the decision (`entry_session`). **On time** is judged on the clock just before the line is written
+   (`decided_at`), not on the run's start (`as_of`).
 3. `ai_picks.py`: the AI-picks sleeve's paper orders for decisions above the threshold. Exits follow what the
    broker actually holds: a part fill is closed for what it filled, and a pair whose exit run was missed is closed
    at the next order window (a late exit, alerted once).

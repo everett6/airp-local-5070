@@ -2,6 +2,7 @@ import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -191,3 +192,45 @@ def test_the_filing_lists_time_no_longer_decides_the_entry_day():
     # ...and a release filed at 10:30 New York, read 4 hours early, would be called late for an open it never had
     assert fe.entry_deadline(got["midday"]).date().isoformat() == "2026-10-02"
     assert fe.entry_deadline("2026-10-01T10:30:00").date().isoformat() == "2026-10-01"
+
+
+def test_one_entry_rule_where_the_two_old_rules_disagreed():
+    """Since 1 Oct 2026 the deadline is the open of the scored entry session (accepted before 13:00 UTC on a trading
+    day: that day; else the next). The old deadline rule (before 09:30 New York: that day) differed in this window."""
+    from app.forward.schedule import entry_session
+    from app.sandbox.events import entry_index
+    # summer, 09:10 New York (13:10 UTC): scored from the next day, so decided for the next day (was: missed)
+    assert entry_deadline("2026-09-22T13:10:00") == datetime(2026, 9, 23, 9, 30, tzinfo=NY)
+    assert entry_deadline("2026-09-22T12:59:00") == datetime(2026, 9, 22, 9, 30, tzinfo=NY)
+    # winter, 08:10 New York (13:10 UTC): the next day too (was: the same morning, a day before the scored trade)
+    assert entry_deadline("2026-11-03T13:10:00") == datetime(2026, 11, 4, 9, 30, tzinfo=NY)
+    assert entry_deadline("2026-11-03T12:50:00") == datetime(2026, 11, 3, 9, 30, tzinfo=NY)  # 07:50 New York
+    # and it is the scoring rule's day for every hour of a fortnight
+    days = pd.bdate_range("2026-10-26", "2026-11-20")
+    for t in pd.date_range("2026-10-26", "2026-11-12 23:00", freq="h"):
+        i = entry_index(days, t.to_pydatetime())
+        assert days[i].date() == entry_session(t.to_pydatetime()) == entry_deadline(t.isoformat()).date()
+
+
+def test_no_decision_is_due_on_a_market_holiday():
+    from app.forward.schedule import is_session, nyse_holidays
+    # Wed 25 Nov 2026 after the close -> not Thanksgiving (Thu 26) but Fri 27
+    assert entry_deadline("2026-11-25T21:05:00") == datetime(2026, 11, 27, 9, 30, tzinfo=NY)
+    assert entry_deadline("2026-11-26T12:00:00") == datetime(2026, 11, 27, 9, 30, tzinfo=NY)  # filed on the holiday
+    assert entry_deadline("2026-04-02T20:30:00") == datetime(2026, 4, 6, 9, 30, tzinfo=NY)    # Good Friday, weekend
+    assert sorted(nyse_holidays(2026)) == [date(2026, 1, 1), date(2026, 1, 19), date(2026, 2, 16), date(2026, 4, 3),
+                                           date(2026, 5, 25), date(2026, 6, 19), date(2026, 7, 3), date(2026, 9, 7),
+                                           date(2026, 11, 26), date(2026, 12, 25)]
+    assert date(2027, 6, 18) in nyse_holidays(2027) and date(2027, 7, 5) in nyse_holidays(2027)  # Sat / Sun rules
+    assert date(2027, 12, 24) in nyse_holidays(2027)
+    assert is_session(date(2027, 12, 31)) and date(2028, 1, 1).weekday() == 5  # New Year on a Saturday: no Friday off
+    assert date(2021, 6, 18) not in nyse_holidays(2021) and date(2022, 6, 20) in nyse_holidays(2022)  # Juneteenth
+
+
+def test_an_outcome_enters_at_the_recorded_session_or_the_next_trading_day():
+    from forward_events import outcome_index
+    days = pd.DatetimeIndex(["2025-01-07", "2025-01-08", "2025-01-10", "2025-01-13"])  # 9 Jan 2025: closed (mourning)
+    assert outcome_index(days, {"entry_session": "2025-01-08", "accepted_utc": "2025-01-07T21:00:00"}) == 1
+    assert outcome_index(days, {"entry_session": "2025-01-09", "accepted_utc": "2025-01-08T21:00:00"}) == 2
+    assert outcome_index(days, {"entry_session": "2025-01-14", "accepted_utc": "2025-01-13T21:00:00"}) is None
+    assert outcome_index(days, {"accepted_utc": "2025-01-07T21:00:00"}) == 1  # an older record: the scoring rule

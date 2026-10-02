@@ -51,7 +51,7 @@ from event_eval import SECTOR_ETF
 
 from app.data_ingestion.tickers import trading_symbol
 from app.forward.ledger import Ledger, jsonl_records, open_append
-from app.forward.schedule import NY, OPEN
+from app.forward.schedule import NY, OPEN, entry_session
 from app.sandbox.events import Prices, entry_index, fwd_excess
 from app.sandbox.gpu_lock import gpu_priority
 from app.tools.gateway import _read_env_file
@@ -61,14 +61,20 @@ H = 5
 
 
 def entry_deadline(accepted_utc: str) -> datetime:
-    """09:30 ET of the first weekday whose open is after the acceptance."""
-    acc = datetime.fromisoformat(accepted_utc).replace(tzinfo=UTC).astimezone(NY)
-    d = acc.date()
-    if acc.weekday() >= 5 or acc.time() >= OPEN:
-        d += timedelta(days=1)
-    while d.weekday() >= 5:
-        d += timedelta(days=1)
-    return datetime.combine(d, OPEN, NY)
+    """09:30 New York on the release's entry session: the one rule for decisions, orders and scoring since 1 Oct
+    2026 (PLAN_60_V2 "One entry-time rule"). The session is the scoring rule's (accepted before 13:00 UTC on a
+    trading day: that day; else the next trading day), on the exchange's holiday calendar."""
+    return datetime.combine(entry_session(datetime.fromisoformat(accepted_utc)), OPEN, NY)
+
+
+def outcome_index(days: pd.DatetimeIndex, rec: dict[str, Any]) -> int | None:
+    """Where a decision's scored trade enters in the price data: its recorded entry session (the first trading day
+    from it on, if the exchange was closed unexpectedly that day). A record written before sessions were stored
+    is placed by the scoring rule on its acceptance time, which gives the same day."""
+    if rec.get("entry_session"):
+        i = int(days.searchsorted(pd.Timestamp(rec["entry_session"])))
+        return i if i < len(days) else None
+    return entry_index(days, datetime.fromisoformat(rec["accepted_utc"]))
 
 
 def members(year: int, indexes: tuple[str, ...] = ("sp500",)) -> pd.DataFrame:
@@ -325,9 +331,8 @@ def pre_entry(ev: pd.DataFrame, p: Prices) -> pd.DataFrame:
         t, etf = trading_symbol(r.ticker), SECTOR_ETF.get(str(r.sector))
         if etf is None or t not in p.close.columns or etf not in p.close.columns:
             continue
-        acc = datetime.fromisoformat(str(r.accepted_utc)).replace(tzinfo=UTC).astimezone(NY)
-        # bars strictly before the entry day: a pre-open release enters that day, a later one the next trading day
-        cutoff = pd.Timestamp(acc.date()) - pd.Timedelta(days=1 if acc.time() < OPEN else 0)
+        # bars strictly before the entry session (the one entry rule, see entry_deadline)
+        cutoff = pd.Timestamp(entry_session(datetime.fromisoformat(str(r.accepted_utc)))) - pd.Timedelta(days=1)
         c, e = p.close[t].loc[:cutoff], p.close[etf].loc[:cutoff]
         i = len(c)
         row = {"accession": r.accession, "sector": r.sector, "momentum": np.nan}
@@ -509,6 +514,11 @@ def main() -> None:
     print(f"run as of {now.isoformat(timespec='minutes')}; filings since {since}", flush=True)
     t_run = time.monotonic()
 
+    def clock() -> datetime:
+        """The time now: the run's start plus how long it has taken (so a replay with --as-of ages like a real run).
+        On time is judged on this, read just before a line is written, never on the start alone."""
+        return now + timedelta(seconds=time.monotonic() - t_run)
+
     TIMING.clear()
     with stage("discovery"):
         new = asyncio.run(discover(since, now, tuple(args.index.split(","))))
@@ -536,16 +546,18 @@ def main() -> None:
     def record(r: Any, lo: float | None) -> None:
         """One release's ledger line: its decision, or why there is none."""
         dl = entry_deadline(str(r.accepted_utc))
+        at = clock()
         base = {"accession": r.accession, "ticker": r.ticker, "sector": r.sector, "accepted_utc": r.accepted_utc,
-                "entry_deadline": dl.isoformat(), "as_of": now.isoformat(timespec="seconds"),
+                "entry_deadline": dl.isoformat(), "entry_session": dl.date().isoformat(),
+                "as_of": now.isoformat(timespec="seconds"), "decided_at": at.isoformat(timespec="seconds"),
                 "guidance": guidance.get(r.accession, "none")}
         if r.accession in skip or lo is None:
             why = skip.get(str(r.accession), NO_RELEASE)
-            if now < dl:  # its open is still ahead: the next run tries again (a download or price may have failed)
+            if at < dl:  # its open is still ahead: the next run tries again (a download or price may have failed)
                 print(f"not decidable yet, tried again next run: {r.ticker} {r.accession}: {why}", flush=True)
                 return
             ledger.append("missed", **base, reason=why)
-        elif now >= dl:
+        elif at >= dl:  # judged at the moment of writing: a run that began before the open may end after it
             ledger.append("missed", **base, reason="decided after the entry open: never backfilled")
         else:
             ledger.append("decision", **base, source=source, logodds=round(float(lo), 4), on_time=True)
@@ -555,7 +567,7 @@ def main() -> None:
         """Called while the judge is still working: an on-time decision goes into the ledger the moment it exists."""
         r = rows.get(acc)
         if r is not None and acc not in written and acc not in skip and np.isfinite(lo) \
-                and now < entry_deadline(str(r.accepted_utc)):
+                and clock() < entry_deadline(str(r.accepted_utc)):
             record(r, lo)
 
     prio = ExitStack()  # forward decisions can't be made later: research jobs yield the GPU (app/sandbox/gpu_lock.py)
@@ -601,7 +613,7 @@ def main() -> None:
         if r["type"] != "decision" or r["accession"] in have:
             continue
         t, etf = trading_symbol(r["ticker"]), SECTOR_ETF.get(str(r["sector"]))
-        i = entry_index(days, datetime.fromisoformat(r["accepted_utc"]))
+        i = outcome_index(days, r)
         if etf is None or i is None or i + H >= len(days) or t not in p.open.columns:
             continue
         f5 = fwd_excess(p, t, etf, i, H)

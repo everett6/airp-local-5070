@@ -25,7 +25,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-PREOPEN_CUTOFF_UTC_HOUR = 13
+# one cutoff for scoring and for the live entry session
+from app.forward.schedule import PREOPEN_CUTOFF_UTC_HOUR
 
 
 @dataclass
