@@ -2064,3 +2064,22 @@ written once from the models installed that day). A model whose weights change g
 - *Extraction benchmark*: hand-checked figures for a fixed set of hard releases (banks, odd fiscal years, losses,
   changed guidance, heavy tables), scored on period, units, accounting basis and correctly reported absence. A
   reader or prompt change is scored on it before it goes live. The benchmark is a yardstick, not a trial.
+
+**6. The acceptance time comes from the filing's own index page (found 1 Oct 2026 ~23:30 PDT while rehearsing a busy
+morning; written here before the code).** The runner took each release's acceptance time from the SEC's filing
+*list* (`data.sec.gov/submissions`, field `acceptanceDateTime`) and read it as UTC. That field is not stable. For
+20 filings checked against their index pages (`...-index.htm`, "Accepted", New York clock time):
+- all 7 live releases of 30 Sep and 1 Oct were stored **4 hours early**: the list gave the New York clock time
+  labelled as UTC on the day of filing;
+- asked again tonight, the list gave the true UTC time for the four of 30 Sep and a time **4 hours late** for the
+  three of 1 Oct; of 13 older filings, 4 were 4 or 5 hours late;
+- all 13 history rows (built weeks after their filings) hold the true UTC time, so the backtests are not affected.
+The entry rule itself ("09:30 New York on the first weekday after the SEC acceptance") is unchanged. What changes is
+where the acceptance time is read: **the filing's index page, New York clock time, converted to UTC**; the list's
+time is used only to find the filing and when the index page gives no time (recorded per run). No live decision so
+far is affected: all seven were filed before 08:00 or after 16:00 New York, where a 4-hour error leaves the entry
+day the same. Left unfixed: with the early time, a release filed between 09:30 and 13:30 New York (2.7% of the
+history) is logged as missed instead of being entered the next morning; with the late time, a release filed
+between 05:30 and 09:30 (52.7%) is not seen by the morning run at all and is entered a day late as if on time.
+From this change on, `accepted_utc` in the ledger is the true UTC time, as in the history; the seven earlier
+records keep the value they were written with (the chain is not rewritten).
