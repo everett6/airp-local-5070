@@ -2129,3 +2129,50 @@ around 9 Jan 2025, which the outcome handles (first trading day from the session
 afternoon run from an empty scratch ledger wrote NKE's decision with `entry_session` 2026-10-02, `as_of` 22:35:00
 and `decided_at` 22:36:45 UTC. Tests: the window where the old rules disagreed (summer and winter), holidays,
 outcomes on a closed day, and a run that starts before the open and ends after it (logged as missed).
+
+
+### Fact sheet v2: year-earlier figures reconciled with the SEC (spec fixed 2026-10-01 ~22:10 PDT, the user's yes the same day; before any v2 code or number)
+
+**The fault.** The reader (frozen, qwen3:8b) quotes every number it takes from a release, and code checks that the
+quote exists and that the scale fits. Nothing checks what the number *means*. Live on Micron (30 Sep): "revenue
+54,229M vs 41,456M a year earlier (+30.8%)"; 41,456M was the quarter before, the year-earlier quarter was 11,315M
+(+379%). On 546 past releases with both figures the reader's year-earlier revenue is exactly the previous quarter
+in 3.1% and more than 10% from the SEC-filed year-earlier figure in 15.2% (partly banks, whose revenue has several
+definitions). Both outside reviews named it. The user said yes to a new version, tested on past reports before it
+replaces the live one.
+
+**What v2 is.** The reader is not changed and nothing is read again (research uses Jan and Bonsai only). v2 is a
+code step in `build_features.py`, after the existing SEC scale check, for revenue and GAAP diluted EPS when the
+reader gave both the quarter's figure and a year-earlier figure and the SEC tool has the year-earlier quarter
+(filed before the release, quarter end within 20 days of a year before the reported one):
+1. **Agrees** (revenue within 10%; EPS within 0.02 or 10%, whichever is larger): nothing changes.
+2. **Previous-quarter trap:** the reader's year-earlier figure equals the SEC-filed figure of the latest filed
+   quarter (revenue within 0.5%, EPS within 0.005) and does not agree with the year-earlier quarter: it is replaced
+   by the SEC-filed year-earlier figure, and the fact sheet says so in one line (both quarter ends named). The
+   exact match proves the release's figures are on the SEC's basis, so the replacement compares like with like.
+3. **Any other difference:** the figures stay as read; one line states the SEC-filed year-earlier figure and that
+   the release may use another definition.
+Adjusted EPS has no SEC counterpart and is not touched. Every other line of the fact sheet stays as it is.
+Beside the fact sheet (not shown to the judge) v2 records for every figure its period end, units, accounting basis,
+source (release quote or SEC filing) and the outcome of the step above.
+
+**Test (one trial, `factsheet_v2_reconciled`, kind "validity").** Sample: the anonymised check's (the two 5-day
+judge files, 2024 and 2025–26, 3,175 releases; today's code rebuilds their fact sheets byte for byte). v2 fact
+sheets are built for the same releases and scored by the same judge call (Bonsai, 5-day horizon); unchanged sheets
+replay from the cache. Releases censored in either version are left out. Pass needs both:
+- **Truer figures:** among sample releases whose own quarter was later filed with the SEC, the share of fact
+  sheets whose year-earlier figure matches the comparative in that later filing (revenue within 1%, EPS within
+  0.01) is not lower under v2 than under v1, for revenue and for EPS; and at least 80% of the figures replaced
+  under rule 2 match it.
+- **No worse for the judge:** d = monthly rank IC (5-day sector-relative return) of v2 minus v1, months with at
+  least 20 releases, 2024 and 2025–26 pooled; the 95% bootstrap interval of the mean of d (5,000 draws, seed 0)
+  lies above −0.01.
+Reported, not deciding: how many sheets change under rules 2 and 3; the IC of each version on the changed sheets
+alone; rank correlation of the two scores; BUY/PASS flips; IC by year.
+
+**Consequence.** Pass: the live runner builds v2 fact sheets from the next run, each decision records the fact
+sheet version, and the change is dated here. Nothing else in the live book moves: same judge, same threshold. Fail:
+v1 stays; the Micron fault stays a known limit, and a release hit by rule 2 or 3 is flagged in the run's log and
+the evidence file without changing what the judge sees. One run; no second version of this step. A reader that
+reads period, units and basis itself (a new prompt or model) is a separate, larger project scored on the
+extraction benchmark; it is not started here.
