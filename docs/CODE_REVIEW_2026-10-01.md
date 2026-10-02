@@ -88,6 +88,51 @@ Numbers are the order of discovery.
 | pandas, Parquet engine, yfinance missing from the base install | true | declared; `requirements.lock`; `tests/test_runtime_deps.py`. A clean-install test needs a download: left for the user |
 | Docs still say "run by hand"; alerts parsed from console text | true | `docs/HOW_IT_RUNS.md` is the one current description; README and docstrings corrected. Structured step results: proposed, left for the user |
 
+### Second outside review (1 Oct, night): five faults and seven records
+
+All five faults were reproduced on made-up data before any change. Three fixes change a rule that was fixed in
+advance; the new rules were written into `docs/PLAN_60_V2.md` ("Outside review, second part") and pushed first. No
+signal had been proposed and no pair had reached its exit, so no recorded result rests on the old rules. Three of
+the files below are on this page's "read and found sound" list; that list was wrong about them.
+
+| Fault | Reproduced as | Fix | Commit |
+|---|---|---|---|
+| A part-filled order leaves shares behind (`broker.py`, `ai_picks.py`) | 10 ordered, 4 filled, cancelled: the 4 were never sold and the whole hedge was bought back | Filled quantity is kept whatever the final status; exits are sized to what the broker holds | 261a4d8 |
+| A missed exit run strands a filled pair (`ai_picks.py`) | Simulator marks the pair closed; no exit order is ever sent | Exits follow the broker's remaining exposure from the scheduled exit on, whatever the simulator says; short exits are re-sent (up to 5); a late exit is recorded and alerted once | 261a4d8 |
+| Later releases re-rank earlier ones (`registry.py`) | A above B, then B above A after later same-month releases | A score uses only releases accepted earlier; per-field percentiles are stored when a live release is collected (`live_pit.csv`) | f03006c |
+| No lifetime error budget (`registry.py`, `learn_loop.py`) | 0.05/k sums to 0.155 over 12 tests; a weekly 80% bound | Holdout test k needs p < 0.05/(k(k+1)); promotion is looked at 4 fixed times at 0.20/(j(j+1)) with a Student's t bound (a bootstrap of 3 or 4 months passed a 10% look 7 times in 40 on no-edge data) | f03006c |
+| The answer cache is keyed by model name (`walkforward.py`) | New weights behind `bonsai-27b:latest` would replay old answers | The key holds Ollama's digest and the output length; old entries are served only for the digest recorded on 1 Oct (`config/model_digests.json`) | dee30cf |
+
+| Record asked for | What exists now | Where |
+|---|---|---|
+| The AI's contribution, apart from execution | The sleeve replayed with the AI's scores, with the same scores dealt at random (500 deals), and with every release; same slots, sizing, costs and run times. Its replay reproduces the live book. Weekly | `scripts/ai_contribution.py` → `results/forward/ai_contribution.json` |
+| A hand-checked extraction benchmark | 12 hard releases (3 banks, 5 odd fiscal years, 2 losses, 2 guidance changes, heavy tables), 65 figures labelled from their text, each with the wrong figures printed next to it. The scorer names the mistake: other period, units, basis, sign, missed, invented | `benchmarks/extraction/gold.json`, `scripts/extraction_benchmark.py` |
+| The whole funnel | Every release, the last stage it reached and why it stopped; weekly it asks the SEC again so a release no run saw is counted | `scripts/funnel.py` → `results/forward/funnel.json` |
+| Predictable throughput | Stage times in every `run` record; nearest open first; each decision written the moment the judge has it; weekly median and worst, and an alert under 10 minutes to spare | `forward_events.py`, `scripts/throughput.py` |
+| An evidence bundle per decision | Press release hash and download time, the reader's record, the exact fact sheet, both models' digests, prompt hashes and settings, code version, entry session, ledger line; written once in the run that decided, indexed by hash, `--check` weekly | `scripts/evidence_bundle.py` → `results/forward/events/evidence/` |
+| One view of the account | Gross and net exposure, leverage, buying power, shared ETF hedges, and any position the two books' orders do not add up to (an alert). Read-only. Today the account reconciles to the share | `scripts/account_view.py` → `results/forward/account/` |
+| Recovery as a workflow | 13 rehearsals against a stand-in for the Alpaca API: lost connections before and after submission, a crash before the book was saved, part fills, a rejected hedge leg, missing prices, missed entry and exit runs, the kill switch. Each ends with no duplicate order, no unexplained position and the simulator's record unchanged | `tests/test_recovery.py` |
+
+**Baseline of the live reader on the benchmark** (run 1 Oct): 42 of 65 labelled figures right. It almost never
+gives a wrong number (2 from another period, none invented, no unit, basis or sign mistakes) but misses 21 that the
+release states: Boeing's whole table (losses in brackets), Intel's and Nike's revenue, most prior-year figures. The
+labels are mine, read from each release; they are not yet checked by the user.
+
+**Busy-morning rehearsal** (the real SEC lookups, reader and judge on the releases of 30 Apr 2026, the busiest
+morning of the year; answers not replayed from the cache): 38 new releases decided in 3 min 48 s (lookup 124 s,
+reading 70 s, judging 31 s), 41 minutes before the open. The 48 releases of the evening before took 3 min 50 s.
+Downloading the 38 press releases afresh took 8 s and gave the same text byte for byte. Without the GPU
+(Bonsai-lite) the morning took 2 min 3 s. The slowest path is a busy GPU: the runner waits up to 15 minutes for
+it, then uses Bonsai-lite, still half an hour early.
+
+**Found by the rehearsal: the SEC's filing list gives unreliable acceptance times.** Two identical lookups returned
+38 and 34 new releases and neither reported a problem. The list's `acceptanceDateTime` was the New York clock time
+labelled as UTC for every live release so far (4 hours early) and 4 or 5 hours late for 7 of 20 filings checked
+that night; the history files hold the true time. The entry day hangs on that time. The runner now reads it from
+each filing's own index page (rule 6 in the plan; 5b5f839). None of the seven live decisions is affected: all were
+filed before 08:00 or after 16:00 New York. Unfixed, a release filed between 09:30 and 13:30 would have been logged
+as missed (2.7% of the history), and one read 4 hours late would have been entered a day late as if on time.
+
 ## Left for the user (also on the app's Home page, `docs/open_decisions.json`)
 
 1. **"On time" is judged by the run's start, not the moment of writing.** A run that starts at 09:10 New York time
@@ -145,6 +190,8 @@ smoke mode that opens every page and reports any that shows an error.
 
 ## Read and found sound
 
+(The second outside review, above, found faults in three of these: `broker.py`, the model client's cache key and
+`app/signals/registry.py`.)
 `app/portfolio/master.py`, `sleeve.py`, `broker.py`, `themes.py`; `app/forward/schedule.py`;
 `app/sandbox/events.py`, `gpu_lock.py`, the model client in `walkforward.py`; `app/signals/registry.py`;
 `app/data_ingestion/edgar.py`; `scripts/guidance_shadow.py`, `themes.py`, `research_queue.py` (no GPU job waiting),

@@ -32,11 +32,23 @@ their own `*_autodry` folders and never touch git.
 1. `broker_sync.py`: mirror the book's pending orders to the Alpaca **paper** account, reconcile fills.
 2. `forward_events.py`: find new S&P 500 earnings releases at the SEC, read them (fact sheet), score them with
    the judge, and append one `decision` (or `missed`) per release to the hash-chained ledger
-   `results/forward/events/ledger.jsonl` before its entry open; later, the 5-day `outcome`.
-3. `ai_picks.py`: the AI-picks sleeve's paper orders for decisions above the threshold.
-4. Shadows, no money: `guidance_shadow.py`, `net_read_shadow.py`, `consensus_shadow.py`, `longterm_picks.py`
+   `results/forward/events/ledger.jsonl` before its entry open; later, the 5-day `outcome`. The nearest open is
+   worked on first and each decision is written the moment the judge has it. A release's acceptance time is read
+   from its filing's index page (the SEC's filing list was hours off; `docs/PLAN_60_V2.md`, rule 6). The `run`
+   record holds the seconds each stage took.
+3. `ai_picks.py`: the AI-picks sleeve's paper orders for decisions above the threshold. Exits follow what the
+   broker actually holds: a part fill is closed for what it filled, and a pair whose exit run was missed is closed
+   at the next order window (a late exit, alerted once).
+4. Records, no money, live only, never able to change the run's result: `evidence_bundle.py` (one evidence file
+   per decision: `results/forward/events/evidence/`) and `account_view.py` (the paper account across both books,
+   read-only: `results/forward/account/view.json`; a position the books cannot explain is an alert).
+5. Shadows, no money: `guidance_shadow.py`, `net_read_shadow.py`, `consensus_shadow.py`, `longterm_picks.py`
    (monthly cohort), `themes.py` (monthly), `m1_shadow.py` (month-end Treasuries), `self_improve.py`.
-5. `learn_loop.py collect`.
+6. `learn_loop.py collect` (the releases' fields, and each field's percentile among earlier releases).
+
+The Saturday review also writes, live only: `funnel.py --sweep` (where every release stopped and why:
+`results/forward/funnel.json`), `ai_contribution.py` (the AI's picks against the same sleeve dealt at random),
+`throughput.py` (stage times and time left before the open) and `evidence_bundle.py --check`.
 
 Then the heartbeat line, alerts, the git push, the research queue's `tick`, and after the afternoon run the phone
 digest.
@@ -83,6 +95,8 @@ limit) and the AI-picks sleeve.
   run history, research queue. It only reads.
 - `docs/PLAN_V3.md` §2: the plan and its status. `docs/EXECUTIVE_SUMMARY.md`: every result.
   `docs/open_decisions.json`: what waits for the user. `docs/CODE_REVIEW_2026-10-01.md`: the last review.
+- Before changing the reader or its prompt: `python scripts/extraction_benchmark.py` (12 hard releases with
+  hand-labelled figures; the docstring says how to score a new reader).
 - By hand: `scripts/autonomy.sh status`; `journalctl --user -u airp-events -n 50`.
 
 ## Install

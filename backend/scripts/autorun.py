@@ -62,8 +62,9 @@ EVIDENCE = "scripts/evidence_bundle.py"    # one evidence file per decision, in 
 ACCOUNT = "scripts/account_view.py"        # the paper account across both books (read-only at the broker)
 FUNNEL = "scripts/funnel.py"               # weekly: where every release stopped, and why
 CONTRIBUTION = "scripts/ai_contribution.py"  # weekly: the AI's picks against the same sleeve dealt at random
+THROUGHPUT = "scripts/throughput.py"       # weekly: stage times, decision latency, time left before the open
 # recorded in the log, but their exit code never becomes the job's result
-SIDE_STEPS = {CONSENSUS, M1_SHADOW, EVIDENCE, ACCOUNT, FUNNEL, CONTRIBUTION}
+SIDE_STEPS = {CONSENSUS, M1_SHADOW, EVIDENCE, ACCOUNT, FUNNEL, CONTRIBUTION, THROUGHPUT}
 # a step that failed for a network reason is retried once: each of these is idempotent (ledgers skip what they have
 # seen; broker orders carry client ids, so a resend is refused, not duplicated)
 RETRYABLE = {"scripts/forward_events.py", "scripts/forward_allocator.py", "scripts/broker_sync.py", "scripts/ai_picks.py"}
@@ -184,7 +185,8 @@ def commands(job: str, m: str) -> list[list[str]]:
         # the monthly loop rides on the Saturday review (it runs once per calendar month); never in dry mode, because
         # its proposals register trials
         monthly = [] if dry else [[*learn, "monthly"]]
-        records = [] if dry else [[PY, FUNNEL, "--sweep"], [PY, CONTRIBUTION], [PY, EVIDENCE, "--check"]]
+        records = [] if dry else [[PY, FUNNEL, "--sweep"], [PY, CONTRIBUTION], [PY, THROUGHPUT],
+                                  [PY, EVIDENCE, "--check"]]
         return [[PY, "scripts/weekly_review.py"], [PY, "scripts/failure_review.py"], *monthly,
                 [*learn, "review", *largs], *records]
     if job == "learn":  # proposals register trials: never in dry mode

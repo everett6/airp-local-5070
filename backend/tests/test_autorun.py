@@ -441,9 +441,10 @@ def test_the_review_records_are_live_only_side_steps_that_cannot_change_a_run() 
     assert live.index("scripts/forward_events.py") < i < j < live.index("scripts/longterm_picks.py")  # pushed early
     assert live.index("scripts/ai_picks.py") < j
     review = autorun.commands("review", "live")
-    assert [c[1:] for c in review[-3:]] == [["scripts/funnel.py", "--sweep"], ["scripts/ai_contribution.py"],
-                                            ["scripts/evidence_bundle.py", "--check"]]
-    new = {"scripts/evidence_bundle.py", "scripts/account_view.py", "scripts/funnel.py", "scripts/ai_contribution.py"}
+    assert [c[1:] for c in review[-4:]] == [["scripts/funnel.py", "--sweep"], ["scripts/ai_contribution.py"],
+                                            ["scripts/throughput.py"], ["scripts/evidence_bundle.py", "--check"]]
+    new = {"scripts/evidence_bundle.py", "scripts/account_view.py", "scripts/funnel.py", "scripts/ai_contribution.py",
+           "scripts/throughput.py"}
     assert new <= autorun.SIDE_STEPS and not new & autorun.EVENT_READERS and not new & autorun.RETRYABLE
     for job in ("events", "review", "allocator"):
         assert not new & {c[1] for c in autorun.commands(job, "dry") if c[1:2]}
