@@ -79,23 +79,31 @@ def prompts() -> dict[str, str]:
 
 
 def build(dec: dict[str, Any], ev: dict[str, Any], extract: dict[str, Any] | None, judged: dict[str, Any] | None,
-          text_file: Path, versions: dict[str, Any], backfilled: bool) -> dict[str, Any]:
+          text_file: Path, versions: dict[str, Any], backfilled: bool,
+          figures: dict[str, Any] | None = None) -> dict[str, Any]:
     """The bundle for one ledger decision. Pure: everything it needs is handed in."""
     pr = versions["prompts"]
     deadline = datetime.fromisoformat(dec["entry_deadline"])
     b: dict[str, Any] = {
         "accession": dec["accession"], "ticker": dec["ticker"], "sector": dec.get("sector"),
         "accepted_utc": dec["accepted_utc"],
-        "entry": {"deadline": dec["entry_deadline"], "session": deadline.astimezone(NY).date().isoformat(),
-                  "rule": "the open of the first weekday after the SEC acceptance; exit 5 trading days later"},
-        "ledger": {k: dec.get(k) for k in ("seq", "hash", "prev", "written_at", "as_of", "source", "logodds",
-                                           "on_time", "guidance")},
+        "entry": {"deadline": dec["entry_deadline"],
+                  "session": dec.get("entry_session") or deadline.astimezone(NY).date().isoformat(),
+                  # decisions since the evening of 1 Oct 2026 store their session (PLAN_60_V2 "One entry-time rule")
+                  "rule": ("accepted before 13:00 UTC on a trading session: that session's open, else the next "
+                           "session's (exchange holiday calendar); exit 5 trading days later"
+                           if dec.get("entry_session") else
+                           "the open of the first weekday after the SEC acceptance; exit 5 trading days later")},
+        "ledger": {k: dec.get(k) for k in ("seq", "hash", "prev", "written_at", "as_of", "decided_at", "source",
+                                           "logodds", "on_time", "guidance", "entry_session", "sheet_version")},
         "source": {"ex99_url": ev.get("ex99_url"), "items": ev.get("items"), "filed": ev.get("filed")},
         "code": versions["code"],
         "strategy": {"score": sleeve.SCORE_NAME, "threshold": sleeve.THRESHOLD, "hold_days": sleeve.HOLD,
                      "slots": sleeve.SLOTS, "cost_per_leg": sleeve.COST, "sleeve_share": sleeve.SHARE},
         "backfilled": backfilled,
     }
+    if figures:  # fact sheet v2: each figure's period, units, accounting basis, source and SEC reconciliation
+        b["figures"] = figures
     if text_file.exists():
         raw = text_file.read_bytes()
         try:
@@ -118,7 +126,7 @@ def build(dec: dict[str, Any], ev: dict[str, Any], extract: dict[str, Any] | Non
         if judged is not None:
             sheet = judged.get("prompt_user") or ""
             b["judge"].update(logodds=judged.get("logodds"), mass=judged.get("mass"), censored=judged.get("censored"))
-            b["fact_sheet"] = {"text": sheet, "sha256": sha(sheet)}
+            b["fact_sheet"] = {"text": sheet, "sha256": sha(sheet), "version": int(dec.get("sheet_version") or 1)}
             b["ledger"]["matches_judge"] = (judged.get("logodds") is not None and dec.get("logodds") is not None
                                             and round(float(judged["logodds"]), 4) == float(dec["logodds"]))
     else:  # Bonsai-lite: a ridge on past decisions, no model call
@@ -142,6 +150,12 @@ def write_new(events_dir: Path, tag: str = "forward", now: datetime | None = Non
     ex = {x["accession"]: x for x in jsonl_records(events_dir / "extract.jsonl")}
     judged = {x["accession"]: x for x in
               jsonl_records(BACKEND / "results" / "events" / f"decide_bonsai-27b_latest_{tag}_h{H}.jsonl")}
+    feats = BACKEND / "results" / "events" / f"features_{tag}.csv"  # this run's fact-sheet table (v2: with figures)
+    figs: dict[str, Any] = {}
+    if feats.exists():
+        ft = pd.read_csv(feats)
+        if "figures" in ft.columns:
+            figs = {a: json.loads(x) for a, x in zip(ft["accession"], ft["figures"], strict=True) if isinstance(x, str)}
     versions = {"prompts": prompts(), "code": code_version(),
                 "reader_digest": manifest_digest(READER["model"], READER["models_dir"]),
                 "judge_digest": manifest_digest(JUDGE["model"], JUDGE["models_dir"])}
@@ -153,7 +167,7 @@ def write_new(events_dir: Path, tag: str = "forward", now: datetime | None = Non
         # the code version and model digests are today's, not necessarily that day's
         age = (now - datetime.fromisoformat(r["written_at"])).total_seconds() if r.get("written_at") else 1e9
         b = build(r, {str(k): (None if pd.isna(v) else v) for k, v in ev.get(acc, {}).items()}, ex.get(acc),
-                  judged.get(acc), text_path(acc), versions, backfilled=age > 7200)
+                  judged.get(acc), text_path(acc), versions, backfilled=age > 7200, figures=figs.get(acc))
         b["bundle_written_at"] = now.isoformat(timespec="seconds")
         body = json.dumps(b, indent=1, sort_keys=True) + "\n"
         tmp = out / f"{acc}.json.tmp"

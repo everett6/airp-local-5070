@@ -146,12 +146,13 @@ def test_longterm_cohort_picks_ten_distinct_names_once(tmp_path: Path, monkeypat
     assert "LEARN ALERT" not in capsys.readouterr().out
 
 
-def test_a_pick_that_stopped_trading_does_not_stop_later_cohorts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+def test_a_pick_that_stopped_trading_is_priced_at_its_last_trade(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
                                                                  stubs: None, capsys: pytest.CaptureFixture[str]
                                                                  ) -> None:
-    """Before: the first cohort with a bought-out or delisted pick made scoring raise at every run, before the new
-    month's cohort was made, so the track stopped for good. Now that cohort is reported and left unscored, the
-    others are scored and the new cohort is made."""
+    """First the cohort with a bought-out or delisted pick made scoring raise at every run (the track stopped for
+    good), then it was left unscored. Rule since 1 Oct 2026: the pick is priced at its last open on or before the
+    exit day and the result says so. A pick with no open at its entry still leaves its cohort unscored, and never
+    stops the others."""
     names = [f"T{i:02d}" for i in range(14)]
     opens, closes = _prices({*names, "SPY"})
     gone = opens.copy()
@@ -171,11 +172,22 @@ def test_a_pick_that_stopped_trading_does_not_stop_later_cohorts(tmp_path: Path,
     LT.run(tmp_path / "events", out, NOW, use_gpu=True)
     recs = led.verify()
     assert [(r["type"], r["month"]) for r in recs] == [("cohort", "2026-05"), ("cohort", "2026-06"),
-                                                       ("result", "2026-06"), ("cohort", "2026-10")]
-    text = capsys.readouterr().out
-    assert "LEARN ALERT: long-term cohort 2026-05: missing entry/exit opens for T13" in text
-    with pytest.raises(ValueError, match="missing entry/exit opens for T13"):  # the check itself is unchanged
-        LT.score(recs[:2], gone)
+                                                       ("result", "2026-05"), ("result", "2026-06"),
+                                                       ("cohort", "2026-10")]
+    may = recs[2]
+    last = opens.index[-71]
+    assert may["priced_at_last_trade"] == {"T13": last.date().isoformat()} and may["priced"] == 10
+    entry = opens.index[-119]
+    want = np.mean([(opens.at[last, "T13"] if t == "T13" else opens.at[opens.index[-56], t]) / opens.at[entry, t] - 1
+                    for t in names[4:14]])
+    assert may["basket"] == round(float(want), 5) and "priced_at_last_trade" not in recs[3]
+    assert "LEARN ALERT" not in capsys.readouterr().out
+    never = opens.copy()
+    never["T13"] = np.nan  # no open at the entry either: nothing to price it from
+    with pytest.raises(ValueError, match="missing entry opens for T13"):
+        LT.score(recs[:2], never)
+    assert [r["month"] for r in LT.score_each(recs[:2], never)] == ["2026-06"]
+    assert "cohort 2026-05: missing entry opens for T13; that cohort stays unscored" in capsys.readouterr().out
 
 
 def test_a_cut_off_rating_run_resumes_and_makes_the_same_cohort(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,

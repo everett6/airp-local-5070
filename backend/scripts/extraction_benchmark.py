@@ -1,7 +1,7 @@
 """The extraction benchmark: hand-labelled figures for hard releases (docs/PLAN_60_V2.md, "Outside review, second
 part", new records). A yardstick, not a trial: run it before a reader or a prompt replaces the live one.
 
-    python scripts/extraction_benchmark.py                       # score the reader records already on disk
+    python scripts/extraction_benchmark.py                       # the live reader's records kept with the benchmark
     python scripts/extraction_benchmark.py --extract results/events/bench_new_reader.jsonl
     # to score a new reader or prompt, first read the benchmark's releases with it (needs the GPU):
     #   python scripts/extract_events.py extract --events benchmarks/extraction/events.csv --from 2000-01-01 \
@@ -41,7 +41,9 @@ from app.forward.ledger import jsonl_records
 
 GOLD = BACKEND / "benchmarks" / "extraction" / "gold.json"
 FIELDS = ("revenue", "eps", "adj_eps")
-DEFAULT_EXTRACTS = ("results/events/extract_qwen3_8b.jsonl", "results/forward/events/extract.jsonl")
+# the live reader (qwen3:8b, live prompt) on the 12 releases, kept with the benchmark so the baseline can be
+# reproduced without the GPU; read again on 1 Oct 2026 (42 of 65 right)
+DEFAULT_EXTRACTS = ("benchmarks/extraction/reader_live.jsonl",)
 
 
 def close(a: float, b: float, eps: bool) -> bool:

@@ -327,6 +327,14 @@ def bonsai(ev_csv: Path, ex: Path, feats: Path, tag: str, since: date, d: Path, 
     return {r["accession"]: float(r["logodds"]) for r in jsonl_records(p) if not r.get("censored")}
 
 
+def censored(tag: str) -> set[str]:
+    """The releases whose judge answer could not be turned into log-odds (neither BUY nor PASS among its likely
+    first words). The judge did answer: such a release is logged as missed, it does not fail the run (PLAN_60_V2,
+    "Rule changes after the records were checked", 1)."""
+    p = BACKEND / "results" / "events" / f"decide_bonsai-27b_latest_{tag}_h{H}.jsonl"
+    return {str(r["accession"]) for r in jsonl_records(p) if r.get("censored")}
+
+
 def pre_entry(ev: pd.DataFrame, p: Prices) -> pd.DataFrame:
     """The price features event_eval.build computes, from closes before the acceptance only: at decision time the
     entry day's bar does not exist yet, so build() would mark every new release unscorable."""
@@ -413,6 +421,7 @@ def prices_for(tickers: set[str], start: date, end: date, save: Path) -> Prices:
     return Prices.from_long(long)
 
 
+UNUSABLE = "no usable judge answer (neither BUY nor PASS among its likely first words)"
 NO_RELEASE = "no decision (no press release, fact sheet or model output)"
 
 
@@ -601,6 +610,10 @@ def main() -> None:
         if use_gpu:
             with stage("judge"):
                 logodds = bonsai(new_csv, d / "extract.jsonl", feats, tag, since, d, px_file, write_early)
+            for acc in sorted(censored(tag) & set(rows) - set(skip) - set(logodds)):
+                skip = {**skip, acc: UNUSABLE}
+                print(f"LEARN ALERT: the judge's answer for {rows[acc].ticker} ({acc}) could not be used; the "
+                      "release is logged as missed once its open has passed, the others are decided", flush=True)
         else:
             with stage("judge"):
                 logodds = lite(feats, new_csv, p)

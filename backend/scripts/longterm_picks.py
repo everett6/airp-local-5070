@@ -167,23 +167,37 @@ def score(recs: list[dict[str, Any]], opens: pd.DataFrame) -> list[dict[str, Any
         def price(t: str, day: pd.Timestamp) -> float:
             return cast(float, opens.at[day, t])
 
-        missing = [t for t in c["tickers"] if t not in opens or not math.isfinite(price(t, entry))
-                   or not math.isfinite(price(t, exit_)) or price(t, entry) <= 0 or price(t, exit_) <= 0]
+        def good(t: str, day: pd.Timestamp) -> bool:
+            return t in opens and math.isfinite(price(t, day)) and price(t, day) > 0
+
+        missing = [t for t in c["tickers"] if not good(t, entry)]
         if missing:
-            raise ValueError(f"long-term cohort {c['month']}: missing entry/exit opens for {', '.join(missing)}")
-        rets = [price(t, exit_) / price(t, entry) - 1 for t in c["tickers"]]
+            raise ValueError(f"long-term cohort {c['month']}: missing entry opens for {', '.join(missing)}")
+        # a pick that stopped trading before the exit (bought out, delisted) is priced at its last open on or before
+        # the exit day (PLAN_60_V2, "Rule changes after the records were checked", 2); the result names such picks
+        last_trade: dict[str, str] = {}
+        exits: dict[str, float] = {}
+        for t in c["tickers"]:
+            if good(t, exit_):
+                exits[t] = price(t, exit_)
+                continue
+            seen = opens[t].loc[entry:exit_].dropna()
+            seen = seen[seen > 0]
+            exits[t] = float(seen.iloc[-1])  # the entry open at the least: it was checked above
+            last_trade[t] = pd.Timestamp(seen.index[-1]).date().isoformat()
+        rets = [exits[t] / price(t, entry) - 1 for t in c["tickers"]]
         spy = price("SPY", exit_) / price("SPY", entry) - 1
         basket = float(np.mean(rets))
         out.append({"month": c["month"], "entry": days[i].date().isoformat(), "exit": days[i + HOLD].date().isoformat(),
                     "basket": round(basket, 5), "spy": round(spy, 5), "priced": len(rets),
-                    "excess_net": round(basket - spy - 2 * COST, 5)})
+                    "excess_net": round(basket - spy - 2 * COST, 5),
+                    **({"priced_at_last_trade": last_trade} if last_trade else {})})
     return out
 
 
 def score_each(recs: list[dict[str, Any]], opens: pd.DataFrame) -> list[dict[str, Any]]:
-    """`score`, cohort by cohort. A cohort that cannot be scored (a pick stopped trading before its exit: bought
-    out or delisted) is reported and left unscored: it must not stop the other cohorts' results or this month's new
-    cohort. How to price such a pick is a rule for the user to set; no result is invented here."""
+    """`score`, cohort by cohort. A cohort that cannot be scored (a pick without an open at its entry) is reported
+    and left unscored: it must not stop the other cohorts' results or this month's new cohort."""
     if "SPY" not in opens:
         raise ValueError("long-term cohort: SPY open prices missing")
     results = [r for r in recs if r.get("type") == "result"]
@@ -194,7 +208,7 @@ def score_each(recs: list[dict[str, Any]], opens: pd.DataFrame) -> list[dict[str
         try:
             out += score([*results, c], opens)
         except ValueError as e:
-            print(f"LEARN ALERT: {e}; that cohort stays unscored until its pricing is decided")
+            print(f"LEARN ALERT: {e}; that cohort stays unscored")
     return out
 
 

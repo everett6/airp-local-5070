@@ -50,7 +50,8 @@ def test_a_bundle_holds_what_rebuilds_the_decision(live: Path) -> None:
     assert b["entry"]["session"] == "2026-10-02" and b["ledger"]["logodds"] == 3.5 and b["ledger"]["matches_judge"]
     assert b["source"]["ex99_url"].endswith("/a.htm") and b["source"]["text_sha256"] == E.sha("the press release")
     assert b["source"]["retrieved_at"] and b["source"]["text_chars"] == 17
-    assert b["fact_sheet"] == {"text": SHEET, "sha256": E.sha(SHEET)}
+    assert b["fact_sheet"] == {"text": SHEET, "sha256": E.sha(SHEET), "version": 1}
+    assert "first weekday" in b["entry"]["rule"] and "figures" not in b  # a decision from before the rule change
     assert b["judge"]["digest"] == "digest-of-bonsai-27b:latest" and b["judge"]["mode"] == "buypass_lo"
     assert len(b["judge"]["prompt_version"]) == 12 and b["judge"]["horizon_days"] == 5
     assert b["reader"]["digest"] == "digest-of-qwen3:8b" and b["reader"]["record"]["eps"] == {"q": 1.0}
@@ -93,3 +94,23 @@ def test_the_recorded_settings_are_the_ones_the_scripts_use() -> None:
     wf = (root.parent / "app" / "sandbox" / "walkforward.py").read_text()
     assert 'body["options"]["num_predict"] = 1\n            body |= {"logprobs": True, "top_logprobs": 20}' in wf
     assert E.manifest_digest("no-such-model", "/nonexistent") is None
+
+
+def test_a_bundle_carries_the_session_the_times_and_the_fact_sheet_version(live: Path, tmp_path: Path) -> None:
+    """Decisions since the evening of 1 Oct 2026: one entry rule, on time at the write, fact sheet version 2."""
+    led = Ledger(live / "ledger.jsonl")
+    led.append("decision", accession="d", ticker="DDD", sector="Industrials", accepted_utc="2026-11-03T13:10:00",
+               entry_deadline="2026-11-04T09:30:00-05:00", entry_session="2026-11-04", sheet_version=2,
+               as_of="2026-11-03T13:45:00+00:00", decided_at="2026-11-03T13:47:10+00:00", guidance="none",
+               source="bonsai", logodds=1.0, on_time=True)
+    with (tmp_path / "results" / "events" / "decide_bonsai-27b_latest_forward_h5.jsonl").open("a") as f:
+        f.write(json.dumps({"accession": "d", "logodds": 1.0, "mass": 0.9, "censored": False, "prompt_user": SHEET}) + "\n")
+    figures = {"revenue": {"q": 54229.0, "prior": 11315.0, "prior_source": "SEC filing", "reconcile": "previous_quarter"}}
+    pd.DataFrame([{"accession": "d", "figures": json.dumps(figures)}, {"accession": "x", "figures": float("nan")}]
+                 ).to_csv(tmp_path / "results" / "events" / "features_forward.csv", index=False)
+    assert "d" in E.write_new(live)
+    b = json.loads((live / "evidence" / "d.json").read_text())
+    assert b["entry"]["session"] == "2026-11-04" and "13:00 UTC" in b["entry"]["rule"]
+    assert b["ledger"]["decided_at"] == "2026-11-03T13:47:10+00:00" and b["ledger"]["sheet_version"] == 2
+    assert b["fact_sheet"]["version"] == 2 and b["figures"] == figures
+    assert E.check(live) == []

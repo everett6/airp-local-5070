@@ -309,3 +309,27 @@ def test_the_fact_sheet_version_is_stored_with_the_decision(runner: dict[str, An
     runner["priced"].append("CCC")
     recs = runner["run"]("2026-10-02T12:45:00")
     assert [r["sheet_version"] for r in recs if r["type"] == "decision" and r["accession"] == "c"] == [2]
+
+
+def test_an_unusable_judge_answer_is_a_missed_release_not_a_failed_run(runner: dict[str, Any],
+                                                                       monkeypatch: pytest.MonkeyPatch,
+                                                                       capsys: pytest.CaptureFixture[str]) -> None:
+    """Until 1 Oct 2026 one answer without BUY or PASS failed the run, and (cached) every run for three days."""
+    real = FE.bonsai
+    monkeypatch.setattr(FE, "bonsai", lambda *a, **k: {x: v for x, v in real(*a, **k).items() if x != "a"})
+    monkeypatch.setattr(FE, "censored", lambda _tag: {"a", "zzz"})
+    recs = runner["run"]("2026-10-01T22:30:00")  # "a" is due the next morning: nothing is written for it yet
+    got = {r["accession"]: r for r in recs if r["type"] in ("decision", "missed")}
+    assert "a" not in got and recs[-1]["type"] == "run" and "could not be used" in capsys.readouterr().out
+    recs = runner["run"]("2026-10-02T22:30:00")  # its open has passed: missed, with the reason
+    got = {r["accession"]: r for r in recs if r["type"] in ("decision", "missed")}
+    assert (got["a"]["type"], got["a"]["reason"]) == ("missed", FE.UNUSABLE)
+
+
+def test_a_judge_that_wrote_nothing_for_a_release_still_fails_the_run(runner: dict[str, Any],
+                                                                      monkeypatch: pytest.MonkeyPatch) -> None:
+    """Not the same as an unusable answer: no answer at all for a release with a fact sheet is a broken pipeline."""
+    monkeypatch.setattr(FE, "bonsai", lambda *a, **k: {})
+    monkeypatch.setattr(FE, "censored", lambda _tag: set())
+    with pytest.raises(ValueError, match="model score absent"):
+        runner["run"]("2026-10-01T22:30:00")
