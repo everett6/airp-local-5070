@@ -65,6 +65,11 @@ TRANSIENT = re.compile(r"Temporary failure in name resolution|Name or service no
                        r"URLError|YFRateLimitError|Too Many Requests|No objects to concatenate|"
                        r"no SPY closing prices", re.IGNORECASE)  # the last three: Yahoo returned nothing
 RETRY_WAIT = 90
+RUNNING = "running.json"         # the job at work; a restart that kills the run leaves it behind (see `resume`)
+RESUME_JOBS = {"events"}         # jobs whose steps are safe to run again after a cut-off run (see RETRYABLE)
+RESUME_MAX_AGE = timedelta(hours=6)
+RESUME_GAP = timedelta(minutes=30)   # no resume this close to the next scheduled event run: that run covers it
+EVENT_SLOTS = ((8, 45), (18, 30))    # airp-events.timer, New York time, Mon-Fri
 EXPECTED = {"events": 2, "allocator_weekday": 0}  # event runs per weekday; the allocator runs Mondays
 
 
@@ -259,7 +264,7 @@ def safe_step(cmd: list[str], inhibit: bool) -> subprocess.CompletedProcess[str]
         return subprocess.CompletedProcess(cmd, 124, "", f"{cmd[1] if cmd[1:2] else cmd[0]}: {type(e).__name__}: {e}"[:300] + "\n")
 
 
-def run(job: str) -> int:
+def run(job: str, resumed_from: str | None = None) -> int:
     m = mode()
     logs = FWD / "logs"
     logs.mkdir(parents=True, exist_ok=True)
@@ -277,7 +282,10 @@ def run(job: str) -> int:
             append("heartbeat.jsonl", {"job": job, "mode": m, "start": start.isoformat(timespec="seconds"), "rc": -1,
                                        "skipped": "lock"})
             return 1
+        (FWD / RUNNING).write_text(json.dumps({"job": job, "mode": m, "start": start.isoformat(timespec="seconds")}) + "\n")
         rc, out = 0, "" if wait_online() else "(network still down after 2 minutes; ran anyway)\n"
+        if resumed_from:
+            out = f"(resumed at boot: the run started {resumed_from} was cut off)\n" + out
         inhibit = can_inhibit()
         skip_dependents = False  # a failed event runner: its readers must not run on a half-written ledger
         for cmd in commands(job, m):
@@ -297,6 +305,7 @@ def run(job: str) -> int:
             rc = rc or r.returncode
             if r.returncode != 0 and cmd[1:2] == ["scripts/forward_events.py"]:
                 skip_dependents = True
+            log.write_text(out)  # after every step: a run cut off by a restart still leaves its log so far
         log.write_text(out)
     # the allocator refuses a second run on the same day with a clear message: not a failure
     if job == "allocator" and rc != 0 and "already ran today" in out:
@@ -306,7 +315,10 @@ def run(job: str) -> int:
     beat = {"job": job, "mode": m, "start": start.isoformat(timespec="seconds"),
             "end": end.isoformat(timespec="seconds"), "rc": rc, "log": str(log.relative_to(BACKEND)),
             "missed_total": missed_total(out) if job == "events" else None}
+    if resumed_from:
+        beat["resumed_from"] = resumed_from
     append("heartbeat.jsonl", beat)
+    (FWD / RUNNING).unlink(missing_ok=True)
     if rc != 0:
         alert(job, f"failed (exit {rc}); log {log.name}: {out.strip().splitlines()[-1][:200] if out.strip() else ''}")
     for f in scan(job, out, prev):
@@ -317,6 +329,59 @@ def run(job: str) -> int:
         push(job)
     post_run(job)
     return rc
+
+
+def next_event_slot(now: datetime) -> datetime:
+    """The next scheduled event run after `now` (airp-events.timer: weekdays 08:45 and 18:30 New York time)."""
+    et = now.astimezone(NY)
+    for d in range(8):
+        day = (et + timedelta(days=d)).date()
+        if day.weekday() >= 5:
+            continue
+        for h, mi in EVENT_SLOTS:
+            slot = datetime(day.year, day.month, day.day, h, mi, tzinfo=NY)
+            if slot > et:
+                return slot
+    raise AssertionError("no weekday in eight days")
+
+
+def resume(now: datetime | None = None, settle_s: float = 120.0) -> int:
+    """At boot (airp-resume.service): finish a scheduled run that a restart cut off. A run writes `running.json`
+    when it starts work and removes it with its heartbeat; a file left behind means the run never finished (1 Oct
+    2026: a restart an hour into the afternoon run; nothing was pushed and no digest was sent until the next
+    morning). Only event runs are run again (their steps skip what is already done), only within 6 hours, and not
+    when the next scheduled run is under 30 minutes away or another run is already at work. Anything else is
+    reported and left to the next scheduled run."""
+    p = FWD / RUNNING
+    if not p.exists():
+        print("nothing to resume")
+        return 0
+    time.sleep(settle_s)  # right after boot: let the network, the desktop session and the GPU come up
+    with (FWD / "autorun.lock").open("w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("a run is at work: nothing to resume")
+            return 0
+        try:
+            was = json.loads(p.read_text())
+            job, start = str(was["job"]), datetime.fromisoformat(was["start"])
+        except (ValueError, KeyError, TypeError):
+            p.unlink(missing_ok=True)
+            alert("resume", "a run was cut off, but its marker could not be read; the next scheduled run covers it")
+            return 0
+        now = now or datetime.now(UTC)
+        why = ("only event runs are resumed" if job not in RESUME_JOBS else
+               "the mode changed since" if was.get("mode") != mode() else
+               f"more than {RESUME_MAX_AGE.seconds // 3600} hours ago" if now - start > RESUME_MAX_AGE else
+               "the next scheduled run is under 30 minutes away" if next_event_slot(now) - now < RESUME_GAP else "")
+        p.unlink(missing_ok=True)
+    if why:
+        alert(job, f"the run started {start:%Y-%m-%d %H:%M} UTC was cut off (restart?); not resumed: {why}. "
+                   "The next scheduled run covers it")
+        return 0
+    alert(job, f"the run started {start:%Y-%m-%d %H:%M} UTC was cut off (restart?); resuming it now")
+    return run(job, resumed_from=was["start"])
 
 
 def post_run(job: str) -> None:
@@ -422,8 +487,10 @@ def go_live(today: date | None = None) -> str | None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("job", choices=("events", "allocator", "review", "check", "learn"))
+    ap.add_argument("job", choices=("events", "allocator", "review", "check", "learn", "resume"))
     args = ap.parse_args()
+    if args.job == "resume":
+        sys.exit(resume())
     if args.job == "check":
         gaps = check()
         for g in gaps:

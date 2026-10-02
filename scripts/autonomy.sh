@@ -16,6 +16,9 @@ case "${1:-status}" in
     for u in "${UNITS[@]}"; do cp "$ROOT/deploy/systemd/$u.service" "$ROOT/deploy/systemd/$u.timer" "$DEST/"; done
     systemctl --user daemon-reload
     for u in "${UNITS[@]}"; do systemctl --user enable --now "$u.timer"; done
+    # not a timer: runs once at boot and does nothing unless a restart cut a scheduled run off (autorun.py resume)
+    cp "$ROOT/deploy/systemd/airp-resume.service" "$DEST/"; systemctl --user daemon-reload
+    systemctl --user enable airp-resume.service
     [ -f "$FWD/AUTORUN_MODE" ] || echo dry > "$FWD/AUTORUN_MODE"
     echo "installed; mode: $(cat "$FWD/AUTORUN_MODE")" ;;
   dry|live)
@@ -27,6 +30,7 @@ case "${1:-status}" in
     echo "--- last alerts"; tail -5 "$FWD/alerts.jsonl" 2>/dev/null || echo none ;;
   uninstall)
     for u in "${UNITS[@]}"; do systemctl --user disable --now "$u.timer" 2>/dev/null || true; rm -f "$DEST/$u.service" "$DEST/$u.timer"; done
+    systemctl --user disable airp-resume.service 2>/dev/null || true; rm -f "$DEST/airp-resume.service"
     systemctl --user daemon-reload; echo "timers removed" ;;
   *) echo "usage: $0 install|dry|live|status|uninstall"; exit 2 ;;
 esac

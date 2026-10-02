@@ -321,3 +321,86 @@ def test_m1_shadow_is_a_side_step_of_live_event_runs_only():
     assert live.index("scripts/m1_shadow.py") > live.index("scripts/forward_events.py")
     assert "scripts/m1_shadow.py" not in [c[1] for c in autorun.commands("events", "dry")]
     assert "scripts/m1_shadow.py" not in autorun.EVENT_READERS  # it reads no event file: runs even if the runner failed
+
+
+def _resumable(tmp_path, monkeypatch, marker):
+    """A scratch forward folder with a marker left by a cut-off run; returns the list of jobs `run` was asked to do."""
+    import json
+    monkeypatch.setattr(autorun, "FWD", tmp_path)
+    monkeypatch.setattr(autorun, "mode", lambda: "live")
+    alerts, ran = [], []
+    monkeypatch.setattr(autorun, "alert", lambda job, msg: alerts.append((job, msg)))
+    monkeypatch.setattr(autorun, "run", lambda job, resumed_from=None: ran.append((job, resumed_from)) or 0)
+    if marker is not None:
+        (tmp_path / "running.json").write_text(marker if isinstance(marker, str) else json.dumps(marker))
+    return alerts, ran
+
+
+def test_a_run_cut_off_by_a_restart_is_resumed_at_boot(tmp_path, monkeypatch):
+    """1 Oct 2026: a restart at 16:33 PDT killed the afternoon run started 22:30 UTC."""
+    from datetime import UTC, datetime
+    was = {"job": "events", "mode": "live", "start": "2026-10-01T22:30:54+00:00"}
+    alerts, ran = _resumable(tmp_path, monkeypatch, was)
+    assert autorun.resume(datetime(2026, 10, 1, 23, 37, tzinfo=UTC), settle_s=0) == 0
+    assert ran == [("events", "2026-10-01T22:30:54+00:00")] and "resuming it now" in alerts[0][1]
+    assert not (tmp_path / "running.json").exists()
+    assert autorun.resume(datetime(2026, 10, 1, 23, 40, tzinfo=UTC), settle_s=0) == 0 and len(ran) == 1  # once
+
+
+def test_resume_leaves_it_to_the_next_scheduled_run_when_that_is_safer(tmp_path, monkeypatch):
+    import fcntl
+    from datetime import UTC, datetime
+    ev = {"job": "events", "mode": "live", "start": "2026-10-01T22:30:54+00:00"}
+    for marker, now, why in [
+            (ev, datetime(2026, 10, 2, 5, 0, tzinfo=UTC), "more than 6 hours"),
+            ({**ev, "start": "2026-10-02T12:45:00+00:00"}, datetime(2026, 10, 2, 22, 10, tzinfo=UTC), "more than 6"),
+            ({**ev, "start": "2026-10-02T20:00:00+00:00"}, datetime(2026, 10, 2, 22, 10, tzinfo=UTC), "under 30 minutes"),
+            ({**ev, "job": "review"}, datetime(2026, 10, 1, 23, 0, tzinfo=UTC), "only event runs"),
+            ({**ev, "mode": "dry"}, datetime(2026, 10, 1, 23, 0, tzinfo=UTC), "mode changed"),
+            ("{cut off", datetime(2026, 10, 1, 23, 0, tzinfo=UTC), "could not be read")]:
+        alerts, ran = _resumable(tmp_path, monkeypatch, marker)
+        assert autorun.resume(now, settle_s=0) == 0
+        assert ran == [] and why in alerts[0][1] and not (tmp_path / "running.json").exists()
+    alerts, ran = _resumable(tmp_path, monkeypatch, None)  # no marker: nothing happens, not even the wait
+    assert autorun.resume(settle_s=3600) == 0 and ran == [] and alerts == []
+    alerts, ran = _resumable(tmp_path, monkeypatch, ev)  # a scheduled run is already at work: it covers it
+    with (tmp_path / "autorun.lock").open("w") as held:
+        fcntl.flock(held, fcntl.LOCK_EX)
+        assert autorun.resume(datetime(2026, 10, 1, 23, 0, tzinfo=UTC), settle_s=0) == 0
+    assert ran == [] and alerts == [] and (tmp_path / "running.json").exists()
+
+
+def test_next_event_slot_skips_weekends():
+    from datetime import UTC, datetime
+    slot = autorun.next_event_slot
+    assert slot(datetime(2026, 10, 1, 23, 0, tzinfo=UTC)).isoformat() == "2026-10-02T08:45:00-04:00"
+    assert slot(datetime(2026, 10, 2, 13, 0, tzinfo=UTC)).isoformat() == "2026-10-02T18:30:00-04:00"
+    assert slot(datetime(2026, 10, 2, 23, 0, tzinfo=UTC)).isoformat() == "2026-10-05T08:45:00-04:00"  # Fri evening
+    assert slot(datetime(2026, 11, 2, 12, 0, tzinfo=UTC)).isoformat() == "2026-11-02T08:45:00-05:00"  # winter time
+
+
+def test_a_run_marks_itself_while_it_works_and_keeps_its_log_so_far(tmp_path, monkeypatch):
+    import json
+    seen = []
+
+    def fake_step(cmd, inhibit):
+        import subprocess
+        seen.append((json.loads((tmp_path / "running.json").read_text())["job"],
+                     [f.read_text() for f in tmp_path.glob("logs/*.log")]))
+        return subprocess.CompletedProcess(cmd, 0, f"{cmd[1]} done\n", "")
+
+    monkeypatch.setattr(autorun, "FWD", tmp_path)
+    monkeypatch.setattr(autorun, "BACKEND", tmp_path)
+    monkeypatch.setattr(autorun, "wait_online", lambda: True)
+    monkeypatch.setattr(autorun, "can_inhibit", lambda: False)
+    monkeypatch.setattr(autorun, "commands", lambda job, mode: [["py", "scripts/a.py"], ["py", "scripts/b.py"]])
+    monkeypatch.setattr(autorun, "post_run", lambda job: None)
+    monkeypatch.setattr(autorun, "alert", lambda *a: None)
+    monkeypatch.setattr(autorun, "step", fake_step)
+    assert autorun.run("events", resumed_from="2026-10-01T22:30:54+00:00") == 0
+    assert [s[0] for s in seen] == ["events", "events"]
+    assert seen[0][1] == [] and "scripts/a.py done" in seen[1][1][0]  # the second step sees the first one's log
+    assert not (tmp_path / "running.json").exists()
+    beat = json.loads((tmp_path / "heartbeat.jsonl").read_text().splitlines()[-1])
+    assert beat["resumed_from"] == "2026-10-01T22:30:54+00:00" and beat["rc"] == 0
+    assert next(tmp_path.glob("logs/*.log")).read_text().startswith("(resumed at boot")

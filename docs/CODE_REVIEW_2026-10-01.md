@@ -69,6 +69,13 @@ Numbers are the order of discovery.
 | 9 | `digest.py` | A run that did its job but raised an alert was called "FAILED". | "Finished with an alert". | 8824bf9 |
 | 21 | `autorun.py` | The consensus shadow ran after the push, so its lines got their outside time stamp a run late, and its output was not logged. | It runs right after the labels, as a side step that cannot change the run's result. | 2eb11f3 |
 
+### After the restart of 1 Oct, 16:33 (the afternoon run was killed an hour in)
+
+| # | Where | What was wrong | Fix | Commit |
+|---|---|---|---|---|
+| 25 | `longterm_picks.py` | Ratings were only written at the end: 449 finished ratings of the first cohort were lost. | Each rating is saved as made; a cut-off run reuses a saved rating only when its card is unchanged. | 30cefca |
+| 26 | `autorun.py`, `airp-resume.service` | A run killed by a restart left no heartbeat, no log, no push and no digest, and nothing ran until the next slot (`Persistent=true` only covers a slot missed while the PC was off). | A run marks itself in `running.json` and writes its log after every step. At boot `autorun.py resume` (a one-shot service, not a timer) finishes a cut-off event run: within 6 hours, not within 30 minutes of the next slot, never while another run works; otherwise it only alerts. | this commit |
+
 ## Left for the user (also on the app's Home page, `docs/open_decisions.json`)
 
 1. **"On time" is judged by the run's start, not the moment of writing.** A run that starts at 09:10 New York time
