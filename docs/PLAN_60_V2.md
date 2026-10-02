@@ -2083,3 +2083,39 @@ history) is logged as missed instead of being entered the next morning; with the
 between 05:30 and 09:30 (52.7%) is not seen by the morning run at all and is entered a day late as if on time.
 From this change on, `accepted_utc` in the ledger is the true UTC time, as in the history; the seven earlier
 records keep the value they were written with (the chain is not rewritten).
+
+
+### One entry-time rule and the on-time rule (the user's yes, 2026-10-01 ~21:50 PDT; written before any code for them)
+
+Two faults in the live event runner's record, found by the code review of 1 Oct and again by the outside review.
+Both were on the open-decisions list because they change what the frozen runner records. The user said yes to both.
+
+**1. On time means written before the open.** Until now the runner compared the entry open with the moment the
+run *started*; a run that started before the open and finished after it would have recorded a late decision as on
+time. It has not happened (the seven decisions so far were written at least 42 minutes early). From this change:
+- a decision is on time only if the clock, read just before its line is written, is before its entry open;
+  otherwise the release is logged as missed ("decided after the entry open: never backfilled"), as before;
+- each decision stores three times: `as_of` (the run's start, as before), `decided_at` (the clock just before the
+  write) and the ledger's own `written_at`. In a replay with `--as-of`, the clock is that start plus the time the
+  run has taken.
+
+**2. One entry session for orders and for scoring.** Until now two rules were in force. Scoring (every backtest and
+the live outcomes) enters at the open of the day of the acceptance if the SEC accepted the release before 13:00 UTC
+on a trading day, else at the next trading day's open. The deadline for decisions and the AI-picks orders used
+"09:30 New York of the first weekday whose open is after the acceptance", with no holidays. They disagree for a
+release accepted between 13:00 UTC and 09:30 New York (09:00–09:30 in summer, 08:00–09:30 in winter): the order
+could go in a day before the trade that is scored, and in summer such a release was logged as missed although the
+scored trade was still a day away. They also disagree on market holidays.
+- **The rule kept is the scoring rule**, because it is the one every backtest and the registered forward measure
+  use; nothing about how results are scored changes. The **entry session** of a release is the day of its
+  acceptance if that is a trading session and the acceptance is before 13:00 UTC, else the next trading session.
+- Trading sessions come from the New York Stock Exchange's holiday calendar (weekends and its ten holidays with
+  their observance rules), computed in code and checked against the exchange days in the price history.
+- The decision deadline is 09:30 New York on the entry session. Each decision stores `entry_session`; the
+  AI-picks orders (which follow the stored deadline) and the outcome (which enters at that session's open, or the
+  first trading day after it if the exchange was closed unexpectedly) both use it. Records written before this
+  change keep their fields and are scored as before; for all seven the two rules agree.
+- What changes in practice: in winter a release accepted between 08:00 and 09:30 New York is decided for the
+  next session's open (as it is scored) instead of the same morning's; in summer a release accepted between 09:00
+  and 09:30 is no longer logged as missed but decided for the next session; a decision is never due on a holiday.
+- Not changed: the judge, the reader, the threshold, the 5-day horizon, the sector benchmark, the schedule.
