@@ -32,13 +32,14 @@ from decide_events import SECTOR_ETF, event_text, pct
 
 from app.forward.ledger import jsonl_records
 from app.sandbox.events import Prices, entry_index, plausible
+from app.sandbox.reconcile import reconcile
 
 
 def sec_tool(hist: pd.DataFrame, released: str) -> dict[str, Any]:
     """XBRL rows for one company filed strictly before the release date."""
     h = hist[hist["filed"] < released[:10]].sort_values("end")
     if h.empty:
-        return {"history": [], "rev_ref": None, "prior": None}
+        return {"history": [], "rev_ref": None, "prior": None, "last": None}
     last_end = pd.Timestamp(h["end"].iloc[-1])
     target = last_end - pd.Timedelta(days=274)
     cand = h.assign(gap=(pd.to_datetime(h["end"]) - target).abs().dt.days)
@@ -50,7 +51,8 @@ def sec_tool(hist: pd.DataFrame, released: str) -> dict[str, Any]:
     revs = h["rev"].dropna()
     return {"history": rows, "rev_ref": float(revs.iloc[-1]) if len(revs) else None,
             "prior": None if prior is None else {"end": prior["end"], "eps": prior["eps"], "rev": prior["rev"],
-                                                 "filed": prior["filed"]}}
+                                                 "filed": prior["filed"]},
+            "last": {"end": h["end"].iloc[-1], "eps": h["eps"].iloc[-1], "rev": h["rev"].iloc[-1]}}
 
 
 def check_revenue(value: Any, ref: float | None) -> float | None:
@@ -68,6 +70,32 @@ def check_revenue(value: Any, ref: float | None) -> float | None:
 
 def rev_raw(filled: dict[str, Any], k: str) -> str:
     return f"{(filled.get('revenue') or {}).get(k, float('nan')):,.1f}"
+
+
+BASIS = {"revenue": ("USD millions", "revenue as the release states it"),
+         "eps": ("USD per share", "GAAP, diluted"), "adj_eps": ("USD per share", "adjusted (non-GAAP), as the release defines it")}
+
+
+def figures(read: dict[str, Any], shown: dict[str, Any], tool: dict[str, Any], status: dict[str, str],
+            eps_prior_source: str | None) -> dict[str, Any]:
+    """For every figure on a v2 fact sheet: its period, units, accounting basis and where it came from. `read` is
+    the reader's record, `shown` what the fact sheet shows after the SEC checks."""
+    year_ago = (tool["prior"] or {}).get("end")
+    out: dict[str, Any] = {}
+    for key, (units, basis) in BASIS.items():
+        d = shown.get(key) or {}
+        if "q" not in d:
+            continue
+        check = status.get(key, "unchecked")
+        from_sec = check == "previous_quarter" or (key == "eps" and eps_prior_source == "sec") or (
+            key == "revenue" and "prior" in d and "prior" not in (read.get("revenue") or {}))
+        out[key] = {"q": d["q"], "period_end": read.get("period_end"), "units": units, "basis": basis,
+                    "source": "release (its quote was checked by code when it was read)",
+                    "prior": d.get("prior"),
+                    "prior_period_end": year_ago if from_sec else None,
+                    "prior_source": None if "prior" not in d else "SEC filing" if from_sec else "release",
+                    "reconcile": check}
+    return out
 
 
 def history_lines(hist: list[dict[str, Any]]) -> list[str]:
@@ -89,6 +117,8 @@ def main() -> None:
     ap.add_argument("--name", default="sp500_2025")
     ap.add_argument("--live", action="store_true",
                     help="forward test: a release whose entry day is not in the prices yet uses the closes before it")
+    ap.add_argument("--sheet-version", type=int, default=1, choices=(1, 2),
+                    help="2: year-earlier revenue and EPS reconciled with the SEC-filed quarters (PLAN_60_V2)")
     args = ap.parse_args()
     ev = pd.read_csv(BACKEND / args.events)
     ex = {x["accession"]: x for x in jsonl_records(BACKEND / args.extract, must_exist=True)}
@@ -122,6 +152,12 @@ def main() -> None:
                 elif v != rev[k]:
                     rev[k] = v
         filled["revenue"] = rev if "q" in rev else {}
+        recon, status = [], {"eps": "unchecked", "revenue": "unchecked"}
+        if args.sheet_version >= 2:
+            for key in ("revenue", "eps"):
+                filled[key], status[key], line = reconcile(key, filled.get(key) or {}, tool["prior"], tool["last"])
+                if line:
+                    recon.append(line)
         for key, src in (("eps", "eps"), ("revenue", "rev")):
             d = filled.get(key) or {}
             if "q" in d and "prior" not in d and tool["prior"] and pd.notna(tool["prior"][src]):
@@ -135,6 +171,8 @@ def main() -> None:
             extra.append("Year-earlier figures added from SEC filings: " + "; ".join(notes) + ".")
         if dropped:
             extra.append("SEC cross-check: " + "; ".join(dropped) + ".")
+        if recon:
+            extra.append("SEC reconciliation: " + "; ".join(recon) + ".")
         if tool["history"]:
             extra.append("Earlier quarters as filed with the SEC (diluted EPS vs a year earlier):")
             extra += history_lines(tool["history"])
@@ -148,8 +186,14 @@ def main() -> None:
                      "guidance": e.get("guidance"), "tone": e.get("tone"),
                      "sec_quarters": len(tool["history"]),
                      "fact_sheet": sheet + ("\n" + "\n".join(extra) if extra else "")})
+        if args.sheet_version >= 2:  # beside the fact sheet, not shown to the judge: what each figure is
+            rows[-1] |= {"sheet_version": args.sheet_version, "rev_reconcile": status["revenue"],
+                         "eps_reconcile": status["eps"],
+                         "figures": json.dumps(figures(e, filled, tool, status, rows[-1]["eps_prior_source"]))}
     cols = ["accession", "ticker", "cik", "sector", "accepted_utc", "entry", "eps_q", "eps_prior", "eps_prior_source",
             "rev_q", "rev_prior", "guidance", "tone", "sec_quarters", "fact_sheet"]
+    if args.sheet_version >= 2:
+        cols += ["sheet_version", "rev_reconcile", "eps_reconcile", "figures"]
     df = pd.DataFrame(rows, columns=cols)  # the header even when no release could be read (the decider reads it)
     out = BACKEND / "results" / "events" / f"features_{args.name}.csv"
     df.to_csv(out, index=False)
