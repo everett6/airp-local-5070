@@ -1,0 +1,174 @@
+{
+ "protocol": "LRF1",
+ "directory": "/home/everett/airp-local-5070/backend/results/forward/live_research/20261004T020530-854a3686",
+ "watchlist": [
+  "AAPL",
+  "MSFT",
+  "NVDA",
+  "JPM",
+  "XOM"
+ ],
+ "created_at": "2026-10-04T02:09:28.000836+00:00",
+ "models": {
+  "hf.co/janhq/Jan-v1-4B-GGUF:Q4_K_M": "14e719800c3cd9bc8348480948f2afe0be9ffbf6fe4ad38c9fe92d3903e70614",
+  "bonsai-27b:latest": "2dc6f1414f2fb2902a3e2528567b3fc32a6a14356a4eade133f3893dc0b0534d"
+ },
+ "loads": {
+  "jan_server_start_s": 4.259848987000169,
+  "bonsai_server_start_s": 2.6103646540000227
+ },
+ "companies": [
+  {
+   "ticker": "AAPL",
+   "status": "decided",
+   "error": null,
+   "research_s": 50.900730805999956,
+   "judge_s": 28.94871159399986,
+   "queue_wait_s": 4.275204196999994,
+   "total_latency_s": 234.79870318899998,
+   "ratings": {
+    "day": 3,
+    "medium": 3,
+    "long": 3
+   }
+  },
+  {
+   "ticker": "MSFT",
+   "status": "decided",
+   "error": null,
+   "research_s": 43.94950556999993,
+   "judge_s": 2.30962479599998,
+   "queue_wait_s": 55.18663274100004,
+   "total_latency_s": 237.11841180400006,
+   "ratings": {
+    "day": 3,
+    "medium": 3,
+    "long": 3
+   }
+  },
+  {
+   "ticker": "NVDA",
+   "status": "research_failed",
+   "error": "ValueError",
+   "research_s": 32.696655428999975,
+   "judge_s": null,
+   "queue_wait_s": 99.1419094360001,
+   "total_latency_s": 131.83844066999995,
+   "ratings": null
+  },
+  {
+   "ticker": "JPM",
+   "status": "research_failed",
+   "error": "ValueError",
+   "research_s": 34.909786854000004,
+   "judge_s": null,
+   "queue_wait_s": 131.849138091,
+   "total_latency_s": 166.75855821999994,
+   "ratings": null
+  },
+  {
+   "ticker": "XOM",
+   "status": "research_failed",
+   "error": "ValueError",
+   "research_s": 35.96599112700005,
+   "judge_s": null,
+   "queue_wait_s": 166.76846915200008,
+   "total_latency_s": 202.7344317950001,
+   "ratings": null
+  }
+ ],
+ "timing": {
+  "all_attempts": {
+   "queue_wait_s": {
+    "n": 5,
+    "median": 99.1419094360001,
+    "p95": 166.76846915200008,
+    "max": 166.76846915200008
+   },
+   "research_s": {
+    "n": 5,
+    "median": 35.96599112700005,
+    "p95": 50.900730805999956,
+    "max": 50.900730805999956
+   },
+   "judge_s": {
+    "n": 2,
+    "median": 15.62916819499992,
+    "p95": 28.94871159399986,
+    "max": 28.94871159399986
+   },
+   "total_latency_s": {
+    "n": 5,
+    "median": 202.7344317950001,
+    "p95": 237.11841180400006,
+    "max": 237.11841180400006
+   }
+  },
+  "decided": {
+   "queue_wait_s": {
+    "n": 2,
+    "median": 29.730918469000017,
+    "p95": 55.18663274100004,
+    "max": 55.18663274100004
+   },
+   "research_s": {
+    "n": 2,
+    "median": 47.42511818799994,
+    "p95": 50.900730805999956,
+    "max": 50.900730805999956
+   },
+   "judge_s": {
+    "n": 2,
+    "median": 15.62916819499992,
+    "p95": 28.94871159399986,
+    "max": 28.94871159399986
+   },
+   "total_latency_s": {
+    "n": 2,
+    "median": 235.95855749650002,
+    "p95": 237.11841180400006,
+    "max": 237.11841180400006
+   }
+  }
+ },
+ "portfolio": {
+  "mode": "proposal_only",
+  "caps": {
+   "day": 0.1,
+   "medium": 0.3,
+   "long": 0.5
+  },
+  "algorithms": {
+   "day": "event_intraday_proposal",
+   "medium": "earnings_drift_proposal",
+   "long": "quality_trend_proposal"
+  },
+  "weights": {
+   "day": {},
+   "medium": {},
+   "long": {}
+  },
+  "cash": 1,
+  "no_ai_weights": {
+   "AAPL": 0.1,
+   "MSFT": 0.1,
+   "NVDA": 0.1,
+   "JPM": 0.1,
+   "XOM": 0.1
+  },
+  "no_ai_cash": 0.5,
+  "returns": null,
+  "incremental_net_return": null,
+  "uncertainty": null,
+  "cost_bps_per_side": 10,
+  "stress_bps_per_side": 20,
+  "reason_unscored": "No observed post-decision entry/exit fills; targets are not trades"
+ },
+ "suggestions": [
+  "Measure entry/exit fills and net costs before trusting the experimental targets.",
+  "Research is the larger stage: inspect slow tool calls, cap requests, and shorten source cards.",
+  "Batch queue time includes waiting for earlier companies and the Jan-to-Bonsai handoff; reduce cohort size near deadlines."
+ ],
+ "orders_submitted_by_experiment": 0,
+ "implementation_sha256": "8fce24bcb3fc885f8ddd66f74b8856c2119d6562b3599584d2aa8a8b3d280e69"
+}
