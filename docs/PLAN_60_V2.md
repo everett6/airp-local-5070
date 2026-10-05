@@ -2228,3 +2228,47 @@ section fixes the rule-level faults that were still open. Each is a change to a 
    the book is marked wiped, the mirror plans one set of sell orders for that book's assets (SPY, SGOV, BTC, ETH;
    the AI-picks sleeve's pairs are not touched), sends them like any other orders and alerts. Nothing is bought
    back and no other book is mirrored in its place until the user decides. Paper money only.
+
+### Day-trading round 8: D12 AI earnings day trade, D13 live day-call shadow (spec fixed 2026-10-04 ~19:00 PDT, before any D12/D13 code ran)
+
+The user asked again (4 Oct) to try to fix day trading. Ten tradable day-trading rules failed; every one traded a
+**price pattern** (momentum, breakouts, VWAP, boxes, reversals). Never tested: a day trade whose signal is the AI
+**reading the news**. D12 is a new mechanism, not a variant of a failed rule. Its scores already exist: the live
+judge (Bonsai on fact sheet v2) scored all 3,175 sample earnings releases on 1 Oct for the fact-sheet check. Those
+scores were written for a 5-day question; D12 asks whether they also call the release's own entry day.
+
+**D12 (trial `daytrade_ai_earnings`), historical, run once:**
+- **Cause:** markets take hours to digest an earnings release (post-earnings drift starts on day one; Bernard and
+  Thomas 1989; intraday: Patell and Wolfson 1984); a model that reads the release before the open may be on the
+  right side of the first session's move.
+- **Data (all on disk, nothing downloaded):** `data/events/events_sp500_2024.csv` and `_2025.csv` (accession,
+  acceptance time); the judge files `results/events/decide_bonsai-27b_latest_factsheet2024_v2_h5.jsonl` and
+  `..._factsheet_v2_h5.jsonl` (logodds; censored scores dropped); `data/events/ohlcv_2023-01-01_2026-09-25.parquet`
+  (daily Open and Close, the stock and SPY).
+- **Entry day:** `app/forward/schedule.entry_session(accepted_utc)`, the live rule. A release whose entry day lacks
+  the stock's or SPY's Open or Close is dropped and counted.
+- **Side:** long if the release's logodds is above the median logodds of the previous 250 scored releases (by
+  acceptance time, strictly earlier), short otherwise. The first 250 releases are the warm-up and are not traded.
+- **Trade:** buy (or sell short) at the entry day's open, close at its close, hedged with SPY over the same hours:
+  side × [(Close/Open − 1) − (SPY Close/SPY Open − 1)] − cost.
+- **Cost:** 12 bp per trade (10 bp round trip on the stock, 2 bp on the hedge); also reported at 22 bp.
+- **Book:** each day's trades are equal-weighted and use the whole capital; a day without a trade returns 0.
+- **Window:** from the first entry day after the warm-up to 2026-09-24.
+- **Pass:** annualized Sharpe (√252) ≥ 0.5 **and** the 95% block-bootstrap interval (21-day blocks,
+  `daytrade_test.stats`) above 0, at 12 bp. First trial of its family: 95% level.
+- **Reported, not deciding:** 22 bp; long and short sides; each calendar year; unhedged; trades per day; hit rate;
+  releases traded and dropped; correlation of the daily returns with SPY's open-to-close.
+- **Known limits, before the run:** (a) daily bars' Open/Close stand in for the opening and closing auction prices;
+  (b) the judge may remember 2024–25 outcomes (the name-hiding check of 1 Oct found no evidence of memory);
+  (c) the live run must decide before 09:30 New York time, which the entry rule already assumes; (d) a short
+  needs a locate.
+- **If it passes:** nothing moves money; D13 below is the forward check. **If it fails:** an AI day trade on
+  earnings releases is closed; the live day calls stay unproven until D13 says otherwise.
+
+**D13 (trial `daytrade_ai_daycalls_forward`), forward, prospective:** every "day" call of the new deep-research
+pipeline (bull or bear, research decided before the entry day's open) on a stock that passes the day-feasibility
+screen is scored after its entry day: side × [(Close/Open − 1) − (SPY Close/SPY Open − 1)] − 12 bp, from Alpaca's
+free daily bars. Calls on the same stock and day count once (the latest research before the open). Verdict once,
+at 300 scored calls: **pass** if the mean net return per call is above 0 with its 95% bootstrap interval (calls
+resampled by entry day) above 0. Reported: strong versus weak calls, support (event, quoted, none), bull versus bear.
+Until the verdict, day calls trade only in paper and with the smallest size.
