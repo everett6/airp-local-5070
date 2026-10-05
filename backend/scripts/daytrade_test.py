@@ -8,6 +8,7 @@
     python scripts/daytrade_test.py --rules C1   # crypto funding carry; needs scripts/funding_data.py
     python scripts/daytrade_test.py --rules T1   # turn-of-the-month on SPY, daily closes
     python scripts/daytrade_test.py --rules O1   # SPY overnight premium, daily adjusted bars
+    python scripts/daytrade_test.py --rules D12  # AI earnings day trade (the live judge's scores, daily bars)
 Each rule is one registered trial: run a rule once. Results merge into results/daytrade_test.json.
 
 Pass (each rule): on its post-publication window, at 1 bp a side, the annualized Sharpe of the daily P&L (SPY and
@@ -41,6 +42,7 @@ from app.sandbox.intraday import (
     d9_open_reversal,
     d10_premarket_reversal,
     d11_loo_reversal,
+    d12_ai_earnings,
     sharpe,
 )
 
@@ -430,6 +432,50 @@ def check_d9() -> dict:
     return res
 
 
+D12_TRIAL = "daytrade_ai_earnings"
+
+
+def run_d12(core: pd.Series) -> dict:
+    """D12 (PLAN_60_V2 "Day-trading round 8"): the live judge's fact-sheet-v2 scores of the 3,175 sample releases,
+    each release's entry day traded open to close on the score's side, hedged with SPY."""
+    from app.forward.schedule import entry_session
+    ev = BACKEND / "results" / "events"
+    judge = pd.concat([pd.read_json(ev / f, lines=True) for f in ("decide_bonsai-27b_latest_factsheet2024_v2_h5.jsonl",
+                                                                 "decide_bonsai-27b_latest_factsheet_v2_h5.jsonl")])
+    judge = judge[~judge["censored"].astype(bool)].drop_duplicates("accession")
+    events = pd.concat([pd.read_csv(BACKEND / "data" / "events" / f) for f in ("events_sp500_2024.csv", "events_sp500_2025.csv")])
+    rel = judge[["accession", "logodds"]].merge(events[["accession", "ticker", "accepted_utc"]].drop_duplicates("accession"),
+                                                on="accession")
+    rel["accepted_utc"] = pd.to_datetime(rel["accepted_utc"], utc=True)
+    rel["ticker"] = rel["ticker"].str.replace(".", "-", regex=False)  # the price file spells class shares BRK-B
+    px = pd.read_parquet(BACKEND / "data" / "events" / "ohlcv_2023-01-01_2026-09-25.parquet")
+    px["Date"] = pd.to_datetime(px["Date"])
+    opens = px.pivot_table(index="Date", columns="Ticker", values="Open").loc[:"2026-09-24"]
+    closes = px.pivot_table(index="Date", columns="Ticker", values="Close").loc[:"2026-09-24"]
+    res: dict = {"scored_releases": len(judge), "matched_releases": len(rel)}
+    for bp in (12, 22):
+        daily, trades, counts = d12_ai_earnings(rel, opens, closes, entry_session, bp / 1e4)
+        part = {"book": stats(daily), "trades": len(trades), "counts": counts,
+                "trades_per_trading_day": round(float(trades.groupby("day").size().mean()), 2),
+                "trade_hit_rate": round(float((trades["ret"] > 0).mean()), 3),
+                "mean_trade_bp": round(float(trades["ret"].mean() * 1e4), 2)}
+        for name, side in (("long", 1), ("short", -1)):
+            t = trades[trades["side"] == side]
+            part[name] = {"trades": len(t), "mean_trade_bp": round(float(t["ret"].mean() * 1e4), 2),
+                          "book": stats(t.groupby("day")["ret"].mean().reindex(daily.index, fill_value=0.0))}
+        part["by_year"] = {str(y): stats(g) for y, g in daily.groupby(daily.index.year) if len(g) > 40}
+        spy_oc = closes["SPY"] / opens["SPY"] - 1
+        part["corr_spy_open_close"] = round(float(daily.corr(spy_oc.reindex(daily.index))), 3)
+        part["corr_core"] = round(float(daily.corr(core.reindex(daily.index))), 3)
+        res[f"{bp}bp"] = part
+    udaily, _, _ = d12_ai_earnings(rel, opens, closes, entry_session, 10 / 1e4, hedge=False)
+    res["unhedged_10bp"] = stats(udaily)
+    t = res["12bp"]["book"]
+    res["window"] = [str(udaily.index.min().date()), "2026-09-24"]
+    return finish("D12", D12_TRIAL, res["window"][0], res["window"][1], res, t,
+                  f"{res['12bp']['trades']} trades, {res['12bp']['mean_trade_bp']} bp a trade net")
+
+
 def finish(name: str, trial: str, start: str, end: str, res: dict, t: dict, note: str) -> dict:
     res["pass"] = bool(t["sharpe"] >= 0.5 and t["ci"][0] > 0)
     register({"trial": trial, "date": time.strftime("%Y-%m-%d"), "kind": "daytrade", "sharpe_ann": t["sharpe"],
@@ -454,7 +500,7 @@ def main() -> None:
         return
     rules = a.rules.split(",")
     bars = ({s: pd.read_parquet(DATA / f"{s}_1min.parquet") for s in ("SPY", "QQQ")}
-            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "D11", "P1", "C1", "T1", "O1", "E1"} else {})
+            if set(rules) - {"D5", "D7", "D8", "D9", "D10", "D11", "D12", "P1", "C1", "T1", "O1", "E1"} else {})
     core = pd.read_parquet(BACKEND / "results" / "planner" / "track_returns.parquet")["core"]
     f = BACKEND / "results" / "daytrade_test.json"
     out: dict = json.loads(f.read_text()) if f.exists() else {}
@@ -465,8 +511,8 @@ def main() -> None:
             out[name] = run_d5(core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue
-        if name in ("D7", "D8", "D9", "D10", "D11", "P1", "C1", "T1", "O1", "E1"):
-            out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10, "D11": run_d11, "P1": run_p1,
+        if name in ("D7", "D8", "D9", "D10", "D11", "D12", "P1", "C1", "T1", "O1", "E1"):
+            out[name] = {"D7": run_d7, "D8": run_d8, "D9": run_d9, "D10": run_d10, "D11": run_d11, "D12": run_d12, "P1": run_p1,
                          "C1": run_c1, "T1": run_t1, "O1": run_o1, "E1": run_e1}[name](core)
             f.write_text(json.dumps(out, indent=1) + "\n")
             continue

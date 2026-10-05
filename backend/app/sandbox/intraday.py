@@ -433,3 +433,42 @@ def block_ci(r: pd.Series, block: int = 21, n: int = 5000, seed: int = 0, level:
     sh = s.mean(1) / s.std(1) * np.sqrt(252)
     tail = (1 - level) / 2 * 100
     return float(np.percentile(sh, tail)), float(np.percentile(sh, 100 - tail))
+
+
+def d12_ai_earnings(rel: pd.DataFrame, opens: pd.DataFrame, closes: pd.DataFrame, entry: object, cost: float,
+                    warmup: int = 250, hedge: bool = True) -> tuple[pd.Series, pd.DataFrame, dict[str, int]]:
+    """D12 (docs/PLAN_60_V2.md "Day-trading round 8"): trade each earnings release's entry day, open to close, on
+    the side of the live judge's score. rel: ticker, accepted_utc (tz-aware), logodds. opens/closes: wide daily
+    frames (index dates, columns tickers incl. SPY). entry: accepted_utc -> entry date (schedule.entry_session).
+    Side: long when logodds is above the median of the previous `warmup` releases accepted strictly earlier.
+    Returns the daily book (equal weight across the day's trades, 0 on days without one, from the first traded day
+    to the last price date), the trades, and counts."""
+    rel = rel.sort_values("accepted_utc").reset_index(drop=True)
+    times = rel["accepted_utc"].to_numpy()
+    lo = rel["logodds"].to_numpy(dtype=float)
+    rows, counts = [], {"releases": len(rel), "warmup": 0, "no_prices": 0}
+    for i, r in rel.iterrows():
+        k = int(np.searchsorted(times, times[i], side="left"))  # releases accepted strictly earlier
+        if k < warmup:
+            counts["warmup"] += 1
+            continue
+        side = 1 if lo[i] > float(np.median(lo[k - warmup:k])) else -1
+        day = pd.Timestamp(entry(r["accepted_utc"].to_pydatetime()))  # type: ignore[operator]
+        try:
+            o, c = float(opens.at[day, r["ticker"]]), float(closes.at[day, r["ticker"]])
+            so, sc = float(opens.at[day, "SPY"]), float(closes.at[day, "SPY"])
+        except KeyError:
+            counts["no_prices"] += 1
+            continue
+        if not all(np.isfinite([o, c, so, sc])) or min(o, so) <= 0:
+            counts["no_prices"] += 1
+            continue
+        stock, spy = c / o - 1, sc / so - 1
+        rows.append({"day": day, "ticker": r["ticker"], "side": side, "stock": stock, "spy": spy,
+                     "ret": side * (stock - spy if hedge else stock) - cost})
+    trades = pd.DataFrame(rows)
+    if trades.empty:
+        return pd.Series(dtype=float), trades, counts
+    days = opens.index[(opens.index >= trades["day"].min())]
+    daily = trades.groupby("day")["ret"].mean().reindex(days, fill_value=0.0)
+    return daily, trades, counts

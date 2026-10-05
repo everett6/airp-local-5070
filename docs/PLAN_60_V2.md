@@ -2272,3 +2272,15 @@ free daily bars. Calls on the same stock and day count once (the latest research
 at 300 scored calls: **pass** if the mean net return per call is above 0 with its 95% bootstrap interval (calls
 resampled by entry day) above 0. Reported: strong versus weak calls, support (event, quoted, none), bull versus bear.
 Until the verdict, day calls trade only in paper and with the smallest size.
+
+**D12 result (run once, 4 Oct 2026, after the spec was pushed in `9e6ee6d`): FAIL.** Sharpe **+0.13**, 95% interval
+[−1.08, +1.55], −0.6% a year at 12 bp; at 22 bp −0.42. 2,914 trades on 2,925 releases after the warm-up (11 without
+prices), 6.8 a trading day, from 2024-02-06. Per trade: −3.7 bp net, so about +8 bp before costs: the judge's side is
+right slightly more often than not, but the edge is smaller than the cost of trading it. Long side +10.8 bp a trade
+net (Sharpe +0.62), short side −18.9 bp (−0.66); by year −1.19 (2024), +0.52 (2025), +1.09 (2026 to Sep). Unhedged at
+10 bp: +0.13. Correlation with SPY's open-to-close +0.04, with the core +0.08.
+
+What it means: an AI day trade on earnings releases does not pay after costs on this sample. The long side and the
+recent years look better, but those are read off this result: trading only longs, or only 2025–26, would be a new
+version chosen after seeing the data, and is not run. The day calls of the new pipeline stay unproven; D13 (above),
+recorded forward from now, is the one remaining check.
