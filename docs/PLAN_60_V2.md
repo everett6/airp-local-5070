@@ -2323,3 +2323,24 @@ rule? The autopilot is about 2x gross and nearly all long technology, so the boo
   state on 31% of days, 154 switches. Per the spec the autopilot keeps its current rules and no variant is run.
   Also read off this result (not a test): on this proxy the current rule's drawdown (-45.7%) is deeper than the
   autopilot's 35% stop, which it would have hit in 2022 and about reached in 2020.
+
+## Autopilot stability changes K1, N1, C1 (user request 2026-10-05 ~19:45 PDT; rules fixed before any code)
+
+The user asked for a steadier, Renaissance-like fund: Kelly sizing (K1), a market-neutral book (N1) and the core trend
+book shown together with the autopilot (C1). These are rules of the user's paper experiment (scripts/full_auto.py),
+not registered trials: nothing is backtested and nothing calls register(). Gross stays 2.0 (the user, 5 Oct: keep it).
+
+- **N1 market-neutral.** Each day the autopilot estimates every held or planned stock's beta to QQQ (OLS on the last
+  120 daily returns, Alpaca IEX bars; no estimate: beta 1). Hedge = minus the book's beta-weighted net weight, split
+  equally over QQQ, QQQM, XLK and VGT (the account risk check caps one asset at 25% of equity; QQQ and QQQM track the
+  same index). If stocks plus hedge exceed gross 2.0, both are scaled down together. The stock sizing rules are
+  unchanged. Expected: the book's daily moves follow the market far less; it earns only what the AI's calls earn
+  over QQQ, which no test has shown to be positive yet.
+- **K1 fractional Kelly (Berlekamp).** Every closed autopilot lot is priced at the next trading pass: its return over
+  its holding period minus beta x QQQ's return over the same dates. Per horizon, once at least 100 lots are closed and
+  priced: multiplier = clip(0.5 x mean / variance of those returns / the horizon's base weight, 0, 2); a horizon whose
+  mean is 0 or below is switched off (no edge, no bet) until its record turns positive. Fewer than 100: multiplier 1.
+  Applied to all open lots of the horizon at every pass; the per-name and gross limits still apply.
+- **C1 combined fund view.** The Autopilot page adds the main paper account (the core trend book plus the AI-picks
+  sleeve) beside the autopilot account: both equity curves, their sum as one fund, the daily-change correlation and
+  the combined drawdown. The two accounts stay separate; nothing is traded across them.
