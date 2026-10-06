@@ -2344,3 +2344,32 @@ not registered trials: nothing is backtested and nothing calls register(). Gross
 - **C1 combined fund view.** The Autopilot page adds the main paper account (the core trend book plus the AI-picks
   sleeve) beside the autopilot account: both equity curves, their sum as one fund, the daily-change correlation and
   the combined drawdown. The two accounts stay separate; nothing is traded across them.
+
+## E1: minute-bar signal ensemble, no AI (user request 2026-10-06 ~02:00 ET; spec fixed before any code or data view)
+
+**Why.** The user asked for a Renaissance-style day-trading book: price data only, no language models, fast,
+high leverage. What is publicly known of Medallion is many weak short-horizon price signals combined by
+regression and traded at scale; the closest honest version here is one pooled model over many weak signals,
+tested once. It is a new test of a combination. Single signals of the same family already failed on their own
+(intraday momentum, ORB, VWAP noise, EOD/open reversal, pairs); E1 does not re-run any of them with new settings.
+
+**Universe (14 ETFs, none in the N1 hedge basket):** SPY IWM DIA XLF XLE XLV XLI XLY XLP XLU XLB XLC XLRE SMH.
+Leader series: SPY (for SPY itself: QQQ). Alpaca free historical SIP 1-minute bars, regular hours, split-adjusted.
+
+**Features** at each bar close t, per symbol (returns divided by the symbol's 1-minute return std over the prior
+5 sessions): own return over 1, 5, 30 minutes; leader return over 1 and 5 minutes; 5-minute residual (own minus
+prior-20-session beta x leader); 5-bar close location in the high-low range minus 0.5; log 5-minute volume over its
+prior-390-bar mean, times the sign of the 5-minute return; distance from session VWAP.
+**Target:** return from the open of bar t+1 to the open of bar t+6 (executable after the signal), vol-scaled.
+**Model:** one pooled ridge regression (alpha 10, standardized features), refit at each month start on all data
+before it (expanding, training from 2021-01-04). Out-of-sample: 2023-01-03 .. 2026-09-25.
+**Trading:** decisions at 09:35, 09:40, .. 15:50 ET; hold 5 minutes; flat by 15:55. A symbol is held (side = sign
+of prediction) only if |predicted return| > its round-trip cost. Each held symbol gets gross/14 of equity.
+**Costs:** per side 0.5 bp SPY, 1.5 bp every other ETF, charged on every change of position.
+**Pass (all three):** OOS annualized Sharpe of daily net returns >= 1.0; day-block bootstrap (2,000 draws, seed 7)
+95% CI of the Sharpe above 0; net return > 0 in each OOS calendar year (2023, 2024, 2025, 2026 to date).
+Leverage does not change Sharpe; the gross used for the reported return is 3.0.
+**If it passes:** the autopilot account's algo engine trades it live intraday at gross up to 3.0 (account total
+under Alpaca's 4x day-trading power), flat by 15:55, own daily loss stop 5% of equity. **If it fails:** the engine
+runs in shadow (signals and simulated fills logged, no orders) as a forward record; going live then is the user's
+call. Run once; no variants.
