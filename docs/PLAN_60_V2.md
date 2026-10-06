@@ -2284,3 +2284,34 @@ What it means: an AI day trade on earnings releases does not pay after costs on 
 recent years look better, but those are read off this result: trading only longs, or only 2025–26, would be a new
 version chosen after seeing the data, and is not run. The day calls of the new pipeline stay unproven; D13 (above),
 recorded forward from now, is the one remaining check.
+
+## Regime guardrail H1: HMM leverage switch (spec fixed 2026-10-05 ~19:30 PDT, before any HMM code or data view)
+
+The user asked for Markov-switching "panic regime" guardrails (Medallion-style descriptions are claims, not evidence).
+Pairs and stat-arb already failed (`pairs_ggr`, `statarb_arm_a`, `statarb_arm_b_stage1_8k_filter`) and are not
+rerun. This tests one thing: does a two-state hidden Markov model cut the autopilot's drawdown better than its current
+rule? The autopilot is about 2x gross and nearly all long technology, so the book is proxied by leveraged QQQ.
+
+- **Data:** QQQ adjusted daily closes, `data/trend/etf_closes.parquet` (2006-01-03 to 2026-09-25); the 3-month
+  T-bill rate, `data/fred_dtb3.csv` (forward-filled). Returns q_t = close-to-close simple returns.
+- **Book:** leverage L set at close t applies to day t+1. Daily return = L*q - max(L-1,0)*(bill+0.5%)/252 +
+  max(1-L,0)*bill/252 - 2 bp*|L_new - L_old| (cash earns the bill; borrowing costs the bill + 0.5%; 2 bp per unit
+  of leverage traded).
+- **Arm A (the autopilot's rule today):** L = 2.0 when QQQ's close is above its 50-day average, else 1.0.
+- **Arm B (HMM):** a two-state Gaussian HMM on daily log returns, fitted by Baum-Welch (at most 200 iterations,
+  tolerance 1e-6 on the log-likelihood) on the first trading day of each month, on all returns from 2006-01-04 to the
+  previous close (expanding window). Fixed start: means 0, variances 0.5x and 2x the sample variance, transition
+  diagonal 0.98, start probabilities 0.5. The panic state is the state with the larger variance. At each close the
+  forward-filtered probability of the panic state (that month's parameters, the filter run over all returns so far)
+  sets L = 0.5 if above 0.5, else 2.0.
+- **Also reported:** static 2.0x; CAGR, annualized Sharpe and max drawdown of each; the 21-day block-bootstrap 95% CI
+  (2,000 resamples, seed 0) of the Sharpe difference B - A; share of days in panic; number of switches; the
+  drawdowns of 2020 and 2022.
+- **Window:** 2016-01-04 to 2026-09-25 (ten years of fitting history before it).
+- **Pass (trial `hmm_leverage_guardrail`):** B's max drawdown at least 5 percentage points smaller than A's AND B's
+  annualized Sharpe at least A's.
+- **If it passes:** the autopilot's gross limit follows the HMM (2.0 calm, 0.5 panic, refitted monthly on QQQ);
+  the 50-day rule keeps only its sizing role (halving calls against the trend). **If it fails:** no variant (other
+  state counts, thresholds, leverage levels or inputs such as VIX would each be a new, separately justified trial);
+  the autopilot keeps its current rules.
+- Scope: leverage only. Wider stops and other "safety margins" are not tested here.
