@@ -148,7 +148,9 @@ async def _news_search(gw: ToolGateway, a: dict[str, Any]) -> Any:
             key = re.sub(r"\W+", " ", it["title"].lower()).strip()[:80]
             if key and (key not in items or (it["fetchable"] and not items[key]["fetchable"])):
                 items[key] = it
-    ranked = sorted(items.values(), key=lambda x: x["published"] or "", reverse=True)[: a["limit"]]
+    # Prefer original URLs: Google redirect tokens otherwise crowd out readable Bing results.
+    ranked = sorted(items.values(), key=lambda x: (bool(x["fetchable"]), x["published"] or ""),
+                    reverse=True)[: a["limit"]]
     if not ranked and errors:
         raise FetchError("; ".join(errors))
     return {"query": q, "items": ranked}
@@ -265,7 +267,7 @@ TOOLS: dict[str, ToolSpec] = {s.name: s for s in [
               "limit": Param("int", "max items", default=10, min=1, max=25)}, _news_search, timeout_s=8),
     ToolSpec("fetch_page", "Read the main text of a web page (e.g. a news article URL from a search result).",
              {"url": Param("str", "http(s) URL", required=True, max_len=2000),
-              "max_chars": Param("int", "max characters of text", default=3000, min=500, max=8000)},
+              "max_chars": Param("int", "max characters of text", default=3000, min=500, max=16000)},
              _fetch_page, timeout_s=10),
     ToolSpec("price_history", "Recent daily closes and simple return/volatility stats for a ticker.",
              {"ticker": Param("str", "e.g. NVDA", required=True, max_len=10),
@@ -297,7 +299,7 @@ TOOLS: dict[str, ToolSpec] = {s.name: s for s in [
              asof.filing_documents, modes=("as_of",), timeout_s=30),
     ToolSpec("read_filing", "Read the text of an SEC filing document accepted before the decision time.",
              {"url": Param("str", "https://www.sec.gov/Archives/edgar/data/... URL", required=True, max_len=500),
-              "max_chars": Param("int", "max characters of text", default=4000, min=500, max=8000)},
+              "max_chars": Param("int", "max characters of text", default=4000, min=500, max=16000)},
              asof.read_filing, modes=("as_of",), timeout_s=40),
     ToolSpec("news_as_of", "The company's news page (Yahoo, MarketWatch, Reuters, CNBC) as archived in the "
              "weeks before the decision time: recent headlines.",

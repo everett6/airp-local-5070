@@ -95,7 +95,8 @@ def build(dec: dict[str, Any], ev: dict[str, Any], extract: dict[str, Any] | Non
                            if dec.get("entry_session") else
                            "the open of the first weekday after the SEC acceptance; exit 5 trading days later")},
         "ledger": {k: dec.get(k) for k in ("seq", "hash", "prev", "written_at", "as_of", "decided_at", "source",
-                                           "logodds", "on_time", "guidance", "entry_session", "sheet_version")},
+                                           "logodds", "on_time", "guidance", "entry_session", "sheet_version",
+                                           "pipeline", "judge_tag", "research_sha256")},
         "source": {"ex99_url": ev.get("ex99_url"), "items": ev.get("items"), "filed": ev.get("filed")},
         "code": versions["code"],
         "strategy": {"score": sleeve.SCORE_NAME, "threshold": sleeve.THRESHOLD, "hold_days": sleeve.HOLD,
@@ -116,7 +117,7 @@ def build(dec: dict[str, Any], ev: dict[str, Any], extract: dict[str, Any] | Non
     else:
         b["source"]["file"] = None
     if extract is not None:
-        b["reader"] = {**{k: v for k, v in READER.items() if k != "models_dir"},
+        b["reader"] = {**{k: v for k, v in versions.get("reader_settings", READER).items() if k != "models_dir"},
                        "model_recorded": extract.get("model"), "digest": versions["reader_digest"],
                        "prompt_sha256": sha(pr["reader"]), "record": extract,
                        "record_sha256": sha(json.dumps(extract, sort_keys=True))}
@@ -166,8 +167,44 @@ def write_new(events_dir: Path, tag: str = "forward", now: datetime | None = Non
         # a decision bundled in the run that made it: within two hours of its ledger line. Older: backfilled, and
         # the code version and model digests are today's, not necessarily that day's
         age = (now - datetime.fromisoformat(r["written_at"])).total_seconds() if r.get("written_at") else 1e9
-        b = build(r, {str(k): (None if pd.isna(v) else v) for k, v in ev.get(acc, {}).items()}, ex.get(acc),
-                  judged.get(acc), text_path(acc), versions, backfilled=age > 7200, figures=figs.get(acc))
+        reader_record, judge_record, current_versions = ex.get(acc), judged.get(acc), versions
+        research_record = None
+        figures = figs.get(acc)
+        if r.get("pipeline") == "jan_bonsai_v1":
+            from jan_forward import JAN, MODELS
+            reader_path = (events_dir / str(r.get("reader_record_path", "jan/extract.jsonl"))).resolve()
+            research_path = (events_dir / str(r.get("research_path", ""))).resolve()
+            if not reader_path.is_relative_to(events_dir.resolve()) or not research_path.is_relative_to(events_dir.resolve()):
+                raise ValueError("Jan evidence path escapes the events directory")
+            research_body = research_path.read_text()
+            if sha(research_body) != r.get("research_sha256"):
+                raise ValueError("Jan research changed since the decision")
+            research_record = json.loads(research_body)
+            source_hash = research_record.get("source_sha256")
+            if source_hash and (not text_path(acc).exists() or sha(text_path(acc).read_bytes()) != source_hash):
+                raise ValueError("Jan source changed since the research")
+            reader_record = next((x for x in jsonl_records(reader_path) if x["accession"] == acc), None)
+            judge_tag = str(r.get("judge_tag", ""))
+            if not all(c.isalnum() or c in "_-" for c in judge_tag) or not judge_tag:
+                raise ValueError("invalid Jan judge tag")
+            jp = BACKEND / "results" / "events" / f"decide_bonsai-27b_latest_{judge_tag}_h{H}.jsonl"
+            judge_record = next((x for x in jsonl_records(jp) if x["accession"] == acc), None)
+            jan_features = BACKEND / "results" / "events" / f"features_{judge_tag}.csv"
+            if jan_features.exists():
+                jan_ft = pd.read_csv(jan_features)
+                matching = jan_ft[jan_ft["accession"].astype(str) == str(acc)]
+                if not matching.empty and "figures" in matching and isinstance(matching.iloc[0]["figures"], str):
+                    figures = json.loads(matching.iloc[0]["figures"])
+            current_versions = {**versions, "reader_digest": manifest_digest(JAN, MODELS),
+                                "reader_settings": {**READER, "model": JAN, "parallel": 1, "models_dir": MODELS}}
+            if reader_record is None or judge_record is None:
+                raise ValueError("Jan decision is missing its reader or judge evidence")
+        b = build(r, {str(k): (None if pd.isna(v) else v) for k, v in ev.get(acc, {}).items()}, reader_record,
+                  judge_record, text_path(acc), current_versions, backfilled=age > 7200, figures=figures)
+        if research_record is not None:
+            b["research"] = {"record": research_record, "sha256": r["research_sha256"],
+                             "path": r["research_path"], "model": research_record["model"],
+                             "digest": research_record["digest"]}
         b["bundle_written_at"] = now.isoformat(timespec="seconds")
         body = json.dumps(b, indent=1, sort_keys=True) + "\n"
         tmp = out / f"{acc}.json.tmp"
@@ -201,6 +238,12 @@ def check(events_dir: Path) -> list[str]:
         want = b["source"].get("file_sha256")
         if want and (not text_path(acc).exists() or sha(text_path(acc).read_bytes()) != want):
             problems.append(f"{acc}: the press release on disk is not the one the decision read")
+        research = b.get("research")
+        if research:
+            research_path = (events_dir / research["path"]).resolve()
+            if (not research_path.is_relative_to(events_dir.resolve()) or not research_path.is_file()
+                    or sha(research_path.read_bytes()) != research["sha256"]):
+                problems.append(f"{acc}: Jan research differs from the decision evidence")
         fs = b.get("fact_sheet")
         if fs and sha(fs["text"]) != fs["sha256"]:
             problems.append(f"{acc}: the fact sheet does not match its hash")

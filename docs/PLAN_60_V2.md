@@ -2373,3 +2373,9 @@ Leverage does not change Sharpe; the gross used for the reported return is 3.0.
 under Alpaca's 4x day-trading power), flat by 15:55, own daily loss stop 5% of equity. **If it fails:** the engine
 runs in shadow (signals and simulated fills logged, no orders) as a forward record; going live then is the user's
 call. Run once; no variants.
+
+**E1 result (run once 2026-10-06 06:05 UTC): FAIL.** OOS 936 days: net Sharpe 0.381 (bootstrap 95% CI
+[-0.98, +0.90]); before costs 0.420; years 2023 -0.07%, 2024 0.00%, 2025 +3.83%, 2026 +0.04%. Predicted 5-minute
+moves (~0.1-0.2 bp) almost never beat the round trip: a position in 0.008% of decisions. Per the rule: the engine
+(scripts/algo_engine.py) runs in shadow from the autopilot; live only if the user creates results/forward/algo/LIVE.
+No variant. Summary: docs/ALGO_DAYTRADING.md.

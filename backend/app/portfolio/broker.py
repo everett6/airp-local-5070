@@ -22,16 +22,23 @@ The planning and reconciling functions take plain data, so they are tested witho
 """
 from __future__ import annotations
 
+import fcntl
+import json
 import math
 import re
+import time as clock_time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
-from datetime import datetime, time
+from datetime import UTC, datetime, time, timedelta
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import httpx
 
 from app.data_ingestion.bars import key
+from app.forward.ledger import Ledger
+from app.portfolio.account_risk import RiskPolicy, evaluate
 
 PAPER = "https://paper-api.alpaca.markets/v2"
 DATA = "https://data.alpaca.markets"
@@ -40,6 +47,9 @@ CRYPTO = {"BTC-USD": "BTC/USD", "ETH-USD": "ETH/USD"}
 STOCKS = ("SPY", "SGOV", "QQQ", "TLT")  # the book's stock assets: sold when a decision drops them
 GAP_ALERT = 0.005
 MIN_NOTIONAL = 10.0  # smaller legs are skipped (Alpaca's crypto minimum is about $1; a $10 floor avoids dust)
+BACKEND = Path(__file__).resolve().parents[2]
+EXECUTION = BACKEND / "results" / "forward" / "execution"
+DEFAULT_RISK = RiskPolicy()
 OPG_CLOSED = (time(9, 28), time(19, 0))  # stock legs are sent only outside [09:28, 19:00) ET, i.e. before the open
 STOCK_TIF = "day"  # queued market order that fills at the open; paper "opg" orders expire (see above)
 
@@ -155,17 +165,32 @@ def leg_dict(leg: Leg) -> dict[str, Any]:
 class Alpaca:
     """The few paper-trading calls the mirror needs. Never logs or returns the keys."""
 
-    def __init__(self, key_id: str, secret: str, base: str = PAPER, transport: httpx.BaseTransport | None = None):
+    def __init__(self, key_id: str, secret: str, base: str = PAPER, transport: httpx.BaseTransport | None = None,
+                 risk_policy: RiskPolicy | None = DEFAULT_RISK, audit_path: Path = EXECUTION):
         if base.rstrip("/") != PAPER:
             raise BrokerError("only the Alpaca PAPER endpoint is allowed")
         h = {"APCA-API-KEY-ID": key_id, "APCA-API-SECRET-KEY": secret}
         self.c = httpx.Client(headers=h, timeout=20.0, transport=transport)
+        self.risk_policy, self.audit_path = risk_policy, audit_path
+
+    def _audit(self, kind: str, **fields: Any) -> None:
+        self.audit_path.mkdir(parents=True, exist_ok=True)
+        with (self.audit_path / "audit.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            Ledger(self.audit_path / "ledger.jsonl").verify()
+            Ledger(self.audit_path / "ledger.jsonl").append(kind, **fields)
 
     @classmethod
     def from_env(cls) -> Alpaca | None:
         k, s = key("ALPACA_API_KEY_ID", "APCA_API_KEY_ID"), key("ALPACA_API_SECRET_KEY", "APCA_API_SECRET_KEY")
         base = key("ALPACA_BASE_URL") or PAPER
-        return cls(k, s, base) if k and s else None
+        if not (k and s):
+            return None
+        try:
+            policy = RiskPolicy(**json.loads((BACKEND / "config" / "account_risk.json").read_text()))
+        except (OSError, ValueError, TypeError) as exc:
+            raise BrokerError("account risk policy is missing or invalid") from exc
+        return cls(k, s, base, risk_policy=policy)
 
     def _get(self, url: str, **params: Any) -> Any:
         r = self.c.get(url, params=params or None)
@@ -196,8 +221,77 @@ class Alpaca:
         return out
 
     def submit(self, leg: Leg) -> None:
+        if self.risk_policy is not None:
+            self.audit_path.mkdir(parents=True, exist_ok=True)
+            with (self.audit_path / "submit.lock").open("a") as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                # Recover a lost acknowledgement before considering a new order or new limits.
+                existing = self.c.get(f"{PAPER}/orders:by_client_order_id", params={"client_order_id": leg.client_order_id})
+                if existing.status_code == 200:
+                    self.refresh(leg)
+                    return
+                if existing.status_code != 404:
+                    raise BrokerError(f"order lookup: HTTP {existing.status_code}; no order sent")
+                try:
+                    verdict = self.pretrade(leg)
+                except (BrokerError, httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+                    # Local validation text is safe and actionable; broker HTTP bodies
+                    # remain excluded from diagnostics.
+                    detail = str(exc)[:120] if isinstance(exc, ValueError) else type(exc).__name__
+                    verdict = {"allowed": False, "reasons": [f"risk snapshot unavailable: {detail}"]}
+                self._audit("risk", client_order_id=leg.client_order_id,
+                    symbol=leg.symbol, side=leg.side, qty=leg.qty, ref_price=leg.ref_price,
+                    at=datetime.now(UTC).isoformat(), **verdict)
+                if not verdict["allowed"]:
+                    leg.status, leg.note = "rejected", "ACCOUNT RISK: " + "; ".join(verdict["reasons"])
+                    return
+                self._submit(leg)
+            return
+        self._submit(leg)  # explicit disabled policy is reserved for isolated simulation fixtures
+
+    def pretrade(self, leg: Leg) -> dict[str, Any]:
+        if self.risk_policy is None:
+            raise BrokerError("risk policy disabled")
+        now = datetime.now(UTC)
+        # Independent reads overlap; submission still waits for every risk input.
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            account_job = pool.submit(self.account)
+            positions_job = pool.submit(self._get, f"{PAPER}/positions")
+            orders_job = pool.submit(self._get, f"{PAPER}/orders", status="open", limit=500)
+            account, positions, orders = account_job.result(), positions_job.result(), orders_job.result()
+        if len(orders) >= 500:
+            raise BrokerError("open order snapshot may be truncated")
+        names = {leg.symbol} | {p["symbol"] for p in positions} | {o["symbol"] for o in orders}
+        coins = {n: next((s for s in CRYPTO.values() if n.replace("/", "") == s.replace("/", "")), "") for n in names}
+        stocks = [n for n in names if not coins[n]]
+        quotes: dict[str, dict[str, Any]] = {}
+        if stocks:
+            quotes.update(self._get(f"{DATA}/v2/stocks/quotes/latest", symbols=",".join(sorted(stocks)), feed="iex")["quotes"])
+        if any(coins.values()):
+            got = self._get(f"{DATA}/v1beta3/crypto/us/latest/quotes", symbols=",".join(sorted({s for s in coins.values() if s})))["quotes"]
+            quotes.update({n: got[s] for n, s in coins.items() if s})
+        floor = now - timedelta(seconds=self.risk_policy.max_quote_age_s)
+        if not coins[leg.symbol]:
+            market = self._get(f"{PAPER}/clock")
+            if not market["is_open"]:
+                calendar = self._get(f"{PAPER}/calendar", start=(now.astimezone(NY).date() - timedelta(days=10)).isoformat(),
+                                     end=now.astimezone(NY).date().isoformat())
+                closes = [datetime.fromisoformat(f"{d['date']}T{d['close']}").replace(tzinfo=NY) for d in calendar]
+                floor = max(t for t in closes if t <= now) - timedelta(minutes=15)
+        verdict = evaluate(self.risk_policy, account, positions, orders, quotes, leg.symbol, leg.side, leg.qty,
+                           leg.ref_price, now, bool(coins[leg.symbol]), floor)
+        if leg.side == "sell" and not coins[leg.symbol] and not verdict["reducing"]:
+            asset = self._get(f"{PAPER}/assets/{leg.symbol}")
+            if not asset.get("tradable") or not asset.get("shortable"):
+                verdict["allowed"] = False
+                verdict["reasons"].append("asset is not tradable and shortable")
+        verdict["feed"] = "alpaca_crypto" if coins[leg.symbol] else "iex"
+        return verdict
+
+    def _submit(self, leg: Leg) -> None:
         body = {"symbol": leg.symbol, "qty": str(leg.qty), "side": leg.side, "type": "market",
                 "time_in_force": leg.tif, "client_order_id": leg.client_order_id}
+        start = clock_time.monotonic()
         r = self.c.post(f"{PAPER}/orders", json=body)
         if r.status_code in (200, 201):
             leg.status, leg.order_id = "submitted", r.json().get("id")
@@ -205,6 +299,17 @@ class Alpaca:
             self.refresh(leg)
         else:
             leg.status, leg.note = "rejected", f"HTTP {r.status_code} {r.text[:160]}"
+        if self.risk_policy is not None:
+            self._audit("submission", client_order_id=leg.client_order_id,
+                at=datetime.now(UTC).isoformat(), latency_ms=1000 * (clock_time.monotonic() - start),
+                status=leg.status, symbol=leg.symbol, side=leg.side, qty=leg.qty, ref_price=leg.ref_price)
+
+    def cancel_leg(self, leg: Leg) -> None:
+        """Cancel only this owned entry order; a racing fill is read by refresh next."""
+        order = self._get(f"{PAPER}/orders:by_client_order_id", client_order_id=leg.client_order_id)
+        response = self.c.delete(f"{PAPER}/orders/{order['id']}")
+        if response.status_code not in (204, 404, 422):
+            raise BrokerError("Could not cancel restricted entry")
 
     def refresh(self, leg: Leg) -> None:
         o = self._get(f"{PAPER}/orders:by_client_order_id", client_order_id=leg.client_order_id)
@@ -219,6 +324,10 @@ class Alpaca:
             leg.status, leg.filled_qty = ("expired" if st == "done_for_day" else st), got
         else:  # still working (new, accepted, partially_filled, ...)
             leg.status, leg.filled_qty = "submitted", got
+        if self.risk_policy is not None:
+            self._audit("fill_snapshot", client_order_id=leg.client_order_id,
+                at=datetime.now(UTC).isoformat(), status=leg.status, filled_qty=leg.filled_qty,
+                filled_price=leg.filled_price, filled_at=leg.filled_at)
 
     def cancel_all(self) -> None:
         r = self.c.delete(f"{PAPER}/orders")

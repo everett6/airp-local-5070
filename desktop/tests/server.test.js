@@ -218,3 +218,25 @@ test('records: every record is null or empty until its script has written it, th
   assert.equal(r.evidence[0].ticker, null);  // an index line that names a path outside the folder is not opened
   assert.deepEqual(r.benchmark.rows, [{ ticker: 'MU', wrong: ['revenue.prior: wrong_period'] }]);
 });
+
+test('Jan paper decisions show their own reader and enriched judge evidence', async (t) => {
+  const root = fakeAirp();
+  const ev = path.join(root, 'backend', 'results', 'forward', 'events');
+  mkdirSync(path.join(ev, 'evidence'), { recursive: true });
+  writeFileSync(path.join(ev, 'ledger.jsonl'), JSON.stringify({ type: 'decision', accession: 'jan-case', ticker: 'AAA', pipeline: 'jan_bonsai_v1', source: 'bonsai' }) + '\n');
+  writeFileSync(path.join(ev, 'extract.jsonl'), JSON.stringify({ accession: 'jan-case', model: 'wrong-baseline-reader', revenue: 999 }) + '\n');
+  writeFileSync(path.join(ev, 'evidence', 'jan-case.json'), JSON.stringify({
+    reader: { model: 'Jan', record: { revenue: 100, model: 'Jan' } },
+    fact_sheet: { text: 'base sheet plus Jan research' },
+    research: { model: 'Jan', record: { brief: { facts: [{ text: 'revenue 100', source: 'https://www.sec.gov/a.htm' }] } } },
+  }));
+  const s = await startServer({ airpRoot: root });
+  t.after(() => s.close());
+  const launch = await fetch(s.launchUrl, { redirect: 'manual' });
+  const cookie = launch.headers.get('set-cookie').split(';')[0];
+  const rows = await (await fetch(`${s.origin}/api/team`, { headers: { cookie } })).json();
+  assert.equal(rows[0].reader.revenue, 100);
+  assert.equal(rows[0].reader_model, 'Jan');
+  assert.equal(rows[0].sheet, 'base sheet plus Jan research');
+  assert.equal(rows[0].research.facts[0].text, 'revenue 100');
+});

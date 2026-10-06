@@ -10,6 +10,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import autorun
 
 
+def test_structured_failure_at_zero_exit_is_recorded_and_fails_the_step(tmp_path, monkeypatch):
+    from app.forward.ledger import Ledger
+    monkeypatch.setattr(autorun, "FWD", tmp_path)
+    monkeypatch.setattr(autorun, "step", lambda cmd, inhibit: subprocess.CompletedProcess(
+        cmd, 0, 'AIRP_RESULT {"version":1,"status":"failed","reason":"rejected hedge"}', ""))
+    result = autorun.safe_step(["py", "scripts/broker_sync.py"], False)
+    assert result.returncode == 1
+    assert Ledger(tmp_path / "step_records.jsonl").verify()[0]["status"] == "failed"
+
+
 def test_mode_defaults_to_dry_and_dry_never_uses_real_ledgers(tmp_path, monkeypatch):
     monkeypatch.setattr(autorun, "FWD", tmp_path)
     assert autorun.mode() == "dry"

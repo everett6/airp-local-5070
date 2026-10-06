@@ -226,6 +226,13 @@ def main() -> None:
     with open_append(ledger) as f:
         f.write(json.dumps(rec) + "\n")
     write_atomic(state_path, json.dumps(books_to_json(books), indent=1) + "\n")
+    from app.portfolio.measurement import preserve_closes
+    factor_cache_ok = True
+    try:
+        preserve_closes(DIR / "factor_closes.parquet", p.close, now)
+    except (OSError, ValueError) as exc:
+        factor_cache_ok = False
+        print(f"LEARN ALERT: attribution close cache unavailable ({type(exc).__name__})")
     print(json.dumps(rec, indent=1))
     if not args.no_commit and not dry:
         repo = BACKEND.parent
@@ -233,6 +240,9 @@ def main() -> None:
         subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m",
                         f"forward allocator run {rec['run_at_utc']} (data through {rec['data_through']})"], check=True)
         print("committed to git (push when you like)")
+    from app.forward.step_result import emit
+    emit("warning" if not factor_cache_ok or any(b.get("error") for b in rec["books"].values()) else "ok",
+         data_through=rec["data_through"], factor_cache_ok=factor_cache_ok)
 
 
 if __name__ == "__main__":

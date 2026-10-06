@@ -13,6 +13,7 @@ function saveSettings() {
   try { localStorage.setItem('airp.settings', JSON.stringify(settings)); } catch { /* storage unavailable: settings last for this session */ }
   document.body.classList.toggle('no-plain', !settings.plainWords);
 }
+let alpacaTab = 'main';  // which Alpaca account the Alpaca page shows
 const sysHistory = [];  // recent machine readings for the System page charts (kept while the app is open)
 
 async function api(path, body) {
@@ -135,6 +136,159 @@ function consensusCard(c) {
 }
 
 const views = {
+  async horizons() {
+    const d = await api('horizon-shadows');
+    return `<h2>Horizon shadows</h2><p class="lede">Separate virtual vintages for day, 21-session medium and 63-session long theses. Each fixes its weights before any entry prices are observed.</p>
+      <button class="btn ghost" data-operation="horizon_review">Review horizon shadows</button>
+      <p>New Live research test cohorts create prospective plans. Existing cohorts are excluded. Entries use the first session open after the decision. Day exits at that session close; medium/long exit 21/63 sessions later. Caps: day 10%, medium 30%, long 50%, each company 10% total, cash at least 10%, no borrowing.</p>
+      <p class="muted">Free IEX daily prices are proxies, not broker or consolidated auction fills. Costs are assumed at 10 bp per side, stressed at 20 bp. Vintages are not pooled as one account. No automatic qualification or promotion.</p>
+      ${d.error ? `<p class="err">${esc(d.error)}</p>` : !(d.vintages || []).length ? '<p class="empty">No prospective horizon outcomes yet. Run a new Live research test, then review horizon shadows.</p>' : `<p>Observed ${esc(when(d.at))}</p>${d.vintages.map((v) => `<div class="card wide"><h3>${esc(v.id)}</h3><p>Decision ${esc(when(v.plan.decided_at))}</p><table><tr><th>Horizon</th><th>Status</th><th>AI net</th><th>No-AI net</th><th>Difference</th><th>AI at 20 bp</th><th>Turnover AI / no-AI</th><th>Missing prices</th></tr>${Object.entries(v.outcomes.horizons).map(([h,x]) => `<tr><td>${esc(h)}</td><td>${esc(x.status)}</td><td>${pct(x.arms.ai?.net_return)}</td><td>${pct(x.arms.no_ai?.net_return)}</td><td>${pct(x.incremental_net_return)}</td><td>${pct(x.arms.ai?.stress_net_return)}</td><td>${fmt(x.arms.ai?.turnover, 3)} / ${fmt(x.arms.no_ai?.turnover, 3)}</td><td>${esc(x.missing.join(', ') || '—')}</td></tr>`).join('')}</table><details><summary>Locked plan and outcome evidence</summary><pre class="operation-log">${esc(JSON.stringify(v, null, 2))}</pre></details></div>`).join('')}`}`;
+  },
+  async planning() {
+    const d = await api('trading-plan');
+    if (d.error) throw new Error(d.error);
+    const horizons = ['day', 'short', 'medium', 'long'];
+    const latency = d.evidence.filter((r) => r.research_s != null || r.judge_s != null);
+    return `<h2>AI planning &amp; case simulation</h2><p class="lede">Evidence-linked budgets for day (1 session), short (5), medium (21) and long term (63). Cases show hypothetical gains and losses, not expected returns or trading instructions.</p>
+      <div class="banner ${d.policy_error ? 'bad' : ''}">${esc(d.policy_error || (d.policy_active ? `New AI stock entries restricted to ${d.allowed_symbols.length} selected stocks. Existing exits and sector ETF hedges remain allowed.` : 'Stock entry restriction activates when Auto-trade 100 technology stocks starts.'))}</div>
+      <p>${d.evidence.length} recent company attempts in the selected universe. Evidence older than ${d.freshness_hours} hours is excluded. Missing or failed ratings hold cash. Simulations use a $10,000 virtual budget, no borrowing, and a 10% cap per company across horizons.</p>
+      ${(d.plans || []).map((p) => `<div class="card wide"><h3>${esc(p.profile.replaceAll('_', ' '))} budget</h3>
+        ${shareBars([...horizons.map((h) => ({ label: h, v: p.allocation[h], note: `cap ${pct(p.caps[h])}` })), { label: 'cash', v: p.cash }])}
+        <h4>Hypothetical net gains / losses by case</h4>${barChart(p.cases.map((c) => c.name.replaceAll('_', ' ')), horizons.map((h) => ({ name: h, y: p.cases.map((c) => c.contribution[h]) })), { height: 220 })}
+        <table><tr><th>Case</th><th>Combined budget contribution</th><th>Hypothetical P&amp;L</th><th>Costs per side</th></tr>${p.cases.map((c) => `<tr><td>${esc(c.name)}</td><td>${pct(c.net_return)}</td><td>$${fmt(c.pnl, 2)}</td><td>${fmt(c.cost_bps_per_side)} bp</td></tr>`).join('')}</table>
+        <p class="muted">${esc(p.explanation)}</p><details><summary>Exact weights, assumed shocks and source-linked plan</summary><pre class="operation-log">${esc(JSON.stringify(p, null, 2))}</pre></details></div>`).join('')}
+      <div class="card wide"><h3>Research and decision latency</h3>${latency.length ? barChart(latency.map((r) => r.ticker), [{ name: 'Jan research', y: latency.map((r) => r.research_s ?? null) }, { name: 'Bonsai judgment', y: latency.map((r) => r.judge_s ?? null) }], { yFmt: (n) => fmt(n) + 's' }) : '<p class="empty">Timings appear after company attempts finish.</p>'}</div>
+      <div class="card wide"><h3>Selected stock universe</h3><table><tr><th>Stock</th><th>Company</th><th>Research state</th><th>Day / short / medium / long ratings</th></tr>${d.universe.map((c) => { const r = d.evidence.find((r) => r.ticker === c.ticker); return `<tr><td>${esc(c.ticker)}</td><td>${esc(c.name)}</td><td>${esc(r?.status || c.state)}</td><td>${horizons.map((h) => esc(r?.ratings?.[h] ?? 'PASS / unmeasured')).join(' / ')}</td></tr>`; }).join('') || '<tr><td colspan="4">Start the 100-stock workflow to freeze the universe.</td></tr>'}</table></div>`;
+  },
+  async alpaca() {
+    const auto = alpacaTab === 'auto';
+    const d = await api(auto ? 'alpaca-account-auto' : 'alpaca-account'), a = d.account || {}, e = auto ? null : d.exposure;
+    const tabs = `<div class="row tabs">${[['main', 'Main account (core book + AI picks)'], ['auto', 'Autopilot account']].map(([k, n]) => `<button class="btn ${alpacaTab === k ? 'lime' : 'ghost'}" data-acct="${k}">${esc(n)}</button>`).join('')}</div>`;
+    const money = (v) => v == null ? '—' : `${esc(a.currency || 'USD')} ${fmt(Number(v), 2)}`;
+    const rows = (fields, format) => fields.map(([key, label]) => `<tr><td>${esc(label)}</td><td>${format(a[key])}</td></tr>`).join('');
+    const flag = (v) => v == null ? 'Not reported' : v === true ? 'Yes' : v === false ? 'No' : esc(v);
+    return `<h2>Alpaca accounts</h2><p class="lede">Your two Alpaca paper accounts: the main one and the autopilot's separate one. Use Refresh to read the latest details.</p>${tabs}
+      ${d.error ? `<div class="banner warn">${esc(d.error)}</div>` : `<p>Account ${esc(d.account_number || 'number not reported')} · ${pill(a.status || 'Not reported')} · fetched ${esc(when(d.at))}</p>
+      <div class="kpis">${kpi('Equity', money(a.equity))}${kpi('Cash', money(a.cash))}${kpi('Buying power', money(a.buying_power))}${kpi('Broker multiplier', a.multiplier == null ? '—' : esc(a.multiplier) + '×')}</div>
+      <div class="split"><div class="card"><h3>Balances &amp; margin</h3><table>${rows([
+        ['portfolio_value','Portfolio value'],['last_equity','Previous equity'],['regt_buying_power','Regulation T buying power'],
+        ['daytrading_buying_power','Day trading buying power'],['non_marginable_buying_power','Non-marginable buying power'],
+        ['initial_margin','Initial margin'],['maintenance_margin','Maintenance margin'],['last_maintenance_margin','Previous maintenance margin'],
+        ['long_market_value','Long market value'],['short_market_value','Short market value'],['accrued_fees','Accrued fees'],
+        ['pending_transfer_in','Pending transfer in'],['pending_transfer_out','Pending transfer out'],['options_buying_power','Options buying power']], money)}</table></div>
+      <div class="card"><h3>Account permissions &amp; restrictions</h3><table>${rows([
+        ['pattern_day_trader','Pattern day trader flag'],['daytrade_count','Day trade count'],['shorting_enabled','Shorting enabled'],
+        ['trading_blocked','Trading blocked'],['transfers_blocked','Transfers blocked'],['account_blocked','Account blocked'],
+        ['trade_suspended_by_user','Trading suspended by user'],['options_approved_level','Options approved level'],
+        ['options_trading_level','Options trading level']], flag)}<tr><td>Created</td><td>${esc(when(a.created_at))}</td></tr></table></div></div>
+      <p class="muted">The broker multiplier is an account setting; actual leverage depends on positions. Missing fields mean Alpaca did not report them.</p>`}
+      <div class="split"><div class="card"><h3>Alpaca account equity — last month</h3>${d.history?.timestamp?.length ? lineChart([{ name: 'Broker equity', x: d.history.timestamp.map((t) => new Date(t * 1000).toISOString().slice(0, 10)), y: (d.history.equity || []).map((v) => v == null ? null : Number(v)) }], { height: 220, yFmt: (v) => '$' + fmt(v), xTicks: (t) => t.slice(5, 10) }) : `<p class="empty">${esc(d.history_error || 'No account history yet.')}</p>`}</div>
+      <div class="card"><h3>Broker-reported P&amp;L</h3>${d.history?.timestamp?.length ? lineChart([{ name: 'P&L', x: d.history.timestamp.map((t) => new Date(t * 1000).toISOString().slice(0, 10)), y: (d.history.profit_loss || []).map((v) => v == null ? null : Number(v)) }], { height: 220, yFmt: (v) => '$' + fmt(v), zero: true, xTicks: (t) => t.slice(5, 10) }) : '<p class="empty">No broker P&amp;L history yet.</p>'}<p class="muted">Account-level P&amp;L includes all books and account cashflows; it does not isolate AI contribution.</p></div></div>
+      <div class="card wide"><h3>Actual paper positions</h3>${d.positions_error ? `<p class="err">${esc(d.positions_error)}</p>` : ''}${d.positions?.length ? barChart(d.positions.map((p) => p.symbol), [{ name: 'Market value', y: d.positions.map((p) => Number(p.market_value)) }], { yFmt: (v) => '$' + fmt(v), height: 220 }) : ''}<table><tr><th>Symbol</th><th>Side</th><th>Shares</th><th>Market value</th><th>Unrealized P&amp;L</th></tr>${(d.positions || []).map((p) => `<tr><td>${esc(p.symbol)}</td><td>${esc(p.side)}</td><td>${esc(p.qty)}</td><td>${money(p.market_value)}</td><td>${money(p.unrealized_pl)} (${pct(Number(p.unrealized_plpc))})</td></tr>`).join('') || '<tr><td colspan="5">No positions reported.</td></tr>'}</table></div>
+      <div class="card wide"><h3>Recent paper orders — latest 100</h3>${d.orders_error ? `<p class="err">${esc(d.orders_error)}</p>` : ''}<table><tr><th>Submitted</th><th>Symbol</th><th>Side</th><th>Quantity / filled</th><th>Status</th><th>Fill price</th></tr>${(d.orders || []).map((o) => `<tr><td>${esc(when(o.submitted_at))}</td><td>${esc(o.symbol)}</td><td>${esc(o.side)}</td><td>${esc(o.qty)} / ${esc(o.filled_qty)}</td><td>${esc(o.status)}</td><td>${money(o.filled_avg_price)}</td></tr>`).join('') || '<tr><td colspan="6">No orders reported.</td></tr>'}</table></div>
+      ${auto ? '' : `<div class="card wide"><h3>Latest reconciled exposure</h3>${e ? `<p>Snapshot ${esc(when(e.at))} · gross ${money(e.gross)} · net ${money(e.net)} · actual gross leverage ${fmt(e.leverage, 3)}× · open orders ${esc(e.open_orders)}</p><p class="muted">This saved snapshot updates during account reconciliation and may be older than the balances above.</p>${(e.alerts || []).map((x) => `<p class="err">${esc(x)}</p>`).join('')}` : '<p class="empty">No exposure snapshot yet. Run Sync paper orders in Run Center to reconcile the account.</p>'}</div>`}`;
+  },
+  async institutional() {
+    const [d, r] = await Promise.all([api('institutional'), api('operations')]);
+    if (d.error) throw new Error(d.error);
+    const b = d.benchmark, x = d.execution, f = d.attribution, risk = d.risk.policy;
+    const money = (value) => '$' + fmt(value, 2);
+    const run = (id) => { const a = r.actions.find((v) => v.id === id); return `<button class="btn ghost" data-operation="${esc(id)}" ${a?.disabled ? 'disabled' : ''}>${esc(a?.label || id)}</button>`; };
+    const reviewForm = (action, digest) => `<form data-engineering-form data-action="${action}" data-digest="${esc(digest)}">
+      ${action === 'costs' ? `<p>Supply total broker costs in dollars for the reported execution period, including legacy fills. New fills make this cost review stale.</p>${['fees', 'borrow', 'financing'].map((c) => `<label>${c} <input name="${c}" type="number" min="0" step="any" required></label>`).join(' ')}` : `<p>Review candidate ${esc(d.release.candidate?.id)} and its recorded test log before attesting.</p>${['source', 'tests', 'risk', 'recovery'].map((c) => `<label><input type="checkbox" name="checks" value="${c}" required> Reviewed ${c}</label>`).join(' · ')}`}
+      <label>Your name <input name="reviewer" required maxlength="100"></label> <label>Evidence and review notes <input name="note" required maxlength="2000"></label>
+      <label>Type REVIEWED <input name="confirm" required pattern="REVIEWED"></label><button class="btn ghost">Record my review</button></form>`;
+    return `<h2>Engineering checks</h2><p class="lede">Evidence for reliable paper trading, with missing verification shown explicitly.</p>
+      <div class="grid">
+      <div class="card"><h3>Source accuracy</h3><p>${b.human_attested} / ${b.cases} cases reviewed by a person. ${b.remaining} remain.</p><p>Provisional reader result: ${b.provisional_score.right} / ${b.provisional_score.fields} fields right. ${esc(b.label_origin)}</p><details><summary>Reader coverage and results</summary>${(b.readers || []).map((r) => `<p>${esc(r.source)}: ${esc(r.provisional.right)} / ${esc(r.provisional.fields)} fields, ${esc(r.provisional.scored_cases)} / ${esc(r.provisional.cases)} cases read. Human score: ${r.human_verified ? esc(r.human_verified.right) + ' / ' + esc(r.human_verified.fields) : 'pending'}.</p>`).join('')}</details><button class="btn lime" data-go="benchmark">Review source labels</button></div>
+      <div class="card"><h3>Account order limits</h3><p>Gross ${risk.max_gross}× equity · single asset ${risk.max_asset}× · crypto ${fmt(risk.max_crypto * 100)}% · daily loss ${fmt(risk.daily_loss * 100)}%.</p><p>Every new paper submission checks both books and outstanding orders. Missing account data or unusable quotes block the submission. Valid closes can reduce an existing limit breach.</p></div>
+      <div class="card"><h3>Execution measurement</h3><p>${x.fills_measured} fills measured · ${x.orders_submitted} submissions recorded · arrival slippage ${fmt(x.weighted_slippage_bp, 2)} bp.</p><p>Arrival shortfall plus fees, borrow and financing: ${x.period_cost_dollars ? money(x.period_cost_dollars.total) : 'awaiting broker cost inputs'}.</p><p>Cost coverage: ${esc(x.cost_status || 'incomplete')} · ${esc(x.unmeasured_fill_snapshots)} fill(s) lack arrival measurements.</p><details><summary>Unmeasured fills and blocked orders</summary><pre class="operation-log">${esc(JSON.stringify({unmeasured: x.unmeasured_fills, blocked: x.blocked}, null, 2))}</pre></details><p class="muted">${esc(x.note)}</p>${x.stress.map((s) => `<p>Extra ${s.extra_cost_bp_per_side} bp / side: ${money(s.extra_dollars_on_measured_turnover)} on measured turnover.</p>`).join('')}</div>
+      <div class="card"><h3>Factor attribution</h3><p>${esc(f.status)} · ${f.observations ?? 0} matched observations / ${f.required ?? 120} required.</p><p>Factors: ${esc((f.factors || []).join(', ') || 'none yet')}. Missing: ${esc((f.missing_factors || f.missing || []).join(', ') || 'none')}.</p>${f.loadings ? `<pre>${esc(JSON.stringify({ loadings: f.loadings, intercept_95: f.intercept_95 }, null, 2))}</pre>` : ''}<p>Uses matched dates and uncertainty adjusted for serial correlation. More forward observations are needed to judge the AI’s incremental value.</p></div>
+      <div class="card"><h3>Release and review</h3><p>${d.release.snapshots.length} recent snapshots. ${esc(d.release.independent_review)}.</p>${run('release_check')} ${run('rollback_probe')}<p>Source hashes bind each candidate to its checks. Candidates do not automatically activate trading changes.</p></div>
+      <div class="card"><h3>Recovery and run health</h3><p>Last restore: ${esc(d.recovery.last_restore?.status || 'no rehearsal yet')}.</p>${run('backup')} ${run('restore_probe')} ${run('recovery_tests')}<p>${esc(d.recovery.off_machine_copy)}</p><p>${d.steps.native} structured stage records · ${d.steps.legacy} legacy stage records. Legacy success codes remain unverified stage outcomes.</p></div></div>
+      <div class="card wide"><h3>Engineering records</h3>${run('institutional_report')}<p>${d.evidence_bundles} reproducible decision bundles. The Records page shows the full opportunity funnel, contribution comparison and decision latency.</p>
+      <details><summary>Recent blocked orders</summary><pre class="operation-log">${esc(JSON.stringify(x.blocked, null, 2))}</pre></details>
+      <details><summary>Snapshot identifiers and digests</summary><pre class="operation-log">${esc(JSON.stringify(d.release.snapshots, null, 2))}</pre></details>
+      ${x.ledger_sha256 ? `<details><summary>Supply broker cost evidence</summary>${reviewForm('costs', x.cost_scope_sha256 || x.ledger_sha256)}</details>` : '<p>Cost review becomes available after the first audited submission.</p>'}
+      ${d.release.candidate ? `<details><summary>Record release review</summary>${reviewForm('release', d.release.candidate.archive_sha256)}</details>` : '<p>Preserve a checked release to make its review available here.</p>'}</div>`;
+  },
+  async benchmark() {
+    const cases = await api('benchmark');
+    if (!Array.isArray(cases)) throw new Error(cases.error || 'Benchmark unavailable');
+    return `<h2>Source review</h2><p class="lede">Read the filing and verify each labelled period, unit, accounting basis and absence. Original AI labels remain provisional until you record a review.</p>
+      ${cases.map((m) => `<div class="card wide"><h3>${esc(m.case.ticker)} · ${esc(m.case.accession)}</h3><p>${m.approved ? `Reviewed by ${esc(m.review.reviewer)}` : 'Needs human review'} · ${esc((m.case.categories || []).join(', '))}</p>
+      <details><summary>Source text</summary><pre class="operation-log">${esc(m.source || 'Source is not cached. Review cannot be approved.')}</pre></details>
+      <details><summary>Find labelled numbers in the source (candidate matches, not verification)</summary>${(m.label_excerpts || []).map((x) => `<h4>${esc(x.field)}: ${esc(x.label)} · ${esc(x.occurrences)} occurrence(s)</h4><p>${esc(x.note)}</p>${x.snippets.map((s) => `<pre class="operation-log">${esc(s)}</pre>`).join('') || '<p>No text match. Check units, formatting and the original table.</p>'}`).join('')}</details>
+      <form data-benchmark-form data-accession="${esc(m.case.accession)}" data-source-hash="${esc(m.source_hash)}" data-case-hash="${esc(m.case_hash)}">
+      <label>Labels and corrections (JSON)<textarea name="corrected" rows="14" required>${esc(JSON.stringify(m.review?.corrected_case || m.case, null, 2))}</textarea></label>
+      <p>${['period', 'units', 'basis', 'absence'].map((c) => `<label><input type="checkbox" name="checks" value="${c}" required> Verified ${c}</label>`).join(' · ')}</p>
+      <label>Your name <input name="reviewer" required maxlength="100"></label> <label>Review notes <input name="note" required maxlength="2000"></label>
+      <label>Decision <select name="decision"><option value="approved">Approve reviewed labels</option><option value="rejected">Reject labels</option></select></label>
+      <label>Type VERIFIED <input name="confirm" required pattern="VERIFIED"></label>
+      <button class="btn lime" ${m.source_available ? '' : 'disabled'}>Record my review</button></form></div>`).join('')}`;
+  },
+  async operations() {
+    const [r, research, budget] = await Promise.all([api('operations'), api('live-research'), api('budget-experiment')]);
+    if (!operationId || !r.jobs.some((j) => j.id === operationId)) operationId = r.active?.id || r.autopilot?.id || r.jobs[0]?.id;
+    const selected = operationId ? await api(`operation?id=${encodeURIComponent(operationId)}`) : null;
+    const states = { starting: 'Starting', running: 'Running', succeeded: 'Passed / finished', warning: 'Finished with warnings', failed: 'Failed', blocked: 'Blocked', interrupted: 'Interrupted', stopped: 'Stopped' };
+    const color = (s) => s === 'succeeded' ? 'ok' : ['failed', 'interrupted'].includes(s) ? 'bad' : 'warn';
+    return `<h2>Run Center</h2><p class="lede">Run the current AI paper strategy and check the system while the assistant is away.</p>
+      ${!r.ready ? '<div class="banner bad">The checkout is missing its Python runtime or run worker.</div>' : ''}
+      ${r.active ? `<div class="banner warn"><b>${esc(r.active.label)} is active.</b> ${esc(r.active.message)}</div>` : ''}
+      ${r.autopilot ? `<div class="banner warn"><b>Continuous workflow</b> ${esc(r.autopilot.message)}<p>Companies: ${esc(r.autopilot.progress?.attempted ?? 0)} / ${esc(r.autopilot.progress?.total ?? "loading")}; failed: ${esc(r.autopilot.progress?.failed ?? 0)}. Previous failed attempts retained: ${esc(r.autopilot.progress?.previous_failed_attempts ?? 0)}.</p><button class="btn ghost" data-stop-auto="${esc(r.autopilot.id)}">Stop after current step</button></div>` : ""}
+      ${r.stockPolicy ? `<div class="banner">AI stock entries restricted to ${esc(r.stockPolicy.symbols?.length ?? 0)} selected technology stocks. <button class="btn ghost" data-view="planning">View universe and cases</button></div>` : ""}
+      ${r.halted ? '<div class="banner warn">The kill switch is on. AI trade runs are disabled; order sync follows the existing halt rules.</div>' : ''}
+      ${r.mode !== 'live' ? '<div class="banner warn">The system is in rehearsal mode. Paper order actions require the existing live paper mode.</div>' : ''}
+      <div class="grid">${r.actions.map((a) => `<div class="card"><h3>${esc(a.label)}</h3><p>${esc(a.description)}</p>
+        <button class="btn ${a.paper ? 'lime' : 'ghost'}" data-operation="${esc(a.id)}" ${a.disabled ? 'disabled' : ''}>${a.paper ? 'Start paper run' : a.learning ? 'Review now' : a.label}</button></div>`).join('')}</div>
+      <p class="muted">Paper orders use the current strategy, mandate, position sizing, and entry deadlines. Filled trades appear under Live book &amp; orders and AI picks. Each run saves its status and log. Closing the app leaves the run working; after a PC restart an unfinished run is marked interrupted. Automatic jobs take priority; blocked runs can be started again after they finish.</p>
+      ${r.researchQueue ? `<div class="card wide"><h3>Company research queue</h3><p>${esc(r.researchQueue.total)} companies · ${r.researchQueue.profile === "tech100" ? "Information Technology only" : "all sectors"} · cached membership ${esc(r.researchQueue.snapshotYear)}. Timing includes model startup, research and judgment. Individual evidence is saved with each attempt.</p><table><tr><th>Company</th><th>State</th><th>Elapsed</th></tr>${r.researchQueue.recent.map((c) => `<tr><td>${esc(c.ticker)} · ${esc(c.name)}</td><td>${esc(c.state)}</td><td>${c.elapsed_s == null ? "—" : fmt(c.elapsed_s) + "s"}</td></tr>`).join("")}</table></div>` : ""}
+      <div class="card wide"><h3>Live research experiment</h3><p>Fresh public evidence; experimental horizon targets are separate from approved filing trades. No measured returns until post-decision entry and exit fills exist.</p>
+      ${research.error ? `<p class="err">${esc(research.error)}</p>` : !research.companies?.length ? '<p class="empty">No completed cohort yet. Start Live research test above.</p>' : `<p class="tiny muted">${esc(when(research.created_at))} · ${(research.watchlist || []).map(esc).join(', ')}</p>
+      <table><tr><th>Company</th><th>Status</th><th>Research</th><th>Judge</th><th>Queue</th><th>Cohort to decision</th><th>Day / medium / long ratings</th></tr>
+      ${research.companies.map((x) => `<tr><td>${esc(x.ticker)}</td><td>${esc(x.status)}${x.error_reason || x.error ? ' · ' + esc(x.error_reason || x.error) : ''}</td><td>${x.research_s == null ? '—' : fmt(x.research_s) + 's'}</td><td>${x.judge_s == null ? '—' : fmt(x.judge_s) + 's'}</td><td>${fmt(x.queue_wait_s)}s</td><td>${fmt(x.total_latency_s)}s</td><td>${x.ratings ? ['day','medium','long'].map((h) => esc(x.ratings[h])).join(' / ') : '—'}</td></tr>`).join('')}</table>
+      <p>Virtual caps: day 10%, medium 30%, long 50%; each company ≤10% across all horizons. Proposed cash: ${pct(research.portfolio?.cash)}.</p>
+      <p>All attempts: median cohort latency ${fmt(research.timing?.all_attempts?.total_latency_s?.median)}s · p95 ${fmt(research.timing?.all_attempts?.total_latency_s?.p95)}s · max ${fmt(research.timing?.all_attempts?.total_latency_s?.max)}s.</p>
+      <p>${(research.suggestions || []).map(esc).join(' ')}</p>`}</div>
+      <div class="card wide"><h3>Economic discipline comparison</h3><p>Same Jan evidence, same Bonsai model, same limits. Budget-aware wording is compared with neutral wording. Both can PASS; neither can submit orders or change evaluation rules.</p>
+      ${budget.error ? `<p class="err">${esc(budget.error)}</p>` : !budget.comparison ? '<p class="empty">Not run yet. Start Test economic discipline above.</p>' : `<p>${esc(budget.comparison.interpretation)}</p>
+      <table><tr><th>Arm</th><th>Companies</th><th>Failed</th><th>Median judge time</th><th>p95 judge time</th></tr>
+      ${Object.entries(budget.comparison.arms).map(([name,a]) => `<tr><td>${esc(name)}</td><td>${esc(a.attempts)}</td><td>${esc(a.failed)}</td><td>${fmt(a.timing?.all_attempts?.judge_s?.median)}s</td><td>${fmt(a.timing?.all_attempts?.judge_s?.p95)}s</td></tr>`).join('')}</table>
+      <p>No automatic winner. Trading returns, factual accuracy and uncertainty are unmeasured; no extra capital or compute has been assigned.</p>`}</div>
+      <div class="card wide"><h3>Run status and output</h3>${selected ? `<p><b>${esc(selected.label)}</b> ${pill(states[selected.state] || selected.state, color(selected.state))}</p>
+        <p>${esc(selected.message)}</p><p class="tiny muted">Started ${esc(when(selected.started_at || selected.created_at))}${selected.finished_at ? ` · ended ${esc(when(selected.finished_at))}` : ''}</p>
+        <ol>${(selected.steps || []).map((s) => `<li>${esc(s.label)} — ${esc(states[s.state] || s.state)}${s.code != null ? ` (exit ${esc(s.code)})` : ''}</li>`).join('')}</ol>
+        <pre class="operation-log">${esc(selected.output || 'Waiting for output…')}</pre>` : '<p class="empty">Choose an action above to start your first run.</p>'}</div>
+      <div class="card wide"><h3>Recent manual runs</h3><table><tr><th>Started</th><th>Action</th><th>Result</th><th></th></tr>
+        ${r.jobs.map((j) => `<tr><td>${esc(when(j.created_at))}</td><td>${esc(j.label)}</td><td>${pill(states[j.state] || j.state, color(j.state))}</td><td><button class="btn ghost" data-operation-log="${esc(j.id)}">View log</button></td></tr>`).join('') || '<tr><td colspan="4" class="muted">No manual runs yet.</td></tr>'}</table></div>`;
+  },
+  async improvement() {
+    const [d, runs] = await Promise.all([api('improvement'), api('operations')]);
+    if (d.error) throw new Error(d.error);
+    const p = d.prompt, s = d.recipes;
+    const review = runs.actions.find((a) => a.id === 'improvement_review');
+    const status = { champion: 'Current shadow prompt', challenger: 'Challenger', shadow: 'Forward shadow', promoted: 'Qualified in simulation', rejected_train: 'Failed training check', rejected_holdout: 'Failed holdout check', retired: 'Retired', skipped: 'Deferred' };
+    const c = p.comparison;
+    return `<h2>Self-improvement</h2><p class="lede">Learn from completed calls, test a candidate, watch it on new releases, and retire it if its edge disappears.</p>
+      <div class="banner ok"><b>Learning runs with the existing automatic jobs.</b> Prompt reflection runs after earnings jobs when eligible; signal proposals run monthly during Saturday review. ${runs.mode !== 'live' ? '<b>Rehearsal mode: monthly signal proposals are currently inactive.</b>' : ''}</div>
+      <div class="card wide"><h3>Automatic implementation audit</h3><p>Every completed one-click AI paper run reviews existing candidates. Continuous mode reviews hourly; the scheduled jobs propose and evaluate candidates on their existing schedule. Qualified shadow changes, retirement and rollback are applied by the evidence gates. Live trading rules remain under separate deployment control.</p>
+        <table><tr><th>Review</th><th>Result</th><th>Prompt shadow changed</th><th>Signal transitions</th></tr>${(d.automatic_reviews || []).slice().reverse().map((r) => `<tr><td>${esc(when(r.at))}</td><td>${esc(r.status)}</td><td>${r.prompt_changed ? 'Yes' : 'No'}</td><td>${r.signal_transitions.map((x) => `${esc(x.name)}: ${esc(x.before)} → ${esc(x.after)}`).join('<br>') || 'None — evidence gates still apply'}</td></tr>`).join('') || '<tr><td colspan="4">No audited review yet. The next successful paper run or hourly review will record one.</td></tr>'}</table></div>
+      ${(d.errors || []).map((e) => `<div class="banner bad">${esc(e)}</div>`).join('')}
+      <div class="card wide"><h3>Review the evidence now</h3><p>Review previously created candidates using completed outcomes. The review collects decision-time features and updates shadow qualification or retirement. New AI proposals follow the existing monthly schedule.</p>
+        <button class="btn lime" data-operation="improvement_review" ${review?.disabled ? 'disabled' : ''}>Review self-improvement</button>
+        <p class="muted">Qualified candidates stay in research and paper simulation. Changing the frozen trading rules still requires your approval. This workflow measures evidence; it does not guarantee higher returns.</p></div>
+      ${p.available ? `<div class="card wide"><h3>AI prompt learning</h3><p>The bull/bear agent keeps a current prompt and tests one challenger. Bonsai reviews the older calls, checks lessons on held-back calls, then compares both prompts on future releases.</p>
+        <div class="kpis">${kpi('Current shadow prompt', `v${esc(p.champion.v)}`)}${kpi('Challenger', p.challenger ? `v${esc(p.challenger.v)}` : 'none')}${kpi('Matured calls', `${fmt(p.matured)} / ${p.reflection_min}`)}${kpi('Needed before reflection', fmt(p.remaining))}</div>
+        <p>Promotion requires at least ${p.gates.min_paired} paired calls across ${p.gates.min_months} entry months and evidence score ≥ ${p.gates.e_bound}. A reliably worse challenger retires; a worse current shadow prompt rolls back to v0.</p>
+        ${c ? `<p>Current comparison: ${fmt(c.paired)} paired calls · ${fmt(c.months)} months · ${fmt(c.weeks)} completed weeks · evidence for improvement ${fmt(c.e_better, 2)} / ${p.gates.e_bound} · evidence for deterioration ${fmt(c.e_worse, 2)}.</p>` : '<p class="muted">No challenger has accumulated a paired forward comparison yet.</p>'}
+        <h4>Lessons in the current shadow prompt</h4>${p.champion.lessons?.length ? `<ul>${p.champion.lessons.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="muted">No learned lessons yet; the original prompt remains current.</p>'}
+        <table><tr><th>Version / month</th><th>State</th><th>Reason or new lessons</th></tr>${p.history.slice().reverse().map((v) => `<tr><td>${esc(v.v == null ? v.month : `v${v.v}`)}</td><td>${esc(status[v.status] || v.status)}</td><td>${esc(v.why || v.new_lessons?.join(' · ') || 'Original baseline')}</td></tr>`).join('')}</table></div>` : ''}
+      ${s.available ? `<div class="card wide"><h3>Trading-signal learning</h3><p>At most ${s.gates.proposals_per_month} new recipes per month. Each must pass training and a separate holdout before entering a forward shadow. Qualification requires at least ${s.gates.min_days} days, ${s.gates.min_events} scored releases, and a positive uncertainty bound on added value.</p>
+        <div class="kpis">${kpi('In forward shadow', fmt(s.counts.shadow))}${kpi('Qualified in simulation', fmt(s.counts.promoted))}${kpi('Rejected', fmt(s.counts.rejected_train + s.counts.rejected_holdout))}${kpi('Retired', fmt(s.counts.retired))}</div>
+        <p class="muted">Promotion checks happen at days ${s.gates.look_days.join(', ')}. Unqualified signals retire after ${s.gates.retire_days} days. Qualified simulation sleeves total at most ${pct(s.gates.sleeve_cap, 0)}. Last review: ${esc(s.review?.at || 'not yet run')}.</p>
+        <table><tr><th>Candidate</th><th>Stage</th><th>Recipe / rationale</th><th>Latest evidence</th></tr>${s.signals.map((x) => { const last = x.history.at(-1) || {}; return `<tr><td>${esc(x.name)}</td><td>${esc(status[x.status] || x.status)}</td><td>${esc(x.recipe)}<p class="tiny muted">${esc(x.rationale)}</p></td><td>${esc(last.event || 'none')}${last.events != null ? ` · ${fmt(last.events)} releases` : ''}${last.blend_gain_lo != null ? ` · gain lower bound ${fmt(last.blend_gain_lo, 4)}` : ''}${last.reason ? ` · ${esc(last.reason)}` : ''}</td></tr>`; }).join('') || '<tr><td colspan="4" class="muted">No recipes yet. The next eligible monthly review proposes them.</td></tr>'}</table></div>` : ''}`;
+  },
   async overview() {
     const [o, m, td, open] = await Promise.all([api('overview'), metrics().catch(() => ({ missing: true })), api('today').catch(() => null), api('open_decisions').catch(() => [])]);
     const runs = o.recentRuns.filter((r) => r.job !== 'check');
@@ -244,6 +398,111 @@ const views = {
         ${r.runs.map((x) => `<tr><td>${esc(when(x.start))}</td><td>${esc(JOBS[x.job] || x.job)}</td><td>${esc(x.mode === 'live' ? 'live' : 'rehearsal')}</td><td class="num">${took(x.seconds)}</td><td>${x.rc === 0 ? pill('clean', 'ok') : x.skipped ? pill('skipped', 'warn') : pill('problem', 'bad')}</td><td>${x.alerts.length ? x.alerts.map(esc).join('<br>') : x.gaps ? `${esc(x.gaps)} gap(s)` : '<span class="muted">nothing</span>'}</td></tr>`).join('')}</table></div>`;
   },
 
+  async autopilot() {
+    const [d, ops] = await Promise.all([api('autopilot'), api('operations')]);
+    const job = ops.autopilot?.action === 'full_auto' ? ops.autopilot : null;
+    const other = ops.autopilot && !job ? ops.autopilot : null;
+    const action = (ops.actions || []).find((a) => a.id === 'full_auto');
+    const st = d.status || {}, a = d.account || {};
+    const money = (v) => (v == null ? '–' : `$${fmt(Number(v), 2)}`);
+    const HOR = { day: 'Day trade', short: '5 sessions', medium: '21 sessions', long: '63 sessions' };
+    const LABEL = { 1: ['strong bear', 'bad'], 2: ['bear', 'bad'], 3: ['no call', ''], 4: ['bull', 'ok'], 5: ['strong bull', 'ok'] };
+    const side = (s) => (s > 0 ? pill('LONG (buy)', 'ok') : pill('SHORT (sell)', 'bad'));
+    const button = job
+      ? `<button class="btn" data-stop-auto="${esc(job.id)}" data-back="autopilot">■ Stop autopilot</button> <span class="muted">Running since ${esc(when(job.started_at || job.created_at))}</span>`
+      : `<button class="btn lime big" data-operation="full_auto" ${action?.disabled ? 'disabled' : ''}>▶ Run autopilot</button>
+         ${other ? `<span class="err">Stop the other continuous workflow first (${esc(other.label)}).</span>` : action?.disabled ? `<span class="muted">${esc(ops.mode !== 'live' ? 'Paper mode is not on.' : 'Another app run is active.')}</span>` : ''}`;
+    const acct = !d.account_configured
+      ? `<div class="banner warn"><b>The separate Alpaca paper account is not connected yet.</b> Until it is, the autopilot researches and logs what it would trade, and sends no orders.
+         <ol class="tiny"><li>At alpaca.markets, open a second <b>paper</b> account (Paper Trading → the account menu → open a new paper account) and generate its API keys.</li>
+         <li>Add two lines to <code>backend/.env</code>: <code>AIRP_AUTO_ALPACA_KEY_ID=…</code> and <code>AIRP_AUTO_ALPACA_SECRET_KEY=…</code></li>
+         <li>Within a minute the running autopilot connects (keys of the main paper account are refused, so the two books stay apart).</li></ol></div>`
+      : d.account_error ? `<p class="err">The separate account did not answer: ${esc(d.account_error)}</p>`
+      : `<div class="kpis">${kpi('Total money', money(a.equity), `start ${money(st.start_equity)}`)}${kpi('Today', money(Number(a.equity) - Number(a.last_equity)), pct((Number(a.equity) - Number(a.last_equity)) / Number(a.last_equity || 1), 2))}${kpi('Since start', st.start_equity ? money(Number(a.equity) - st.start_equity) : '–', st.start_equity ? pct(Number(a.equity) / st.start_equity - 1, 2) : '')}${kpi('Cash', money(a.cash))}${kpi('Long / short', `${money(a.long_market_value)} / ${money(a.short_market_value)}`)}${kpi('Day trades (5 days)', fmt(a.daytrade_count))}</div>`;
+    const iso = (t) => new Date(t * 1000).toISOString();
+    const hd = d.history_day || {}, hm = d.history_month || {};
+    const chart = (h, name, f) => (h.timestamp?.length > 1 ? lineChart([{ name, x: h.timestamp.map(f), y: (h.equity || []).map((v) => (v == null ? null : Number(v))) }], { height: 220, yFmt: (v) => '$' + fmt(v), xTicks: name === 'Today' ? (t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (t) => t.slice(5, 10) }) : '<p class="empty">The graph starts after the first trading session.</p>');
+    const local = d.equity?.length > 1 ? lineChart([{ name: 'Total money', x: d.equity.map((r) => r.t), y: d.equity.map((r) => r.v) }], { height: 220, yFmt: (v) => '$' + fmt(v), xTicks: (t) => new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }) : '<p class="empty">Recorded every minute while the market is open, once the account is connected.</p>';
+    const lots = (d.lots || []).map((x) => `<tr><td><b>${esc(x.symbol)}</b>${x.theme ? ` <span class="muted tiny">${esc(x.theme)}</span>` : ''}</td><td>${side(x.side)}</td><td>${esc(HOR[x.horizon] || x.horizon)}</td><td class="num">${pct(x.weight, 1)}</td><td class="num">${x.entry_price ? fmt(x.entry_price, 2) : '–'}</td><td>${esc(x.exit_session || '')}</td><td class="tiny muted">${esc((x.sizing || []).join(' · '))}</td></tr>`).join('');
+    const pos = (d.positions || []).map((p) => `<tr><td><b>${esc(p.symbol)}</b></td><td>${esc(p.side)}</td><td class="num">${fmt(Number(p.qty))}</td><td class="num">${fmt(Number(p.avg_entry_price), 2)}</td><td class="num">${fmt(Number(p.current_price), 2)}</td><td class="num">${money(p.market_value)}</td><td class="num ${Number(p.unrealized_pl) < 0 ? 'err' : ''}">${money(p.unrealized_pl)} (${pct(Number(p.unrealized_plpc), 2)})</td></tr>`).join('');
+    const fills = [...(d.trades || [])].reverse().map((f) => `<tr><td>${esc(when(f.time))}</td><td>${f.side === 'buy' ? pill('buy', 'ok') : pill(f.side, 'bad')}</td><td><b>${esc(f.symbol)}</b></td><td class="num">${fmt(f.qty)}</td><td class="num">${fmt(f.price, 2)}</td><td class="num">${money(f.qty * f.price)}</td><td class="tiny">${esc(f.why)}</td></tr>`).join('');
+    const ords = (d.orders || []).slice(0, 60).map((o) => `<tr><td>${esc(when(o.submitted_at))}</td><td>${esc(o.side)}</td><td><b>${esc(o.symbol)}</b></td><td class="num">${fmt(Number(o.qty))}</td><td class="num">${fmt(Number(o.filled_qty))}</td><td class="num">${o.filled_avg_price ? fmt(Number(o.filled_avg_price), 2) : '–'}</td><td>${esc(o.status)}</td></tr>`).join('');
+    const thought = (t) => `<details><summary><b>${esc(t.ticker)}</b> ${Object.entries(t.ratings || {}).map(([h, l]) => pill(`${HOR[h] || h}: ${(LABEL[l] || [l])[0]}`, (LABEL[l] || [, ''])[1])).join(' ')} <span class="muted tiny">${esc(when(t.at))} · ${esc(t.regime)} market · ${t.trades?.length ? `${fmt(t.trades.length)} trade(s)` : 'no trade'}</span></summary>
+        <h4>Jan (researcher)</h4>${(t.jan_steps || []).map((s, i) => `<div class="step"><b>Step ${i + 1}.</b> ${esc(s.thought || '(no thought written)')}${s.tools ? `<div class="tools">→ ${s.tools.map(esc).join('<br>→ ')}</div>` : ''}${s.estimate?.reason ? `<p class="tiny muted">${esc(s.estimate.reason)}</p>` : ''}</div>`).join('') || '<p class="muted tiny">No steps recorded.</p>'}
+        ${(t.facts || []).length ? `<details><summary class="tiny">Facts it found (${fmt(t.facts.length)})</summary><ul class="tiny">${t.facts.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></details>` : ''}
+        <h4>Bonsai (judge)</h4>${Object.entries(t.bonsai || {}).map(([h, b]) => `<div class="step"><b>${esc(HOR[h] || h)}</b> ${b.label != null ? pill((LABEL[b.label] || [b.label])[0], (LABEL[b.label] || [, ''])[1]) : ''}${b.quote ? `<p class="tiny">“${esc(b.quote)}”</p>` : ''}${b.why ? `<p class="tiny muted">${esc(b.why)}</p>` : ''}${b.risk ? `<p class="tiny muted">What would prove it wrong: “${esc(b.risk)}”</p>` : ''}</div>`).join('')}
+        ${t.bull_case || t.bear_case ? `<div class="cases"><div><b>Bull case</b><p class="tiny">${esc(t.bull_case || '–')}</p></div><div><b>Bear case</b><p class="tiny">${esc(t.bear_case || '–')}</p></div></div>` : ''}
+        ${t.double_check ? `<p class="tiny">Double-check of its draft: ${t.double_check.changed?.length ? pill(`changed ${t.double_check.changed.join(', ')}`, 'warn') : pill('draft confirmed', 'ok')}</p>` : ''}${t.primary ? `<p class="tiny">Primary horizon: <b>${esc(HOR[t.primary] || t.primary)}</b></p>` : ''}
+        <h4>What the autopilot did</h4>${t.trades?.length ? t.trades.map((x) => `<div class="step">${side(x.side)} ${esc(HOR[x.horizon] || x.horizon)} · ${pct(x.weight, 1)} of the account · exits ${esc(x.exit_session)}</div>`).join('') : '<p class="tiny muted">No trade (no side, not tradable on this horizon, too old, or not shortable).</p>'}
+        <p class="tiny muted">${t.research_s ? `Research ${fmt(t.research_s)} s · Bonsai ${fmt(t.judge_s)} s · ` : ''}<a href="#researchlog">Full log and websites →</a></p></details>`;
+    const ev = (d.events || []).slice(0, 40).map((e) => `<tr><td>${esc(when(e.at))}</td><td>${esc(e.type)}</td><td class="tiny">${esc(JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => !['at', 'type', 'seq', 'hash', 'prev'].includes(k))))).slice(0, 300)}</td></tr>`).join('');
+    return `<h2>Autopilot</h2><p class="lede">One button: research 150 technology companies, decide bull or bear, and trade them long and short in a separate paper account.</p>
+      ${plain('Jan reads the news and filings, Bonsai calls each horizon bull or bear, and the autopilot buys the bull calls and short-sells the bear calls in its <b>own practice account</b> (paper money, separate from the main one). Day trades close before 4 pm; swing trades close on their exit day or at a 10% stop. If the account falls 35% below its start, everything closes and it stops. Every day-trading rule we tested lost money after costs, so watch this as an experiment.')}
+      <div class="card wide"><div class="row">${button}</div>
+        <p class="muted">${esc(st.message || 'Not started yet.')}${st.updated_at ? ` · ${esc(when(st.updated_at))}` : ''}</p>
+        ${d.killed ? `<p class="err"><b>Stopped by the 35% drawdown limit:</b> ${esc(d.killed)}</p>` : ''}${st.last_error ? `<p class="tiny err">Last error (${esc(when(st.last_error_at))}): ${esc(st.last_error)}</p>` : ''}
+        <div class="kpis">${kpi('Market', esc(st.regime || '–'), 'QQQ trend')}${kpi('Open calls', fmt(st.open_calls ?? (d.lots || []).length), `${fmt(st.longs ?? 0)} long · ${fmt(st.shorts ?? 0)} short`)}${kpi('Fresh research', `${fmt(d.fresh)} of ${fmt((d.universe || []).length)}`, 'decided in the last 20 hours')}${kpi('Phase', esc(st.phase || '–'))}</div></div>
+      <div class="card wide">${h3('Separate paper account', 'Autopilot account')}${acct}</div>
+      <div class="split"><div class="card">${h3('Total money: today', 'Autopilot equity')}${chart(hd, 'Today', iso)}</div><div class="card">${h3('Total money: last month', 'Autopilot equity')}${chart(hm, 'Month', (t) => iso(t).slice(0, 10))}</div></div>
+      <div class="card wide">${h3('Total money: every minute since the start', 'Autopilot equity')}${local}</div>
+      <div class="card wide">${h3('Combined fund: core trend book + autopilot', 'Combined fund')}${d.combined?.timestamp?.length > 1 ? `
+        ${lineChart([{ name: 'Combined fund', x: d.combined.timestamp.map((t) => iso(t).slice(0, 10)), y: d.combined.total }, { name: 'Main account (core book)', x: d.combined.timestamp.map((t) => iso(t).slice(0, 10)), y: d.combined.main }, { name: 'Autopilot', x: d.combined.timestamp.map((t) => iso(t).slice(0, 10)), y: d.combined.auto }], { height: 240, yFmt: (v) => '$' + fmt(v), xTicks: (t) => t.slice(5, 10) })}
+        <div class="kpis">${kpi('Combined money', money(d.combined.total.at(-1)))}${kpi('Combined drawdown', pct(d.combined.drawdown, 1), 'from its peak this month')}${kpi('Daily-change correlation', d.combined.correlation == null ? '–' : fmt(d.combined.correlation, 2), 'near 0 = the two books steady each other')}</div>` : '<p class="empty">Appears after two trading days with both accounts.</p>'}
+        <p class="tiny muted">The two accounts stay separate; this only adds them up. The main account also holds the AI-picks sleeve.</p></div>
+      <div class="card wide">${h3('Stability rules', 'Stability rules')}
+        <p class="tiny">${pill('Market-neutral hedge', 'ok')} Short ${pct(Math.abs(st.hedge ?? 0), 0)} of the account in QQQ, QQQM, XLK and VGT against the stocks’ market exposure (beta), so market swings largely cancel out.</p>
+        <table><tr><th>Horizon</th><th class="num">Finished trades</th><th class="num">Average edge over the market</th><th class="num">Kelly size</th></tr>
+        ${Object.entries(d.kelly || {}).map(([h, k]) => `<tr><td>${esc(HOR[h] || h)}</td><td class="num">${fmt(k.n)}</td><td class="num">${k.mean == null ? '–' : pct(k.mean, 2)}</td><td class="num">${k.n < 100 ? `×1 <span class="muted tiny">(needs 100)</span>` : k.mult === 0 ? pill('off: no edge', 'bad') : `×${fmt(k.mult, 2)}`}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Starts with the first finished trades.</td></tr>'}</table>
+        <p class="tiny muted">Kelly (Berlekamp’s rule at Renaissance): bet in proportion to the measured edge. Half Kelly, at most ×2; a horizon whose finished trades lose is switched off until its record turns positive.</p></div>
+      <div class="card wide">${h3('Open calls (the plan)', 'Autopilot calls')}${lots ? `<table><tr><th>Stock</th><th>Side</th><th>Horizon</th><th class="num">Size</th><th class="num">Entry</th><th>Exit day</th><th>How the size was set</th></tr>${lots}</table>` : '<p class="empty">No open calls.</p>'}</div>
+      <div class="card wide">${h3('Positions at the broker', 'Autopilot positions')}${pos ? `<table><tr><th>Stock</th><th>Side</th><th class="num">Shares</th><th class="num">Bought at</th><th class="num">Now</th><th class="num">Value</th><th class="num">Profit</th></tr>${pos}</table>` : '<p class="empty">No positions.</p>'}</div>
+      <div class="card wide">${h3('Every trade (fills)', 'Autopilot trades')}${fills ? `<table><tr><th>When</th><th>Side</th><th>Stock</th><th class="num">Shares</th><th class="num">Price</th><th class="num">Amount</th><th>Why</th></tr>${fills}</table>` : '<p class="empty">No trades yet.</p>'}
+        ${ords ? `<details><summary>Orders (latest 60)</summary><table><tr><th>Sent</th><th>Side</th><th>Stock</th><th class="num">Shares</th><th class="num">Filled</th><th class="num">Price</th><th>Status</th></tr>${ords}</table></details>` : ''}</div>
+      <div class="card wide rlog">${h3("The AI models' chain of thought, newest first", 'Autopilot reasoning')}${(d.thoughts || []).length ? d.thoughts.map(thought).join('') : '<p class="empty">Written as each company’s research is decided.</p>'}</div>
+      <div class="card wide">${h3('Autopilot log', 'Autopilot log')}${ev ? `<table><tr><th>When</th><th>What</th><th>Details</th></tr>${ev}</table>` : '<p class="empty">Nothing yet.</p>'}</div>`;
+  },
+
+  async researchlog() {
+    const r = await api('research_log');
+    const p = r.progress || {}, total = p.total || 150, done = p.done || 0;
+    const dur = (x) => (x == null ? '–' : x < 90 ? `${fmt(x)} s` : x < 5400 ? `${fmt(x / 60)} min` : `${fmt(x / 3600, 1)} h`);
+    const LABEL = { 1: ['strong bear', 'bad'], 2: ['bear', 'bad'], 4: ['bull', 'ok'], 5: ['strong bull', 'ok'] };
+    const HOR = { day: 'Next session', short: '5 sessions', medium: '21 sessions', long: '63 sessions' };
+    const SUP = { event: 'backed by a company event', quoted: 'quote is only about the share price', none: 'no valid quote' };
+    const finish = p.eta_s && p.state === 'running' ? new Date(Date.now() + p.eta_s * 1000) : null;
+    const bar = !p.total ? '<p class="empty">No 150-company run yet.</p>' : `
+      <div class="progress"><div style="width:${Math.min(100, (100 * done) / total).toFixed(1)}%"></div></div>
+      <div class="kpis">${kpi('Companies done', `${fmt(done)} of ${fmt(total)}`, pct(done / total, 0))}${kpi('Time left', p.state === 'running' ? dur(p.eta_s) : '–', finish ? `about ${esc(when(finish.toISOString()))}` : esc(p.state || ''))}${kpi('Per company', dur(p.per_company_s), 'median of finished batches')}${kpi('Batches run', fmt((p.batches || []).length), `${fmt(Object.keys(p.attempts || {}).length)} companies failed at least once`)}</div>
+      <p class="muted">${esc(p.message || '')}${r.active ? ` · in progress: ${r.active.companies.map((c) => `${esc(c.ticker)} (${esc(c.stage || c.status || '…')})`).join(', ')}` : ''}</p>`;
+    const call = (h, c) => { const [name, kind] = LABEL[c.label] || [c.label, '']; return `<div class="step"><b>${esc(HOR[h] || h)}</b> ${pill(name, kind)} <span class="muted tiny">${esc(SUP[c.support] || c.support)}${c.weakened ? ', weakened from strong' : ''}</span>
+      ${c.quote ? `<p class="tiny">“${esc(c.quote)}”</p>` : ''}${c.why ? `<p class="tiny muted">${esc(c.why)}</p>` : ''}</div>`; };
+    const one = (c) => {
+      const b = c.bonsai, j = c.jan, calls = Object.entries(b.calls || {});
+      const summary = calls.length ? calls.map(([h, x]) => pill(`${h}: ${(LABEL[x.label] || [x.label])[0]}`, (LABEL[x.label] || [, ''])[1])).join(' ') : pill(c.status || 'running', c.status === 'decided' ? '' : 'bad');
+      return `<details><summary><b>${esc(c.ticker)}</b> ${summary} <span class="muted tiny">${esc(when(c.decided_at || c.as_of))} · research ${dur(c.research_s)} · Bonsai ${dur(c.judge_s)}${c.error ? ` · ${esc(c.error)}` : ''}</span></summary>
+        <h4>Jan (researcher)</h4>
+        ${j.searches.length ? `<p class="tools">Searches: ${j.searches.map(esc).join(' · ')}</p>` : ''}
+        ${j.steps.map((s, i) => `<div class="step"><b>Step ${i + 1}.</b> ${esc(s.thought || '(no thought written)')}${s.tools ? `<div class="tools">→ ${s.tools.map(esc).join('<br>→ ')}</div>` : ''}${s.conclusion ? `<p class="tiny muted">Conclusion: ${esc(s.conclusion)}</p>` : ''}</div>`).join('')}
+        ${j.readers.length ? `<p class="muted tiny">${fmt(j.readers.length)} parallel readers kept ${fmt(j.readers.reduce((a, x) => a + (x.kept || 0), 0))} checked facts; ${fmt(j.facts.length)} went on the fact sheet.</p>` : ''}
+        ${j.facts.length ? `<details><summary class="tiny">Fact sheet (${fmt(j.facts.length)} facts)</summary><ul class="tiny">${j.facts.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></details>` : ''}
+        <h4>Bonsai (judge)</h4>
+        ${(b.lookups || []).map((s) => `<div class="step"><b>Lookup ${esc(s.round)}.</b> ${esc(s.thought || s.error || '')}${s.done ? ' <span class="muted">(enough)</span>' : ''}${(s.calls || []).length ? `<div class="tools">${s.calls.map((x) => `→ ${esc(x.tool)} ${esc(JSON.stringify(x.args).slice(0, 180))}${x.ok ? '' : ` <span class="err">(${esc(x.error || 'failed')})</span>`}`).join('<br>')}</div>` : ''}</div>`).join('')}
+        ${b.double_check ? `<h4>Bonsai's double-check of its draft ${b.double_check.changed?.length ? pill(`changed: ${b.double_check.changed.join(', ')}`, 'warn') : pill('draft confirmed', 'ok')}</h4>
+          ${(b.double_check.steps || []).map((s) => `<div class="step"><b>Check ${esc(s.round)}.</b> ${esc(s.thought || s.error || '')}${s.done ? ' <span class="muted">(checked)</span>' : ''}${(s.calls || []).length ? `<div class="tools">${s.calls.map((x) => `→ ${esc(x.tool)} ${esc(JSON.stringify(x.args).slice(0, 180))}${x.ok ? '' : ` <span class="err">(${esc(x.error || 'failed')})</span>`}`).join('<br>')}</div>` : ''}</div>`).join('')}
+          <p class="tiny muted">Draft: ${Object.entries(b.double_check.draft || {}).map(([h, l]) => `${esc(h)} ${esc((LABEL[l] || [l])[0])}`).join(' · ')} · ${fmt(b.double_check.s)} s</p>` : ''}
+        ${b.bull_case || b.bear_case ? `<div class="cases"><div><b>Bull case</b><p class="tiny">${esc(b.bull_case || '–')}</p></div><div><b>Bear case</b><p class="tiny">${esc(b.bear_case || '–')}</p></div></div>` : ''}
+        ${b.primary ? `<p class="tiny">Primary horizon: <b>${esc(HOR[b.primary] || b.primary)}</b></p>` : ''}
+        ${calls.map(([h, x]) => call(h, x)).join('')}
+        <h4>Websites visited (${fmt(c.sites.length)})</h4>
+        ${c.sites.map((x) => `<div class="site">${x.used ? pill('used', 'ok') : x.skipped ? pill('skipped: robots.txt') : x.ok ? pill('opened') : pill('blocked', 'bad')} ${esc(x.by)} · <a href="${esc(x.url)}" target="_blank" rel="noreferrer">${esc(x.url)}</a>${x.note ? ` <span class="muted">${esc(x.note)}</span>` : ''}</div>`).join('')}
+      </details>`;
+    };
+    return `<h2>Research log</h2><p class="lede">The 150 technology companies: how far the run is, and what both AIs thought and read.</p>
+      ${plain('Jan searches the news and the company’s own SEC filings, and parallel readers pull checked facts from every page. Bonsai then looks up what is still missing, argues the bull case and the bear case, and calls each horizon bull or bear. Quotes are checked word for word by code. Research only: nothing here places orders.')}
+      <div class="card wide">${h3('Progress', 'Research progress')}${bar}</div>
+      <div class="card wide rlog">${h3('Reasoning and sources, newest first', 'Research log')}${r.companies.length ? r.companies.map(one).join('') : '<p class="empty">No research yet.</p>'}</div>`;
+  },
+
   async records() {
     const r = await api('records');
     const none = (what) => `<p class="empty">${esc(what)}</p>`;
@@ -258,7 +517,7 @@ const views = {
       <div class="kpis">${chain(f.stages)}</div>${why(f.stopped, 'Stopped after')}${why(f.waiting, 'Waiting after')}
       <h4>Of the scored reports, the AI-picks trades</h4><div class="kpis">${chain(f.trade_stages)}</div>${why(f.trade_stopped, 'Stopped after')}${why(f.trade_waiting, 'Waiting after')}`;
     const row = (name, x) => `<tr><td>${esc(name)}</td><td class="num">${pct(x.net_return, 2)}</td><td class="num">${fmt(x.pairs)}</td><td class="num">${fmt(x.turnover, 2)}×</td><td class="num">${fmt(x.mean_gross_exposure, 2)}×</td></tr>`;
-    const contrib = !c ? none('Written by the next weekly run.') : `<p class="muted">The same small book traded three ways with identical timing, sizes and costs: with the AI's real scores, with the same scores dealt out at random, and buying every report. Only the choice of stocks differs, so the gap is what the AI adds. ${esc(c.note || '')}</p>
+    const contrib = !c ? none('Written by the next weekly run.') : c.replay_matches_live_book === false ? `<div class="banner warn">Legacy AI contribution comparison blocked: the replay does not match the live simulator. Update engineering evidence for reconciliation details.</div><pre class="operation-log">${esc(JSON.stringify({reconciliation: c.reconciliation, prospective: c.prospective_replay}, null, 2))}</pre>` : `<p class="muted">The same small book traded three ways with identical timing, sizes and costs: with the AI's real scores, with the same scores dealt out at random, and buying every report. These are simulated counterfactuals. A mismatch blocks any claim about live AI contribution. ${esc(c.note || '')}</p>
       <table><tr><th>Version</th><th class="num">Return after costs</th><th class="num">Trades</th><th class="num">Turnover</th><th class="num">Average size</th></tr>
         ${row("AI's picks", c.ai)}${row('Every report', c.every_release)}
         <tr><td>Scores dealt at random (${fmt(c.shuffled.deals)} deals)</td><td class="num">${pct(c.shuffled.mean_net_return, 2)} <span class="muted">(${pct(c.shuffled.p05, 2)} to ${pct(c.shuffled.p95, 2)})</span></td><td class="num">${fmt(c.shuffled.mean_pairs, 1)}</td><td></td><td></td></tr></table>
@@ -505,16 +764,17 @@ Object.assign(views, {
 
   async system() {
     const s = await api('system');
-    sysHistory.push({ t: s.at, cpu: s.cpu.temp_c, gpu: s.gpu?.temp_c ?? null, cpuUse: s.cpu.usage, gpuUse: s.gpu ? s.gpu.util / 100 : null });
-    if (sysHistory.length > 240) sysHistory.shift();
+    sysHistory.push({ t: s.at, cpu: s.cpu.temp_c, cores: s.cpu.cores_c ?? null, gpu: s.gpu?.temp_c ?? null, cpuUse: s.cpu.usage, gpuUse: s.gpu ? s.gpu.util / 100 : null });
+    if (sysHistory.length > 450) sysHistory.shift();  // 15 minutes at one reading every 2 s
     const gb = (b) => (b == null ? '–' : `${(b / 2 ** 30).toFixed(1)} GB`), heat = (c, warn, hot) => (c == null ? '' : c >= hot ? pill('hot', 'bad') : c >= warn ? pill('warm', 'warn') : pill('ok', 'ok'));
-    const g = s.gpu, memUsed = s.mem.total != null ? 1 - s.mem.available / s.mem.total : null, x = sysHistory.map((h) => h.t.slice(11, 19));
-    const hist = (keys, names, f) => (sysHistory.length > 1 ? lineChart(keys.map((k, i) => ({ name: names[i], x, y: sysHistory.map((h) => h[k]) })), { width: 560, height: 220, yFmt: f }) : '<p class="empty">The chart fills in as this page refreshes (every few seconds).</p>');
+    const g = s.gpu, memUsed = s.mem.total != null ? 1 - s.mem.available / s.mem.total : null, x = sysHistory.map((h) => h.t);
+    const clock = (d) => new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const hist = (keys, names, f) => (sysHistory.length > 1 ? lineChart(keys.map((k, i) => ({ name: names[i], x, y: sysHistory.map((h) => h[k]) })), { width: 560, height: 220, yFmt: f, xTicks: clock }) : '<p class="empty">The chart fills in as this page refreshes (every 2 seconds).</p>');
     const up = `${Math.floor(s.uptime_s / 86400)}d ${Math.floor((s.uptime_s % 86400) / 3600)}h ${Math.floor((s.uptime_s % 3600) / 60)}m`;
     return `<h2>System</h2><p class="lede">How hard this PC is working right now. ${pill('experimental', 'warn')}</p>
       ${plain('The AI models run on the graphics card (GPU) and the trading code on the processor (CPU). If the GPU memory is full or something is running hot, research jobs slow down or stop. This page only reads the sensors; it changes nothing.')}
       <div class="kpis">
-        ${kpi('CPU temperature', s.cpu.temp_c == null ? '–' : `${s.cpu.temp_c.toFixed(0)} °C`, heat(s.cpu.temp_c, 80, 92))}
+        ${kpi('CPU temperature', s.cpu.cores_c == null ? (s.cpu.temp_c == null ? '–' : `${s.cpu.temp_c.toFixed(1)} °C`) : `${s.cpu.cores_c.toFixed(1)} °C`, `${heat(s.cpu.cores_c ?? s.cpu.temp_c, 80, 92)}${s.cpu.cores_c != null && s.cpu.temp_c != null ? ` cores · hottest point ${s.cpu.temp_c.toFixed(1)} °C` : ''}`)}
         ${kpi('GPU temperature', g?.temp_c == null ? '–' : `${g.temp_c} °C`, heat(g?.temp_c, 75, 85))}
         ${kpi('CPU in use', pct(s.cpu.usage, 0), `load ${s.cpu.load.map((v) => v.toFixed(1)).join(' · ')} on ${s.cpu.cores} threads`)}
         ${kpi('GPU in use', g ? `${g.util}%` : '–', g ? `${g.power_w?.toFixed(0) ?? '–'} W${g.fan != null ? ` · fan ${g.fan}%` : ''}` : 'no NVIDIA GPU found')}
@@ -524,7 +784,7 @@ Object.assign(views, {
         ${kpi('Up for', up, esc(s.host))}
       </div>
       <div class="split">
-        <div class="card"><h3>Temperature (°C)</h3>${hist(['cpu', 'gpu'], ['CPU', 'GPU'], (v) => v.toFixed(0))}</div>
+        <div class="card"><h3>Temperature (°C), last 15 minutes</h3>${hist(['cores', 'cpu', 'gpu'], ['CPU cores', 'CPU hottest point', 'GPU'], (v) => v.toFixed(0))}</div>
         <div class="card"><h3>How busy</h3>${hist(['cpuUse', 'gpuUse'], ['CPU', 'GPU'], (v) => pct(v, 0))}</div>
       </div>
       <div class="split">
@@ -573,7 +833,7 @@ Object.assign(views, {
     const card = (r) => `<div class="team-card"><div class="team-head"><span class="tk">${esc(r.ticker)}</span><span class="muted">${esc(r.sector)} · ${esc(when(r.accepted_utc ? `${r.accepted_utc}Z` : null))}</span>
         ${thr != null && r.logodds >= thr ? pill('practice trade', 'lime') : pill('no trade')}${r.outcome?.excess != null ? pill(`result ${pct(r.outcome.excess)} vs sector`, r.outcome.excess > 0 ? 'ok' : 'bad') : pill('result due in a week', 'warn')}</div>
       <div class="agents">
-        <div class="agent"><div class="who"><span>Reader agent · checked facts</span>${tone(r.reader.tone)}</div>
+        <div class="agent"><div class="who"><span>${r.pipeline === 'jan_bonsai_v1' ? 'Jan reader & research' : 'Reader agent'} · checked facts</span>${tone(r.reader.tone)}</div>
           Sales ${num(r.reader.revenue, 'M', 0)}<br>Profit per share ${num(r.reader.eps)}<br>Outlook: ${tone(r.reader.guidance)}
           ${r.reader.rejected.length ? `<br><span class="muted">${r.reader.rejected.length} number(s) thrown out: not found word-for-word</span>` : ''}
           ${(r.dropped || []).map((x) => `<br><span class="warn-text">Not passed to the judge: ${esc(x)}</span>`).join('')}</div>
@@ -610,6 +870,8 @@ Object.assign(views, {
 });
 
 let current = 'overview';
+let operationId = null;
+let operationStarting = false;
 let shown = 0;  // ignore a slower, older page load that finishes after a newer click
 async function show(name, keepScroll = false) {
   current = name;
@@ -621,8 +883,15 @@ async function show(name, keepScroll = false) {
   let html;
   try { html = await views[name](); } catch (e) { html = `<p class="err">${esc(e.message)}</p>`; }
   if (mine !== shown) return;
+  // A refresh keeps what you opened: expanded sections stay expanded (keyed by their summary text and order)
+  const keys = (root) => { const seen = {}; return [...root.querySelectorAll('details')].map((d) => {
+    const t = d.querySelector(':scope > summary')?.textContent.trim().slice(0, 120) ?? ''; seen[t] = (seen[t] || 0) + 1; return `${t}#${seen[t]}`; }); };
+  const before = keepScroll ? keys($('#view')) : [];
+  const open = new Set([...$('#view').querySelectorAll('details')].map((d, i) => (keepScroll && d.open ? before[i] : null)).filter(Boolean));
+  const top = $('.main-area').scrollTop;
   $('#view').innerHTML = html;
-  if (!keepScroll) $('.main-area').scrollTop = 0;
+  if (open.size) { const after = keys($('#view')); $('#view').querySelectorAll('details').forEach((d, i) => { if (open.has(after[i])) d.open = true; }); }
+  $('.main-area').scrollTop = keepScroll ? top : 0;
   attachHover($('#view'));
   $('#updated').textContent = `updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
@@ -664,8 +933,40 @@ $('#halt-btn').addEventListener('click', async () => {
   sidebarState(); show(current);
 });
 $('#view').addEventListener('click', async (e) => {
+  const go = e.target.closest('[data-go]');
+  if (go) { await show(go.dataset.go); return; }
+  const navigate = e.target.closest('[data-view]');
+  if (navigate) { await show(navigate.dataset.view); return; }
+  const log = e.target.closest('[data-operation-log]');
+  if (log) { operationId = log.dataset.operationLog; await show('operations', true); return; }
+  const stopAuto = e.target.closest('[data-stop-auto]');
+  if (stopAuto) {
+    try { await api('operations/stop', { id: stopAuto.dataset.stopAuto }); await show(stopAuto.dataset.back || 'operations', true); }
+    catch (error) { alert(error.message); }
+    return;
+  }
+  const op = e.target.closest('[data-operation]');
+  if (op) {
+    if (operationStarting) return;
+    operationStarting = true;
+    try {
+      const action = op.dataset.operation;
+      const paper = ['paper_ai', 'paper_sync', 'paper_research_test', 'paper_auto', 'paper_auto_tech100', 'full_auto'].includes(action);
+      const confirmation = paper ? await confirmDialog({ title: op.closest('.card')?.querySelector('h3')?.textContent || op.textContent,
+        text: action === 'full_auto' ? 'Start the autopilot: it researches the 150 technology companies and the theme stocks, and trades their bull and bear calls long and short in the SEPARATE Alpaca paper account (paper money only; without its keys it only researches and logs). It runs until you stop it and uses the GPU between scheduled jobs. Day trades close before 4 pm; a 35% fall from the start closes everything.' : action === 'paper_auto_tech100' ? 'Activate the cached 100 technology stocks as the persistent entry universe for ALL AI paper runs, including scheduled runs. Existing positions can exit and paired sector ETF hedges remain allowed. No model or dataset downloads. New horizon budgets stay simulations; approved five-day sizing remains in force. Stop the current continuous worker before switching profiles.' : action === 'paper_auto' ? 'Start continuous paper sync, filing checks every 15 minutes and evidence review, plus a resumable news research queue. This can use the GPU for days. Ten minutes is a maximum per company, not a forced delay. Proposals cannot change the mandate. Stop finishes the current step; restart manually after reboot.' : action === 'paper_research_test' ? 'Run fresh public research and virtual horizon proposals, then the approved filing strategy and Alpaca paper orders. Experimental horizon allocations are not submitted. This can use the GPU for several minutes.' : action === 'paper_ai' ? 'Jan reads and researches new filings, then Bonsai judges them and eligible paper trades are submitted. This uses the GPU sequentially and can take time. Failed research is deferred, with no lite fallback. Existing entry sessions and sizing apply.' : 'Reconcile existing orders and submit any pending paper orders. This may change holdings in the practice account.', word: 'PAPER' }) : {};
+      if (!confirmation) return;
+      op.disabled = true;
+      const run = await api('operations', { action, ...confirmation });
+      operationId = run.id;
+      await show(action === 'full_auto' ? 'autopilot' : 'operations', true);
+    } catch (error) { alert(error.message); await show('operations', true); }
+    finally { operationStarting = false; }
+    return;
+  }
   const q = e.target.closest('[data-q]');
   if (q) { await api('research', { action: q.dataset.q, name: q.dataset.name }).catch((x) => alert(x.message)); show('research'); }
+  const acct = e.target.closest('[data-acct]');
+  if (acct) { alpacaTab = acct.dataset.acct; show('alpaca'); return; }
   const st = e.target.closest('[data-strat]');
   if (st) { stratTab = st.dataset.strat; show('strategies'); return; }
   const rv = e.target.closest('[data-review]');
@@ -675,6 +976,29 @@ $('#view').addEventListener('click', async (e) => {
     document.querySelectorAll('[data-review]').forEach((b) => b.classList.toggle('lime', b === rv));
   }
 });
+$('#view').addEventListener('submit', async (e) => {
+  const engineering = e.target.closest('[data-engineering-form]');
+  if (engineering) {
+    e.preventDefault();
+    const data = new FormData(engineering);
+    const body = { action: engineering.dataset.action, digest: engineering.dataset.digest,
+      reviewer: data.get('reviewer'), note: data.get('note'), confirm: data.get('confirm'), checks: data.getAll('checks') };
+    if (body.action === 'costs') body.costs = Object.fromEntries(['fees', 'borrow', 'financing'].map((key) => [key, Number(data.get(key))]));
+    try { await api('engineering_review', body); await show('institutional', true); } catch (error) { alert(error.message); }
+    return;
+  }
+  const form = e.target.closest('[data-benchmark-form]');
+  if (!form) return;
+  e.preventDefault();
+  const data = new FormData(form);
+  try {
+    await api('benchmark', { accession: form.dataset.accession, expected_source_hash: form.dataset.sourceHash,
+      expected_case_hash: form.dataset.caseHash, reviewer: data.get('reviewer'), note: data.get('note'),
+      checks: data.getAll('checks'), decision: data.get('decision'), confirm: data.get('confirm'),
+      corrected: JSON.parse(data.get('corrected')) });
+    await show('benchmark', true);
+  } catch (error) { alert(error.message); }
+});
 
 saveSettings();
 const start = location.hash.slice(1);
@@ -682,11 +1006,11 @@ show(views[start] ? start : views[settings.startPage] ? settings.startPage : 'ov
 window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (views[v]) show(v); });
 sidebarState();
 // Auto-reload: every page except the ones you read or type in. The System page ticks every 5 s so its charts move.
-const NO_RELOAD = new Set(['settings', 'how', 'reviews']);
+const NO_RELOAD = new Set(['settings', 'how', 'reviews', 'benchmark', 'institutional']);
 let lastReload = Date.now();
 setInterval(() => {
-  const due = current === 'system' ? 5 : settings.reloadSec;
-  if (!settings.autoReload || NO_RELOAD.has(current) || document.querySelector('dialog[open]') || document.hidden) return;
+  const due = current === 'system' ? 2 : current === 'operations' ? 5 : settings.reloadSec;
+  if ((!settings.autoReload && current !== 'operations') || NO_RELOAD.has(current) || document.querySelector('dialog[open]') || operationStarting || document.hidden) return;
   if (Date.now() - lastReload < due * 1000) return;
   lastReload = Date.now();
   if (current !== 'system') { metricsCache = null; sidebarState(); }

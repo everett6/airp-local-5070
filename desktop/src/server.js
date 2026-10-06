@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAirp } from './airp.js';
 import { systemStats } from './system.js';
+import { createRunner } from './runner.js';
 
 export const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -25,8 +26,9 @@ function readBody(req) {
   });
 }
 
-export async function startServer({ airpRoot, port = 0, publicDir = path.join(appRoot, 'public') } = {}) {
+export async function startServer({ airpRoot, port = 0, publicDir = path.join(appRoot, 'public'), runnerOptions } = {}) {
   const airp = createAirp(airpRoot);
+  const runner = createRunner(airpRoot, runnerOptions);
   const token = randomBytes(24).toString('base64url');
   const ok = (req) => {
     const m = /(?:^|;\s*)airp_token=([^;]+)/.exec(req.headers.cookie || '');
@@ -38,6 +40,10 @@ export async function startServer({ airpRoot, port = 0, publicDir = path.join(ap
   const routes = {
     'GET /api/overview': () => airp.overview(),
     'GET /api/books': () => airp.books(),
+    'GET /api/alpaca-account': () => airp.alpacaAccount(),
+    'GET /api/alpaca-account-auto': () => airp.alpacaAutoAccount(),
+    'GET /api/trading-plan': () => airp.tradingPlan(),
+    'GET /api/horizon-shadows': () => airp.horizonShadows(),
     'GET /api/decisions': () => airp.decisions(),
     'GET /api/team': () => airp.team(),
     'GET /api/health': () => airp.health(),
@@ -55,6 +61,21 @@ export async function startServer({ airpRoot, port = 0, publicDir = path.join(ap
     'GET /api/reviews': () => airp.reviews(),
     'GET /api/info': () => ({ airpRoot, found: airp.exists(), versions: { node: process.versions.node, electron: process.versions.electron ?? null, app: process.env.npm_package_version ?? null } }),
     'GET /api/system': () => systemStats(airpRoot),
+    'GET /api/operations': () => runner.status(),
+    'GET /api/improvement': () => airp.improvement(),
+    'GET /api/institutional': () => airp.institutional(),
+    'GET /api/budget-experiment': () => airp.budgetExperiment(),
+    'GET /api/live-research': () => airp.liveResearch(),
+    'GET /api/research_log': () => airp.researchLog(),
+    'GET /api/autopilot': () => airp.autopilot(),
+    'GET /api/benchmark': () => airp.benchmarkReview(),
+    'POST /api/benchmark': async (req) => airp.attestBenchmark(await readBody(req)),
+    'POST /api/engineering_review': async (req) => airp.engineeringReview(await readBody(req)),
+    'POST /api/operations/stop': async (req) => runner.stop((await readBody(req)).id),
+    'POST /api/operations': async (req) => {
+      const { action, confirm } = await readBody(req);
+      return runner.start(action, confirm);
+    },
     'GET /api/metrics': () => airp.metrics() ?? { missing: true },
     'POST /api/metrics': () => airp.rebuildMetrics(),
     'POST /api/halt': async (req) => {
@@ -83,7 +104,13 @@ export async function startServer({ airpRoot, port = 0, publicDir = path.join(ap
       }
       if (url.pathname.startsWith('/api/')) {
         if (!ok(req)) return send(res, 401, { error: 'unauthorized' });
+        const origin = `http://127.0.0.1:${server.address().port}`;
+        if (req.method === 'POST' && ((req.headers.origin && req.headers.origin !== origin) || req.headers['sec-fetch-site'] === 'cross-site')) return send(res, 403, { error: 'same-origin actions only' });
         if (req.method === 'POST' && req.headers['content-type'] !== 'application/json') return send(res, 415, { error: 'json only' });
+        if (url.pathname === '/api/operation' && req.method === 'GET') {
+          const job = runner.job(url.searchParams.get('id'), true);
+          return job ? send(res, 200, job) : send(res, 404, { error: 'no such run' });
+        }
         if (url.pathname === '/api/review') {
           const text = airp.review(url.searchParams.get('name') || '');
           return text == null ? send(res, 404, { error: 'no such review' }) : send(res, 200, { text });

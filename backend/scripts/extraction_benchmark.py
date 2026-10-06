@@ -1,4 +1,4 @@
-"""The extraction benchmark: hand-labelled figures for hard releases (docs/PLAN_60_V2.md, "Outside review, second
+"""The extraction benchmark: provisional labels for hard releases (docs/PLAN_60_V2.md, "Outside review, second
 part", new records). A yardstick, not a trial: run it before a reader or a prompt replaces the live one.
 
     python scripts/extraction_benchmark.py                       # the live reader's records kept with the benchmark
@@ -155,8 +155,15 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--extract", action="append", help="reader output (jsonl); may be given more than once")
     ap.add_argument("--out", default="", help="write the full result here (json)")
+    ap.add_argument("--human-verified", action="store_true", help="require source-bound human labels for every case")
     a = ap.parse_args()
     gold = json.loads(GOLD.read_text())
+    if a.human_verified:
+        from app.forward.benchmark_review import materials
+        reviewed = materials(BACKEND)
+        if any(not m["approved"] for m in reviewed):
+            raise SystemExit("Reader qualification blocked: all benchmark cases need a human source review")
+        gold["cases"] = [m["review"]["corrected_case"] for m in reviewed]
     rep = score(gold, load_records([BACKEND / p for p in (a.extract or DEFAULT_EXTRACTS)]))
     if a.out:
         (BACKEND / a.out).write_text(json.dumps(rep, indent=1) + "\n")

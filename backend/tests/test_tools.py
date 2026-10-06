@@ -117,6 +117,16 @@ def test_parse_rss_unwraps_bing_and_flags_google_links():
     assert parse_rss("<not xml") == []
 
 
+async def test_news_search_does_not_crowd_out_original_urls(monkeypatch):
+    monkeypatch.setitem(DNS, 'news.google.com', ['93.184.216.34'])
+    monkeypatch.setitem(DNS, 'www.bing.com', ['93.184.216.34'])
+    f = fetcher(lambda _request: httpx.Response(200, text=RSS))
+    gateway = G.ToolGateway(mode='live', fetcher=f)
+    result = await G._news_search(gateway, {'query': 'company', 'days': 14, 'limit': 1})
+    assert result['items'][0]['url'] == 'https://www.example.com/story'
+    await gateway.aclose()
+
+
 def test_html_to_text_keeps_article_drops_chrome():
     html = """<html><head><title>T</title><meta property="article:published_time" content="2026-09-12T10:00Z">
     <script>var secret = 1;</script></head><body><nav>Home | Markets | About us and more links here</nav>

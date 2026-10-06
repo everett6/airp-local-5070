@@ -39,7 +39,7 @@ from collections.abc import Callable, Collection, Iterator
 from contextlib import ExitStack, contextmanager
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
@@ -77,7 +77,7 @@ def outcome_index(days: pd.DatetimeIndex, rec: dict[str, Any]) -> int | None:
     if rec.get("entry_session"):
         i = int(days.searchsorted(pd.Timestamp(rec["entry_session"])))
         return i if i < len(days) else None
-    return entry_index(days, datetime.fromisoformat(rec["accepted_utc"]))
+    return cast(int | None, entry_index(days, datetime.fromisoformat(rec["accepted_utc"])))
 
 
 def members(year: int, indexes: tuple[str, ...] = ("sp500",)) -> pd.DataFrame:
@@ -119,7 +119,7 @@ async def discover(since: date, now: datetime, indexes: tuple[str, ...] = ("sp50
         raise SystemExit("set SEC_USER_AGENT in backend/.env")
     sec = Sec(ua)
     mem = members(now.year, indexes)
-    info = {int(r.cik): r for r in mem.itertuples()}
+    info = {int(cast(Any, r.cik)): r for r in mem.itertuples()}
     try:
         found: list[dict[str, Any]] = []
         for i in range(0, len(mem), 50):
@@ -303,7 +303,7 @@ def fact_sheets(d: Path, ev_csv: Path, since: date, use_gpu: bool, tag: str, pri
         with open_append(ex) as f:
             for r in pd.read_csv(ev_csv).itertuples():
                 if r.accession not in done:
-                    f.write(json.dumps({"accession": r.accession, "ticker": r.ticker, "cik": int(r.cik),
+                    f.write(json.dumps({"accession": r.accession, "ticker": r.ticker, "cik": int(cast(Any, r.cik)),
                                         "accepted_utc": r.accepted_utc, "model": "none"}) + "\n")
     with stage("fact sheet"):
         run([PY, "scripts/build_features.py", "--events", str(ev_csv), "--extract", str(ex), "--name", tag,
@@ -506,6 +506,7 @@ def main() -> None:
     ap.add_argument("--as-of", default="", help="replay at this UTC time (dry runs only; needs a --dir of its own)")
     ap.add_argument("--start", default="2026-09-30", help="first filing date the forward test covers")
     ap.add_argument("--no-gpu", action="store_true")
+    ap.add_argument("--jan-research", action="store_true", help="app paper path: Jan research then Bonsai; no lite fallback")
     ap.add_argument("--index", default="sp500", help="comma list: sp500 (the shadow book), sp400,sp600 (breadth)")
     ap.add_argument("--status", action="store_true")
     args = ap.parse_args()
@@ -524,6 +525,8 @@ def main() -> None:
     since = max(date.fromisoformat(args.start), date.fromisoformat(runs[-1]["as_of"][:10]) - timedelta(days=3)
                 if runs else date.fromisoformat(args.start))
     tag = "forward" if not args.as_of else "forward_" + d.name
+    if args.jan_research:
+        tag += "_jan_" + now.strftime("%Y%m%dT%H%M%S")
     print(f"run as of {now.isoformat(timespec='minutes')}; filings since {since}", flush=True)
     t_run = time.monotonic()
 
@@ -554,7 +557,11 @@ def main() -> None:
     print(f"{len(new)} new releases", flush=True)
 
     rows = {str(r.accession): r for r in new.itertuples()}
+    r: Any
     written: set[str] = set()
+    research_meta: dict[str, dict[str, str]] = {}
+    models_run: list[str] = []
+    pipeline = "jan_bonsai_v1" if args.jan_research else "baseline"
 
     def record(r: Any, lo: float | None) -> None:
         """One release's ledger line: its decision, or why there is none."""
@@ -564,7 +571,9 @@ def main() -> None:
                 "entry_deadline": dl.isoformat(), "entry_session": dl.date().isoformat(),
                 "as_of": now.isoformat(timespec="seconds"), "decided_at": at.isoformat(timespec="seconds"),
                 "guidance": guidance.get(r.accession, "none"),
-                **({"sheet_version": SHEET_VERSION} if SHEET_VERSION > 1 else {})}
+                **({"sheet_version": SHEET_VERSION} if SHEET_VERSION > 1 else {}),
+                **({"pipeline": pipeline, "judge_tag": tag, "reader_record_path": f"jan/extract_{tag}.jsonl",
+                    **research_meta.get(str(r.accession), {})} if args.jan_research else {})}
         if r.accession in skip or lo is None:
             why = skip.get(str(r.accession), NO_RELEASE)
             if at < dl:  # its open is still ahead: the next run tries again (a download or price may have failed)
@@ -588,10 +597,14 @@ def main() -> None:
     if len(new) and not args.no_gpu:
         prio.enter_context(gpu_priority("forward_events"))
     with stage("gpu wait"):
-        use_gpu = not args.no_gpu and wait_gpu_free(900 if len(new) else 0)
+        use_gpu = bool(len(new)) and not args.no_gpu and wait_gpu_free(900)
     logodds: dict[str, float] = {}
     guidance: dict[str, str] = {}
-    source = "bonsai" if use_gpu else "lite"
+    source = ("bonsai" if use_gpu else "lite") if len(new) else "none"
+    if not len(new):
+        print("No new filings: neither Jan nor Bonsai ran.", flush=True)
+    if args.jan_research and not use_gpu:
+        source = "none"
     tickers = {trading_symbol(t) for t in allev["ticker"]} | set(SECTOR_ETF.values()) | {"SPY"}
     px_file = d / "prices.parquet"
     with stage("prices"):
@@ -601,15 +614,45 @@ def main() -> None:
     if len(skip) < len(new):
         new_csv = d / "events_new.csv"
         new.to_csv(new_csv, index=False)
-        feats = fact_sheets(d, new_csv, since, use_gpu, tag, px_file)
-        skip = undecidable(new, p, now, fetched=True)
+        if args.jan_research:
+            if not use_gpu:
+                skip.update({str(r.accession): "Jan research deferred: GPU unavailable; no model or lite fallback"
+                             for r in new.itertuples() if str(r.accession) not in skip})
+            else:
+                from jan_forward import prepare
+                # Only currently eligible releases enter the research queue.
+                for r in new.itertuples():
+                    if clock() >= entry_deadline(str(r.accepted_utc)):
+                        skip.setdefault(str(r.accession), "Jan research skipped: entry deadline passed")
+                eligible = new[~new["accession"].isin(skip)]
+                eligible.to_csv(new_csv, index=False)
+                try:
+                    if eligible.empty:
+                        raise RuntimeError("no filings remain before their entry deadline")
+                    feats, research_skip, research_meta = prepare(d, new_csv, since, tag, px_file, p, clock, models_run)
+                    skip.update(undecidable(new, p, now, fetched=True))
+                    skip.update(research_skip)
+                    for r in new.itertuples():
+                        if str(r.accession) not in research_meta:
+                            skip.setdefault(str(r.accession), "Jan research unavailable or entry deadline passed")
+                except (RuntimeError, OSError, ValueError, subprocess.CalledProcessError) as exc:
+                    skip.update({str(r.accession): f"Jan research failed: {type(exc).__name__}; no fallback"
+                                 for r in new.itertuples() if str(r.accession) not in skip})
+                    print(f"Jan pipeline unavailable: {type(exc).__name__}", flush=True)
+        else:
+            feats = fact_sheets(d, new_csv, since, use_gpu, tag, px_file)
+            if use_gpu:
+                models_run.append("qwen3:8b")
+            skip = undecidable(new, p, now, fetched=True)
     if len(skip) < len(new):
         validate_event_inputs(new, p, now, feats=feats, skip=skip)
         f = pd.read_csv(feats).drop_duplicates("accession")
         guidance = dict(zip(f["accession"], f["guidance"].fillna("none"), strict=True))
         if use_gpu:
             with stage("judge"):
-                logodds = bonsai(new_csv, d / "extract.jsonl", feats, tag, since, d, px_file, write_early)
+                models_run.append("bonsai-27b:latest")
+                logodds = bonsai(new_csv, d / (f"jan/extract_{tag}.jsonl" if args.jan_research else "extract.jsonl"),
+                                 feats, tag, since, d, px_file, write_early)
             for acc in sorted(censored(tag) & set(rows) - set(skip) - set(logodds)):
                 skip = {**skip, acc: UNUSABLE}
                 print(f"LEARN ALERT: the judge's answer for {rows[acc].ticker} ({acc}) could not be used; the "
@@ -619,9 +662,11 @@ def main() -> None:
                 logodds = lite(feats, new_csv, p)
         validate_event_inputs(new, p, now, logodds=logodds, skip=skip)
     prio.close()
-    for r in new.itertuples():
-        if r.accession not in written:
-            record(r, logodds.get(str(r.accession)))
+    if args.jan_research and "bonsai-27b:latest" not in models_run:
+        source = "none"
+    for pending in new.itertuples():
+        if pending.accession not in written:
+            record(pending, logodds.get(str(pending.accession)))
 
     # outcomes: only bars dated before the run's date
     days = pd.DatetimeIndex(p.open.index)
@@ -638,9 +683,15 @@ def main() -> None:
         ledger.append("outcome", accession=r["accession"], entry=days[i].date().isoformat(),
                       fwd5=None if f5 is None else round(f5, 5), as_of=now.isoformat(timespec="seconds"))
     ledger.append("run", as_of=now.isoformat(timespec="seconds"), new=len(new), source=source,
-                  gpu=use_gpu, **({"lookups": dict(LOOKUPS)} if LOOKUPS else {}),
+                  gpu=use_gpu, pipeline=pipeline, models_run=models_run, deferred=len(new) - len(written), **({"lookups": dict(LOOKUPS)} if LOOKUPS else {}),
                   timing={**TIMING, "total": round(time.monotonic() - t_run, 1)})
     print(json.dumps(score(ledger.verify()), indent=1))
+    from app.forward.step_result import emit
+    missed_now = sum(r["type"] == "missed" and r.get("as_of") == now.isoformat(timespec="seconds") for r in ledger.records())
+    emit("warning" if missed_now or LOOKUPS.get("unread") or (len(new) and not use_gpu)
+         or (args.jan_research and len(skip)) else "ok",
+         new=len(new), missed=missed_now, source=source, gpu=use_gpu, pipeline=pipeline, models_run=models_run,
+         deferred=len(new) - len(written))
 
 
 if __name__ == "__main__":

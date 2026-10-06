@@ -55,7 +55,9 @@ export async function systemStats(root) {
   return {
     at: new Date().toISOString(), host: os.hostname(), uptime_s: os.uptime(),
     cpu: { model: os.cpus()[0]?.model ?? null, cores: os.cpus().length, usage: b.total > a.total ? 1 - (b.idle - a.idle) / (b.total - a.total) : null,
-      load: os.loadavg(), temp_c: find('k10temp', 'Tctl') ?? find('coretemp') ?? find('zenpower') },
+      load: os.loadavg(), temp_c: find('k10temp', 'Tctl') ?? find('coretemp') ?? find('zenpower'),
+      // AMD: Tctl is the processor's hottest control point (it jumps); the CCD sensors are the core clusters
+      cores_c: (() => { const c = s.filter((x) => x.chip === 'k10temp' && /^Tccd/.test(x.label)).map((x) => x.c); return c.length ? Math.max(...c) : null; })() },
     mem: { total: mem.MemTotal ?? null, available: mem.MemAvailable ?? null, swap_total: mem.SwapTotal ?? null, swap_free: mem.SwapFree ?? null },
     disk, gpu: g, sensors: s,
   };

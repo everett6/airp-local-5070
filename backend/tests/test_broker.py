@@ -87,7 +87,7 @@ def setup(tmp: Path, fake: FakeAlpaca) -> tuple[B.Alpaca, Path]:
     alloc.mkdir()
     (alloc / "state.json").write_text(json.dumps({"master": {"pending": {"SPY": 0.78, "BTC-USD": 0.2},
                                                              "decided_at": DEC}}))
-    return B.Alpaca("k", "s", transport=httpx.MockTransport(fake)), alloc
+    return B.Alpaca("k", "s", transport=httpx.MockTransport(fake), risk_policy=None), alloc
 
 
 def test_sync_crypto_now_spy_in_window_then_reconcile(tmp_path: Path) -> None:
@@ -185,7 +185,7 @@ def test_class_shares_use_the_brokers_spelling() -> None:
     def handler(req: httpx.Request) -> httpx.Response:
         seen.append(req.url.params["symbols"])
         return httpx.Response(200, json={"trades": {"BRK.B": {"p": 500.0}, "SPY": {"p": 600.0}}})
-    c = B.Alpaca("k", "s", transport=httpx.MockTransport(handler))
+    c = B.Alpaca("k", "s", transport=httpx.MockTransport(handler), risk_policy=None)
     assert c.prices(["BRK-B", "SPY"]) == {"BRK-B": 500.0, "SPY": 600.0}
     assert seen == ["BRK.B,SPY"]
 
@@ -201,7 +201,7 @@ def test_a_wiped_out_book_is_sold_at_the_broker_and_the_sleeve_is_left_alone(tmp
             return super().__call__(req)
 
     fake = Holding()
-    client = B.Alpaca("k", "s", transport=httpx.MockTransport(fake))
+    client = B.Alpaca("k", "s", transport=httpx.MockTransport(fake), risk_policy=None)
     alloc, out, halt = tmp_path / "alloc", tmp_path / "broker", tmp_path / "HALT"
     alloc.mkdir()
     name = broker_sync.AGGRESSIVE

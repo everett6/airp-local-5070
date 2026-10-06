@@ -72,8 +72,9 @@ def runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(FE, "gpu_priority", lambda _n: contextlib.nullcontext())
     monkeypatch.setattr(FE, "prices_for", lambda *_a, **_k: _prices(state["priced"]))
 
-    def run(as_of: str) -> list[dict[str, Any]]:
-        monkeypatch.setattr(sys, "argv", ["forward_events.py", "--dir", str(tmp_path / "ev"), "--as-of", as_of])
+    def run(as_of: str, jan: bool = False) -> list[dict[str, Any]]:
+        monkeypatch.setattr(sys, "argv", ["forward_events.py", "--dir", str(tmp_path / "ev"), "--as-of", as_of,
+                                               *(["--jan-research"] if jan else [])])
         FE.main()
         return Ledger(tmp_path / "ev" / "ledger.jsonl").verify()
     state["run"] = run
@@ -333,3 +334,114 @@ def test_a_judge_that_wrote_nothing_for_a_release_still_fails_the_run(runner: di
     monkeypatch.setattr(FE, "censored", lambda _tag: set())
     with pytest.raises(ValueError, match="model score absent"):
         runner["run"]("2026-10-01T22:30:00")
+
+
+def test_busy_morning_persists_early_decisions_and_never_backfills_late_ones(runner, monkeypatch):
+    clock = {"t": 0.0}
+    monkeypatch.setattr(FE.time, "monotonic", lambda: clock["t"])
+    real_discovery, real_sheets = FE.discover, FE.fact_sheets
+
+    async def crowded(*args):
+        one = (await real_discovery(*args)).iloc[[0]]
+        rows = [one.assign(accession=f"busy-{n:03}") for n in range(80)]
+        return pd.concat(rows, ignore_index=True)
+
+    def delayed_gpu(*args):
+        clock["t"] += 600
+        return True
+
+    def slow_sheets(*args):
+        clock["t"] += 300
+        return real_sheets(*args)
+
+    def one_at_a_time(_ev, _ex, feats, *rest):
+        scores = {}
+        for accession in pd.read_csv(feats)["accession"]:
+            clock["t"] += 60
+            scores[accession] = 3.5
+            rest[-1](accession, 3.5)
+        return scores
+
+    monkeypatch.setattr(FE, "discover", crowded)
+    monkeypatch.setattr(FE, "wait_gpu_free", delayed_gpu)
+    monkeypatch.setattr(FE, "fact_sheets", slow_sheets)
+    monkeypatch.setattr(FE, "bonsai", one_at_a_time)
+    recs = runner["run"]("2026-10-02T12:45:00")
+    decisions = [r for r in recs if r["type"] == "decision"]
+    missed = [r for r in recs if r["type"] == "missed"]
+    assert len(decisions) == 29 and len(missed) == 51
+    assert all(r["on_time"] for r in decisions)
+    assert len({r["accession"] for r in decisions + missed}) == 80
+    # Restart after the open does not submit or relabel an old decision.
+    again = runner["run"]("2026-10-02T14:30:00")
+    assert len([r for r in again if r["type"] == "decision"]) == 29
+
+
+def test_gpu_outage_uses_existing_cpu_path_without_inventing_bonsai_scores(runner, monkeypatch):
+    monkeypatch.setattr(FE, "wait_gpu_free", lambda *args: False)
+    monkeypatch.setattr(FE, "lite", lambda feats, *_args: dict.fromkeys(pd.read_csv(feats)["accession"], .1))
+    monkeypatch.setattr(FE, "bonsai", lambda *args: pytest.fail("GPU judge called during outage"))
+    records = runner["run"]("2026-10-01T22:30:00")
+    assert records[-1]["gpu"] is False and records[-1]["source"] == "lite"
+    assert all(r["source"] == "lite" for r in records if r["type"] == "decision")
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_jan_pipeline_requires_research_before_judgment(runner: dict[str, Any], monkeypatch: pytest.MonkeyPatch,
+                                                        failure: bool) -> None:
+    import jan_forward
+    calls = []
+    baseline = FE.fact_sheets
+
+    def prepare(d: Path, ev: Path, since: Any, tag: str, px: Path, p: Any, clock: Any,
+                activity: list[str]) -> Any:
+        calls.append(list(pd.read_csv(ev)["accession"]))
+        activity.append(jan_forward.JAN)
+        feats = baseline(d, ev, since, True, tag, px)
+        if failure:
+            return feats, {"a": "Jan research failed"}, {}
+        df = pd.read_csv(feats)
+        df["fact_sheet"] += "\nJan source-checked research"
+        df.to_csv(feats, index=False)
+        return feats, {}, {"a": {"research_path": "jan/research/a.json", "research_sha256": "abc"}}
+
+    monkeypatch.setattr(jan_forward, "prepare", prepare)
+    monkeypatch.setattr(FE, "fact_sheets", lambda *_a, **_k: pytest.fail("baseline reader used by Jan path"))
+    monkeypatch.setattr(FE, "lite", lambda *_a, **_k: pytest.fail("lite used by Jan path"))
+    recs = runner["run"]("2026-10-01T22:30:00", jan=True)
+    decisions = [r for r in recs if r["type"] == "decision"]
+    assert calls == [["a"]]  # no missing source, missing price, or already late filing
+    assert runner["judged"] == ([] if failure else [["a"]])
+    if failure:
+        assert not decisions and recs[-1]["source"] == "none"
+    else:
+        assert decisions[0]["pipeline"] == "jan_bonsai_v1"
+        assert decisions[0]["research_sha256"] == "abc"
+        assert decisions[0]["reader_record_path"] == f"jan/extract_{decisions[0]['judge_tag']}.jsonl"
+        assert "_jan_" in decisions[0]["judge_tag"]
+        assert recs[-1]["models_run"] == [jan_forward.JAN, "bonsai-27b:latest"]
+
+
+def test_jan_gpu_unavailable_never_falls_back(runner: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(FE, "wait_gpu_free", lambda *_a: False)
+    monkeypatch.setattr(FE, "fact_sheets", lambda *_a: pytest.fail("reader should not run"))
+    monkeypatch.setattr(FE, "lite", lambda *_a: pytest.fail("lite fallback"))
+    recs = runner["run"]("2026-10-01T22:30:00", jan=True)
+    assert not [r for r in recs if r["type"] == "decision"]
+    assert recs[-1]["models_run"] == [] and recs[-1]["source"] == "none"
+    assert recs[-1]["deferred"] > 0
+
+
+@pytest.mark.parametrize("jan", [False, True])
+def test_no_new_filings_means_no_model_activity(runner: dict[str, Any], monkeypatch: pytest.MonkeyPatch,
+                                               capsys: pytest.CaptureFixture[str], jan: bool) -> None:
+    original = FE.discover
+
+    async def empty(*args: Any) -> pd.DataFrame:
+        return (await original(*args)).iloc[:0]
+    monkeypatch.setattr(FE, "discover", empty)
+    monkeypatch.setattr(FE, "wait_gpu_free", lambda *_a: pytest.fail("no GPU probe necessary"))
+    monkeypatch.setattr(FE, "fact_sheets", lambda *_a: pytest.fail("no model should run"))
+    recs = runner["run"]("2026-10-01T22:30:00", jan=jan)
+    assert recs[-1]["source"] == "none" and recs[-1]["models_run"] == [] and not recs[-1]["gpu"]
+    assert "neither Jan nor Bonsai ran" in capsys.readouterr().out

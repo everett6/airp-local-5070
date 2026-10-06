@@ -54,6 +54,8 @@ def test_a_run_writes_one_ledger_line_and_the_books_and_refuses_a_second_run_tha
     assert rec["drawdown_leveraged"][AGGRESSIVE]["limit_at"] == 0.6 and "aggressive_issues" not in rec
     state = json.loads((d / "state.json").read_text())
     assert set(state) == set(BOOKS) and not list(d.glob("*.tmp"))
+    saved = pd.read_parquet(d / "factor_closes.parquet")
+    assert set(saved.columns) >= {"SPY", "BTC-USD", "ETH-USD"} and all(saved.index.date < datetime.now(UTC).date())
     # the aggressive book wants 2.5 times the frozen book's targets, asset by asset
     frozen, agg = state["master+brakes"]["pending"], state[AGGRESSIVE]["pending"]
     assert set(agg) == set(frozen) and all(abs(agg[a] - 2.5 * frozen[a]) < 1e-3 for a in frozen)

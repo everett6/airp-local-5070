@@ -82,6 +82,16 @@ def same_book(replayed: dict[str, Any], live: dict[str, Any]) -> bool:
     return key(replayed) == key(live)
 
 
+def differences(replayed: dict[str, Any], live: dict[str, Any]) -> list[dict[str, Any]]:
+    """Actual discrepancies, without changing the book or forcing the replay to match."""
+    by = {p["accession"]: p for p in replayed.get("pairs", [])}
+    actual = {p["accession"]: p for p in live.get("pairs", [])}
+    return [{"accession": a, "replayed": {k: by.get(a, {}).get(k) for k in ("status", "qty", "etf_qty", "note")},
+             "live": {k: actual.get(a, {}).get(k) for k in ("status", "qty", "etf_qty", "note")}}
+            for a in sorted(set(by) | set(actual)) if any(by.get(a, {}).get(k) != actual.get(a, {}).get(k)
+                                                         for k in ("status", "qty", "etf_qty"))]
+
+
 def contribution(recs: list[dict[str, Any]], opens: pd.DataFrame, closes: pd.DataFrame, etf_of: dict[str, str],
                  end: datetime, shuffles: int = 500, seed: int = 0, live_book: dict[str, Any] | None = None
                  ) -> dict[str, Any]:
@@ -118,7 +128,54 @@ def contribution(recs: list[dict[str, Any]], opens: pd.DataFrame, closes: pd.Dat
         # ties count half: with one or two pairs many deals are the AI's own book
         out["share_of_deals_ai_beats"] = round(float((r < ai["net_return"]).mean() + 0.5 * (r == ai["net_return"]).mean()), 3)
         out["ai_minus_every_release"] = round(ai["net_return"] - every["net_return"], 5)
+    matched = out["replay_matches_live_book"]
+    out["comparison_valid"] = matched is not False
+    out["basis"] = "hypothetical simulation replay; not actual broker returns"
+    out["reconciliation"] = differences(ai_state, live_book) if live_book is not None else []
+    if matched is False:
+        out["note"] = "Comparison blocked: revised prices or missing run inputs do not reproduce the live simulator. Hypothetical arm metrics are not evidence of live AI contribution."
+        for key in ("ai_minus_shuffled", "share_of_deals_ai_beats", "ai_minus_every_release"):
+            out[key] = None
     return out
+
+
+def prospective(rows: list[dict[str, Any]], etf_of: dict[str, str], live: dict[str, Any],
+                shuffles: int = 500) -> dict[str, Any]:
+    """Common legacy starting holdings; only newly observed decisions are randomized."""
+    from app.portfolio.sleeve_replay import replay as exact_replay
+    from app.portfolio.sleeve_replay import state as replay_state
+    actual = exact_replay(rows, etf_of)
+    if replay_state(actual) != replay_state(live):
+        raise ValueError("Prospective inputs do not reproduce the current simulator state")
+    initial = rows[0]["before"]
+    seen = set(initial["seen"])
+    new = {d["accession"]: d for row in rows for d in row["decisions"]
+           if d.get("type") == "decision" and d["accession"] not in seen and d.get("on_time") and d.get("source") == "bonsai"}
+    history_days = max(1, len(actual["history"]) - len(initial["history"]))
+    baseline = measure(initial, history_days)
+
+    def measured(book: dict[str, Any]) -> dict[str, Any]:
+        result = measure(book, history_days)
+        result["net_return"] = book["equity"] / initial["equity"] - 1
+        result["turnover"] = result["turnover"] - baseline["turnover"]
+        result["costs"] = result["costs"] - baseline["costs"]
+        result["mean_gross_exposure"] = None  # legacy/intraday holdings need a complete dated exposure series
+        return result
+
+    ai = measured(actual)
+    all_state = exact_replay(rows, etf_of, dict.fromkeys(new, TAKE_ALL))
+    every = measured(all_state)
+    rng = np.random.default_rng(0)
+    scores = [float(d.get("logodds") or 0) for d in new.values()]
+    rets = [measured(exact_replay(rows, etf_of, dict(zip(new, rng.permutation(scores), strict=True))))["net_return"]
+            for _ in range(shuffles if len(scores) > 1 else 0)]
+    return {"scope": "Exact prospective inputs; all arms inherit identical legacy holdings. Only new decisions differ.",
+            "start": rows[0]["as_of"], "steps": len(rows), "matches_live_state": True,
+            "eligible_new_decisions": len(new), "ai": ai, "every_release": every,
+            "ai_minus_every_release": ai["net_return"] - every["net_return"],
+            "ai_minus_shuffled": ai["net_return"] - float(np.mean(rets)) if rets else None,
+            "shuffle_range": [float(np.percentile(rets, 5)), float(np.percentile(rets, 95))] if rets else None,
+            "uncertainty": None, "qualification": "descriptive only; no statistical qualification or broker-return claim"}
 
 
 def main() -> None:
@@ -140,6 +197,15 @@ def main() -> None:
     live = json.loads(book.read_text()) if book.exists() else None
     rep = contribution(Ledger(ev / "ledger.jsonl").records(), p.open, p.close, SECTOR_ETF, datetime.now(UTC),
                        a.shuffles, live_book=live)
+    journal = book.parent / "replay_inputs.jsonl"
+    if journal.exists():
+        rows = Ledger(journal).verify()
+        try:
+            if live is None:
+                raise ValueError("No live book to reconcile")
+            rep["prospective_replay"] = prospective(rows, SECTOR_ETF, live, a.shuffles)
+        except ValueError as exc:
+            rep["prospective_replay"] = {"steps": len(rows), "matches_live_state": False, "error": str(exc)}
     out = BACKEND / a.out
     tmp = out.with_name(out.name + ".tmp")
     tmp.write_text(json.dumps(rep, indent=1) + "\n")
@@ -153,7 +219,7 @@ def main() -> None:
         m = rep[name]
         print(f"  {name.replace('_', ' '):14} net {100 * m['net_return']:+.2f}%  pairs {m['pairs']} "
               f"(closed {m['closed']})  turnover {m['turnover']}x  mean gross {m['mean_gross_exposure']}x")
-    if "shuffled" in rep:
+    if "shuffled" in rep and rep["comparison_valid"]:
         s = rep["shuffled"]
         print(f"  shuffled       net {100 * s['mean_net_return']:+.2f}% on average "
               f"({100 * s['p05']:+.2f}% to {100 * s['p95']:+.2f}% in 9 of 10 deals; {s['deals']} deals)")

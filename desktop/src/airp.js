@@ -1,6 +1,7 @@
 // Reads airp's forward-test files and runs the few safe airp commands the app may trigger.
 // Paper money only. Nothing here edits a ledger, a rule or the mandate; the only actions are airp's own kill switch
 // (forward_allocator.py --halt / --resume) and pausing or resuming a research-queue job.
+// Manual paper and test runs are managed separately in runner.js.
 import { execFile } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -24,6 +25,13 @@ export function createAirp(root) {
     const r = await run(file, args);
     try { return JSON.parse(r.stdout); } catch { return { error: (r.stderr || r.stdout || 'no output').slice(-400) }; }
   }
+  const accounts = { main: { cache: null, pending: null, at: 0 }, auto: { cache: null, pending: null, at: 0 } };
+  async function liveAccount(which = 'main') {
+    const c = accounts[which];
+    if (c.cache && Date.now() - c.at < 10_000) return c.cache;
+    if (!c.pending) c.pending = runJson("alpaca_account.py", which === 'auto' ? ['--auto'] : []).then((data) => { c.cache = data; c.at = Date.now(); return data; }).finally(() => { c.pending = null; });
+    return c.pending;
+  }
   function timers() {
     return new Promise((resolve) => {
       execFile('systemctl', ['--user', 'list-timers', 'airp-*', '--all', '--output=json'], { timeout: 10_000 },
@@ -34,6 +42,11 @@ export function createAirp(root) {
   return {
     root,
     exists: () => existsSync(fwd),
+    alpacaAccount: async () => ({ ...await liveAccount(),
+      exposure: json(path.join(fwd, 'account', 'view.json'), null) }),
+    alpacaAutoAccount: () => liveAccount('auto'),
+    tradingPlan: () => runJson("trading_plan.py"),
+    horizonShadows: () => runJson('horizon_review.py', ['--status']),
 
     async overview() {
       const beats = jsonl(path.join(fwd, 'heartbeat.jsonl'));
@@ -82,9 +95,14 @@ export function createAirp(root) {
       const sheets = Object.fromEntries(jsonl(path.join(backend, 'results', 'events', 'decide_bonsai-27b_latest_forward_h5.jsonl'))
         .map((x) => [x.accession, String(x.prompt_user || '')]));
       return led.filter((r) => r.type === 'decision').slice(-limit).reverse().map((r) => {
-        const x = extract[r.accession] || {}, n = net[r.accession], b = bb[r.accession], l = lens[r.accession];
+        const bundle = /^[A-Za-z0-9_-]{1,80}$/.test(String(r.accession || '')) ? json(path.join(ev, 'evidence', `${r.accession}.json`), null) : null;
+        const jan = r.pipeline === 'jan_bonsai_v1';
+        const x = (jan ? bundle?.reader?.record : extract[r.accession]) || {}, n = net[r.accession], b = bb[r.accession], l = lens[r.accession];
+        const sheet = jan ? (bundle?.fact_sheet?.text || '') : (sheets[r.accession] || '');
         return {
           accession: r.accession, ticker: r.ticker, sector: r.sector, accepted_utc: r.accepted_utc, source: r.source,
+          pipeline: r.pipeline || "baseline", reader_model: bundle?.reader?.model || x.model || null,
+          research: jan ? { model: bundle?.research?.model || null, facts: bundle?.research?.record?.brief?.facts || [] } : null,
           logodds: r.logodds, on_time: r.on_time, guidance: r.guidance,
           reader: { revenue: x.revenue ?? null, eps: x.eps ?? null, adj_eps: x.adj_eps ?? null, guidance: x.guidance ?? null,
             tone: x.tone ?? null, highlights: (x.highlights || []).slice(0, 3), rejected: x.rejected || [], period_end: x.period_end ?? null },
@@ -92,8 +110,8 @@ export function createAirp(root) {
           bull_bear: b ? { read: b.bb_read, bull: pts(b.bull), bear: pts(b.bear) } : null,
           ai_lens: l ? { read: l.ai_read, exposure: l.fields?.ai_exposure ?? null } : null,
           outcome: outcome[r.accession] ? { excess: outcome[r.accession].fwd5 ?? null } : null,
-          sheet: (sheets[r.accession] || '').slice(0, 2500) || null,
-          dropped: (sheets[r.accession] || '').split('\n').filter((l) => l.startsWith('SEC cross-check:')).map((l) => l.slice(17).trim()),
+          sheet: sheet.slice(0, 12000) || null,
+          dropped: sheet.split('\n').filter((l) => l.startsWith('SEC cross-check:')).map((l) => l.slice(17).trim()),
         };
       });
     },
@@ -289,6 +307,24 @@ export function createAirp(root) {
       const reg = jsonl(path.join(backend, 'results', 'trials_registry.jsonl'));
       return reg.map((r) => ({ trial: r.trial || r.name, date: r.date, kind: r.kind, result: r.result ?? r.verdict,
         sharpe: r.sharpe_ann ?? null, ic: r.ic ?? null, window: r.window ?? null })).reverse();
+    },
+    improvement: () => runJson('improvement_report.py'),
+    institutional: () => runJson('institutional_report.py'),
+    budgetExperiment: () => runJson('live_research_test.py', ['--status', '--budget-experiment']),
+    liveResearch: () => runJson('live_research_test.py', ['--status']),
+    // the 150-company research run: progress, both models' reasoning, every website visited (read-only)
+    researchLog: () => runJson('research_view.py'),
+    autopilot: () => runJson('full_auto.py', ['view']),
+    benchmarkReview: () => runJson('benchmark_review.py'),
+    async engineeringReview(data) {
+      if (!['costs', 'release'].includes(data.action) || data.confirm !== 'REVIEWED') return { status: 400, body: { error: 'Choose a review action and type REVIEWED' } };
+      const result = await run('engineering_review.py', ['--record', JSON.stringify(data)]);
+      return result.ok ? { status: 200, body: { saved: true } } : { status: 400, body: { error: (result.stderr || 'Review rejected').slice(-400) } };
+    },
+    async attestBenchmark(data) {
+      if (data.confirm !== 'VERIFIED') return { status: 400, body: { error: 'Type VERIFIED after reviewing the source' } };
+      const result = await run('benchmark_review.py', ['--attest', JSON.stringify(data)]);
+      return result.ok ? { status: 200, body: { saved: true } } : { status: 400, body: { error: (result.stderr || 'Review rejected').slice(-400) } };
     },
 
     reviews() {

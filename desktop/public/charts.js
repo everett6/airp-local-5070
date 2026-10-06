@@ -31,7 +31,16 @@ export function lineChart(series, opts = {}) {
   const yearStep = Math.ceil(years.length / 9);
   let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(series.map((s) => s.name).join(', '))}" data-chart="${id}">`;
   for (const t of ticks) svg += `<line x1="${L}" x2="${W - R}" y1="${Y(t)}" y2="${Y(t)}" stroke="${t === 0 ? ZERO : GRID}" stroke-width="1"/><text x="${L - 8}" y="${Y(t) + 4}" fill="${MUTED}" font-size="11" text-anchor="end">${esc(fmt(t))}</text>`;
-  years.forEach((y, i) => { if (i % yearStep) return; const d = dates.find((x) => x.startsWith(y)); svg += `<text x="${X(d)}" y="${H - 6}" fill="${MUTED}" font-size="11">${y}</text>`; });
+  if (opts.xTicks) {  // e.g. clock times or day labels: about six evenly spaced ticks
+    const n = Math.min(5, dates.length);
+    let lastX = -Infinity;
+    for (let k = 0; k < n; k++) {
+      const d = dates[Math.round((k * (dates.length - 1)) / Math.max(1, n - 1))];
+      if (X(d) - lastX < 90) continue;  // few points: labels would overlap
+      lastX = X(d);
+      svg += `<text x="${X(d)}" y="${H - 6}" fill="${MUTED}" font-size="11" text-anchor="${k === 0 ? 'start' : k === n - 1 ? 'end' : 'middle'}">${esc(opts.xTicks(d))}</text>`;
+    }
+  } else years.forEach((y, i) => { if (i % yearStep) return; const d = dates.find((x) => x.startsWith(y)); svg += `<text x="${X(d)}" y="${H - 6}" fill="${MUTED}" font-size="11">${y}</text>`; });
   const labels = [];
   series.forEach((s, k) => {
     const color = s.color || (series.length === 1 ? LIME : PALETTE[k]);
@@ -56,7 +65,7 @@ export function barChart(cats, series, opts = {}) {
   const W = opts.width || 900, H = opts.height || 230, L = 56, R = 20, T = 14, B = 26;
   const all = series.flatMap((s) => s.y.filter((v) => v != null));
   if (!all.length) return '<p class="empty">No data yet.</p>';
-  const lo = Math.min(0, ...all), hi = Math.max(0, ...all), padv = (hi - lo) * 0.08;
+  const lo = Math.min(0, ...all), hi = Math.max(0, ...all), padv = (hi - lo) * 0.08 || 1;
   const Y = (v) => T + (1 - (v - (lo - padv)) / (hi + padv - (lo - padv))) * (H - T - B);
   const fmt = opts.yFmt || ((v) => pct(v, 0));
   const band = (W - L - R) / cats.length, bw = Math.max(3, (band - 8) / series.length - 2);

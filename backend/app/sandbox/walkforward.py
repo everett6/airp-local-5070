@@ -182,6 +182,7 @@ class OllamaLLM:
         return self.digest
 
     native_tools: list[dict[str, Any]] | None = None  # set for models trained on native tool calls (Jan-v1)
+    keep_thinking: bool = False  # a tool call's "thought" is its thinking when it wrote no text (live research log)
 
     def _use_native_tools(self, system: str, user: str, mode: str | None) -> bool:
         """Research rounds only (their prompt asks for "actions"); not the forced final round or the brief."""
@@ -199,7 +200,11 @@ class OllamaLLM:
             data = r.json()
             m = data["message"]
             if m.get("tool_calls"):
-                return data, json.dumps({"thought": (m.get("content") or "").strip()[:300], "actions": [
+                thought = (m.get("content") or "").strip()
+                if not thought and self.keep_thinking:
+                    think = " ".join(str(m.get("thinking") or "").split())
+                    thought = think if len(think) <= 1200 else think[:400] + " … " + think[-780:]
+                return data, json.dumps({"thought": thought[:1200], "actions": [
                     {"tool": c["function"]["name"], "args": c["function"].get("arguments") or {}}
                     for c in m["tool_calls"]]})
             if _is_agent_reply(t := _as_actions(m.get("content") or "")):

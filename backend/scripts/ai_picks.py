@@ -89,6 +89,11 @@ def exit_due(p: dict[str, Any], days: pd.DatetimeIndex) -> bool:
     return p["status"] in ("closed", "skipped")  # closed in the simulator, or never opened there after its entry filled
 
 
+def risk_blocked(leg: dict[str, Any]) -> bool:
+    """A local pretrade refusal sent no POST and can reuse its original client ID."""
+    return leg.get("status") == "rejected" and not leg.get("order_id") and str(leg.get("note", "")).startswith("ACCOUNT RISK:")
+
+
 def due_legs(p: dict[str, Any], days: pd.DatetimeIndex, now: datetime) -> list[Leg]:
     """The legs that should be sent now for this pair (none if they were sent already or it's not their time).
 
@@ -98,7 +103,7 @@ def due_legs(p: dict[str, Any], days: pd.DatetimeIndex, now: datetime) -> list[L
     review, second part", rule 1)."""
     if not opg_open(now):
         return []
-    have = {d["client_order_id"] for d in p.get("legs", [])}
+    have = {d["client_order_id"] for d in p.get("legs", []) if not risk_blocked(d)}
     if p["status"] == "planned" and now < datetime.fromisoformat(p["entry_deadline"]):
         legs = [Leg(p["ticker"], symbol(p["ticker"]), "buy", p["qty"], STOCK_TIF, leg_id(p["accession"], "in", "s"), 0.0),
                 Leg(p["etf"], symbol(p["etf"]), "sell", p["etf_qty"], STOCK_TIF, leg_id(p["accession"], "in", "e"), 0.0)]
@@ -111,8 +116,13 @@ def due_legs(p: dict[str, Any], days: pd.DatetimeIndex, now: datetime) -> list[L
     for asset, part, side in ((p["ticker"], "s", "sell"), (p["etf"], "e", "buy")):
         left = exposure(p).get(asset, 0.0)
         outs = [d for d in p.get("legs", []) if _phase(d) == "out" and d.get("asset") == asset]
-        if left <= 0 or any(d.get("status") in ("submitted", "planned") for d in outs) or len(outs) >= MAX_EXIT_TRIES:
+        if left <= 0 or any(d.get("status") in ("submitted", "planned") for d in outs) or sum(not risk_blocked(d) for d in outs) >= MAX_EXIT_TRIES:
             continue  # nothing held, an exit order is still working, or enough tries
+        if outs and risk_blocked(outs[-1]):
+            leg = leg_from(outs[-1])
+            leg.status, leg.note = "planned", ""
+            legs.append(leg)
+            continue
         cid = leg_id(p["accession"], "out", part) + (f"-r{len(outs) + 1}" if outs else "")
         legs.append(Leg(asset, symbol(asset), side, int(left) if float(left).is_integer() else left, STOCK_TIF,
                         cid, 0.0))
@@ -158,7 +168,7 @@ def audit_pair(p: dict[str, Any], legs: list[Leg]) -> list[str]:
             flags.append(f"out hedge rejected/canceled: {', '.join(sorted(short))}")
         if p["status"] in ("closed", "skipped") and left:
             flags.append("out hedge not fully filled")
-        stuck = [a for a in left if len([x for x in pair if x.asset == a]) >= MAX_EXIT_TRIES]
+        stuck = [a for a in left if len([x for x in pair if x.asset == a and not risk_blocked(leg_dict(x))]) >= MAX_EXIT_TRIES]
         if stuck:
             flags.append(f"exit gave up after {MAX_EXIT_TRIES} orders, still held: {', '.join(sorted(stuck))}")
     if p.get("late_exit"):
@@ -185,8 +195,8 @@ def audit_pair(p: dict[str, Any], legs: list[Leg]) -> list[str]:
     return [f"ai picks {p['ticker']} {flag}" for flag in sorted(current - old)]
 
 
-def mirror(st: dict[str, Any], client: Alpaca, days: pd.DatetimeIndex, now: datetime, dry: bool, mode: str
-           ) -> list[str]:
+def mirror(st: dict[str, Any], client: Alpaca, days: pd.DatetimeIndex, now: datetime, dry: bool, mode: str,
+           references: dict[str, float] | None = None, allowed_stocks: set[str] | None = None) -> list[str]:
     alerts: list[str] = []
     for p in st["pairs"]:
         legs = [leg_from(d) for d in p.get("legs", [])]
@@ -195,14 +205,25 @@ def mirror(st: dict[str, Any], client: Alpaca, days: pd.DatetimeIndex, now: date
         for leg in legs:
             if leg.status == "submitted" and not dry:
                 try:
+                    if allowed_stocks is not None and p["ticker"] not in allowed_stocks and "-in-" in leg.client_order_id:
+                        client.cancel_leg(leg)
                     client.refresh(leg)
                 except (BrokerError, httpx.HTTPError) as e:
                     alerts.append(f"ai picks {p['ticker']} order refresh uncertain: {type(e).__name__}: {e}")
             when = "in" if "-in-" in leg.client_order_id else "out"
             alerts += reconcile(leg, {k: v for k, v in sims[when].items() if v})
         p["legs"] = [leg_dict(x) for x in legs]  # due_legs reads the refreshed entry fills
-        if mode != "HALTED":
+        restricted_wait = allowed_stocks is not None and p["ticker"] not in allowed_stocks and any(
+            leg.status == "submitted" and "-in-" in leg.client_order_id for leg in legs)
+        if restricted_wait:
+            alerts.append(f"ai picks {p['ticker']}: restricted entry cancellation still pending; waiting before exits")
+        if mode != "HALTED" and not restricted_wait:
             for leg in due_legs(p, days, now):
+                # The reference is the latest completed close available to this run,
+                # never a future entry/exit open. Missing prices still fail the gate.
+                leg.ref_price = (references or {}).get(leg.asset, 0.0)
+                if "-in-" in leg.client_order_id and allowed_stocks is not None and p["ticker"] not in allowed_stocks:
+                    continue
                 if mode == "REDUCING" and "-in-" in leg.client_order_id:
                     continue
                 if late_exit(p, leg) and not p.get("late_exit"):
@@ -218,6 +239,7 @@ def mirror(st: dict[str, Any], client: Alpaca, days: pd.DatetimeIndex, now: date
                         leg.note = f"submission uncertain: {type(e).__name__}: {e}"[:160]
                         alerts.append(f"ai picks {p['ticker']} {leg.asset} {leg.note}")
                     alerts += reconcile(leg, {})
+                legs = [x for x in legs if x.client_order_id != leg.client_order_id]
                 legs.append(leg)
         if not dry and p["status"] in ("open", "closed") and not any("-in-" in x.client_order_id for x in legs) \
                 and not p.get("unsent_alerted"):
@@ -238,14 +260,30 @@ def run(events: Path, out: Path, now: datetime, dry: bool, client: Alpaca | None
     recs = Ledger(events / "ledger.jsonl").verify()
     p = Prices.from_long(pd.read_parquet(events / "prices.parquet"))
     mode = state(halt_path)
-    for n in sleeve.step(st, recs, p.open, p.close, SECTOR_ETF, now, mode):
+    from app.portfolio.sleeve_replay import inputs
+    from app.portfolio.sleeve_replay import state as replay_state
+    from app.portfolio.stock_universe import allowed
+    policy_alerts: list[str] = []
+    try:
+        allowed_stocks = allowed(out.parent / "paper_autopilot" / "stock_policy.json")
+    except (OSError, ValueError, KeyError, TypeError):
+        allowed_stocks = set()
+        policy_alerts.append("AI stock-entry policy invalid: all new entries blocked; exits remain available")
+    before = replay_state(st)
+    for n in sleeve.step(st, recs, p.open, p.close, SECTOR_ETF, now, mode, allowed_stocks):
         print("ai picks:", n)
-    alerts = mirror(st, client, pd.DatetimeIndex(p.open.index), now, dry, mode) if client else []
+    replay_input = inputs(before, st, recs, p.open, p.close, now, mode)
+    replay_input["allowed_stocks"] = sorted(allowed_stocks) if allowed_stocks is not None else None
+    completed = p.close.loc[pd.DatetimeIndex(p.close.index).date < now.date()]
+    references = {str(a): float(values.dropna().iloc[-1]) for a, values in completed.items() if values.notna().any()}
+    alerts = mirror(st, client, pd.DatetimeIndex(p.open.index), now, dry, mode, references, allowed_stocks) if client else []
+    alerts += policy_alerts
     st["broker_audit_status"] = "dry" if dry else "no_keys" if client is None else "checked"
     out.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(st, indent=1) + "\n")
     tmp.replace(path)
+    Ledger(out / "replay_inputs.jsonl").append("sleeve_step", **replay_input)
     print("ai picks (UNTESTED sleeve):", json.dumps(sleeve.summary(st)))
     return alerts
 
@@ -262,6 +300,7 @@ def main() -> None:
         st = json.loads((out / "book.json").read_text()) if (out / "book.json").exists() else sleeve.new_state()
         print(json.dumps(sleeve.summary(st), indent=1))
         return
+    client: Alpaca | None = None
     try:
         client = Alpaca.from_env()
         if client is None:
@@ -272,6 +311,9 @@ def main() -> None:
         alerts = [f"ai picks failed: {type(e).__name__}: {e}"[:300]]
     for x in alerts:
         print("BROKER ALERT:", x)
+    from app.forward.step_result import emit
+    emit("failed" if alerts else "warning" if client is None else "ok", alerts=alerts,
+         broker_available=client is not None)
     if alerts:
         raise SystemExit(1)  # never mark a broken paper hedge as a clean event run
 

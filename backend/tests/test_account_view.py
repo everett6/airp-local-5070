@@ -88,7 +88,7 @@ def test_run_only_reads_the_account_and_writes_its_view(tmp_path: Path) -> None:
     (tmp_path / "picks").mkdir()
     (tmp_path / "broker" / "orders.json").write_text(json.dumps(ORDERS))
     (tmp_path / "picks" / "book.json").write_text(json.dumps(PICKS))
-    client = Alpaca("k", "s", PAPER, transport=httpx.MockTransport(handler))
+    client = Alpaca("k", "s", PAPER, transport=httpx.MockTransport(handler), risk_policy=None)
     assert V.run(client, tmp_path / "account", NOW, tmp_path / "broker", tmp_path / "picks") == []
     assert {m for m, _ in seen} == {"GET"} and len(seen) == 3  # nothing is sent, changed or cancelled
     v = json.loads((tmp_path / "account" / "view.json").read_text())

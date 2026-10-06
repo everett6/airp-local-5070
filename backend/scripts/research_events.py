@@ -103,7 +103,8 @@ def previous_releases(events: pd.DataFrame) -> dict[str, str]:
 
 
 async def research(r, llm: Router, fetcher: SafeFetcher, ua: str, lookup, rounds: int,
-                   prefetch: list[dict] | None = None, cap_s: float = 25.0, brief: bool = True) -> dict:
+                   prefetch: list[dict] | None = None, cap_s: float = 25.0, brief: bool = True,
+                   horizon_days: int = 20) -> dict:
     as_of = datetime.fromisoformat(str(r.accepted_utc)).replace(tzinfo=UTC)
     gw = ToolGateway(mode="as_of", fetcher=fetcher, as_of=as_of, sec_user_agent=ua, price_lookup=lookup,
                      tool_cache=WEBCACHE, max_result_chars=5000, timeout_cap_s=cap_s,
@@ -117,7 +118,7 @@ async def research(r, llm: Router, fetcher: SafeFetcher, ua: str, lookup, rounds
                     "task": "research", "prompt": "as_of", "brief": brief, "return_evidence": not brief,
                     "skip_final": True,
                     "prefetch": prefetch or [],
-                    "subject": {"ticker": str(r.ticker), "horizon_days": 20, "as_of": as_of.isoformat()},
+                    "subject": {"ticker": str(r.ticker), "horizon_days": horizon_days, "as_of": as_of.isoformat()},
                     "tools": gw.specs_for_prompt(), "max_rounds": rounds, "max_calls_per_round": 4,
                     "num_ctx": llm.num_ctx, "num_predict": llm.num_predict})
             return {"accession": r.accession, "ticker": r.ticker, "as_of": as_of.isoformat(), **res,

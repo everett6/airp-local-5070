@@ -597,6 +597,8 @@ def run_research(msg: dict[str, Any]) -> dict[str, Any]:
                                    as_of=subj["as_of"], tools=json.dumps(msg["tools"], indent=1),
                                    max_calls=max_calls)
     head = subject_line(subj) if as_of_prompt else ""  # RESEARCH_SYSTEM_ASOF names no stock itself
+    if msg.get("research_focus"):
+        system += "\nResearch requirements: " + str(msg["research_focus"])[:1000]
     history_budget = min(MAX_OBS_CHARS, prompt_char_budget(int(msg.get("num_ctx", 8192)),
                                                            int(msg.get("num_predict", 600))) - len(system) - 300)
     steps: list[dict[str, Any]] = []

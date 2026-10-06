@@ -53,6 +53,8 @@ DRY_FROM = date(2026, 9, 28)
 MIN_GOOD_EVENT_RUNS = 8          # of the 10 scheduled Mon-Fri
 # steps that read the event runner's ledger; the broker, long-term and theme steps are independent and always run
 CONSENSUS = "scripts/consensus_shadow.py"
+DAY_CALLS = "scripts/day_calls_shadow.py"  # D13: the live day calls scored after their day (no orders)
+DAY_FEASIBILITY = "scripts/day_feasibility.py"  # which tech stocks can be day-traded cheaply (user, 4 Oct 2026)
 M1_SHADOW = "scripts/m1_shadow.py"  # month-end Treasuries, a no-money shadow (the user's yes, 1 Oct 2026)
 EVENT_READERS = {"scripts/ai_picks.py", "scripts/guidance_shadow.py", "scripts/net_read_shadow.py",
                  "scripts/self_improve.py", "scripts/learn_loop.py", CONSENSUS}
@@ -64,7 +66,7 @@ FUNNEL = "scripts/funnel.py"               # weekly: where every release stopped
 CONTRIBUTION = "scripts/ai_contribution.py"  # weekly: the AI's picks against the same sleeve dealt at random
 THROUGHPUT = "scripts/throughput.py"       # weekly: stage times, decision latency, time left before the open
 # recorded in the log, but their exit code never becomes the job's result
-SIDE_STEPS = {CONSENSUS, M1_SHADOW, EVIDENCE, ACCOUNT, FUNNEL, CONTRIBUTION, THROUGHPUT}
+SIDE_STEPS = {CONSENSUS, DAY_FEASIBILITY, DAY_CALLS, M1_SHADOW, EVIDENCE, ACCOUNT, FUNNEL, CONTRIBUTION, THROUGHPUT}
 # a step that failed for a network reason is retried once: each of these is idempotent (ledgers skip what they have
 # seen; broker orders carry client ids, so a resend is refused, not duplicated)
 RETRYABLE = {"scripts/forward_events.py", "scripts/forward_allocator.py", "scripts/broker_sync.py", "scripts/ai_picks.py"}
@@ -177,8 +179,9 @@ def commands(job: str, m: str) -> list[list[str]]:
         m1 = [] if dry else [[PY, M1_SHADOW]]  # live only, CPU; downloads only when a month is due; a side step
         # before the long steps, so the evidence files and the account view are pushed with the decisions
         records = [] if dry else [[PY, EVIDENCE], [PY, ACCOUNT]]
+        feasibility = [] if dry else [[PY, DAY_FEASIBILITY], [PY, DAY_CALLS]]  # market data only; side steps
         return [broker, [PY, "scripts/forward_events.py", *(DRY["events"] if dry else [])], picks, guide, net_read,
-                *consensus, *records, longterm, themes, *m1, improve, [*learn, "collect", *largs]]
+                *consensus, *records, longterm, themes, *m1, *feasibility, improve, [*learn, "collect", *largs]]
     if job == "allocator":
         return [[PY, "scripts/forward_allocator.py", *(DRY["allocator"] if dry else [])], broker]
     if job == "review":
@@ -270,10 +273,18 @@ def step(cmd: list[str], inhibit: bool = True) -> subprocess.CompletedProcess[st
 def safe_step(cmd: list[str], inhibit: bool) -> subprocess.CompletedProcess[str]:
     """`step`, with a step that hangs past its time limit or cannot start turned into a failed step: the run still
     writes its log, heartbeat and alert instead of dying without a trace."""
+    from app.forward.ledger import Ledger
+    from app.forward.step_result import outcome
+    started = time.monotonic()
     try:
-        return step(cmd, inhibit)
+        result = step(cmd, inhibit)
     except (OSError, subprocess.TimeoutExpired) as e:
-        return subprocess.CompletedProcess(cmd, 124, "", f"{cmd[1] if cmd[1:2] else cmd[0]}: {type(e).__name__}: {e}"[:300] + "\n")
+        result = subprocess.CompletedProcess(cmd, 124, "", f"{cmd[1] if cmd[1:2] else cmd[0]}: {type(e).__name__}: {e}"[:300] + "\n")
+    record = outcome(cmd, result.returncode, result.stdout, result.stderr, time.monotonic() - started)
+    Ledger(FWD / "step_records.jsonl").append("step", **record)
+    if record["status"] == "failed" and result.returncode == 0:
+        result.returncode = 1
+    return result
 
 
 def run(job: str, resumed_from: str | None = None) -> int:

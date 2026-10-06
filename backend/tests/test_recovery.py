@@ -93,7 +93,7 @@ class Rig:
     def __init__(self, tmp: Path) -> None:
         self.events, self.out, self.halt = tmp / "events", tmp / "ai_picks", tmp / "HALT"
         self.x = Exchange()
-        self.client = Alpaca("k", "s", PAPER, transport=httpx.MockTransport(self.x.handler))
+        self.client = Alpaca("k", "s", PAPER, transport=httpx.MockTransport(self.x.handler), risk_policy=None)
         self.stock, self.etf = list(STOCK), list(ETF)
         Ledger(self.events / "ledger.jsonl").append(
             "decision", accession=ACC, ticker="AAA", sector="Industrials", logodds=3.5, source="bonsai",

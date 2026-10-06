@@ -92,7 +92,7 @@ def mark(st: dict[str, Any], closes: pd.DataFrame) -> float:
 
 
 def pick(st: dict[str, Any], decisions: list[dict[str, Any]], closes: pd.DataFrame, etf_of: dict[str, str],
-         now: datetime, mode: str = "ACTIVE") -> list[str]:
+         now: datetime, mode: str = "ACTIVE", allowed_stocks: set[str] | None = None) -> list[str]:
     """Plan pairs for new qualifying decisions. Every decision is looked at once (recorded in `seen`)."""
     notes = []
     seen = set(st["seen"])
@@ -112,7 +112,8 @@ def pick(st: dict[str, Any], decisions: list[dict[str, Any]], closes: pd.DataFra
                              "entry_day": deadline.astimezone(NY).date().isoformat(),
                              "entry_deadline": r["entry_deadline"], "qty": 0, "etf_qty": 0}
         busy = sum(x["status"] in ("planned", "open") for x in st["pairs"])
-        why = ("kill switch" if mode == "HALTED" else "REDUCING: no new pairs" if mode == "REDUCING"
+        why = ("outside the selected 100-stock universe" if allowed_stocks is not None and t not in allowed_stocks
+               else "kill switch" if mode == "HALTED" else "REDUCING: no new pairs" if mode == "REDUCING"
                else "decided after the entry open" if now >= deadline
                else f"sleeve drawdown {100 * dd:.1f}%" if dd >= MAX_DD
                else f"all {SLOTS} slots in use" if busy >= SLOTS
@@ -133,9 +134,15 @@ def pick(st: dict[str, Any], decisions: list[dict[str, Any]], closes: pd.DataFra
 
 
 def step(st: dict[str, Any], decisions: list[dict[str, Any]], opens: pd.DataFrame, closes: pd.DataFrame,
-         etf_of: dict[str, str], now: datetime, mode: str = "ACTIVE") -> list[str]:
-    notes = settle(st, opens)
-    notes += pick(st, decisions, closes, etf_of, now, mode)
+         etf_of: dict[str, str], now: datetime, mode: str = "ACTIVE", allowed_stocks: set[str] | None = None) -> list[str]:
+    notes = []
+    if allowed_stocks is not None:
+        for pair in st["pairs"]:
+            if pair["status"] == "planned" and pair["ticker"] not in allowed_stocks:
+                pair.update(status="skipped", note="outside the selected 100-stock universe")
+                notes.append("blocked pending entry " + pair["ticker"])
+    notes += settle(st, opens)
+    notes += pick(st, decisions, closes, etf_of, now, mode, allowed_stocks)
     st["equity"] = round(mark(st, closes), 2)
     st["peak"] = max(st["peak"], st["equity"])
     day = pd.Timestamp(closes.index[-1]).date().isoformat() if len(closes.index) else None

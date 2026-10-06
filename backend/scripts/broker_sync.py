@@ -163,15 +163,21 @@ def main() -> None:
     client = Alpaca.from_env()
     if client is None:
         print("broker: skipped (no Alpaca paper keys in backend/.env)")
+        from app.forward.step_result import emit
+        emit("skipped", reason="paper keys unavailable")
         return
     alloc = BACKEND / a.dir
     halt_path = alloc / "HALT" if a.dry else HALT
     try:
         alerts = sync(client, alloc, BACKEND / a.out, datetime.now(UTC), a.dry, halt_path)
-    except (BrokerError, httpx.HTTPError, OSError, ValueError, KeyError) as e:  # a mirror: never fail the book's job
+    except (BrokerError, httpx.HTTPError, OSError, ValueError, KeyError) as e:  # record the failure without losing order state
         alerts = [f"broker sync failed: {type(e).__name__}: {e}"[:300]]
     for x in alerts:
         print("BROKER ALERT:", x)
+    from app.forward.step_result import emit
+    emit("failed" if alerts else "ok", alerts=alerts)
+    if alerts:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

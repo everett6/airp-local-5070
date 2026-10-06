@@ -53,6 +53,7 @@ td { padding: 8px 10px; border-bottom: 1px solid #22221f; vertical-align: top; }
 .btn:hover { border-color: #55554c; } .btn.ghost { background: none; } .btn.wide { width: 100%; }
 .btn.danger { background: #2a1712; border-color: #5c2e25; color: var(--danger); }
 .btn.lime { background: var(--lime); color: var(--lime-ink); border-color: var(--lime); }
+.btn.big { font-size: 1.05rem; padding: 10px 22px; font-weight: 600; }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; } .row-end { display: flex; gap: 10px; justify-content: flex-end; }
 pre.md { white-space: pre-wrap; font: 12px/1.6 var(--mono); color: #d8d7d0; margin: 0; }
 svg.chart { width: 100%; height: auto; display: block; }
@@ -129,3 +130,23 @@ table.heat tr:hover td { background-color: inherit; } table.heat td.heat-total {
 .bar.hot span { background: #d95926; }
 details summary { cursor: pointer; color: var(--muted); font-size: 11px; margin-top: 4px; } details[open] summary { margin-bottom: 4px; }
 .warn-text { color: var(--warn); font-size: 11px; } pre.sheet { white-space: pre-wrap; font: 11px/1.5 var(--mono); color: var(--muted); margin: 6px 0 0; max-height: 260px; overflow: auto; }
+/* Manual-run output remains readable without pushing the history off the page. */
+.operation-log { max-height: 340px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+form[data-benchmark-form] textarea { width: 100%; box-sizing: border-box; font-family: monospace; }
+form[data-benchmark-form] label, form[data-engineering-form] label { display: inline-block; margin: 6px 8px 6px 0; }
+form[data-benchmark-form] > label:first-child { display: block; width: 100%; }
+form[data-benchmark-form] textarea, form[data-benchmark-form] input:not([type=checkbox]),
+form[data-engineering-form] input:not([type=checkbox]), form[data-benchmark-form] select {
+  background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 6px; padding: 6px;
+}
+
+/* Research log: run progress and the models' reasoning */
+.progress { height: 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; margin: 10px 0 6px; }
+.progress > div { height: 100%; background: var(--lime); transition: width .4s; }
+.rlog details { border-top: 1px solid var(--line); padding: 8px 0; }
+.rlog summary { cursor: pointer; }
+.rlog .step { margin: 6px 0 6px 12px; padding-left: 10px; border-left: 2px solid var(--line-2); }
+.rlog .tools { font: 11px var(--mono); color: var(--muted); word-break: break-all; }
+.rlog .site { font: 11px var(--mono); word-break: break-all; }
+.rlog .cases { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 800px) { .rlog .cases { grid-template-columns: 1fr; } }

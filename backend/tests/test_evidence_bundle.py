@@ -114,3 +114,30 @@ def test_a_bundle_carries_the_session_the_times_and_the_fact_sheet_version(live:
     assert b["ledger"]["decided_at"] == "2026-11-03T13:47:10+00:00" and b["ledger"]["sheet_version"] == 2
     assert b["fact_sheet"]["version"] == 2 and b["figures"] == figures
     assert E.check(live) == []
+
+
+def test_jan_decision_uses_its_actual_research_and_judge(live: Path) -> None:
+    from jan_forward import JAN
+    jan = live / "jan"
+    jan.mkdir()
+    research = {"model": JAN, "digest": "jan-at-decision", "evidence": "source text", "brief": {"facts": []}}
+    body = json.dumps(research) + "\n"
+    (jan / "research-j.json").write_text(body)
+    (jan / "extract.jsonl").write_text(json.dumps({"accession": "j", "model": JAN, "parsed": True}) + "\n")
+    (E.BACKEND / "results" / "events" / "decide_bonsai-27b_latest_forward_jan_test_h5.jsonl").write_text(
+        json.dumps({"accession": "j", "logodds": 3.5, "prompt_user": "base + Jan research"}) + "\n")
+    Ledger(live / "ledger.jsonl").append("decision", accession="j", ticker="JJJ", sector="Industrials",
+        accepted_utc="2026-10-01T20:10:00", entry_deadline="2026-10-02T09:30:00-04:00", source="bonsai",
+        logodds=3.5, on_time=True, pipeline="jan_bonsai_v1", judge_tag="forward_jan_test",
+        reader_record_path="jan/extract.jsonl", research_path="jan/research-j.json", research_sha256=E.sha(body))
+    E.write_new(live)
+    bundle = json.loads((live / "evidence" / "j.json").read_text())
+    assert bundle["reader"]["model"] == JAN and bundle["reader"]["parallel"] == 1
+    assert bundle["research"]["record"] == research and bundle["research"]["digest"] == "jan-at-decision"
+    assert bundle["fact_sheet"]["text"] == "base + Jan research" and bundle["ledger"]["matches_judge"]
+    assert E.check(live) == []
+    (jan / "research-j.json").write_text("changed")
+    assert any("Jan research differs" in x for x in E.check(live))
+    (live / "evidence" / "j.json").unlink()
+    with pytest.raises(ValueError, match="research changed"):
+        E.write_new(live)
