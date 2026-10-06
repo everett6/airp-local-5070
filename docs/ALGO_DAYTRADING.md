@@ -42,7 +42,7 @@ E1 used 2023-01-03 to 2026-09-25 out-of-sample, with costs of 0.5 bp per side fo
 ## Honest limits
 - Alpaca paper fills are simulated, and the free live feed is IEX, about 2–3% of volume. The history used for the test is the full SIP feed.
 - **"A couple of ms":** the latency from home to Alpaca is tens of milliseconds, not a couple. That doesn't matter at a 5-minute horizon, and true high-frequency trading is not reachable from here.
-- Earlier day-trading tests that also failed: intraday momentum, ORB, VWAP noise, end-of-day and open reversal, box/Darvas, pairs, and the AI earnings day trade. E1 is the 14th. See `backend/results/trials_registry.jsonl`.
+- Earlier day-trading tests that also failed: intraday momentum, ORB, VWAP noise, end-of-day and open reversal, box/Darvas, pairs, and the AI earnings day trade. E1 joins them. See `backend/results/trials_registry.jsonl`.
 
 ## Files
 - **Code:** `backend/app/sandbox/minute_ensemble.py`, `backend/scripts/e1_ensemble.py`, `backend/scripts/algo_engine.py`
