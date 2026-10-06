@@ -2315,3 +2315,11 @@ rule? The autopilot is about 2x gross and nearly all long technology, so the boo
   state counts, thresholds, leverage levels or inputs such as VIX would each be a new, separately justified trial);
   the autopilot keeps its current rules.
 - Scope: leverage only. Wider stops and other "safety margins" are not tested here.
+- **Result (run once, 2026-10-05 ~19:19 PDT): FAIL.** 2016-01-04 to 2026-09-25, after costs:
+  50-day rule (A) Sharpe **0.958**, CAGR 30.0%, max drawdown **-45.7%** (2020 -35.3%, 2022 -44.2%);
+  HMM (B) Sharpe **0.939**, CAGR 25.0%, max drawdown **-31.8%** (2020 -23.4%, 2022 -28.6%); static 2x Sharpe 0.877,
+  max drawdown -63.1%. B's drawdown is 13.9 points smaller (passes that half) but its Sharpe is 0.02 lower (fails
+  the other); the Sharpe difference's 95% CI is [-0.29, +0.27], i.e. no measurable difference either way. Panic
+  state on 31% of days, 154 switches. Per the spec the autopilot keeps its current rules and no variant is run.
+  Also read off this result (not a test): on this proxy the current rule's drawdown (-45.7%) is deeper than the
+  autopilot's 35% stop, which it would have hit in 2022 and about reached in 2020.
