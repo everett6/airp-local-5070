@@ -34,3 +34,11 @@ no leverage changes, no downloads, no shutdown.
   7. Day's gross from config is not capped at 3.0 on a live reload; fix: clamp to the ceiling.
   Lower: SIGTERM/cancel path skips Day's close-on-stop; the drawdown kill closes positions outside the intent log;
   quote freshness is checked once per batch; Night's 4% breaker is not latched for the session.
+
+## Progress (23:30 PDT): the user approved the order-path edits
+- 35ed788e: findings 1-7 fixed with fake-broker tests (unknown-outcome gate, 5xx, closes sized under the lock
+  counting working orders, unique flatten IDs, no replay of partial fills, drawdown kill blocks Day, Day gross clamp).
+- 1412e14f: Day closes on any exit incl. signals; additions skipped when slow reductions made the decision late.
+- Day restarted with the fixes (LIVE paper, waiting for the open). 908 tests pass.
+- Night: the drawdown kill now uses logged, verified closes for both strategies, and the 4% breaker is latched for
+  the session; applied at the next research gap with a Night restart (tests run first; reverted if any fail).
