@@ -2441,3 +2441,37 @@ position 22% of the time; years -39%, -30%, +2.8%, -22%. M-NN: net **-4.76** (CI
 costs; years all negative. The trees find a real but small 30-minute signal; trading it costs more than it earns.
 The network finds nothing. Per the rule: Autopilot Day keeps E1; price-only day trading on these bars is tested out
 at 5 and 30 minutes with linear, tree and neural models. No variant.
+
+## O1: operational hardening and rule changes from the 50-point review (user: "do all of them", 2026-10-06 ~23:50 ET; rules fixed before any code)
+
+**Execution and risk plumbing (no trading-rule change):** one account-wide risk authority (both autopilots submit
+through one locked function using the account risk check, which counts open orders at worst case); stable client
+order IDs from strategy, session, decision, symbol and intent; every intent written to disk before it is sent;
+reductions confirmed filled before dependent additions; every order state handled (partial, rejected, expired,
+canceled); breakers and flattening use broker-confirmed holdings; symbol ownership enforced (Day: the 14 ETFs;
+Night: everything else); reconcile at start and after reconnecting, entries blocked until it succeeds; flattening
+verified, else an incident stays open; a clock-driven session deadline independent of market data; named operating
+states (waiting, ready, trading, reduce_only, reconciling, halted, recovering) with logged reasons; persisted
+latches; recovery only after fresh data, reconciliation and valid limits; bounded retries; Night watches Day's
+heartbeat and flattens Day's symbols if Day stalls in its window; incident log; pause / cancel / flatten controls.
+**Rule changes (paper autopilot account only):**
+- *Day labelling (review #12):* E1 failed; it trades only as the user's explicit paper experiment and is shown as
+  "failed strategy, paper experiment" everywhere. Leverage stays the user's choice.
+- *Day execution (#15):* marketable limit orders, immediate-or-cancel, collar 3 bp beyond the quote; no order on a
+  quote older than 5 s or a spread over 5 bp.
+- *Night sizing (#13):* the "strong" label no longer doubles a weight (labels are not calibrated); the book is
+  rescaled so its gross stays where it was (leverage not reduced). Each order at most 1% of the stock's average
+  daily dollar volume (#15).
+- *Night correlated exposure (#14):* beta-weighted net after the hedge within +/-0.30 of equity; theme caps R1 stay.
+- *Night timing gate (#27):* a new call is not entered if the stock has already moved more than 1.5 ATR in the
+  call's direction since the research was decided (logged as "already priced in").
+- *Net opportunity (#33):* K1 Kelly uses returns net of a 10 bp round trip.
+- *Prediction target (#26):* a call means: the stock beats beta x QQQ over the horizon, from the entry session's
+  open to the exit session's close; evaluation uses exactly this.
+- *Controls (#38):* every new AI lot gets two shadow control lots (seeded random side; 20-day momentum side) with the
+  same sizing, evaluated the same way; shadows send no orders.
+- *Hard ceilings (#40):* code refuses limits looser than gross 3.9, daily loss 15%, drawdown kill 35%, per-asset
+  25%, whatever a config file says; no automatic process may change a risk limit or a pass rule.
+Reports (#34 calibration, #35 abstention, #38 controls, #39 attribution, #48 evidence) are descriptive; nothing in
+them changes trading. #30 needs the user's labels: a benchmark of constructed trap cases ships, and real cases are
+queued for human review.
