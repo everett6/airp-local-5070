@@ -2381,3 +2381,28 @@ moves (~0.1-0.2 bp) almost never beat the round trip: a position in 0.008% of de
 No variant. Summary: docs/ALGO_DAYTRADING.md.
 
 **E1 live (user decision 2026-10-06 ~18:04 local):** the user created results/forward/algo/LIVE; the engine sends paper orders in the autopilot account despite the FAIL. Nothing else changes.
+
+## Autopilot Night / Day split, risk rules R1-R3, research memory M1 (user request 2026-10-06 ~22:15 ET; rules fixed before any code)
+
+**Split.** Two buttons, one account (the autopilot's paper account), each its own process and lock:
+- *Autopilot Night* (`full_auto`): Jan/Bonsai research and the AI long/short swing book (5, 21, 63 sessions), hedge,
+  Kelly as before. It no longer opens AI "day" lots (base weight 0; the user asked for day trading without AI) and
+  no longer starts the algo engine.
+- *Autopilot Day* (`autopilot_day`): the E1 algo engine (live, the user's call of 6 Oct) inside a window the user
+  sets (default 09:35-15:55 ET, config/autopilot_day.json); flat at the window's end. Same leverage (3.0x algo,
+  3.9x account).
+**Risk rules (leverage unchanged: gross 2.0 Night, 3.0 Day, cap 3.9):**
+- *R1 theme concentration:* the net of each user theme (config/themes_book.json) at most 30% of equity and its gross
+  at most 50%; the weight removed goes pro rata to the other stocks (each still under per_name), so the book's
+  gross does not fall.
+- *R2 account circuit breaker:* account equity down 4% on the day (vs last_equity): Night sends only reducing orders
+  and Day opens nothing new until the next session; down 7%: Day goes flat. The 15% daily-loss stop of the risk
+  check and the 35% drawdown kill stay.
+- *R3 stale data (Day):* no decision on bars older than 3 minutes; data stale 10 minutes: flat.
+**M1 research memory (speed, on disk under results/research_memory/):** after each company, the checked facts
+(with dates and sources), the pages read and the call (sides, primary, bull/bear case) are saved. Next time: pages
+already read are skipped by the Jan readers; when nothing new was found, Jan's reading is skipped and the saved
+facts are reused; Bonsai's card gets a dated "past research" block (earlier facts and calls); Jan's brief gets a
+short note on the area (recent facts from the same theme). Research budget per company: 8 minutes first time,
+5 minutes with memory (was 10). Records carry `memory: true|false`. Accuracy is NOT claimed: D13 keeps its rule
+(every day call of the deep pipeline) and its report will add the memory/no-memory split; no new test is run.
