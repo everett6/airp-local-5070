@@ -3,7 +3,7 @@
 // (forward_allocator.py --halt / --resume) and pausing or resuming a research-queue job.
 // Manual paper and test runs are managed separately in runner.js.
 import { execFile } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 export function createAirp(root) {
@@ -315,6 +315,23 @@ export function createAirp(root) {
     // the 150-company research run: progress, both models' reasoning, every website visited (read-only)
     researchLog: () => runJson('research_view.py'),
     autopilot: () => runJson('full_auto.py', ['view']),
+    // O1 Fund control: reports (scripts/fund_report.py), the fact check (#30) and the user's controls (#50)
+    fundReport: () => runJson('fund_report.py'),
+    factReview: () => runJson('fact_review.py', ['status']),
+    async labelFact(data) {
+      if (!/^[0-9a-f]{16}$/.test(String(data.id || '')) || !['correct', 'wrong', 'unclear'].includes(data.verdict)) return { status: 400, body: { error: 'Choose a fact and correct, wrong or unclear' } };
+      return runJson('fact_review.py', ['label', data.id, data.verdict, '--note', String(data.note || '').slice(0, 300)]);
+    },
+    control(data) {
+      const dirs = { night: ['results', 'forward', 'full_auto'], day: ['results', 'forward', 'algo'] };
+      const files = { pause: 'PAUSE', cancel: 'CANCEL', flatten: 'FLATTEN' };
+      if (!dirs[data.strategy] || !['pause', 'resume', 'cancel', 'flatten'].includes(data.action)) return { status: 400, body: { error: 'Unknown control' } };
+      if (data.action === 'flatten' && data.confirm !== 'FLATTEN') return { status: 400, body: { error: 'Type FLATTEN to close the positions' } };
+      const dir = path.join(backend, ...dirs[data.strategy]);
+      if (data.action === 'resume') { for (const f of ['PAUSE']) { try { unlinkSync(path.join(dir, f)); } catch { /* not paused */ } } }
+      else writeFileSync(path.join(dir, files[data.action]), `${new Date().toISOString()} requested in the app\n`);
+      return { ok: true, strategy: data.strategy, action: data.action, note: 'The worker confirms from the broker; see Fund control.' };
+    },
     // Autopilot Day: the algo engine's status (results/forward/algo) and its trading window (config/autopilot_day.json)
     autopilotDay: () => ({ status: json(path.join(backend, 'results', 'forward', 'algo', 'status.json'), {}),
       config: json(path.join(backend, 'config', 'autopilot_day.json'), {}),

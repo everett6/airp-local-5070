@@ -46,7 +46,6 @@ def panel() -> pd.DataFrame:
     parts = []
     for s in me.UNIVERSE:
         f = me.frame(lead["SPY"] if s == "SPY" else load(s), lead[me.leader_of(s)])
-        f.attrs = {}
         f = f[f["m"].isin(me.DECISION_BARS_E2) & (f["date"] >= TRAIN_FROM) & (f["date"] <= OOS_TO)]
         parts.append(f.assign(symbol=s))
     p = me.ranks(pd.concat(parts))

@@ -255,3 +255,23 @@ test('the Day window is validated before it is saved', async (t) => {
   assert.equal(JSON.parse(readFileSync(path.join(root, 'backend', 'config', 'autopilot_day.json'), 'utf8')).end, '14:00');
   assert.equal(airp.autopilotDay().live, false);
 });
+
+test('fund controls are validated and only write their control files', async (t) => {
+  const { createAirp } = await import('../src/airp.js');
+  const { mkdtempSync, mkdirSync, existsSync, rmSync } = await import('node:fs');
+  const os = await import('node:os'); const path = await import('node:path');
+  const root = mkdtempSync(path.join(os.tmpdir(), 'airp-ctl-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const night = path.join(root, 'backend', 'results', 'forward', 'full_auto');
+  mkdirSync(night, { recursive: true }); mkdirSync(path.join(root, 'backend', 'results', 'forward', 'algo'), { recursive: true });
+  const airp = createAirp(root);
+  assert.equal(airp.control({ strategy: 'main', action: 'pause' }).status, 400);
+  assert.equal(airp.control({ strategy: 'night', action: 'flatten' }).status, 400);  // needs FLATTEN typed
+  assert.equal(airp.control({ strategy: 'night', action: 'pause' }).ok, true);
+  assert.ok(existsSync(path.join(night, 'PAUSE')));
+  airp.control({ strategy: 'night', action: 'resume' });
+  assert.ok(!existsSync(path.join(night, 'PAUSE')));
+  assert.equal(airp.control({ strategy: 'night', action: 'flatten', confirm: 'FLATTEN' }).ok, true);
+  assert.ok(existsSync(path.join(night, 'FLATTEN')));
+  assert.equal((await airp.labelFact({ id: 'x', verdict: 'correct' })).status, 400);
+});

@@ -76,6 +76,7 @@ class Leg:
     gap: float | None = None
     note: str = ""
     alerted: bool = False
+    limit_price: float | None = None  # set: a limit order (with tif "ioc", a bounded marketable order)
 
 
 UNFILLED = ("rejected", "canceled", "expired")  # final without a full fill (part of it may still have filled)
@@ -291,6 +292,8 @@ class Alpaca:
     def _submit(self, leg: Leg) -> None:
         body = {"symbol": leg.symbol, "qty": str(leg.qty), "side": leg.side, "type": "market",
                 "time_in_force": leg.tif, "client_order_id": leg.client_order_id}
+        if leg.limit_price is not None:
+            body.update(type="limit", limit_price=f"{leg.limit_price:.2f}")
         start = clock_time.monotonic()
         r = self.c.post(f"{PAPER}/orders", json=body)
         if r.status_code in (200, 201):

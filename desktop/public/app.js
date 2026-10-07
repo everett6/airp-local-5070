@@ -487,6 +487,92 @@ const views = {
       <div class="card wide">${h3('Autopilot log', 'Autopilot log')}${ev ? `<table><tr><th>When</th><th>What</th><th>Details</th></tr>${ev}</table>` : '<p class="empty">Nothing yet.</p>'}</div>`;
   },
 
+  // O1 Fund control (review #41-#50, #30): one page for the account's risk, the user's controls and the evidence
+  async fund() {
+    const [r, fr, day, ops] = await Promise.all([api('fund-report'), api('fact-review'), api('autopilot-day'), api('operations')]);
+    if (r.error) return `<h2>Fund control</h2><p class="err">${esc(r.error)}</p>`;
+    const rk = r.risk || {}, ex = rk.exposure || {}, st = rk.states || {};
+    const bp = (v) => (v == null ? '–' : `${fmt(v * 1e4, 1)} bp`);
+    const stateKind = (s) => ({ trading: 'ok', waiting: '', ready: 'ok', reduce_only: 'warn', reconciling: 'warn', recovering: 'warn', halted: 'bad' }[s] || '');
+    const nightOn = !!(ops.autopilot && ops.autopilot.action === 'full_auto'), dayOn = !!ops.day;
+    const mode = (on, live, extra) => (!on ? pill('stopped') : live ? pill('ALPACA PAPER ORDERS', 'warn') : pill('SIMULATED (shadow, no orders)'))
+      + (extra ? ` ${pill(extra, 'bad')}` : '');
+    // #41: the exact mode of each part, prominently
+    const banner = `<div class="modebar">
+      <div><b>Research</b> ${pill(nightOn ? 'Jan + Bonsai running' : 'idle', nightOn ? 'ok' : '')}</div>
+      <div><b>Night</b> ${mode(nightOn, true)}</div>
+      <div><b>Day</b> ${mode(dayOn, day.live, day.status?.qualified === false ? 'failed strategy: experiment' : '')}</div>
+      <div><b>Real money</b> ${pill('NEVER: paper endpoint only', 'ok')}</div></div>`;
+    // #50: separate pause / cancel / close controls, with the broker-confirmed result
+    const ctl = (s, label, cur) => {
+      const c = (rk.controls || {})[s] || [], paused = c.some(([n]) => n === 'PAUSE');
+      const conf = cur?.controls || {};
+      const done = (k) => (conf[k] ? `${conf[k].confirmed ? pill('confirmed by the broker', 'ok') : pill('NOT yet confirmed', 'bad')} <span class="tiny muted">${esc(when(conf[k].at))}</span>` : '');
+      return `<div class="card"><h3>${esc(label)}</h3>
+        <p>State: ${pill(st[s]?.state || '–', stateKind(st[s]?.state))} <span class="tiny muted">${esc(st[s]?.reason || '')} · ${esc(st[s]?.allows || '')}</span></p>
+        <div class="row">${paused ? `<button class="btn" data-control="${s}" data-act="resume">▶ Resume new entries</button>` : `<button class="btn ghost" data-control="${s}" data-act="pause">⏸ Pause new entries</button>`}
+        <button class="btn ghost" data-control="${s}" data-act="cancel">✕ Cancel pending entries</button>
+        <button class="btn" data-control="${s}" data-act="flatten">⏹ Close owned positions</button></div>
+        <p class="tiny muted">Pause: only orders that shrink positions. Cancel: open orders of this autopilot are withdrawn. Close: its positions are sold or bought back, then checked at the broker; until the broker shows them gone an incident stays open.</p>
+        <p class="tiny">Cancel ${done('cancel') || '<span class="muted">not used</span>'} · Close ${done('flatten') || '<span class="muted">not used</span>'}</p></div>`;
+    };
+    // #45: one account-risk dashboard (broker data only)
+    const owners = Object.entries(ex.by_owner || {}).map(([k, v]) => `<tr><td>${esc(k === 'day' ? 'Day (14 ETFs)' : 'Night (stocks + hedge)')}</td><td class="num">${pct(v.gross, 1)}</td><td class="num">${pct(v.net, 1)}</td></tr>`).join('');
+    const themes = Object.entries(ex.themes || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${pct(v.gross, 1)}</td><td class="num">${pct(v.net, 1)}</td><td class="tiny muted">cap 50% gross / 30% net</td></tr>`).join('');
+    const riskCard = rk.error ? `<p class="err">${esc(rk.error)}</p>` : `<div class="kpis">${kpi('Gross exposure', pct(ex.gross, 0), `cap ${fmt(rk.ceilings?.max_gross, 1)}x`)}${kpi('Net exposure', pct(ex.net, 0))}${kpi('Beta-weighted net', pct(ex.beta_net, 0), 'Night cap ±30%')}${kpi('Pending orders', pct(ex.pending_gross, 0), `worst case total ${pct(ex.worst_case_gross, 0)}`)}${kpi('Headroom', pct(ex.headroom_gross, 0), `buying power $${fmt(ex.buying_power)}`)}</div>
+      <div class="split"><table><tr><th>Owner</th><th class="num">Gross</th><th class="num">Net</th></tr>${owners || '<tr><td colspan="3" class="muted">no positions</td></tr>'}</table>
+      <table><tr><th>Theme</th><th class="num">Gross</th><th class="num">Net</th><th></th></tr>${themes || '<tr><td colspan="4" class="muted">no theme positions</td></tr>'}</table></div>
+      <p class="tiny">Largest: ${(ex.top || []).map((t) => `${esc(t.symbol)} ${pct(t.weight, 1)}`).join(' · ') || '–'} · Breakers: Night ${esc(rk.breakers?.night || 'off')}, Day ${esc(rk.breakers?.day || 'off')} · Hard ceilings: gross ${fmt(rk.ceilings?.max_gross, 1)}x, one asset ${pct(rk.ceilings?.max_asset, 0)}, daily loss ${pct(rk.ceilings?.daily_loss, 0)}, drawdown ${pct(rk.ceilings?.max_drawdown, 0)} (no config can loosen them)</p>`;
+    // #46: acknowledgments are not fills
+    const SK = { filled: 'ok', submitted: 'warn', intended: '', rejected: 'bad', canceled: '', expired: '', never_sent: '', unexplained: 'bad' };
+    const orders = `<div class="row">${Object.entries(r.orders?.by_state || {}).map(([k, v]) => pill(`${k}: ${v}`, SK[k] || '')).join(' ') || '<span class="muted">No orders yet.</span>'}</div>
+      ${(r.orders?.recent || []).length ? `<details><summary>Latest orders (${fmt(r.orders.recent.length)})</summary><table><tr><th>When</th><th>Who</th><th>Order</th><th>State</th><th class="num">Filled</th><th>Note</th></tr>${r.orders.recent.map((o) => `<tr><td>${esc(when(o.at))}</td><td>${esc(o.strategy)}</td><td>${esc(o.side)} ${fmt(o.qty)} <b>${esc(o.symbol)}</b>${o.limit ? ` @ ${fmt(o.limit, 2)}` : ''}</td><td>${pill(o.state, SK[o.state] || '')}</td><td class="num">${o.filled_qty == null ? '–' : fmt(o.filled_qty)}</td><td class="tiny muted">${esc(o.note || '')}</td></tr>`).join('')}</table></details>` : ''}
+      <p class="tiny muted">Submitted = the broker acknowledged the order; only "filled" means shares changed hands. Rejected, canceled and expired orders are listed with their reason.</p>`;
+    // #43: why no trade
+    const wn = Object.entries(r.why_no_trade?.night || {}).sort((a, b) => (a[1].at < b[1].at ? 1 : -1)).slice(0, 40);
+    const wd = Object.entries(r.why_no_trade?.day || {});
+    const why = `<div class="split"><div><h4>Night (latest 40 companies)</h4>${wn.length ? `<details><summary>${fmt(wn.length)} companies held back: ${esc([...new Set(wn.flatMap(([, v]) => v.reasons.map((x) => x.split(':').pop().trim())))].slice(0, 3).join('; '))}</summary><table>${wn.map(([t, v]) => `<tr><td><b>${esc(t)}</b></td><td class="tiny">${v.reasons.map(esc).join('<br>')}</td></tr>`).join('')}</table></details>` : '<p class="empty">Nothing held back yet.</p>'}</div>
+      <div><h4>Day (last decision)</h4>${wd.length ? `<table>${wd.map(([s, v]) => `<tr><td><b>${esc(s)}</b></td><td class="tiny">${esc(v)}</td></tr>`).join('')}</table>` : '<p class="empty">No decision yet today.</p>'}</div></div>`;
+    // #44: the opportunity funnel
+    const F = { companies: 'Companies', researched: 'Researched', decided: 'Decided', eligible_calls: 'Eligible calls', risk_approved: 'Risk-approved orders', submitted: 'Submitted', filled: 'Filled', exited: 'Exited', evaluated: 'Evaluated' };
+    const fs = r.funnel?.stages || {};
+    const drops = (name, rows) => (rows?.length ? `<h4>${esc(name)}</h4><table>${rows.map(([w, n]) => `<tr><td class="tiny">${esc(w)}</td><td class="num">${fmt(n)}</td></tr>`).join('')}</table>` : '');
+    const funnel = `<div class="funnel">${Object.entries(F).map(([k, l]) => `<div><div class="tiny muted">${esc(l)}</div><b>${fmt(fs[k] ?? 0)}</b></div>`).join('<span class="muted">→</span>')}</div>
+      <div class="split"><div>${drops('Research that failed', r.funnel?.drops?.['research failed'])}</div><div>${drops('Calls not traded', r.funnel?.drops?.['no trade'])}${drops('Orders rejected', r.funnel?.drops?.rejected)}</div></div>`;
+    // #34 #35 #38 #39: scored calls
+    const sm = (x) => (!x || !x.n ? '<td class="num">0</td><td class="num">–</td><td class="num">–</td><td class="num">–</td>' : `<td class="num">${fmt(x.n)}</td><td class="num ${x.mean < 0 ? 'err' : ''}">${pct(x.mean, 2)}</td><td class="num">${pct(x.hit, 0)}</td><td class="num tiny">${x.ci ? `${pct(x.ci[0], 2)} … ${pct(x.ci[1], 2)}` : '–'}</td>`);
+    const tbl = (title, obj) => `<h4>${esc(title)}</h4><table><tr><th></th><th class="num">Calls</th><th class="num">Mean vs market</th><th class="num">Right</th><th class="num">95% range</th></tr>${Object.entries(obj || {}).map(([k, v]) => `<tr><td>${esc(k)}</td>${sm(v)}</tr>`).join('')}</table>`;
+    const c = r.calls || {};
+    const calls = `<p class="tiny">${esc(c.target || '')}. Before trading costs. Only horizons whose exit day has closed.</p>
+      <table><tr><th></th><th class="num">Calls</th><th class="num">Mean vs market</th><th class="num">Right</th><th class="num">95% range</th></tr><tr><td><b>All AI calls</b></td>${sm(c.all)}</tr></table>
+      <div class="split"><div>${tbl('Calibration: by label (#34)', c.calibration_by_label)}${tbl('By horizon', c.by_horizon)}</div><div>${tbl('By side (1 = long)', c.by_side)}${tbl('By evidence support', c.by_support)}${tbl('With research memory', c.by_memory)}</div></div>
+      <p class="tiny">Abstention (#35): ${fmt(c.abstention?.n ?? 0)} horizon calls had no side; the market-relative move missed on them averaged ${c.abstention?.mean_abs_move_missed == null ? '–' : pct(c.abstention.mean_abs_move_missed, 2)} (in either direction).</p>
+      ${tbl('AI calls against simple controls, same dates and sizes (#38)', Object.fromEntries(Object.entries(r.controls || {}).filter(([k]) => k !== 'note')))}`;
+    // #47 execution quality
+    const exq = `<div class="kpis">${kpi('Fills', fmt(r.execution?.fills ?? 0))}${Object.entries(r.execution?.slippage_bp || {}).map(([k, v]) => kpi(`Slippage ${k === 'dy' ? 'Day' : k === 'nt' ? 'Night' : k}`, `${fmt(v.mean, 1)} bp`, `${fmt(v.n)} fills vs decision price`)).join('')}</div><p class="tiny muted">Slippage: fill price against the price when the order was decided (positive = paid more). Equity, drawdown and the combined fund are on the Autopilot page.</p>`;
+    // #48 evidence, #28 feed check, #30 fact check, #29 audit
+    const ev = (r.evidence || []).slice().reverse().map((e) => `<tr><td>${esc(e.name)}</td><td>${esc(e.evidence)}</td><td class="num">${e.sharpe == null ? (e.mean_net_bp == null ? '–' : `${fmt(e.mean_net_bp)} bp/call`) : fmt(e.sharpe, 2)}</td><td class="num">${e.n == null ? '–' : fmt(e.n)}</td><td class="tiny">${esc(e.window || '')}</td><td>${pill(e.result || '–', String(e.result).startsWith('pass') ? 'ok' : String(e.result).startsWith('fail') ? 'bad' : 'warn')}</td></tr>`).join('');
+    const fc = r.feed_check || {};
+    const facts = (fr.queue || []).slice(0, 10).map((f) => `<tr><td><b>${esc(f.ticker)}</b></td><td class="tiny">${esc(f.text)}<br><a href="${esc(f.source)}" target="_blank" rel="noreferrer">${esc(String(f.source).slice(0, 80))}</a> ${esc(f.date || '')}</td><td class="row"><button class="btn ghost" data-fact="${esc(f.id)}" data-verdict="correct">✓</button><button class="btn ghost" data-fact="${esc(f.id)}" data-verdict="wrong">✗</button><button class="btn ghost" data-fact="${esc(f.id)}" data-verdict="unclear">?</button></td></tr>`).join('');
+    // #49 incidents
+    const inc = (r.incidents || []).map((i) => `<tr><td>${esc(when(i.at))}</td><td>${pill(i.state, i.state === 'open' ? 'bad' : 'ok')}</td><td>${esc(i.kind)}</td><td class="tiny">${esc(i.detail)}${Object.keys(i.exposed || {}).length ? `<br>Exposed: ${esc(JSON.stringify(i.exposed))}` : ''}</td><td class="tiny">${esc(i.fallback || '')}</td><td class="tiny">${esc(i.resolution || i.resume_when || '')}</td></tr>`).join('');
+    return `<h2>Fund control</h2><p class="lede">The autopilot account in one place: what mode each part is in, your controls, actual risk, why trades did or did not happen, and how good the evidence is.</p>
+      ${banner}
+      <div class="split">${ctl('night', 'Autopilot Night', (await api('autopilot')).status)}${ctl('day', 'Autopilot Day', day.status)}</div>
+      <div class="card wide">${h3('Account risk (broker data)', 'Account risk')}${riskCard}</div>
+      <div class="card wide">${h3('Orders: acknowledged is not filled', 'Order states')}${orders}</div>
+      <div class="card wide">${h3('Why no trade?', 'Why no trade')}${why}</div>
+      <div class="card wide">${h3('Opportunity funnel', 'Opportunity funnel')}${funnel}</div>
+      <div class="card wide">${h3('How the AI calls did (scored on the defined target)', 'Call evaluation')}${calls}</div>
+      <div class="card wide">${h3('Execution quality', 'Execution quality')}${exq}</div>
+      <div class="card wide">${h3('Evidence behind each strategy', 'Model evidence')}<table><tr><th>Strategy or test</th><th>Evidence</th><th class="num">Sharpe / result</th><th class="num">Sample</th><th>Window</th><th>Verdict</th></tr>${ev}</table>
+        <p class="tiny">Day's live data (#28): ${esc(fc.verdict || 'not checked yet')}${fc.features ? ` · volume feature correlation ${fmt(fc.features.volz?.corr, 2)}, 1-minute return ${fmt(fc.features.r1?.corr, 2)}` : ''}</p>
+        <p class="tiny">Research timestamp audit (#29): ${fmt((r.audit_exceptions || []).length)} record(s) with exceptions${(r.audit_exceptions || []).length ? `: ${r.audit_exceptions.slice(0, 5).map((x) => esc(x.ticker)).join(', ')}` : ''}.</p></div>
+      <div class="card wide">${h3("Check Jan's facts (human-verified accuracy)", 'Fact check')}<p>Verified accuracy so far: <b>${fr.accuracy == null ? '–' : pct(fr.accuracy, 0)}</b> of ${fmt(fr.n_scored ?? 0)} facts marked. Open the source, then mark whether the fact says what the page says.</p>
+        ${facts ? `<table>${facts}</table>` : '<p class="empty">Queue empty.</p>'}</div>
+      <div class="card wide">${h3('Incidents and recovery', 'Incidents')}${inc ? `<table><tr><th>When</th><th>State</th><th>What</th><th>Detail</th><th>Fallback</th><th>Resumes when / resolved by</th></tr>${inc}</table>` : '<p class="empty">No incidents.</p>'}</div>`;
+  },
+
   async researchlog() {
     const r = await api('research_log');
     const p = r.progress || {}, total = p.total || 150, done = p.done || 0;
@@ -927,7 +1013,26 @@ async function sidebarState() {
     $('#mode-text').innerHTML = `${esc(o.mode)} · ${o.halted ? '<span class="err">HALTED</span>' : 'trading'}`;
     $('#halt-btn').textContent = o.halted ? 'Resume trading' : 'Kill switch';
     $('#halt-btn').dataset.halted = o.halted ? '1' : '';
-  } catch { $('#mode-text').textContent = 'airp not reachable'; }
+    const modeBadge = $('#mode-badge');
+    if (modeBadge) {
+      modeBadge.textContent = o.halted ? 'HALTED' : (o.mode ? o.mode.toUpperCase() : 'PAPER');
+      modeBadge.classList.toggle('halted', !!o.halted);
+    }
+    const topStatus = $('#top-status');
+    const topText = $('#top-status-text');
+    if (topStatus && topText) {
+      topStatus.classList.toggle('halted', !!o.halted);
+      topText.textContent = o.halted ? 'KILL SWITCH ACTIVE · HALTED' : `${o.mode || 'Paper book'} · Active`;
+    }
+  } catch {
+    $('#mode-text').textContent = 'airp not reachable';
+    const topStatus = $('#top-status');
+    const topText = $('#top-status-text');
+    if (topStatus && topText) {
+      topStatus.classList.add('halted');
+      topText.textContent = 'Server unreachable';
+    }
+  }
 }
 
 function confirmDialog({ title, text, word, needReason }) {
@@ -942,11 +1047,92 @@ function confirmDialog({ title, text, word, needReason }) {
 }
 
 $('#nav').addEventListener('click', (e) => { const b = e.target.closest('[data-view]'); if (b) show(b.dataset.view); });
-$('#refresh').addEventListener('click', () => { metricsCache = null; show(current); sidebarState(); });
+
+const searchInput = $('#nav-search');
+const searchClear = $('#nav-search-clear');
+if (searchInput) {
+  const filterNav = () => {
+    const q = (searchInput.value || '').trim().toLowerCase();
+    if (searchClear) searchClear.hidden = !q;
+    const items = document.querySelectorAll('#nav .nav-item');
+    items.forEach((item) => {
+      const text = item.textContent.toLowerCase();
+      const match = !q || text.includes(q);
+      item.hidden = !match;
+    });
+    document.querySelectorAll('#nav .nav-section-title').forEach((title) => {
+      let next = title.nextElementSibling;
+      let hasVisible = false;
+      while (next && !next.classList.contains('nav-section-title')) {
+        if (!next.hidden) hasVisible = true;
+        next = next.nextElementSibling;
+      }
+      title.hidden = !hasVisible;
+    });
+  };
+
+  searchInput.addEventListener('input', filterNav);
+  searchClear?.addEventListener('click', () => {
+    searchInput.value = '';
+    filterNav();
+    searchInput.focus();
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const first = document.querySelector('#nav .nav-item:not([hidden])');
+      if (first) {
+        show(first.dataset.view);
+        searchInput.blur();
+      }
+    } else if (e.key === 'Escape') {
+      searchInput.value = '';
+      filterNav();
+      searchInput.blur();
+    }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if ((e.key === '/' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k')) && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+      e.preventDefault();
+      searchInput.focus();
+      searchInput.select();
+    }
+  });
+}
+
+$('#refresh').addEventListener('click', async () => {
+  const btn = $('#refresh');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="btn-icon spin">↻</span>Refreshing…';
+  btn.disabled = true;
+  metricsCache = null;
+  try {
+    await show(current);
+    await sidebarState();
+    btn.innerHTML = '<span class="btn-icon">✓</span>Refreshed';
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 800);
+  } catch {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
+});
 $('#rebuild').addEventListener('click', async () => {
-  $('#rebuild').textContent = 'Rebuilding…'; $('#rebuild').disabled = true;
-  try { await api('metrics', {}); metricsCache = null; await show(current); } catch (e) { alert(e.message); }
-  $('#rebuild').textContent = 'Rebuild charts'; $('#rebuild').disabled = false;
+  const btn = $('#rebuild');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="btn-icon spin">⚡</span>Rebuilding…';
+  btn.disabled = true;
+  try {
+    await api('metrics', {});
+    metricsCache = null;
+    await show(current);
+    btn.innerHTML = '<span class="btn-icon">✓</span>Rebuilt';
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1200);
+  } catch (e) {
+    alert(e.message);
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
 });
 $('#halt-btn').addEventListener('click', async () => {
   const halted = !!$('#halt-btn').dataset.halted;
@@ -988,6 +1174,19 @@ $('#view').addEventListener('click', async (e) => {
     finally { operationStarting = false; }
     return;
   }
+  const ctl = e.target.closest('[data-control]');
+  if (ctl) {
+    const act = ctl.dataset.act, strategy = ctl.dataset.control;
+    let confirm = '';
+    if (act === 'flatten') {
+      const c = await confirmDialog({ title: `Close all ${strategy === 'day' ? 'Day' : 'Night'} positions`, text: `Sell or buy back every position Autopilot ${strategy === 'day' ? 'Day' : 'Night'} owns in the paper account, then keep new entries paused until you resume. The result is confirmed from the broker.`, word: 'FLATTEN' });
+      if (!c) return; confirm = c.confirm;
+    }
+    try { await api('control', { strategy, action: act, confirm }); } catch (error) { alert(error.message); }
+    await show('fund', true); return;
+  }
+  const fact = e.target.closest('[data-fact]');
+  if (fact) { try { await api('fact-review', { id: fact.dataset.fact, verdict: fact.dataset.verdict }); } catch (error) { alert(error.message); } await show('fund', true); return; }
   const q = e.target.closest('[data-q]');
   if (q) { await api('research', { action: q.dataset.q, name: q.dataset.name }).catch((x) => alert(x.message)); show('research'); }
   const acct = e.target.closest('[data-acct]');
@@ -1034,7 +1233,7 @@ sidebarState();
 const NO_RELOAD = new Set(['settings', 'how', 'reviews', 'benchmark', 'institutional']);
 let lastReload = Date.now();
 setInterval(() => {
-  const due = current === 'system' ? 2 : ['operations', 'autopilot'].includes(current) ? 5 : settings.reloadSec;
+  const due = current === 'system' ? 2 : ['operations', 'autopilot'].includes(current) ? 5 : current === 'fund' ? 15 : settings.reloadSec;
   if ((!settings.autoReload && !['operations', 'autopilot'].includes(current)) || NO_RELOAD.has(current) || document.querySelector('dialog[open]') || operationStarting || document.hidden) return;
   if (Date.now() - lastReload < due * 1000) return;
   lastReload = Date.now();

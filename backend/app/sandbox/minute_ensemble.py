@@ -4,6 +4,7 @@ features with the same `frame` so the live book trades exactly what was tested."
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -29,7 +30,8 @@ def cost(symbol: str) -> float:
     return COST_SIDE.get(symbol, DEFAULT_COST)
 
 
-def frame(bars: pd.DataFrame, lead: pd.DataFrame, stats: pd.DataFrame | None = None) -> pd.DataFrame:
+def frame(bars: pd.DataFrame, lead: pd.DataFrame, stats: pd.DataFrame | None = None,
+          with_rolled: bool = False) -> Any:
     """Features and the vol-scaled 5-minute forward target for every bar of one symbol.
 
     `bars` and `lead`: regular-hours 1-minute bars with ts (America/New_York), open, high, low, close, volume.
@@ -98,8 +100,7 @@ def frame(bars: pd.DataFrame, lead: pd.DataFrame, stats: pd.DataFrame | None = N
         "lead15": lr15 / sigma, "lead30": lr30 / sigma, "leadday": (lg - lead_first) / sigma,
         "resid30": (back(lc, 30) - beta * lr30) / sigma, "tod": m / 390.0,
         "fwd30": fwd30, "y30": fwd30 / sigma}, index=df.index)
-    out.attrs["rolled"] = rolled
-    return out
+    return (out, rolled) if with_rolled else out
 
 
 def _rolled(date: np.ndarray, r1: pd.Series, lr1: pd.Series) -> pd.DataFrame:
@@ -113,8 +114,7 @@ def _rolled(date: np.ndarray, r1: pd.Series, lr1: pd.Series) -> pd.DataFrame:
 
 def day_stats(bars: pd.DataFrame, lead: pd.DataFrame, day: object) -> pd.DataFrame:
     """`stats` for `day` from bars of the sessions before it (21 or more), for the live engine."""
-    f = frame(bars[bars["ts"].dt.date < day], lead[lead["ts"].dt.date < day])
-    rolled = f.attrs["rolled"]
+    _, rolled = frame(bars[bars["ts"].dt.date < day], lead[lead["ts"].dt.date < day], with_rolled=True)
     return pd.DataFrame({"sigma": [rolled["sigma"].iloc[-1]], "beta": [rolled["beta"].iloc[-1]]}, index=[day])
 
 

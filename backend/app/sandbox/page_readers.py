@@ -112,7 +112,8 @@ async def read_pages(llm: Callable[[str, str], Awaitable[str]], subject: dict[st
 def card(ticker: str, merged: dict[str, Any]) -> str:
     lines = [f"Company: {ticker}",
              "Jan research (many sources; citations and numbers checked by code against each source):"]
-    lines += [f"- {str(f['text'])[:300]} [{f['source']}] ({str(f.get('date', ''))[:10]})" for f in merged["facts"]]
+    lines += [f"- {str(f['text'])[:300]} [{f['source']}] ({str(f.get('date', ''))[:10]}"
+              + (f"; {f['tag']}" if f.get("tag") else "") + ")" for f in merged["facts"]]  # O1 #32 freshness tag
     for k in ("catalysts", "risks"):
         if merged.get(k):
             lines.append(f"Jan {k} (model assessment): " + "; ".join(str(x)[:200] for x in merged[k]))

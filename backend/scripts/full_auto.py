@@ -21,7 +21,9 @@ from __future__ import annotations
 import argparse
 import csv
 import fcntl
+import hashlib
 import json
+import math
 import os
 import signal
 import subprocess
@@ -30,7 +32,6 @@ import time
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -41,10 +42,10 @@ import httpx
 
 from app.data_ingestion.bars import key
 from app.forward.ledger import Ledger, jsonl_records, write_atomic
+from app.portfolio import account_book as ab
 from app.portfolio import auto_trader as at
 from app.portfolio import fund_stability as fs
-from app.portfolio.account_risk import RiskPolicy, evaluate
-from app.portfolio.broker import DATA, PAPER, Alpaca, BrokerError, Leg
+from app.portfolio.broker import DATA, PAPER, Alpaca, BrokerError
 from app.sandbox import minute_ensemble as me
 from app.sandbox import research_memory as rm
 
@@ -57,8 +58,12 @@ KEYS = ("AIRP_AUTO_ALPACA_KEY_ID", "AIRP_AUTO_ALPACA_SECRET_KEY")
 # Large technology companies the sector list files elsewhere (internet, media, cars, payments).
 TECH_EXTRA = ("GOOGL", "META", "AMZN", "NFLX", "TSLA", "UBER", "ABNB", "DASH", "EBAY", "PYPL", "EA", "TTWO", "MTCH",
               "BKNG", "EXPE", "CHTR", "TMUS")
-SANDBOX_RISK = RiskPolicy(max_gross=3.9, max_asset=0.25, max_crypto=0.01, daily_loss=0.15, max_spread_bp=150.0,
-                          max_reference_gap=0.10, max_quote_age_s=180.0)
+SANDBOX_RISK = ab.SANDBOX_RISK  # one policy for the whole account (app/portfolio/account_book.py)
+ROUND_TRIP = 0.001       # O1 #33: K1 Kelly on returns net of a 10 bp round trip
+PARTICIPATION = 0.01     # O1 #15: an order at most 1% of the stock's average daily dollar volume
+BETA_NET_CAP = 0.30      # O1 #14: beta-weighted net after the hedge
+PRICED_IN_ATR = 1.5      # O1 #27: no entry after a move of this many ATRs in the call's direction
+STALE_DAY_S = 180        # O1 #21: Day's heartbeat older than this inside its window: the watchdog flattens
 # Autopilot Day (scripts/algo_engine.py) owns these ETFs in this account; QQQ stays with the N1 hedge.
 ALGO_SYMBOLS = frozenset(me.UNIVERSE)
 BREAKER = 0.04  # R2
@@ -328,48 +333,6 @@ class Sandbox:
                 self._shortable[sym] = False
         return self._shortable[sym]
 
-    def send_many(self, orders: list[dict[str, Any]], prices: dict[str, float]) -> list[Leg]:
-        """The account risk check of Alpaca.submit with ONE snapshot for the whole pass: each order sent is added to
-        the pending orders and its cost taken off buying power before the next is checked (same limits, same audit
-        records), so a pass costs about 6 requests plus one per order instead of about 8 per order."""
-        a, policy = self.a, self.a.risk_policy
-        assert policy is not None
-        now = datetime.now(UTC)
-        account = dict(a.account())
-        positions = a._get(f"{PAPER}/positions")
-        pending = list(a._get(f"{PAPER}/orders", status="open", limit=500))
-        if len(pending) >= 500:
-            raise BrokerError("open order snapshot may be truncated")
-        names = sorted({o["symbol"] for o in orders} | {p["symbol"] for p in positions} | {o["symbol"] for o in pending})
-        quotes: dict[str, Any] = {}
-        for i in range(0, len(names), 100):
-            quotes.update(a._get(f"{DATA}/v2/stocks/quotes/latest", symbols=",".join(names[i:i + 100]), feed="iex")["quotes"])
-        floor = now - timedelta(seconds=policy.max_quote_age_s)
-        legs = []
-        with (a.audit_path / "submit.lock").open("a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
-            for o in orders:
-                leg = Leg(o["symbol"], o["symbol"].replace("-", "."), o["side"], float(o["qty"]), "day", "fa-" + uuid4().hex[:20],
-                          prices.get(o["symbol"], 0.0))
-                try:
-                    verdict = evaluate(policy, account, positions, pending, quotes, leg.symbol, leg.side, leg.qty,
-                                       leg.ref_price, now, False, floor)
-                except (ValueError, KeyError, TypeError) as exc:
-                    verdict = {"allowed": False, "reasons": [f"risk snapshot unusable: {str(exc)[:120]}"]}
-                a._audit("risk", client_order_id=leg.client_order_id, symbol=leg.symbol, side=leg.side, qty=leg.qty,
-                         ref_price=leg.ref_price, at=datetime.now(UTC).isoformat(), batched=True, **verdict)
-                if not verdict["allowed"]:
-                    leg.status, leg.note = "rejected", "ACCOUNT RISK: " + "; ".join(verdict["reasons"])
-                else:
-                    a._submit(leg)
-                    if leg.status == "submitted":
-                        pending.append({"symbol": leg.symbol, "side": leg.side, "qty": leg.qty, "filled_qty": 0})
-                        if not verdict.get("reducing"):
-                            ask = float((quotes.get(leg.symbol) or {}).get("ap") or leg.ref_price)
-                            account["buying_power"] = str(float(account["buying_power"]) - leg.qty * ask)
-                legs.append(leg)
-        return legs
-
     def fills(self, after: str | None) -> list[dict[str, Any]]:
         params: dict[str, Any] = {"activity_types": "FILL", "direction": "asc", "page_size": 100}
         if after:
@@ -384,6 +347,64 @@ class Sandbox:
         r = self.a.c.delete(f"{PAPER}/positions", params={"cancel_orders": "true"})
         if r.status_code not in (200, 207):
             raise BrokerError(f"close all: HTTP {r.status_code}")
+
+
+def unstrong(lots: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """O1 #13: undo the x2 for "strong" ratings (1 and 5), then rescale so the open book's gross is unchanged."""
+    before = sum(x["weight"] for x in lots if x["state"] == "open")
+    out = [{**x, "weight": x["weight"] / 2 if x.get("rating") in (1, 5) else x["weight"]} for x in lots]
+    after = sum(x["weight"] for x in out if x["state"] == "open")
+    k = before / after if after > 0 else 1.0
+    return [{**x, "weight": x["weight"] * k} for x in out]
+
+
+def beta_cap(w: dict[str, float], betas: dict[str, float], cap: float) -> dict[str, float]:
+    """O1 #14: beta-weighted net after the hedge within +/-cap; if the hedge legs are capped out, the stocks scale."""
+    stocks = {s: x for s, x in w.items() if s not in fs.BASKET}
+    hedge = sum(x for s, x in w.items() if s in fs.BASKET)
+    sb = sum(x * betas.get(s, 1.0) for s, x in stocks.items())
+    net = sb + hedge
+    if abs(net) <= cap or sb == 0:
+        return w
+    f = (math.copysign(cap, net) - hedge) / sb
+    return {s: (x * f if s in stocks else x) for s, x in w.items()}
+
+
+def participation(orders: list[dict[str, Any]], prices: dict[str, float], adv: dict[str, float]) -> list[dict[str, Any]]:
+    """O1 #15: an opening or growing order at most PARTICIPATION of the stock's average daily dollar volume."""
+    out = []
+    for o in orders:
+        cap_usd = PARTICIPATION * adv.get(o["symbol"], 0.0)
+        px = prices.get(o["symbol"], 0.0)
+        if not o["reducing"] and cap_usd > 0 and px > 0 and o["qty"] * px > cap_usd:
+            o = {**o, "qty": int(cap_usd / px), "capped": "1% of daily dollar volume"}
+            if o["qty"] < 1:
+                continue
+        out.append(o)
+    return out
+
+
+def controls(lot: dict[str, Any], mom: int) -> list[dict[str, Any]]:
+    """O1 #38: a seeded random side and a 20-day momentum side for the same stock, size and dates (shadow only)."""
+    seed = int(hashlib.sha256(f"{lot['symbol']}{lot['decided_at']}{lot['horizon']}".encode()).hexdigest()[:8], 16)
+    base = {k: lot[k] for k in ("symbol", "horizon", "weight", "decided_at", "session", "exit_session")
+            if k in lot}
+    return [{**base, "kind": "random", "side": 1 if seed % 2 else -1, "ai_side": lot["side"]},
+            {**base, "kind": "momentum", "side": mom, "ai_side": lot["side"]}]
+
+
+def day_running() -> bool:
+    """Autopilot Day holds results/forward/algo/engine.lock while it runs."""
+    p = FWD / "algo" / "engine.lock"
+    if not p.exists():
+        return False
+    with p.open("a") as f:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(f, fcntl.LOCK_UN)
+        return False
 
 
 def same_account(sandbox: Sandbox) -> bool:
@@ -422,6 +443,11 @@ class Controller:
         self.mkt = "unknown"
         self.backlog = False
         self.market_open = False
+        self.reconciled = False
+        self.adv = {c["ticker"].replace("-", "."): float(c.get("dollar_volume") or 0) for c in self.companies}
+        bad = ab.ceiling_violations(SANDBOX_RISK, max_drawdown=self.cfg.max_drawdown)
+        if bad:  # O1 #40: never trade on limits looser than the hard ceilings
+            raise SystemExit("risk limits above the hard ceilings: " + "; ".join(bad))
 
     # -- bookkeeping
     def persist(self) -> None:
@@ -507,6 +533,87 @@ class Controller:
         sector = next((c.get("sector") for c in self.companies if c["ticker"] == ticker), None)
         return [c["ticker"] for c in self.companies if c.get("sector") == sector and c["ticker"] != ticker][:60]
 
+    def set_op(self, state: str, reason: str) -> None:
+        """O1 #16: Night's named operating state, logged with its reason."""
+        ab.Book().state("night", state, reason)
+        self.report(op_state=state, op_reason=reason, op_allows=ab.STATES[state])
+
+    def no_trade(self, ticker: str, rec: dict[str, Any], reasons: list[str]) -> None:
+        """O1 #43: why a decided call did not become a trade (last 300 companies)."""
+        why = self.state.setdefault("why_no_trade", {})
+        why[ticker] = {"at": now_utc().isoformat(), "decided_at": rec.get("decided_at"), "reasons": reasons[:6]}
+        if len(why) > 300:
+            for k in sorted(why, key=lambda k: why[k]["at"])[:-300]:
+                del why[k]
+
+    def closes(self, ticker: str) -> list[float]:
+        day = now_utc().astimezone(NY).date().isoformat()
+        cache = self.__dict__.setdefault("_closes", {})
+        if cache.get(ticker, (None,))[0] != day and self.sandbox is not None:
+            try:
+                cache[ticker] = (day, self.sandbox.daily_closes([ticker], days=45).get(ticker.replace("-", "."), []))
+            except (BrokerError, httpx.HTTPError):
+                cache[ticker] = (day, [])
+        return cache.get(ticker, (day, []))[1]
+
+    def priced_in(self, ticker: str, side: int, rec: dict[str, Any]) -> bool:
+        """O1 #27: the move since the research (last close before it vs the latest close), in ATRs, in the call's
+        direction. Unknown ATR or prices: not gated."""
+        atr, c = rec.get("atr"), self.closes(ticker)
+        if not atr or len(c) < 2:
+            return False
+        return side * (c[-1] / c[-2] - 1) > PRICED_IN_ATR * atr
+
+    def momentum(self, ticker: str) -> int:
+        c = self.closes(ticker)
+        return 1 if len(c) > 21 and c[-1] >= c[-21] else -1
+
+    def watch_day(self, session: date) -> None:
+        """O1 #21: an independent watchdog for Autopilot Day. If Day holds positions inside its window but its
+        heartbeat is stale (or it is not running after its window), flatten Day's symbols (reduce-only)."""
+        if self.sandbox is None or not self.market_open:
+            return
+        st = load(FWD / "algo" / "status.json", {})
+        beat = st.get("updated_at")
+        age = (now_utc() - datetime.fromisoformat(beat)).total_seconds() if beat else 1e9
+        running = day_running()
+        cfg = load(BACKEND / "config" / "autopilot_day.json", {})
+        ny = now_utc().astimezone(NY)
+        mnow = ny.hour * 60 + ny.minute
+        end = int(str(cfg.get("end", "15:55"))[:2]) * 60 + int(str(cfg.get("end", "15:55"))[3:5])
+        if not ((running and age > STALE_DAY_S) or (not running and mnow >= end) or (not running and age > 3600)):
+            return
+        pos, orders = ab.owned(self.sandbox.a, "day")
+        if not any(pos.values()) and not orders:
+            return
+        why = "Day heartbeat stale" if running else "Day not running"
+        res = ab.flatten(self.sandbox.a, ab.Book(), "watchdog", session, why)
+        ab.Book().incident("watchdog_day", f"{why} ({age:.0f} s) with positions {pos}", exposed=pos,
+                           fallback="Night flattened Day's symbols" + ("" if res["flat"] else " (not yet verified)"),
+                           resume="Day running with a fresh heartbeat")
+        self.log("watchdog_flatten", why=why, heartbeat_age_s=round(age), result=res)
+
+    def controls_tick(self, session: date) -> None:
+        """O1 #50: the user's cancel / flatten controls for Night, each confirmed from the broker."""
+        if self.sandbox is None:
+            return
+        done = self.status.get("controls", {})
+        if (DIR / "CANCEL").exists():
+            _, orders = ab.owned(self.sandbox.a, "night")
+            for o in orders:
+                self.sandbox.a.c.delete(f"{PAPER}/orders/{o['id']}")
+            left = ab.owned(self.sandbox.a, "night")[1]
+            done["cancel"] = {"confirmed": not left, "left": len(left), "at": now_utc().isoformat()}
+            if not left:
+                (DIR / "CANCEL").unlink(missing_ok=True)
+        if (DIR / "FLATTEN").exists() and self.market_open:
+            res = ab.flatten(self.sandbox.a, ab.Book(), "night", session, "user flatten")
+            done["flatten"] = {"confirmed": res["flat"], "left": res.get("left"), "at": now_utc().isoformat()}
+            if res["flat"]:
+                (DIR / "FLATTEN").unlink(missing_ok=True)
+                (DIR / "PAUSE").touch()
+        self.report(controls=done)
+
     def stop_research(self) -> None:
         if self.child is not None and self.child.poll() is None:
             os.killpg(self.child.pid, signal.SIGTERM)
@@ -535,11 +642,27 @@ class Controller:
                    "theme": ",".join(themed[t]["themes"]) if t in themed else None}
             age_h = (now - datetime.fromisoformat(rec["decided_at"])).total_seconds() / 3600
             if age_h > self.cfg.max_age_h:
+                self.no_trade(t, rec, [f"research {age_h:.0f} h old (limit {self.cfg.max_age_h:.0f} h)"])
                 continue
-            lots = at.new_lots(rec, session, self.mkt, self.cfg, self.state["lots"])
-            lots = [x for x in lots if x["horizon"] != "day"]  # Night: day trading is Autopilot Day (no AI)
-            lots = [x for x in lots if (x["side"] > 0 or self.sandbox is None or self.sandbox.shortable(t))
-                    and not halted]
+            made = at.new_lots(rec, session, self.mkt, self.cfg, self.state["lots"])
+            reasons = [] if made else ["no side called, already held, or sized to 0"]
+            lots = [x for x in made if x["horizon"] != "day"]  # Night: day trading is Autopilot Day (no AI)
+            reasons += [f"{x['horizon']}: day trades belong to Autopilot Day" for x in made if x["horizon"] == "day"]
+            keep = []
+            for x in lots:
+                if halted:
+                    reasons.append(f"{x['horizon']}: kill switch on")
+                elif x["side"] < 0 and self.sandbox is not None and not self.sandbox.shortable(t):
+                    reasons.append(f"{x['horizon']}: not shortable / hard to borrow")
+                elif self.priced_in(t, x["side"], rec):
+                    reasons.append(f"{x['horizon']}: already priced in (moved > {PRICED_IN_ATR} ATR since the research)")
+                else:
+                    keep.append(x)
+            lots = keep
+            if reasons:
+                self.no_trade(t, rec, reasons)
+            for x in lots:  # O1 #38: two shadow controls per AI lot, same size and dates; never traded
+                self.state.setdefault("controls", []).extend(controls(x, self.momentum(t)))
             if rec["evidence"] not in seen:
                 seen.add(rec["evidence"])
                 self.state["seen"].append(rec["evidence"])
@@ -593,7 +716,8 @@ class Controller:
                 if (lot["state"] != "open" and lot.get("entry_price") and lot.get("exit_price") is None
                         and prices.get(s) and prices.get("QQQ")):
                     lot.update(exit_price=prices[s], exit_qqq=prices["QQQ"])
-                    lot["hedged_return"] = fs.hedged_return(lot)
+                    lot["hedged_return"] = fs.hedged_return(lot, ROUND_TRIP)
+                    lot["hedged_return_gross"] = fs.hedged_return(lot)
             for lot in at.stop_out(self.state["lots"], {x["symbol"]: prices.get(x["symbol"].replace("-", "."), 0)
                                                         for x in self.state["lots"]}, self.cfg):
                 self.log("stop", symbol=lot["symbol"], horizon=lot["horizon"], why=lot["closed_reason"])
@@ -601,26 +725,50 @@ class Controller:
             self.log("exit", symbol=lot["symbol"], horizon=lot["horizon"], why=lot["closed_reason"])
         k = fs.kelly([x for x in self.state["lots"] if x["state"] != "open"], self.cfg.base)
         sized = [{**x, "weight": x["weight"] * k.get(x["horizon"], {"mult": 1.0})["mult"]} for x in self.state["lots"]]
+        sized = unstrong(sized)  # O1 #13: labels are not calibrated; the book's gross is kept
         w = {s: x for s, x in at.weights(sized, self.cfg).items() if s not in ALGO_SYMBOLS}
         w = fs.theme_cap(w, {t: v["themes"] for t, v in themes().items()}, self.cfg.per_name)  # R1
         w = fs.hedge({s.replace("-", "."): x for s, x in w.items()}, betas, self.cfg.gross)
+        w = beta_cap(w, betas, BETA_NET_CAP)  # O1 #14
         targets = at.target_shares(w, equity, prices)
         for s in set(w) - set(targets):  # no price: keep what is held
             targets[s] = int(total.get(s, 0))
         ords = fs.banded(at.orders(targets, total, prices, self.cfg), prices, equity)
         last = float(acct.get("last_equity") or equity)
         breaker = equity < last * (1 - BREAKER)  # R2: a 4% day sends only reducing orders until the next session
-        if breaker:
-            ords = [o for o in ords if o["reducing"]]
+        paused = (DIR / "PAUSE").exists()  # O1 #50: the user's pause = reduce-only
+        if breaker or paused or not self.reconciled:
+            ords = [o for o in ords if o["reducing"]] if self.reconciled else []
+        self.set_op("trading" if not (breaker or paused) and self.reconciled else
+                    "reconciling" if not self.reconciled else "reduce_only",
+                    "market open" if not (breaker or paused) and self.reconciled else
+                    "records and broker not yet reconciled" if not self.reconciled else
+                    "account down 4%+ today (R2)" if breaker else "paused by the user")
+        ords = participation(ords, prices, self.adv)  # O1 #15
         self.report(breaker=f"account down {1 - equity / last:.1%} today: only reducing orders" if breaker else None)
         todo = [o for o in ords if o["symbol"] not in working  # one order per symbol at a time: a flip opens
                 and (o["reducing"] or o["side"] == "buy" or self.sandbox.shortable(o["symbol"]))]  # after its close
         self.backlog = len(todo) > ORDERS_PER_LOOP
         sent = []
-        for o, leg in zip(todo, self.sandbox.send_many(todo[:ORDERS_PER_LOOP], prices) if todo else []):
-            sent.append({**o, "status": leg.status, "order_id": leg.order_id, "note": leg.note})
+        batch = todo[:ORDERS_PER_LOOP]
+        red, add = [o for o in batch if o["reducing"]], [o for o in batch if not o["reducing"]]
+        a, book = self.sandbox.a, ab.Book()
+        legs = ab.send_batch(a, book, "night", session, "s", red, prices) if red else []
+        ab.wait_final(a, book, "night", legs, timeout_s=20)  # O1 #5: reductions settle before additions
+        if add and not any(x.status == "submitted" for x in legs):
+            legs += ab.send_batch(a, book, "night", session, "s", add, prices)
+        else:
+            add = []
+        for o, leg in zip(red + add, legs):
+            sent.append({**o, "status": leg.status, "order_id": leg.order_id, "id": leg.client_order_id,
+                         "filled_qty": leg.filled_qty, "note": leg.note})
             self.state.setdefault("orders", {})[leg.order_id or leg.client_order_id] = {
                 "symbol": o["symbol"], "why": self.why(o["symbol"]), "at": now.isoformat()}
+            for lot in self.state["lots"]:  # O1 #23: research decision to first order
+                if (lot["state"] == "open" and lot["symbol"].replace("-", ".") == o["symbol"]
+                        and "first_order_at" not in lot and leg.status != "rejected"):
+                    lot["first_order_at"] = now.isoformat()
+                    lot["decision_to_order_s"] = round((now - datetime.fromisoformat(lot["decided_at"])).total_seconds())
         if sent:
             self.log("orders", session=session.isoformat(), sent=sent)
         gross = sum(abs(q) * prices.get(s, 0) for s, q in pos.items()) / equity if equity else 0
@@ -730,6 +878,16 @@ class Controller:
                     nxt = datetime.fromisoformat(clock["next_open"]).astimezone(NY)
                     session = now.astimezone(NY).date() if market_open else nxt.date()
                     self.record(now, market_open)
+                    if not self.reconciled:  # O1 #9/#19: settle records with the broker first
+                        rec = ab.reconcile(self.sandbox.a, ab.Book(), "night")
+                        self.reconciled = rec["ok"]
+                        self.log("reconcile", **rec)
+                    self.controls_tick(session)
+                    self.watch_day(session)
+                    if (DIR / "KILLED").exists() or (FWD / "HALT").exists():
+                        self.set_op("halted", "35% drawdown kill" if (DIR / "KILLED").exists() else "kill switch on")
+                    elif not market_open:
+                        self.set_op("waiting", "market closed")
                     if not (DIR / "KILLED").exists():
                         if not stop:
                             self.absorb(session, market_open, now)
@@ -760,6 +918,7 @@ class Controller:
                                     + (f"; researching {', '.join(self.child_batch)}" if self.child_batch else ""))
                 self.persist()
             except (BrokerError, httpx.HTTPError, OSError, KeyError, ValueError) as exc:
+                self.reconciled = False  # O1 #17/#19: broker trouble -> reconcile before sending again
                 self.report(last_error=f"{type(exc).__name__}: {str(exc)[:200]}", last_error_at=now.isoformat())
                 self.log("error", error=f"{type(exc).__name__}: {str(exc)[:200]}")
             if not stop:

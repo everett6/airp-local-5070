@@ -36,14 +36,15 @@ def hedge(w: dict[str, float], betas: dict[str, float], gross: float,
     return out
 
 
-def hedged_return(lot: dict[str, Any]) -> float | None:
-    """A closed lot's return over its holding period minus beta x QQQ's return over the same dates."""
+def hedged_return(lot: dict[str, Any], cost: float = 0.0) -> float | None:
+    """A closed lot's return over its holding period minus beta x QQQ's return over the same dates, minus `cost`
+    (a round trip; review #33: K1 sizes on net returns)."""
     need = ("entry_price", "exit_price", "entry_qqq", "exit_qqq")
     if any(not lot.get(k) for k in need):
         return None
     stock = lot["exit_price"] / lot["entry_price"] - 1
     market = lot["exit_qqq"] / lot["entry_qqq"] - 1
-    return float(lot["side"] * (stock - lot.get("beta", 1.0) * market))
+    return float(lot["side"] * (stock - lot.get("beta", 1.0) * market)) - cost
 
 
 def kelly(lots: list[dict[str, Any]], base: dict[str, float], min_n: int = 100, frac: float = 0.5,

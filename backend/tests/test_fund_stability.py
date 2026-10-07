@@ -50,47 +50,6 @@ def test_combined_fund():
     assert c["correlation"] == pytest.approx(1.0)
 
 
-def test_one_snapshot_pass_counts_earlier_orders_against_later_ones(tmp_path):
-    import sys
-    from datetime import UTC, datetime
-    sys.path.insert(0, "scripts")
-    import full_auto as fa
-
-    from app.portfolio.account_risk import RiskPolicy
-
-    stamp = datetime.now(UTC).isoformat()
-
-    class Fake:
-        risk_policy = RiskPolicy(max_gross=2.6, max_asset=0.25, max_crypto=0.01, daily_loss=0.15, max_spread_bp=150.0,
-                                 max_reference_gap=0.10, max_quote_age_s=180.0)
-        audit_path = tmp_path
-        calls, posted, audits = [], [], []
-
-        def account(self):
-            return {"equity": "100000", "last_equity": "100000", "status": "ACTIVE", "buying_power": "45000"}
-
-        def _get(self, url, **params):
-            self.calls.append(url)
-            if url.endswith("/quotes/latest"):
-                return {"quotes": {s: {"bp": 99.9, "ap": 100.1, "t": stamp} for s in params["symbols"].split(",")}}
-            return []
-
-        def _submit(self, leg):
-            self.posted.append(leg.symbol)
-            leg.status = "submitted"
-
-        def _audit(self, kind, **f):
-            self.audits.append((kind, f["symbol"], f.get("allowed")))
-
-    sb = fa.Sandbox(Fake())
-    orders = [{"symbol": s, "side": "buy", "qty": 200} for s in ("A", "B", "C")]  # $20k each, $45k buying power
-    legs = sb.send_many(orders, {"A": 100.0, "B": 100.0, "C": 100.0})
-    assert [x.status for x in legs] == ["submitted", "submitted", "rejected"]
-    assert "buying power" in legs[2].note and sb.a.posted == ["A", "B"]
-    assert len(sb.a.calls) == 3  # positions, open orders, quotes: once for the whole pass
-    assert [a[0] for a in sb.a.audits] == ["risk"] * 3
-
-
 def test_theme_cap_keeps_gross_and_caps_the_theme():
     from app.portfolio import fund_stability as fs
     w = {"IONQ": 0.1, "RGTI": 0.1, "QBTS": 0.1, "QUBT": 0.1, "AAPL": 0.05, "MSFT": -0.05, "ORCL": 0.05}

@@ -30,7 +30,9 @@ def sha(path: Path) -> str:
 
 
 def files(root: Path, kind: str) -> list[Path]:
-    folders = ["backend/results/forward"] if kind == "backup" else [
+    # O1 #25: the records needed to rebuild orders, decisions, model versions and risk state: forward records (intents,
+    # incidents, states, latches, models), research memory and the user's fact checks
+    folders = ["backend/results/forward", "backend/results/research_memory", "backend/results/review"] if kind == "backup" else [
         "backend/app", "backend/scripts", "backend/tests", "backend/config", "backend/benchmarks",
         "desktop/src", "desktop/public", "desktop/electron", "desktop/tests", "deploy", ".github", "docs"]
     paths = [p for folder in folders for p in (root / folder).rglob("*") if p.is_file() and not p.is_symlink()
