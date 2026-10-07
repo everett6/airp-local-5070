@@ -2379,3 +2379,5 @@ call. Run once; no variants.
 moves (~0.1-0.2 bp) almost never beat the round trip: a position in 0.008% of decisions. Per the rule: the engine
 (scripts/algo_engine.py) runs in shadow from the autopilot; live only if the user creates results/forward/algo/LIVE.
 No variant. Summary: docs/ALGO_DAYTRADING.md.
+
+**E1 live (user decision 2026-10-06 ~18:04 local):** the user created results/forward/algo/LIVE; the engine sends paper orders in the autopilot account despite the FAIL. Nothing else changes.
