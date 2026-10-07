@@ -700,9 +700,11 @@ class Controller:
         self.state.setdefault("start_equity", equity)
         self.state["peak_equity"] = max(self.state.get("peak_equity", equity), equity)
         if at.drawdown_hit(equity, self.state["start_equity"], self.cfg):
-            self.sandbox.close_everything()
             (DIR / "KILLED").write_text(f"{now.isoformat()} equity {equity:.2f} is {self.cfg.max_drawdown:.0%} below "
                                         f"the start {self.state['start_equity']:.2f}; everything closed\n")
+            book = ab.Book()  # review #8: logged, locked, verified closes for both strategies, not a bare close-all
+            for who in ("night", "watchdog"):
+                self.log("kill_flatten", who=who, **ab.flatten(self.sandbox.a, book, who, session, "35% drawdown"))
             for lot in self.state["lots"]:
                 if lot["state"] == "open":
                     lot.update(state="closed", closed_reason="drawdown limit")
@@ -748,6 +750,9 @@ class Controller:
         ords = fs.banded(at.orders(targets, total, prices, self.cfg), prices, equity)
         last = float(acct.get("last_equity") or equity)
         breaker = equity < last * (1 - BREAKER)  # R2: a 4% day sends only reducing orders until the next session
+        if breaker:  # review #11: latched for the session, a rebound does not reopen new risk
+            self.state["breaker_session"] = session.isoformat()
+        breaker = breaker or self.state.get("breaker_session") == session.isoformat()
         paused = (DIR / "PAUSE").exists()  # O1 #50: the user's pause = reduce-only
         if breaker or paused or not self.reconciled:
             ords = [o for o in ords if o["reducing"]] if self.reconciled else []
