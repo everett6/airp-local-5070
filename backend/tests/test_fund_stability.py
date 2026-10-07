@@ -89,3 +89,12 @@ def test_one_snapshot_pass_counts_earlier_orders_against_later_ones(tmp_path):
     assert "buying power" in legs[2].note and sb.a.posted == ["A", "B"]
     assert len(sb.a.calls) == 3  # positions, open orders, quotes: once for the whole pass
     assert [a[0] for a in sb.a.audits] == ["risk"] * 3
+
+
+def test_theme_cap_keeps_gross_and_caps_the_theme():
+    from app.portfolio import fund_stability as fs
+    w = {"IONQ": 0.1, "RGTI": 0.1, "QBTS": 0.1, "QUBT": 0.1, "AAPL": 0.05, "MSFT": -0.05, "ORCL": 0.05}
+    out = fs.theme_cap(w, {s: ["quantum"] for s in ("IONQ", "RGTI", "QBTS", "QUBT")}, per_name=0.1)
+    assert abs(sum(out[s] for s in ("IONQ", "RGTI", "QBTS", "QUBT")) - 0.30) < 1e-9
+    assert abs(sum(map(abs, out.values())) - sum(map(abs, w.values()))) < 1e-9
+    assert out["MSFT"] < -0.05 and all(abs(x) <= 0.1 + 1e-12 for x in out.values())

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import signal
 import sys
 import time
@@ -39,15 +40,48 @@ ALGO = BACKEND / "results" / "forward" / "algo"
 KEYS = ("AIRP_AUTO_ALPACA_KEY_ID", "AIRP_AUTO_ALPACA_SECRET_KEY")  # the autopilot's own paper account
 STREAM = "wss://stream.data.alpaca.markets/v2/iex"
 SYMBOLS = (*me.UNIVERSE, "QQQ")  # QQQ: SPY's leader, a signal only (it belongs to the N1 hedge basket)
-GROSS = 3.0                  # algo book, fraction of equity, intraday only
-ACCOUNT_GROSS_CAP = 3.9      # whole account, under Alpaca's 4x day-trading buying power
-DAILY_STOP = 0.05            # account equity down this much on the day: algo book flat until tomorrow
-FLAT_AT = 385                # bar of the day (15:55): flat
+CONFIG = BACKEND / "config" / "autopilot_day.json"
+DEFAULTS = {"start": "09:35", "end": "15:55", "gross": 3.0,  # algo book, fraction of equity, intraday only
+            "account_gross_cap": 3.9,   # whole account, under Alpaca's 4x day-trading buying power
+            "daily_stop": 0.05,         # account down this much on the day: algo book flat until tomorrow
+            "breaker": 0.04,            # R2: down this much: nothing new until tomorrow
+            "stale_skip_s": 180,        # R3: no decision on a bar older than this
+            "stale_flat_s": 600}        # R3: no bars this long inside the window: flat
+FLAT_AT = 385                # bar of the day (15:55): flat at the latest
 WAIT_S = 1.5                 # after the leader's bar, wait this long at most for the other bars of the minute
 
 
 def now_utc() -> datetime:
     return datetime.now(UTC)
+
+
+def config() -> dict[str, Any]:
+    """The user's window and the risk numbers; read at every decision, so a change in the app applies at once."""
+    try:
+        got = json.loads(CONFIG.read_text())
+    except (OSError, ValueError):
+        got = {}
+    return {**DEFAULTS, **{k: v for k, v in got.items() if k in DEFAULTS}}
+
+
+def minute(hm: str) -> int:
+    """'09:35' -> bar index of that minute (0 = 09:30)."""
+    return int(hm[:2]) * 60 + int(hm[3:5]) - 570
+
+
+def in_window(m: int, cfg: dict[str, Any]) -> bool:
+    """A decision on bar m happens at minute m + 1; it opens risk only inside [start, end)."""
+    return minute(cfg["start"]) <= m + 1 < minute(cfg["end"])
+
+
+def no_new_risk(new: dict[str, float], cur: dict[str, float]) -> dict[str, float]:
+    """R2: keep or shrink what is held, open nothing, flip nothing."""
+    out = {}
+    for s, w in cur.items():
+        n = new.get(s, 0.0)
+        if n * w > 0:
+            out[s] = n if abs(n) < abs(w) else w
+    return out
 
 
 def regular(df: pd.DataFrame) -> pd.DataFrame:
@@ -92,7 +126,8 @@ def shadow_step(book: dict[str, Any], weights: dict[str, float], prices: dict[st
 
 
 class Engine:
-    def __init__(self) -> None:
+    def __init__(self, stop_file: Path | None = None) -> None:
+        self.stop_file = stop_file
         ALGO.mkdir(parents=True, exist_ok=True)
         k, s = key(KEYS[0]), key(KEYS[1])
         if not (k and s):
@@ -108,11 +143,17 @@ class Engine:
         self.session: date | None = None
         self.done: set[int] = set()
         self.stopped_today = False
+        self.breaker = False
+        self.flat_done = False
+        self.last_bar_wall = time.monotonic()
         self.book: dict[str, Any] = {"equity": 1.0, "w": {}, "px": {}}
         self.status: dict[str, Any] = {"state": "starting", "model_result": self.model_result}
         self.stop = False
 
     # --- plumbing -----------------------------------------------------------------------------------------------
+    def halted(self) -> bool:
+        return self.stop or (ALGO / "STOP").exists() or bool(self.stop_file and self.stop_file.exists())
+
     def mode(self) -> str:
         return "live" if (ALGO / "LIVE").exists() else "shadow"
 
@@ -159,7 +200,7 @@ class Engine:
         self.hist = {s: h[h["ts"].dt.date == h["ts"].dt.date.max()] for s, h in hist.items()}  # yesterday only
         so_far = await self.bars(datetime.combine(day, datetime.min.time(), NY), now_utc(), "iex")
         self.today = {s: so_far[s].to_dict("records") for s in SYMBOLS}
-        self.session, self.done, self.stopped_today = day, set(), False
+        self.session, self.done, self.stopped_today, self.breaker, self.flat_done = day, set(), False, False, False
         self.book = {"equity": self.book["equity"], "w": {}, "px": {}}
         self.log("session", day=day, setup_s=round(time.perf_counter() - t0, 2),
                  sigma={s: float(v["sigma"].iloc[0]) for s, v in self.stats.items()})
@@ -185,31 +226,45 @@ class Engine:
         return pred, sigma, prices
 
     # --- decisions ----------------------------------------------------------------------------------------------
-    async def decide(self, m: int, t_bar: float) -> None:
+    async def decide(self, m: int, t_bar: float, flat: bool = False) -> None:
+        cfg = config()
         pred, sigma, prices = self.predict(m)
-        weights = {} if (m >= FLAT_AT or self.stopped_today) else me.targets(pred, sigma, GROSS)
+        closing = flat or m >= FLAT_AT or m + 1 >= minute(cfg["end"]) or self.stopped_today
+        weights = {} if closing else me.targets(pred, sigma, cfg["gross"])
+        acct = await self.get(f"{PAPER}/account")
+        equity, last = float(acct["equity"]), float(acct.get("last_equity") or acct["equity"])
+        if equity < last * (1 - cfg["daily_stop"]) and not self.stopped_today:
+            self.stopped_today, weights = True, {}
+            self.log("daily_stop", equity=equity, last_equity=last)
+        if equity < last * (1 - cfg["breaker"]) and not self.breaker:
+            self.breaker = True
+            self.log("breaker", equity=equity, last_equity=last)
+        if self.breaker:
+            weights = no_new_risk(weights, self.book["w"])
         t_sig = time.perf_counter()
         r = shadow_step(self.book, weights, prices)
         sent: list[dict[str, Any]] = []
         if self.mode() == "live":
-            sent = await self.trade(weights, prices)
+            sent = await self.trade(weights, prices, equity, cfg)
         t_done = time.perf_counter()
         lat = {"signal_ms": round((t_sig - t_bar) * 1000, 1), "to_orders_ms": round((t_done - t_bar) * 1000, 1)}
         self.log("decision", m=m, mode=self.mode(), weights=weights, step_return=r, latency=lat, orders=sent,
                  top=sorted(((round(p * sigma[s] * 1e4, 2), s) for s, p in pred.items()), reverse=True)[:3])
         self.report(state="running", last_decision=now_utc().isoformat(), bar=m, weights=weights, latency=lat,
-                    message=f"{len(weights)} positions; signal {lat['signal_ms']} ms after the bar")
+                    decisions_today=sum(1 for x in self.done if in_window(x, cfg)),
+                    expected_decisions=sum(1 for x in me.DECISION_BARS if in_window(x, cfg)),
+                    window={"start": cfg["start"], "end": cfg["end"]},
+                    breaker="account down 4%+ today: nothing new" if self.breaker else None,
+                    message=("flat (" + ("daily stop" if self.stopped_today else "window end" if closing else "") + ")")
+                    if closing else f"{len(weights)} positions; signal {lat['signal_ms']} ms after the bar")
 
-    async def trade(self, weights: dict[str, float], prices: dict[str, float]) -> list[dict[str, Any]]:
-        acct, positions = await asyncio.gather(self.get(f"{PAPER}/account"), self.get(f"{PAPER}/positions"))
-        equity, last = float(acct["equity"]), float(acct.get("last_equity") or acct["equity"])
-        if equity < last * (1 - DAILY_STOP):
-            self.stopped_today, weights = True, {}
-            self.log("daily_stop", equity=equity, last_equity=last)
+    async def trade(self, weights: dict[str, float], prices: dict[str, float], equity: float,
+                    cfg: dict[str, Any]) -> list[dict[str, Any]]:
+        positions = await self.get(f"{PAPER}/positions")
         held = {p["symbol"]: abs(float(p["qty"])) * (-1 if p.get("side") == "short" else 1)
                 for p in positions if p["symbol"] in me.UNIVERSE}
         other = sum(abs(float(p["market_value"])) for p in positions if p["symbol"] not in me.UNIVERSE)
-        room = max(0.0, ACCOUNT_GROSS_CAP * equity - other) / equity
+        room = max(0.0, cfg["account_gross_cap"] * equity - other) / equity
         scale = min(1.0, room / max(sum(abs(w) for w in weights.values()), 1e-9))
         orders = share_orders({s: w * scale for s, w in weights.items()}, held, equity, prices)
 
@@ -229,7 +284,7 @@ class Engine:
 
     # --- main loop ----------------------------------------------------------------------------------------------
     async def run(self) -> None:
-        while not self.stop and not (ALGO / "STOP").exists():
+        while not self.halted():
             try:
                 clock = await self.get(f"{PAPER}/clock")
                 if not clock["is_open"]:
@@ -241,6 +296,15 @@ class Engine:
                 self.log("error", error=repr(e)[:300])
                 self.report(state="error", last_error=repr(e)[:300], last_error_at=now_utc().isoformat())
                 await asyncio.sleep(5)
+        if self.mode() == "live" and self.book["w"] is not None:
+            try:
+                positions = await self.get(f"{PAPER}/positions")
+                for p in positions:
+                    if p["symbol"] in me.UNIVERSE:
+                        await self.http.delete(f"{PAPER}/positions/{p['symbol']}")
+                        self.log("close_on_stop", symbol=p["symbol"], qty=p["qty"])
+            except (httpx.HTTPError, KeyError) as e:
+                self.log("error", error=f"closing on stop: {e!r}"[:300])
         await self.http.aclose()
         self.report(state="stopped", message="stopped")
 
@@ -253,7 +317,7 @@ class Engine:
             await ws.send(json.dumps({"action": "subscribe", "bars": list(SYMBOLS)}))
             self.report(state="running", message="streaming bars")
             pending: tuple[int, float] | None = None
-            while not self.stop and not (ALGO / "STOP").exists():
+            while not self.halted():
                 timeout = max(0.05, pending[1] + WAIT_S - time.perf_counter()) if pending else 30
                 try:
                     msgs = json.loads(await asyncio.wait_for(ws.recv(), timeout))
@@ -270,7 +334,15 @@ class Engine:
                     self.today[b["S"]].append({"ts": ts, "open": b["o"], "high": b["h"], "low": b["l"],
                                                "close": b["c"], "volume": b["v"]})
                     m = ts.hour * 60 + ts.minute - 570
-                    if (m in me.DECISION_BARS or m == FLAT_AT) and pending is None and m not in self.done:
+                    self.last_bar_wall = time.monotonic()
+                    cfg = config()
+                    stale = (now_utc() - ts.tz_convert(UTC).to_pydatetime()).total_seconds() - 60 > cfg["stale_skip_s"]
+                    if stale:  # R3: a late bar is not traded on
+                        self.report(stale=f"bar {ts:%H:%M} arrived late; skipped")
+                        continue
+                    due = m in me.DECISION_BARS and in_window(m, cfg)
+                    end = m + 1 >= minute(cfg["end"]) or m >= FLAT_AT
+                    if (due or (end and not self.flat_done)) and pending is None and m not in self.done:
                         pending = (m, time.perf_counter())
                 if pending:
                     m, t_bar = pending
@@ -279,9 +351,46 @@ class Engine:
                     if have or time.perf_counter() - t_bar >= WAIT_S:
                         self.done.add(m)
                         pending = None
+                        cfg = config()
+                        if m + 1 >= minute(cfg["end"]) or m >= FLAT_AT:
+                            self.flat_done = True
                         await self.decide(m, t_bar)
+                cfg = config()
+                quiet = time.monotonic() - self.last_bar_wall
+                if quiet > cfg["stale_flat_s"] and self.book["w"]:  # R3: no data for 10 minutes: flat
+                    self.log("stale_flat", quiet_s=round(quiet))
+                    self.report(stale=f"no bars for {quiet / 60:.0f} min: flat")
+                    await self.decide(max(self.done, default=0), time.perf_counter(), flat=True)
                 if now_utc().astimezone(NY).hour >= 16:
                     return
+
+
+def run_job(job: Path) -> int:
+    """The app's Autopilot Day button (desktop_run.py autopilot_day): one engine at a time, stopped by job/STOP;
+    on the way out the algo book is closed so nothing is held overnight."""
+    import fcntl
+
+    import desktop_run as worker
+    status_path = job / "status.json"
+    js = json.loads(status_path.read_text())
+    js.update(state="running", pid=os.getpid(), identity=worker.identity(os.getpid()),
+              started_at=now_utc().isoformat(), steps=[], message="Autopilot Day running")
+    status_path.write_text(json.dumps(js) + "\n")
+    ALGO.mkdir(parents=True, exist_ok=True)
+    with (ALGO / "engine.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            js.update(state="blocked", message="Autopilot Day is already running.")
+            status_path.write_text(json.dumps(js) + "\n")
+            return 2
+        eng = Engine(stop_file=job / "STOP")
+        asyncio.run(eng.run())
+    js = json.loads(status_path.read_text())
+    js.update(state="stopped", message="Autopilot Day stopped; the algo book was closed",
+              finished_at=now_utc().isoformat())
+    status_path.write_text(json.dumps(js) + "\n")
+    return 0
 
 
 def main() -> None:

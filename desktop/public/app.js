@@ -135,6 +135,10 @@ function consensusCard(c) {
       ${c.releases.slice(0, 12).map((r) => `<tr><td>${esc(r.ticker)}${r.on_time ? '' : ' <span class="muted">(recorded late, not scored)</span>'}</td>${Object.keys(AGENT_NAMES).map((k) => `<td>${vote(r.votes?.[k] ?? 0)}</td>`).join('')}<td class="num">${fmt(r.eq, 2)}</td><td class="num">${fmt(r.rw, 2)}</td><td>${r.result == null ? pill('due in a week', 'warn') : pill(pct(r.result), r.result > 0 ? 'ok' : 'bad')}</td></tr>`).join('')}</table></div></div></div>`;
 }
 
+// Live progress bar: frac in [0,1] or null for a running bar of unknown length
+const progressBar = (frac, label, running = true) => `<div class="progress${running ? ' live' : ''}${frac == null ? ' indeterminate' : ''}"><div style="width:${frac == null ? 35 : Math.max(0, Math.min(100, 100 * frac)).toFixed(1)}%"></div></div>${label ? `<p class="tiny muted">${label}</p>` : ''}`;
+const nyMinutes = (d = new Date()) => { const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false }).format(d).split(':').map(Number); return h * 60 + m; };
+const hmMin = (x) => (x ? Number(x.slice(0, 2)) * 60 + Number(x.slice(3, 5)) : null);
 const views = {
   async horizons() {
     const d = await api('horizon-shadows');
@@ -236,7 +240,10 @@ const views = {
     return `<h2>Run Center</h2><p class="lede">Run the current AI paper strategy and check the system while the assistant is away.</p>
       ${!r.ready ? '<div class="banner bad">The checkout is missing its Python runtime or run worker.</div>' : ''}
       ${r.active ? `<div class="banner warn"><b>${esc(r.active.label)} is active.</b> ${esc(r.active.message)}</div>` : ''}
-      ${r.autopilot ? `<div class="banner warn"><b>Continuous workflow</b> ${esc(r.autopilot.message)}<p>Companies: ${esc(r.autopilot.progress?.attempted ?? 0)} / ${esc(r.autopilot.progress?.total ?? "loading")}; failed: ${esc(r.autopilot.progress?.failed ?? 0)}. Previous failed attempts retained: ${esc(r.autopilot.progress?.previous_failed_attempts ?? 0)}.</p><button class="btn ghost" data-stop-auto="${esc(r.autopilot.id)}">Stop after current step</button></div>` : ""}
+      ${r.active ? progressBar((r.active.steps || []).length ? (r.active.steps.filter((x) => !['running', 'starting'].includes(x.state)).length) / Math.max(1, r.active.steps.length) : null, `<b>${esc(r.active.label)}</b> · step ${fmt((r.active.steps || []).length || 1)} · running ${esc(when(r.active.started_at || r.active.created_at))}`) : ''}
+      ${r.autopilot?.action === 'full_auto' ? progressBar(null, `<b>Autopilot Night</b> running: ${esc(r.autopilot.message || 'researching and trading')} · <a href="#autopilot">open the Autopilot page</a> · <button class="btn ghost" data-stop-auto="${esc(r.autopilot.id)}">Stop Night</button>`) : ''}
+      ${r.day ? progressBar((() => { const n = nyMinutes(), wd = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short' }); return n < 575 || n > 955 || ['Sat', 'Sun'].includes(wd) ? 0 : (n - 575) / 380; })(), `<b>Autopilot Day</b> running · ${(() => { const n = nyMinutes(); return n < 575 || n > 955 ? 'waiting for the next trading window' : 'trading window in progress'; })()} · <button class="btn ghost" data-stop-auto="${esc(r.day.id)}">Stop Day</button>`) : ''}
+      ${r.autopilot && r.autopilot.action !== 'full_auto' ? `<div class="banner warn"><b>Continuous workflow</b> ${esc(r.autopilot.message)}<p>Companies: ${esc(r.autopilot.progress?.attempted ?? 0)} / ${esc(r.autopilot.progress?.total ?? "loading")}; failed: ${esc(r.autopilot.progress?.failed ?? 0)}. Previous failed attempts retained: ${esc(r.autopilot.progress?.previous_failed_attempts ?? 0)}.</p><button class="btn ghost" data-stop-auto="${esc(r.autopilot.id)}">Stop after current step</button></div>` : ""}
       ${r.stockPolicy ? `<div class="banner">AI stock entries restricted to ${esc(r.stockPolicy.symbols?.length ?? 0)} selected technology stocks. <button class="btn ghost" data-view="planning">View universe and cases</button></div>` : ""}
       ${r.halted ? '<div class="banner warn">The kill switch is on. AI trade runs are disabled; order sync follows the existing halt rules.</div>' : ''}
       ${r.mode !== 'live' ? '<div class="banner warn">The system is in rehearsal mode. Paper order actions require the existing live paper mode.</div>' : ''}
@@ -399,7 +406,7 @@ const views = {
   },
 
   async autopilot() {
-    const [d, ops] = await Promise.all([api('autopilot'), api('operations')]);
+    const [d, ops, day] = await Promise.all([api('autopilot'), api('operations'), api('autopilot-day')]);
     const job = ops.autopilot?.action === 'full_auto' ? ops.autopilot : null;
     const other = ops.autopilot && !job ? ops.autopilot : null;
     const action = (ops.actions || []).find((a) => a.id === 'full_auto');
@@ -408,10 +415,27 @@ const views = {
     const HOR = { day: 'Day trade', short: '5 sessions', medium: '21 sessions', long: '63 sessions' };
     const LABEL = { 1: ['strong bear', 'bad'], 2: ['bear', 'bad'], 3: ['no call', ''], 4: ['bull', 'ok'], 5: ['strong bull', 'ok'] };
     const side = (s) => (s > 0 ? pill('LONG (buy)', 'ok') : pill('SHORT (sell)', 'bad'));
+    const dayJob = ops.day || null, dayAction = (ops.actions || []).find((a) => a.id === 'autopilot_day');
     const button = job
-      ? `<button class="btn" data-stop-auto="${esc(job.id)}" data-back="autopilot">■ Stop autopilot</button> <span class="muted">Running since ${esc(when(job.started_at || job.created_at))}</span>`
-      : `<button class="btn lime big" data-operation="full_auto" ${action?.disabled ? 'disabled' : ''}>▶ Run autopilot</button>
+      ? `<button class="btn" data-stop-auto="${esc(job.id)}" data-back="autopilot">■ Stop Night</button> <span class="muted">Running since ${esc(when(job.started_at || job.created_at))}</span>`
+      : `<button class="btn lime big" data-operation="full_auto" ${action?.disabled ? 'disabled' : ''}>▶ Run Autopilot Night</button>
          ${other ? `<span class="err">Stop the other continuous workflow first (${esc(other.label)}).</span>` : action?.disabled ? `<span class="muted">${esc(ops.mode !== 'live' ? 'Paper mode is not on.' : 'Another app run is active.')}</span>` : ''}`;
+    const dayButton = dayJob
+      ? `<button class="btn" data-stop-auto="${esc(dayJob.id)}" data-back="autopilot">■ Stop Day</button> <span class="muted">Running since ${esc(when(dayJob.started_at || dayJob.created_at))}</span>`
+      : `<button class="btn lime big" data-operation="autopilot_day" ${dayAction?.disabled ? 'disabled' : ''}>▶ Run Autopilot Day</button>`;
+    const rs = st.research || {}, cur = rs.current;
+    const fresh = (d.universe || []).length ? d.fresh / d.universe.length : null;
+    const batch = cur ? Math.min(1, (Date.now() - Date.parse(cur.started_at)) / Math.max(1, Date.parse(cur.deadline_at) - Date.parse(cur.started_at))) : null;
+    const nightBars = `${progressBar(fresh, `Research fresh (last 20 h): <b>${fmt(d.fresh)} of ${fmt((d.universe || []).length)}</b> companies${rs.memory != null ? ` · ${fmt(rs.memory)} with saved memory` : ''}`, !!job)}
+      ${cur ? progressBar(batch, `Now researching <b>${cur.tickers.map(esc).join(', ')}</b> · started ${esc(when(cur.started_at))} · time budget ${fmt(cur.budget_min)} min a company`, true) : `<p class="tiny muted">${job ? 'Between research batches (scheduled jobs and the GPU come first).' : 'Not running.'}</p>`}`;
+    const ds = day.status || {}, dc = day.config || {};
+    const w0 = hmMin(dc.start || '09:35'), w1 = hmMin(dc.end || '15:55'), nowM = nyMinutes();
+    const closed = ds.state === 'waiting' || !dayJob;
+    const winFrac = closed || nowM <= w0 ? 0 : nowM >= w1 ? 1 : (nowM - w0) / (w1 - w0);
+    const dayBars = `${progressBar(dayJob ? winFrac : 0, `${closed && dayJob ? 'Waiting for the market to open · ' : ''}Trading window ${esc(dc.start || '09:35')}–${esc(dc.end || '15:55')} New York · now ${String(Math.floor(nowM / 60)).padStart(2, '0')}:${String(nowM % 60).padStart(2, '0')} · ${fmt(ds.decisions_today ?? 0)} of ${fmt(ds.expected_decisions ?? Math.floor((w1 - w0) / 5))} decisions`, !!dayJob && winFrac > 0 && winFrac < 1)}
+      <div class="kpis">${kpi('Mode', day.live ? pill('LIVE paper orders', 'warn') : pill('shadow', ''), 'delete results/forward/algo/LIVE for shadow')}${kpi('Positions', fmt(Object.keys(ds.weights || {}).length), 'of 14 ETFs')}${kpi('Signal speed', ds.latency ? `${fmt(ds.latency.signal_ms)} ms` : '–', ds.latency ? `orders ${fmt(ds.latency.to_orders_ms)} ms after the bar` : 'after each minute bar')}${kpi('Risk', ds.breaker ? pill('breaker on', 'bad') : ds.stale ? pill('stale data', 'warn') : pill('normal', 'ok'), ds.breaker || ds.stale || '4% breaker · 5% stop')}</div>
+      <p class="tiny muted">${esc(ds.message || (dayJob ? 'Starting…' : 'Not running.'))}${ds.updated_at ? ` · ${esc(when(ds.updated_at))}` : ''}</p>
+      <form class="row" data-day-window><label class="tiny">Start <input type="time" name="start" min="09:35" max="15:55" value="${esc(dc.start || '09:35')}"></label> <label class="tiny">End <input type="time" name="end" min="09:35" max="15:55" value="${esc(dc.end || '15:55')}"></label> <button class="btn ghost" type="submit">Save hours</button> <span class="tiny muted">takes effect at the next decision</span></form>`;
     const acct = !d.account_configured
       ? `<div class="banner warn"><b>The separate Alpaca paper account is not connected yet.</b> Until it is, the autopilot researches and logs what it would trade, and sends no orders.
          <ol class="tiny"><li>At alpaca.markets, open a second <b>paper</b> account (Paper Trading → the account menu → open a new paper account) and generate its API keys.</li>
@@ -436,10 +460,11 @@ const views = {
         <h4>What the autopilot did</h4>${t.trades?.length ? t.trades.map((x) => `<div class="step">${side(x.side)} ${esc(HOR[x.horizon] || x.horizon)} · ${pct(x.weight, 1)} of the account · exits ${esc(x.exit_session)}</div>`).join('') : '<p class="tiny muted">No trade (no side, not tradable on this horizon, too old, or not shortable).</p>'}
         <p class="tiny muted">${t.research_s ? `Research ${fmt(t.research_s)} s · Bonsai ${fmt(t.judge_s)} s · ` : ''}<a href="#researchlog">Full log and websites →</a></p></details>`;
     const ev = (d.events || []).slice(0, 40).map((e) => `<tr><td>${esc(when(e.at))}</td><td>${esc(e.type)}</td><td class="tiny">${esc(JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => !['at', 'type', 'seq', 'hash', 'prev'].includes(k))))).slice(0, 300)}</td></tr>`).join('');
-    return `<h2>Autopilot</h2><p class="lede">One button: research 150 technology companies, decide bull or bear, and trade them long and short in a separate paper account.</p>
-      ${plain('Jan reads the news and filings, Bonsai calls each horizon bull or bear, and the autopilot buys the bull calls and short-sells the bear calls in its <b>own practice account</b> (paper money, separate from the main one). Day trades close before 4 pm; swing trades close on their exit day or at a 10% stop. If the account falls 35% below its start, everything closes and it stops. Every day-trading rule we tested lost money after costs, so watch this as an experiment.')}
-      <div class="card wide"><div class="row">${button}</div>
-        <p class="muted">${esc(st.message || 'Not started yet.')}${st.updated_at ? ` · ${esc(when(st.updated_at))}` : ''}</p>
+    return `<h2>Autopilot</h2><p class="lede">Two buttons, one separate paper account. <b>Night</b>: Jan and Bonsai research the companies and trade their bull and bear calls long and short over days to months. <b>Day</b>: a price-only algorithm day-trades 14 ETFs inside the hours you set.</p>
+      ${plain('<b>Night</b>: Jan reads the news and filings (skipping pages it already read and reusing saved facts), Bonsai calls each horizon bull or bear, and the autopilot buys the bull calls and short-sells the bear calls for 5 to 63 sessions in its <b>own practice account</b> (paper money). <b>Day</b>: a price-only algorithm trades 14 ETFs every 5 minutes inside your hours and is flat at the end. Leverage stays the same; the risk rules cap any one theme at 30% net, stop new risk after a 4% down day, and skip stale data. A 35% fall from the start closes everything. Every day-trading rule we tested lost money after costs, so watch Day as an experiment.')}
+      <div class="split"><div class="card">${h3('Autopilot Night: research + long/short swing book', 'Autopilot Night')}<div class="row">${button}</div>${nightBars}</div>
+        <div class="card">${h3('Autopilot Day: algorithmic day trading (no AI)', 'Autopilot Day')}<div class="row">${dayButton}</div>${dayBars}</div></div>
+      <div class="card wide"><p class="muted">${esc(st.message || 'Not started yet.')}${st.updated_at ? ` · ${esc(when(st.updated_at))}` : ''}</p>
         ${d.killed ? `<p class="err"><b>Stopped by the 35% drawdown limit:</b> ${esc(d.killed)}</p>` : ''}${st.last_error ? `<p class="tiny err">Last error (${esc(when(st.last_error_at))}): ${esc(st.last_error)}</p>` : ''}
         <div class="kpis">${kpi('Market', esc(st.regime || '–'), 'QQQ trend')}${kpi('Open calls', fmt(st.open_calls ?? (d.lots || []).length), `${fmt(st.longs ?? 0)} long · ${fmt(st.shorts ?? 0)} short`)}${kpi('Fresh research', `${fmt(d.fresh)} of ${fmt((d.universe || []).length)}`, 'decided in the last 20 hours')}${kpi('Phase', esc(st.phase || '–'))}</div></div>
       <div class="card wide">${h3('Separate paper account', 'Autopilot account')}${acct}</div>
@@ -951,14 +976,14 @@ $('#view').addEventListener('click', async (e) => {
     operationStarting = true;
     try {
       const action = op.dataset.operation;
-      const paper = ['paper_ai', 'paper_sync', 'paper_research_test', 'paper_auto', 'paper_auto_tech100', 'full_auto'].includes(action);
+      const paper = ['paper_ai', 'paper_sync', 'paper_research_test', 'paper_auto', 'paper_auto_tech100', 'full_auto', 'autopilot_day'].includes(action);
       const confirmation = paper ? await confirmDialog({ title: op.closest('.card')?.querySelector('h3')?.textContent || op.textContent,
-        text: action === 'full_auto' ? 'Start the autopilot: it researches the 150 technology companies and the theme stocks, and trades their bull and bear calls long and short in the SEPARATE Alpaca paper account (paper money only; without its keys it only researches and logs). It runs until you stop it and uses the GPU between scheduled jobs. Day trades close before 4 pm; a 35% fall from the start closes everything.' : action === 'paper_auto_tech100' ? 'Activate the cached 100 technology stocks as the persistent entry universe for ALL AI paper runs, including scheduled runs. Existing positions can exit and paired sector ETF hedges remain allowed. No model or dataset downloads. New horizon budgets stay simulations; approved five-day sizing remains in force. Stop the current continuous worker before switching profiles.' : action === 'paper_auto' ? 'Start continuous paper sync, filing checks every 15 minutes and evidence review, plus a resumable news research queue. This can use the GPU for days. Ten minutes is a maximum per company, not a forced delay. Proposals cannot change the mandate. Stop finishes the current step; restart manually after reboot.' : action === 'paper_research_test' ? 'Run fresh public research and virtual horizon proposals, then the approved filing strategy and Alpaca paper orders. Experimental horizon allocations are not submitted. This can use the GPU for several minutes.' : action === 'paper_ai' ? 'Jan reads and researches new filings, then Bonsai judges them and eligible paper trades are submitted. This uses the GPU sequentially and can take time. Failed research is deferred, with no lite fallback. Existing entry sessions and sizing apply.' : 'Reconcile existing orders and submit any pending paper orders. This may change holdings in the practice account.', word: 'PAPER' }) : {};
+        text: action === 'autopilot_day' ? 'Start Autopilot Day: price-only day trading of 14 ETFs in the SEPARATE Alpaca paper account, inside the hours you set. 3x leverage for this book (3.9x for the account), flat at the end of the window, a 4% circuit breaker and 5% daily stop. Its strategy failed its backtest; it sends orders only while the LIVE switch is on.' : action === 'full_auto' ? 'Start Autopilot Night: it researches the 150 technology companies and the theme stocks (reusing saved research memory), and trades their bull and bear calls long and short over 5 to 63 sessions in the SEPARATE Alpaca paper account (paper money only). It runs until you stop it and uses the GPU between scheduled jobs. A 4% daily fall stops new risk; a 35% fall from the start closes everything.' : action === 'paper_auto_tech100' ? 'Activate the cached 100 technology stocks as the persistent entry universe for ALL AI paper runs, including scheduled runs. Existing positions can exit and paired sector ETF hedges remain allowed. No model or dataset downloads. New horizon budgets stay simulations; approved five-day sizing remains in force. Stop the current continuous worker before switching profiles.' : action === 'paper_auto' ? 'Start continuous paper sync, filing checks every 15 minutes and evidence review, plus a resumable news research queue. This can use the GPU for days. Ten minutes is a maximum per company, not a forced delay. Proposals cannot change the mandate. Stop finishes the current step; restart manually after reboot.' : action === 'paper_research_test' ? 'Run fresh public research and virtual horizon proposals, then the approved filing strategy and Alpaca paper orders. Experimental horizon allocations are not submitted. This can use the GPU for several minutes.' : action === 'paper_ai' ? 'Jan reads and researches new filings, then Bonsai judges them and eligible paper trades are submitted. This uses the GPU sequentially and can take time. Failed research is deferred, with no lite fallback. Existing entry sessions and sizing apply.' : 'Reconcile existing orders and submit any pending paper orders. This may change holdings in the practice account.', word: 'PAPER' }) : {};
       if (!confirmation) return;
       op.disabled = true;
       const run = await api('operations', { action, ...confirmation });
       operationId = run.id;
-      await show(action === 'full_auto' ? 'autopilot' : 'operations', true);
+      await show(['full_auto', 'autopilot_day'].includes(action) ? 'autopilot' : 'operations', true);
     } catch (error) { alert(error.message); await show('operations', true); }
     finally { operationStarting = false; }
     return;
@@ -1009,13 +1034,19 @@ sidebarState();
 const NO_RELOAD = new Set(['settings', 'how', 'reviews', 'benchmark', 'institutional']);
 let lastReload = Date.now();
 setInterval(() => {
-  const due = current === 'system' ? 2 : current === 'operations' ? 5 : settings.reloadSec;
-  if ((!settings.autoReload && current !== 'operations') || NO_RELOAD.has(current) || document.querySelector('dialog[open]') || operationStarting || document.hidden) return;
+  const due = current === 'system' ? 2 : ['operations', 'autopilot'].includes(current) ? 5 : settings.reloadSec;
+  if ((!settings.autoReload && !['operations', 'autopilot'].includes(current)) || NO_RELOAD.has(current) || document.querySelector('dialog[open]') || operationStarting || document.hidden) return;
   if (Date.now() - lastReload < due * 1000) return;
   lastReload = Date.now();
   if (current !== 'system') { metricsCache = null; sidebarState(); }
   show(current, true);
 }, 1000);
+document.addEventListener('submit', async (e) => {
+  const f = e.target.closest('[data-day-window]'); if (!f) return;
+  e.preventDefault();
+  try { await api('autopilot-day-window', { start: f.start.value, end: f.end.value }); await show('autopilot', true); }
+  catch (error) { alert(error.message); }
+});
 document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-set]'); if (!el) return;
   const k = el.dataset.set;

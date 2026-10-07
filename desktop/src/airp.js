@@ -3,7 +3,7 @@
 // (forward_allocator.py --halt / --resume) and pausing or resuming a research-queue job.
 // Manual paper and test runs are managed separately in runner.js.
 import { execFile } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 export function createAirp(root) {
@@ -315,6 +315,19 @@ export function createAirp(root) {
     // the 150-company research run: progress, both models' reasoning, every website visited (read-only)
     researchLog: () => runJson('research_view.py'),
     autopilot: () => runJson('full_auto.py', ['view']),
+    // Autopilot Day: the algo engine's status (results/forward/algo) and its trading window (config/autopilot_day.json)
+    autopilotDay: () => ({ status: json(path.join(backend, 'results', 'forward', 'algo', 'status.json'), {}),
+      config: json(path.join(backend, 'config', 'autopilot_day.json'), {}),
+      live: existsSync(path.join(backend, 'results', 'forward', 'algo', 'LIVE')) }),
+    setDayWindow(data) {
+      const hm = (x) => (/^\d{2}:\d{2}$/.test(String(x || '')) ? Number(x.slice(0, 2)) * 60 + Number(x.slice(3)) : null);
+      const a = hm(data.start), b = hm(data.end);
+      if (a == null || b == null || a < 9 * 60 + 35 || b > 15 * 60 + 55 || b - a < 15) return { status: 400, body: { error: 'Choose a window between 09:35 and 15:55 New York time, at least 15 minutes long' } };
+      const file = path.join(backend, 'config', 'autopilot_day.json');
+      const cfg = { ...json(file, {}), start: data.start, end: data.end };
+      writeFileSync(file + '.tmp', JSON.stringify(cfg, null, 2) + '\n'); renameSync(file + '.tmp', file);
+      return cfg;
+    },
     benchmarkReview: () => runJson('benchmark_review.py'),
     async engineeringReview(data) {
       if (!['costs', 'release'].includes(data.action) || data.confirm !== 'REVIEWED') return { status: 400, body: { error: 'Choose a review action and type REVIEWED' } };

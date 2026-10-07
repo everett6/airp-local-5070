@@ -240,3 +240,18 @@ test('Jan paper decisions show their own reader and enriched judge evidence', as
   assert.equal(rows[0].sheet, 'base sheet plus Jan research');
   assert.equal(rows[0].research.facts[0].text, 'revenue 100');
 });
+
+test('the Day window is validated before it is saved', async (t) => {
+  const { createAirp } = await import('../src/airp.js');
+  const { mkdtempSync, mkdirSync, readFileSync, rmSync } = await import('node:fs');
+  const os = await import('node:os'); const path = await import('node:path');
+  const root = mkdtempSync(path.join(os.tmpdir(), 'airp-day-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(path.join(root, 'backend', 'config'), { recursive: true });
+  const airp = createAirp(root);
+  assert.equal(airp.setDayWindow({ start: '09:00', end: '15:55' }).status, 400);
+  assert.equal(airp.setDayWindow({ start: '10:00', end: '10:05' }).status, 400);
+  assert.deepEqual(airp.setDayWindow({ start: '10:00', end: '14:00' }), { start: '10:00', end: '14:00' });
+  assert.equal(JSON.parse(readFileSync(path.join(root, 'backend', 'config', 'autopilot_day.json'), 'utf8')).end, '14:00');
+  assert.equal(airp.autopilotDay().live, false);
+});

@@ -46,6 +46,7 @@ from app.portfolio import fund_stability as fs
 from app.portfolio.account_risk import RiskPolicy, evaluate
 from app.portfolio.broker import DATA, PAPER, Alpaca, BrokerError, Leg
 from app.sandbox import minute_ensemble as me
+from app.sandbox import research_memory as rm
 
 NY = ZoneInfo("America/New_York")
 FWD = BACKEND / "results" / "forward"
@@ -58,8 +59,10 @@ TECH_EXTRA = ("GOOGL", "META", "AMZN", "NFLX", "TSLA", "UBER", "ABNB", "DASH", "
               "BKNG", "EXPE", "CHTR", "TMUS")
 SANDBOX_RISK = RiskPolicy(max_gross=3.9, max_asset=0.25, max_crypto=0.01, daily_loss=0.15, max_spread_bp=150.0,
                           max_reference_gap=0.10, max_quote_age_s=180.0)
-# The E1 algo engine (scripts/algo_engine.py) owns these ETFs in this account; QQQ stays with the N1 hedge.
+# Autopilot Day (scripts/algo_engine.py) owns these ETFs in this account; QQQ stays with the N1 hedge.
 ALGO_SYMBOLS = frozenset(me.UNIVERSE)
+BREAKER = 0.04  # R2
+BUDGET_NEW_S, BUDGET_MEMORY_S = 480, 300  # M1: research minutes a company, first time / with saved memory
 REFRESH_H = 20.0       # research older than this is redone
 BATCH = 4              # companies per research run (Jan and Bonsai load once per run)
 RESEARCH_ROOM_S = 1800  # the research script's own preflight room before the next scheduled job
@@ -458,6 +461,7 @@ class Controller:
                 if not rec or datetime.fromisoformat(rec["decided_at"]) < self.child_started:
                     self.state["attempts"].setdefault(t, []).append(now.isoformat())
             self.log("research_done", tickers=self.child_batch, code=rc)
+            self.status.setdefault("research", {}).pop("current", None)
             self.child_lock.close()
             self.child, self.child_lock, self.child_batch = None, None, []
             self.persist()
@@ -466,7 +470,8 @@ class Controller:
         if room < RESEARCH_ROOM_S + 120 or (DIR / "KILLED").exists() or research_all_active(now):
             return
         due = research_due(self.companies, decisions(self.names), self.state["attempts"], now)
-        self.status["research"] = {"due": len(due), "total": len(self.companies)}
+        self.status["research"] = {"due": len(due), "total": len(self.companies),
+                                   "memory": sum(1 for c in self.companies if (rm.ROOT / f"{c['ticker']}.json").exists())}
         if not due:
             return
         lock = (FWD / "autorun.lock").open("a")
@@ -477,16 +482,30 @@ class Controller:
             return
         batch = due[:BATCH if room >= 2700 + 1800 else 2]
         names = {c["ticker"]: c["name"] for c in batch}
+        budgets = {t: BUDGET_MEMORY_S if rm.load(t)["facts"] else BUDGET_NEW_S for t in names}
         cmd = [sys.executable, "-u", "scripts/live_research_test.py", "--deep", "--company-names-json",
-               json.dumps(names), "--tickers", ",".join(names)]
+               json.dumps(names), "--tickers", ",".join(names), "--budgets-json", json.dumps(budgets),
+               "--peers-json", json.dumps({t: self.peers(t) for t in names})]
         env = {**os.environ, "PYTHONUNBUFFERED": "1", "AIRP_AUTORUN_LOCK_FD": str(lock.fileno())}
         out = (self.job / "research.log").open("ab")
         self.child = subprocess.Popen(cmd, cwd=BACKEND, env=env, stdout=out, stderr=out, start_new_session=True,
                                       pass_fds=(lock.fileno(),))
         out.close()
         self.child_lock, self.child_batch, self.child_started = lock, list(names), now
-        self.child_deadline = time.monotonic() + min(room - 300, 600 * len(batch) + 600)
-        self.log("research_start", tickers=list(names), due=len(due))
+        span = min(room - 300, sum(budgets.values()) + 300 * len(batch) + 600)  # research + Bonsai + model loads
+        self.child_deadline = time.monotonic() + span
+        self.status["research"] = {**self.status.get("research", {}), "current": {
+            "tickers": list(names), "started_at": now.isoformat(), "deadline_at": (now + timedelta(seconds=span)).isoformat(),
+            "budget_min": round(sum(budgets.values()) / 60 / len(budgets), 1)}}
+        self.log("research_start", tickers=list(names), due=len(due), budgets=budgets)
+
+    def peers(self, ticker: str) -> list[str]:
+        """M1 area note: the stock's theme mates, else the companies of its sector."""
+        th = themes().get(ticker, {}).get("themes")
+        if th:
+            return sorted({t for t, v in themes().items() if set(v["themes"]) & set(th)} - {ticker})
+        sector = next((c.get("sector") for c in self.companies if c["ticker"] == ticker), None)
+        return [c["ticker"] for c in self.companies if c.get("sector") == sector and c["ticker"] != ticker][:60]
 
     def stop_research(self) -> None:
         if self.child is not None and self.child.poll() is None:
@@ -502,8 +521,6 @@ class Controller:
     def absorb(self, session: date, market_open: bool, now: datetime) -> list[dict[str, Any]]:
         """Turn research decided since the last look into lots (and a reasoning record each, PASS included)."""
         fresh: list[dict[str, Any]] = []
-        nyt = now.astimezone(NY).strftime("%H:%M")
-        day_ok = not market_open or nyt < self.cfg.day_entry_cutoff
         seen = set(self.state["seen"])
         latest = decisions(self.names)
         save(DIR / "latest.json", latest)
@@ -520,7 +537,7 @@ class Controller:
             if age_h > self.cfg.max_age_h:
                 continue
             lots = at.new_lots(rec, session, self.mkt, self.cfg, self.state["lots"])
-            lots = [x for x in lots if day_ok or x["horizon"] != "day"]
+            lots = [x for x in lots if x["horizon"] != "day"]  # Night: day trading is Autopilot Day (no AI)
             lots = [x for x in lots if (x["side"] > 0 or self.sandbox is None or self.sandbox.shortable(t))
                     and not halted]
             if rec["evidence"] not in seen:
@@ -585,11 +602,17 @@ class Controller:
         k = fs.kelly([x for x in self.state["lots"] if x["state"] != "open"], self.cfg.base)
         sized = [{**x, "weight": x["weight"] * k.get(x["horizon"], {"mult": 1.0})["mult"]} for x in self.state["lots"]]
         w = {s: x for s, x in at.weights(sized, self.cfg).items() if s not in ALGO_SYMBOLS}
+        w = fs.theme_cap(w, {t: v["themes"] for t, v in themes().items()}, self.cfg.per_name)  # R1
         w = fs.hedge({s.replace("-", "."): x for s, x in w.items()}, betas, self.cfg.gross)
         targets = at.target_shares(w, equity, prices)
         for s in set(w) - set(targets):  # no price: keep what is held
             targets[s] = int(total.get(s, 0))
         ords = fs.banded(at.orders(targets, total, prices, self.cfg), prices, equity)
+        last = float(acct.get("last_equity") or equity)
+        breaker = equity < last * (1 - BREAKER)  # R2: a 4% day sends only reducing orders until the next session
+        if breaker:
+            ords = [o for o in ords if o["reducing"]]
+        self.report(breaker=f"account down {1 - equity / last:.1%} today: only reducing orders" if breaker else None)
         todo = [o for o in ords if o["symbol"] not in working  # one order per symbol at a time: a flip opens
                 and (o["reducing"] or o["side"] == "buy" or self.sandbox.shortable(o["symbol"]))]  # after its close
         self.backlog = len(todo) > ORDERS_PER_LOOP
@@ -767,17 +790,7 @@ def run(job: Path, node: str = "", backend: Path = BACKEND) -> int:
             js.update(state="blocked", message="Another continuous worker is running: stop it first.")
             save(status_path, js)
             return 2
-        engine = subprocess.Popen([sys.executable, "-u", str(BACKEND / "scripts" / "algo_engine.py")],
-                                  stdout=(FWD / "algo_engine.log").open("a"), stderr=subprocess.STDOUT,
-                                  start_new_session=True)
-        try:
-            rc = Controller(job).run()
-        finally:
-            engine.terminate()
-            try:
-                engine.wait(30)
-            except subprocess.TimeoutExpired:
-                engine.kill()
+        rc = Controller(job).run()
     js = load(status_path, {})
     js.update(state="stopped", finished_at=now_utc().isoformat())
     save(status_path, js)

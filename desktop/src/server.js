@@ -68,6 +68,8 @@ export async function startServer({ airpRoot, port = 0, publicDir = path.join(ap
     'GET /api/live-research': () => airp.liveResearch(),
     'GET /api/research_log': () => airp.researchLog(),
     'GET /api/autopilot': () => airp.autopilot(),
+    'GET /api/autopilot-day': () => airp.autopilotDay(),
+    'POST /api/autopilot-day-window': async (req) => airp.setDayWindow(await readBody(req)),
     'GET /api/benchmark': () => airp.benchmarkReview(),
     'POST /api/benchmark': async (req) => airp.attestBenchmark(await readBody(req)),
     'POST /api/engineering_review': async (req) => airp.engineeringReview(await readBody(req)),

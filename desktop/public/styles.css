@@ -150,3 +150,10 @@ form[data-engineering-form] input:not([type=checkbox]), form[data-benchmark-form
 .rlog .site { font: 11px var(--mono); word-break: break-all; }
 .rlog .cases { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 800px) { .rlog .cases { grid-template-columns: 1fr; } }
+/* Live progress bars: a moving stripe while a run works; an indeterminate bar slides when the length is unknown */
+.progress.live > div { background-image: linear-gradient(45deg, rgba(255,255,255,.28) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.28) 50%, rgba(255,255,255,.28) 75%, transparent 75%); background-size: 22px 22px; animation: stripes 1s linear infinite; }
+.progress.indeterminate > div { width: 35% !important; animation: stripes 1s linear infinite, slide 1.6s ease-in-out infinite; }
+@keyframes stripes { from { background-position: 0 0; } to { background-position: 22px 0; } }
+@keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .progress > div { animation: none !important; } }
+form.row input[type=time] { background: var(--panel-2); color: inherit; border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }

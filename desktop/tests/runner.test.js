@@ -174,3 +174,16 @@ test('technology profile launches its own action and shares continuous-worker ex
   assert.equal(r.start('paper_auto', 'PAPER').status, 409);
   assert.equal(r.stop(started.body.id).status, 202);
 });
+
+test('Autopilot Day runs beside Autopilot Night, but only one of each', (t) => {
+  const f = fixture(t), r = createRunner(f.root, { launch: f.launch });
+  assert.equal(r.start('full_auto', 'PAPER').status, 202);
+  const night = r.status();
+  assert.equal(night.actions.find((a) => a.id === 'autopilot_day').disabled, false);
+  assert.equal(night.actions.find((a) => a.id === 'full_auto').disabled, true);
+  assert.equal(r.start('autopilot_day', 'PAPER').status, 202);
+  const both = r.status();
+  assert.ok(both.day && both.autopilot && !both.active);
+  assert.equal(both.actions.find((a) => a.id === 'autopilot_day').disabled, true);
+  assert.equal(r.stop(both.day.id).status, 202);
+});

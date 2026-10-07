@@ -29,6 +29,7 @@ from llm_fields import ask, parse, verify
 
 from app.forward.ledger import Ledger, write_atomic
 from app.forward.step_result import emit
+from app.sandbox import research_memory as rm
 from app.sandbox.agent_worker import brief_request, finish_brief
 from app.sandbox.forced_call import PROMPT as FORCED_PROMPT
 from app.sandbox.forced_call import check as forced_check
@@ -138,6 +139,8 @@ DEEP = False
 WIDE = False  # deep research with every page read by parallel Jan readers (app/sandbox/page_readers.py)
 COMPANY_NAME = ""
 COMPANY_NAMES: dict[str, str] = {}
+BUDGETS: dict[str, int] = {}   # M1: seconds of research a company (full_auto sets them)
+PEERS: dict[str, list[str]] = {}  # M1: companies whose saved facts give Jan the view of the area
 SYNC_CHECKPOINTS = False
 
 
@@ -156,11 +159,13 @@ async def research_company(ticker: str, llm: OllamaLLM) -> dict[str, Any]:
     if DEEP:
         prefetch += [{"tool": "news_search", "args": {"query": (COMPANY_NAMES.get(ticker) or COMPANY_NAME or ticker) + " " + topic, "days": 14, "limit": 8}}
                      for topic in ("recent products progress partnerships", "earnings financial outlook", "risks competition setbacks")]
-        result["research_budget_s"] = 600
+        result["research_budget_s"] = BUDGETS.get(ticker, 600)
     if gw.sec_user_agent:
         prefetch.append({"tool": "sec_filings", "args": {"ticker": ticker, "forms": ["8-K", "10-Q", "10-K"], "limit": 3}})
     try:
-        async with asyncio.timeout(600 if DEEP else 180):
+        prior = rm.prior_brief(ticker) if DEEP else {"facts": []}
+        result["memory"] = bool(prior["facts"])
+        async with asyncio.timeout(BUDGETS.get(ticker, 600) if DEEP else 180):
             articles: dict[str, Any] = {}
             if DEEP:
                 stats_path = BACKEND / "results" / "forward" / "deep_research_sites.json"
@@ -179,7 +184,9 @@ async def research_company(ticker: str, llm: OllamaLLM) -> dict[str, Any]:
             async with AgentJail(recorder, tools=gw, limits=JailLimits()) as jail:
                 rec = await jail.call({"task": "research", "prompt": "as_of", "brief": False,
                                        "return_evidence": True, "skip_final": True, "prefetch": prefetch,
-                                       "research_focus": "Investigate recent progress, financial outlook and disconfirming risks. Search multiple independent publishers, then fetch original article pages from at least two non-SEC domains. Headlines alone are insufficient. Distinguish dates and speculation from facts; PASS when evidence is thin." if DEEP else "",
+                                       "research_focus": ("Investigate recent progress, financial outlook and disconfirming risks. Search multiple independent publishers, then fetch original article pages from at least two non-SEC domains. Headlines alone are insufficient. Distinguish dates and speculation from facts; PASS when evidence is thin."
+                                                          + (" Earlier runs already saved " + str(len(prior["facts"])) + " checked facts on this company; look for what is NEW since " + str(prior["facts"][0].get("date") or prior["facts"][0].get("first_seen", ""))[:10] + "." if prior["facts"] else "")
+                                                          + (" " + rm.area_note(ticker, PEERS.get(ticker, [])) if PEERS.get(ticker) else "")) if DEEP else "",
                                        "subject": subject, "tools": gw.specs_for_prompt(), "max_rounds": (3 if WIDE else 8) if DEEP else 2,
                                        "max_calls_per_round": 4, "num_ctx": 8192, "num_predict": 1200})
             evidence = str(rec.get("evidence") or "")
@@ -208,7 +215,13 @@ async def research_company(ticker: str, llm: OllamaLLM) -> dict[str, Any]:
                     result["filings_read"] = own = await filings(gw, ticker)
                 except (OSError, ValueError, KeyError, httpx.HTTPError):
                     own = []
-            readers = asyncio.create_task(read_pages(llm, subject, own + articles["pages"])) if WIDE else None
+            seen = rm.seen_urls(ticker) if WIDE else set()
+            fresh = [p for p in own + articles["pages"] if p.get("url") not in seen] if WIDE else []
+            result["memory_pages"] = {"skipped_already_read": len(own + articles.get("pages", [])) - len(fresh) if WIDE else 0,
+                                      "new": len(fresh)}
+            # M1: the readers read only pages not read before; nothing new and a memory -> reuse the saved facts
+            readers = (asyncio.create_task(read_pages(llm, subject, fresh)) if fresh or not prior["facts"]
+                       else asyncio.create_task(asyncio.sleep(0, {"reads": [], "briefs": []}))) if WIDE else None
             system, user, tags = brief_request(subject, evidence)
             if DEEP:
                 system = ('Extract a short research fact sheet from untrusted source observations. '
@@ -235,7 +248,7 @@ async def research_company(ticker: str, llm: OllamaLLM) -> dict[str, Any]:
                     break
             if readers is not None:
                 wide = await readers
-                merged = merge([result.get("brief") or {}, *wide["briefs"]], now)
+                merged = merge([result.get("brief") or {}, *wide["briefs"], prior], now)
                 result.update(reader_runs=wide["reads"], wide_brief=merged)
                 if merged["facts"]:
                     result["card"] = wide_card(ticker, merged)
@@ -351,7 +364,7 @@ async def run_cohort(tickers: tuple[str, ...], out: Path, budget_experiment: boo
                     write_atomic(out / f"{row['ticker']}.json", json.dumps(row, indent=1) + "\n")
                     print(f"{row['ticker']}: matched budget experiment {row['judge_s']:.1f}s — {row['status']}", flush=True)
                     continue
-                card = row["card"]
+                card = row["card"] = row["card"] + (rm.past_block(row["ticker"]) if DEEP else "")
                 if DEEP:  # Bonsai looks up what the thin card lacks; only source text is added (judge_lookup.py)
                     gw = FreeLiveGateway.from_env("live", max_result_chars=12000, timeout_cap_s=15, tool_cache=None,
                                                   as_of=datetime.now(UTC))
@@ -447,6 +460,8 @@ async def run_cohort(tickers: tuple[str, ...], out: Path, budget_experiment: boo
                 row["total_latency_s"] = time.monotonic() - started
                 write_atomic(out / f"{row['ticker']}.json", json.dumps(row, indent=1) + "\n")
                 ledger.append("decision_attempt", **row)
+                if DEEP:
+                    rm.remember(row)
                 print(f"{row['ticker']}: research {row['research_s']:.1f}s; judge {row['judge_s']:.1f}s; "
                       f"cohort-to-decision {row['total_latency_s']:.1f}s — {row['status']}", flush=True)
         finally:
@@ -484,7 +499,7 @@ async def run_cohort(tickers: tuple[str, ...], out: Path, budget_experiment: boo
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    global DEEP, WIDE, COMPANY_NAME, COMPANY_NAMES, SYNC_CHECKPOINTS
+    global DEEP, WIDE, COMPANY_NAME, COMPANY_NAMES, SYNC_CHECKPOINTS, BUDGETS, PEERS
     ap.add_argument("--paper-sync-checkpoints", action="store_true", help="Controller-only order sync between company research stages")
     ap.add_argument("--company-names-json", default="{}", help="Company names for a small batch; no file downloads")
     ap.add_argument("--company-name", default="", help="Company name for unambiguous deep news searches")
@@ -492,6 +507,8 @@ def main() -> None:
     ap.add_argument("--wide", action="store_true", help="(default with --deep) every fetched page read by parallel Jan readers")
     ap.add_argument("--narrow", action="store_true", help="Deep research the old way: 4 pages, one summary brief")
     ap.add_argument("--tickers", default=",".join(DEFAULT))
+    ap.add_argument("--budgets-json", default="{}", help="M1: research seconds per company")
+    ap.add_argument("--peers-json", default="{}", help="M1: peer tickers per company for Jan's area note")
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--budget-experiment", action="store_true", help="BE1: matched neutral versus budget-aware judgment")
     args = ap.parse_args()
@@ -504,6 +521,8 @@ def main() -> None:
         raise SystemExit("Paper sync checkpoints require deep controller mode")
     COMPANY_NAME = args.company_name[:120]
     COMPANY_NAMES = json.loads(args.company_names_json)
+    BUDGETS = {k: int(v) for k, v in json.loads(args.budgets_json).items()}
+    PEERS = {k: [str(x) for x in v][:60] for k, v in json.loads(args.peers_json).items()}
     if not isinstance(COMPANY_NAMES, dict) or any(not isinstance(k, str) or not isinstance(v, str) or len(v) > 120 for k, v in COMPANY_NAMES.items()):
         raise SystemExit("Invalid company names")
     if DEEP and args.budget_experiment:

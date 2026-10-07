@@ -25,7 +25,7 @@ from app.forward.step_result import outcome
 BACKEND = Path(__file__).resolve().parents[1]
 PAPER_ACTIONS = {"paper_ai", "paper_sync", "paper_research_test", "paper_auto", "paper_auto_tech100"}
 ACTIONS = PAPER_ACTIONS | {"recovery_tests", "backend_tests", "desktop_tests", "improvement_review",
-                           "release_check", "backup", "restore_probe", "rollback_probe", "institutional_report", "live_research_test", "budget_experiment", "horizon_review", "full_auto"}
+                           "release_check", "backup", "restore_probe", "rollback_probe", "institutional_report", "live_research_test", "budget_experiment", "horizon_review", "full_auto", "autopilot_day"}
 NY = ZoneInfo("America/New_York")
 
 
@@ -62,7 +62,7 @@ def next_slot(now: datetime) -> datetime:
 
 def commands(action: str, node: str) -> list[tuple[str, list[str]]]:
     py = sys.executable
-    if action in {"paper_auto", "paper_auto_tech100", "full_auto"}:
+    if action in {"paper_auto", "paper_auto_tech100", "full_auto", "autopilot_day"}:
         return []  # Persistent controller executes allowlisted actions one cycle at a time.
     if action == "budget_experiment":
         return [("Compare neutral and budget-aware judgments on identical evidence",
@@ -179,6 +179,9 @@ def run(action: str, job: Path, node: str, backend: Path = BACKEND) -> int:
     if action == "full_auto":
         from full_auto import run as autopilot
         return autopilot(job, node, backend)
+    if action == "autopilot_day":
+        from algo_engine import run_job
+        return run_job(job)
     fwd = backend / "results" / "forward"
     status_path = job / "status.json"
     status: dict[str, Any] = json.loads(status_path.read_text())

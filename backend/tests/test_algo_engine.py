@@ -23,3 +23,19 @@ def test_shadow_step_charges_costs_and_marks_to_market():
     r1 = ae.shadow_step(book, {}, {"XLF": 51.0})
     assert abs(r1 - (0.2 * 0.02 - 0.2 * 1.5e-4)) < 1e-12
     assert book["w"] == {} and abs(book["equity"] - (1 + r0) * (1 + r1)) < 1e-12
+
+
+def test_window_and_breaker_rules():
+    cfg = {**ae.DEFAULTS, "start": "10:00", "end": "11:00"}
+    inside = [m for m in ae.me.DECISION_BARS if ae.in_window(m, cfg)]
+    assert inside[0] == 29 and inside[-1] == 84 and len(inside) == 12  # 10:00 .. 10:55 decisions
+    got = ae.no_new_risk({"SPY": 0.3, "XLF": -0.2, "XLE": 0.1}, {"SPY": 0.2, "XLF": 0.2, "IWM": 0.1})
+    assert got == {"SPY": 0.2}  # keep or shrink only; no flip, nothing new
+
+
+def test_config_falls_back_to_defaults(tmp_path, monkeypatch):
+    p = tmp_path / "day.json"
+    p.write_text('{"start": "10:30", "gross": 2.5, "unknown": 1}')
+    monkeypatch.setattr(ae, "CONFIG", p)
+    c = ae.config()
+    assert c["start"] == "10:30" and c["end"] == "15:55" and c["gross"] == 2.5 and "unknown" not in c

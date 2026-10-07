@@ -5,8 +5,12 @@ import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, 
 import path from 'node:path';
 
 const AUTO_ACTIONS = new Set(["paper_auto", "paper_auto_tech100", "full_auto"]);
+// Autopilot Day runs beside Autopilot Night (same paper account, separate symbols); both are continuous workers.
+const DAY_ACTIONS = new Set(["autopilot_day"]);
+const CONTINUOUS = new Set([...AUTO_ACTIONS, ...DAY_ACTIONS]);
 export const ACTIONS = [
-  { id: "full_auto", label: "Autopilot: 150 tech stocks", paper: true, description: "Runs everything on its own in the SEPARATE Alpaca paper account: Jan and Bonsai research, bull and bear calls turned into long and short day and swing trades with the sizing rules, stops, and a 35% drawdown limit. Paper money only. Without the separate account keys it researches and logs what it would trade. Scheduled jobs take priority. Stop closes day trades; swing positions keep their plan." },
+  { id: "full_auto", label: "Autopilot Night: research + long/short swing book", paper: true, description: "Runs on its own in the SEPARATE Alpaca paper account: Jan and Bonsai research the 150 technology companies and the theme stocks (with saved research memory), and their bull and bear calls become long and short swing trades (5, 21 and 63 sessions) with the hedge, Kelly sizing, theme caps, stops, a 4% daily circuit breaker and a 35% drawdown limit. Paper money only. Scheduled jobs take priority." },
+  { id: "autopilot_day", label: "Autopilot Day: algorithmic day trading", paper: true, description: "Price-only day trading (no AI) of 14 liquid ETFs in the SEPARATE Alpaca paper account, inside the hours you set (default 09:35-15:55 New York). 3x leverage for this book, 3.9x for the account, flat at the window's end, 4% circuit breaker and 5% daily stop, no trades on stale data. Its strategy failed its backtest; it trades because you switched it live." },
   { id: "paper_auto_tech100", label: "Auto-trade 100 technology stocks", paper: true, description: "Shorter continuous workflow: resume up to 100 companies classified Information Technology in the cached list. Same Jan/Bonsai research, paper sync and learning reviews. Separate saved queue; no downloads. Activates a persistent 100-stock entry allowlist for all AI paper runs. Existing exits and paired sector ETF hedges remain allowed. Day/short/medium/long budgets and cases are simulations; current five-day orders keep their existing sizing." },
   { id: "paper_auto", label: "Start continuous paper workflow", paper: true, description: "Resume up to 1,000 cached companies: Jan public-news research (10-minute maximum), Bonsai proposals, filing checks every 15 minutes and evidence review, and order sync every minute while idle. Scheduled jobs take priority. Proposals cannot change the trading mandate. Stop after current step; restart manually after reboot." },
   { id: 'horizon_review', label: 'Review horizon shadows', paper: false, description: 'Refresh free IEX price proxies for new day, medium and long virtual vintages. Compare AI and no-AI targets with fixed costs. No orders or automatic promotion.' },
@@ -72,8 +76,8 @@ export function createRunner(root, { launch = spawn } = {}) {
     const halted = existsSync(path.join(fwd, 'HALT'));
     const ready = existsSync(py) && existsSync(worker);
     return {
-      actions: ACTIONS.map((a) => ({ ...a, disabled: !ready || jobs.some((j) => ACTIVE.has(j.state) && !AUTO_ACTIONS.has(j.action)) || (AUTO_ACTIONS.has(a.id) && jobs.some((j) => ACTIVE.has(j.state) && AUTO_ACTIONS.has(j.action))) || (a.paper && (mode !== 'live' || (['paper_ai', 'paper_research_test'].includes(a.id) && halted))) })),
-      jobs: jobs.slice(0, 30), active: jobs.find((j) => ACTIVE.has(j.state) && !AUTO_ACTIONS.has(j.action)) ?? null, autopilot: jobs.find((j) => ACTIVE.has(j.state) && AUTO_ACTIONS.has(j.action)) ?? null,
+      actions: ACTIONS.map((a) => ({ ...a, disabled: !ready || jobs.some((j) => ACTIVE.has(j.state) && !CONTINUOUS.has(j.action)) || (AUTO_ACTIONS.has(a.id) && jobs.some((j) => ACTIVE.has(j.state) && AUTO_ACTIONS.has(j.action))) || (DAY_ACTIONS.has(a.id) && jobs.some((j) => ACTIVE.has(j.state) && DAY_ACTIONS.has(j.action))) || (a.paper && (mode !== 'live' || (['paper_ai', 'paper_research_test'].includes(a.id) && halted))) })),
+      jobs: jobs.slice(0, 30), active: jobs.find((j) => ACTIVE.has(j.state) && !CONTINUOUS.has(j.action)) ?? null, autopilot: jobs.find((j) => ACTIVE.has(j.state) && AUTO_ACTIONS.has(j.action)) ?? null, day: jobs.find((j) => ACTIVE.has(j.state) && DAY_ACTIONS.has(j.action)) ?? null,
       stockPolicy: json(path.join(fwd, "paper_autopilot", "stock_policy.json")),
       researchQueue: (() => { const latest = jobs.find((j) => AUTO_ACTIONS.has(j.action)); const q = json(path.join(fwd, "paper_autopilot", latest?.action === "paper_auto_tech100" ? "queue_tech100.json" : "queue.json")); return q ? { total: q.companies.length, profile: q.profile || "all1000", snapshotYear: q.snapshot_year, recent: q.companies.filter((c) => c.state !== "pending").slice(-15) } : null; })(),
       ready, mode, halted, scheduled: json(path.join(fwd, 'running.json')),
@@ -105,7 +109,7 @@ export function createRunner(root, { launch = spawn } = {}) {
   }
   function stop(id) {
     const data = job(id);
-    if (!data || !AUTO_ACTIONS.has(data.action) || !ACTIVE.has(data.state)) return { status: 409, body: { error: "No active continuous worker with this ID" } };
+    if (!data || !CONTINUOUS.has(data.action) || !ACTIVE.has(data.state)) return { status: 409, body: { error: "No active continuous worker with this ID" } };
     writeFileSync(path.join(dir, id, "STOP"), "Stop requested\n");
     return { status: 202, body: { message: "Stop requested; current step finishes safely." } };
   }

@@ -89,3 +89,31 @@ def combined(main: dict[str, Any], auto: dict[str, Any]) -> dict[str, Any]:
         peak = np.maximum.accumulate(total)
         out["drawdown"] = float(min(np.array(total) / peak - 1))
     return out
+
+
+def theme_cap(w: dict[str, float], theme_of: dict[str, list[str]], per_name: float, net_cap: float = 0.30,
+              gross_cap: float = 0.50) -> dict[str, float]:
+    """R1: each theme's net at most `net_cap` and gross at most `gross_cap` of equity; the weight removed goes pro rata
+    to the stocks in no capped theme (each under `per_name`), so the book's gross does not fall."""
+    scale = dict.fromkeys(w, 1.0)
+    for theme in {t for ts in theme_of.values() for t in ts}:
+        names = [s for s in w if theme in theme_of.get(s, [])]
+        net, gross = sum(w[s] for s in names), sum(abs(w[s]) for s in names)
+        k = min(1.0, net_cap / abs(net) if net else 1.0, gross_cap / gross if gross else 1.0)
+        for s in names:
+            scale[s] = min(scale[s], k)
+    out = {s: x * scale[s] for s, x in w.items()}
+    freed = sum(abs(x) for x in w.values()) - sum(abs(x) for x in out.values())
+    free = [s for s in out if scale[s] == 1.0 and s not in theme_of and out[s]]
+    for _ in range(5):  # a name that hits per_name passes its share on to the others
+        room = {s: per_name - abs(out[s]) for s in free if per_name - abs(out[s]) > 1e-12}
+        base = sum(abs(out[s]) for s in room)
+        if freed <= 1e-12 or base <= 0:
+            break
+        given = 0.0
+        for s, r in room.items():
+            add = min(r, freed * abs(out[s]) / base)
+            out[s] += add if out[s] > 0 else -add
+            given += add
+        freed -= given
+    return out
