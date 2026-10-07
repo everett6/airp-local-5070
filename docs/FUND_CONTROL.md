@@ -82,7 +82,7 @@ Status key:
 | 40 | Constrained self-improvement | done | Hard ceilings in code; no process can loosen a limit or a pass rule |
 | 41 | Mode shown prominently | done | Mode bar on Fund control: research / paper orders / simulated / real money never |
 | 42 | Buttons say what they do | done | e.g. "Start Autopilot Night (research + Alpaca PAPER orders)"; the old "Auto-trade" labels renamed |
-| 43 | Why no trade | done | Concrete reasons per company (Night) and per ETF (Day) |
+| 43 | Why no trade | partial | Concrete reasons per ETF (Day). Night still shows a general reason; the concrete version is written and waits for a Night restart. |
 | 44 | Opportunity funnel | done | Companies → researched → … → evaluated, with drop reasons |
 | 45 | Account-risk dashboard | done | Gross, net, beta-net, pending, headroom, ownership, themes, breakers, ceilings |
 | 46 | Acknowledged vs filled | done | Order states shown separately |
