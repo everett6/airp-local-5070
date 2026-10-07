@@ -166,8 +166,9 @@ def test_two_company_deep_batch_loads_each_model_once_and_checks_four_horizons(m
     monkeypatch.setattr(L, 'DEEP', True)
     models['fail'] = 'NONE'
     async def articles(*_a, **_kw):
-        return {"pages": [{"publisher": h, "url": f"https://{h}/story", "text": "The company reported revenue 100"}
-                          for h in ("publisher-a.example", "publisher-b.example")],
+        texts = {"publisher-a.example": "The company reported revenue 100 for the quarter",  # two independent stories
+                 "publisher-b.example": "Analysts at a broker raised their target after a product launch"}
+        return {"pages": [{"publisher": h, "url": f"https://{h}/story", "text": t} for h, t in texts.items()],
                 "domains": ["publisher-a.example", "publisher-b.example"]}
     monkeypatch.setattr(L, 'collect', articles)
     original_gateway = L.FreeLiveGateway.from_env

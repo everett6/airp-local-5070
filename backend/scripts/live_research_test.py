@@ -30,6 +30,7 @@ from llm_fields import ask, parse, verify
 from app.forward.ledger import Ledger, write_atomic
 from app.forward.step_result import emit
 from app.sandbox import research_memory as rm
+from app.sandbox import research_quality as rq
 from app.sandbox.agent_worker import brief_request, finish_brief
 from app.sandbox.forced_call import PROMPT as FORCED_PROMPT
 from app.sandbox.forced_call import check as forced_check
@@ -203,8 +204,11 @@ async def research_company(ticker: str, llm: OllamaLLM) -> dict[str, Any]:
             if DEEP:
                 domains = articles.get("domains", [])
                 result["article_domains"] = domains
-                if len(domains) < 2:
-                    result["error_reason"] = "insufficient original article coverage: need two non-SEC domains"
+                # O1 #31: a press release syndicated on several sites is one source, not several
+                result["independent_sources"] = rq.independent_sources(articles.get("pages", []))
+                if len(domains) < 2 or result["independent_sources"] < 2:
+                    result["error_reason"] = ("insufficient original article coverage: need two independent non-SEC "
+                                              "sources (syndicated copies count once)")
                     raise ResearchFailure(result)
             if not evidence:
                 result["error_reason"] = "no research evidence"
@@ -249,6 +253,8 @@ async def research_company(ticker: str, llm: OllamaLLM) -> dict[str, Any]:
             if readers is not None:
                 wide = await readers
                 merged = merge([result.get("brief") or {}, *wide["briefs"], prior], now)
+                known = {rm._key(str(f.get("text", ""))): f.get("first_seen", "") for f in prior["facts"]}
+                merged["facts"] = rq.tag_facts(merged["facts"], known, now, rm._key)  # O1 #32
                 result.update(reader_runs=wide["reads"], wide_brief=merged)
                 if merged["facts"]:
                     result["card"] = wide_card(ticker, merged)
@@ -461,6 +467,8 @@ async def run_cohort(tickers: tuple[str, ...], out: Path, budget_experiment: boo
                 write_atomic(out / f"{row['ticker']}.json", json.dumps(row, indent=1) + "\n")
                 ledger.append("decision_attempt", **row)
                 if DEEP:
+                    row["audit_exceptions"] = rq.audit(row)  # O1 #29
+                    write_atomic(out / f"{row['ticker']}.json", json.dumps(row, indent=1) + "\n")
                     rm.remember(row)
                 print(f"{row['ticker']}: research {row['research_s']:.1f}s; judge {row['judge_s']:.1f}s; "
                       f"cohort-to-decision {row['total_latency_s']:.1f}s — {row['status']}", flush=True)
