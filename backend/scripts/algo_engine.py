@@ -355,6 +355,9 @@ class Engine:
             self.ab.incident("day_reduction", "a reduction did not reach a final state", fallback="no additions",
                              resume="the order is final")
             return [self.leg_out(x, t) for x in legs]
+        late = (now_utc() - self.bar_close(m)).total_seconds()
+        if late > LATE_S:  # review #23: reductions took long; additions on a stale decision are not sent
+            return [self.leg_out(x, t) for x in legs] + [{"skipped": f"additions {late:.0f} s after the bar"}]
         pos2, _ = ab.owned(self.alpaca, "day")  # additions from what actually filled (review #5)
         add = [o for o in share_orders(scaled, pos2, equity, prices) if abs(o["to"]) >= abs(pos2.get(o["symbol"], 0.0))]
         legs2 = ab.send_batch(self.alpaca, self.ab, "day", self.session, f"m{m}", add, prices, LIMIT_BP,
@@ -438,34 +441,36 @@ class Engine:
     # --- main loop ----------------------------------------------------------------------------------------------
     async def run(self) -> None:
         guard = asyncio.create_task(self.guard())
-        while not self.halted():
-            try:
-                clock = await self.get(f"{PAPER}/clock")
-                if not clock["is_open"]:
-                    if self.op != "waiting":
-                        self.set_op("waiting", "market closed")
-                    self.report(state="waiting", message=f"market closed; next open {clock['next_open']}")
-                    await asyncio.sleep(30)
-                    continue
-                await self.stream(now_utc().astimezone(NY).date())
-            except Exception as e:  # noqa: BLE001 - keep the engine up; every failure is logged
-                self.log("error", error=repr(e)[:300])
-                self.reconciled = False  # review #17/#19: after any failure, reconcile before trading again
-                self.set_op("recovering", f"{type(e).__name__}: reconnecting, then reconcile")
-                self.report(state="error", last_error=repr(e)[:300], last_error_at=now_utc().isoformat())
-                await asyncio.sleep(5)
-        guard.cancel()
-        if self.mode() == "live" and self.session is not None:  # review #10: nothing overnight, verified
-            try:
-                res = await asyncio.to_thread(ab.flatten, self.alpaca, self.ab, "day", self.session, "Day stopped")
-                self.log("close_on_stop", **res)
-            except Exception as e:  # noqa: BLE001
-                self.log("error", error=f"closing on stop: {e!r}"[:300])
-                self.ab.incident("flatten_day", f"close on stop failed: {e!r}"[:300], fallback="Night watchdog",
-                                 resume="Day's positions verified flat")
-        self.set_op("waiting", "stopped")
-        await self.http.aclose()
-        self.report(state="stopped", message="stopped")
+        try:  # review #9: the close on stop also runs on cancellation or a signal
+            while not self.halted():
+                try:
+                    clock = await self.get(f"{PAPER}/clock")
+                    if not clock["is_open"]:
+                        if self.op != "waiting":
+                            self.set_op("waiting", "market closed")
+                        self.report(state="waiting", message=f"market closed; next open {clock['next_open']}")
+                        await asyncio.sleep(30)
+                        continue
+                    await self.stream(now_utc().astimezone(NY).date())
+                except Exception as e:  # noqa: BLE001 - keep the engine up; every failure is logged
+                    self.log("error", error=repr(e)[:300])
+                    self.reconciled = False  # review #17/#19: after any failure, reconcile before trading again
+                    self.set_op("recovering", f"{type(e).__name__}: reconnecting, then reconcile")
+                    self.report(state="error", last_error=repr(e)[:300], last_error_at=now_utc().isoformat())
+                    await asyncio.sleep(5)
+        finally:
+            guard.cancel()
+            if self.mode() == "live" and self.session is not None:  # review #10: nothing overnight, verified
+                try:
+                    res = await asyncio.to_thread(ab.flatten, self.alpaca, self.ab, "day", self.session, "Day stopped")
+                    self.log("close_on_stop", **res)
+                except Exception as e:  # noqa: BLE001
+                    self.log("error", error=f"closing on stop: {e!r}"[:300])
+                    self.ab.incident("flatten_day", f"close on stop failed: {e!r}"[:300], fallback="Night watchdog",
+                                     resume="Day's positions verified flat")
+            self.set_op("waiting", "stopped")
+            await self.http.aclose()
+            self.report(state="stopped", message="stopped")
 
     async def stream(self, day: date) -> None:
         if self.session != day:
@@ -546,6 +551,8 @@ def run_job(job: Path) -> int:
             status_path.write_text(json.dumps(js) + "\n")
             return 2
         eng = Engine(stop_file=job / "STOP")
+        for sig in (signal.SIGTERM, signal.SIGINT):  # review #9: a signal stops cleanly (positions closed)
+            signal.signal(sig, lambda *_: setattr(eng, "stop", True))
         asyncio.run(eng.run())
     js = json.loads(status_path.read_text())
     js.update(state="stopped", message="Autopilot Day stopped; the algo book was closed",

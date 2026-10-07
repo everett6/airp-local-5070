@@ -53,6 +53,7 @@ def engine(tmp_path, broker):
     e.op, e.done, e.status, e.stop_file = "trading", set(), {}, None
     e.book = {"equity": 1.0, "w": {}, "px": {}}
     e.last_bar_wall = ae.time.monotonic()
+    e.bar_close = lambda m: ae.now_utc()  # each decision is on time unless a test says otherwise
     return e
 
 
@@ -117,3 +118,14 @@ def test_latches_survive_a_restart(tmp_path, monkeypatch):
     g = engine(tmp_path, None)
     g.load_latches(date(2026, 10, 8))
     assert not g.breaker
+
+
+def test_additions_after_slow_reductions_are_skipped_as_late(tmp_path, monkeypatch):
+    sys.path.insert(0, str(Path(__file__).parent))
+    from test_account_book import FakeBroker
+    monkeypatch.setattr(ae, "ALGO", tmp_path)
+    br = FakeBroker({"XLF": 100})
+    e = engine(tmp_path, br)
+    e.bar_close = lambda m: ae.now_utc() - ae.timedelta(seconds=ae.LATE_S + 5)
+    out = e.trade_sync({"XLE": 0.2}, {"XLF": 100, "XLE": 100}, 100_000, {**ae.DEFAULTS}, 29, False)
+    assert br.pos["XLF"] == 0 and "XLE" not in br.pos and "after the bar" in out[-1]["skipped"]
