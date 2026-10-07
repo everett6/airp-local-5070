@@ -10,6 +10,11 @@ import pandas as pd
 
 UNIVERSE = ("SPY", "IWM", "DIA", "XLF", "XLE", "XLV", "XLI", "XLY", "XLP", "XLU", "XLB", "XLC", "XLRE", "SMH")
 FEATURES = ("r1", "r5", "r30", "lead1", "lead5", "resid5", "loc5", "volz", "vwap")
+# E2 (30-minute models): E1's features plus these; xs_* are cross-sectional ranks added per decision by `ranks`
+FEATURES_E2 = (*FEATURES, "r15", "r60", "rday", "gap", "rv30", "lead15", "lead30", "leadday", "resid30", "tod",
+               "xs_r30", "xs_rday")
+HOLD_E2 = 30
+DECISION_BARS_E2 = tuple(range(29, 330, HOLD_E2))  # 10:00 .. 15:00 entries, flat by 15:30
 HOLD = 5                                     # minutes per decision
 DECISION_BARS = tuple(range(4, 380, HOLD))   # bar index (0 = 09:30) whose close triggers a decision: 09:34 .. 15:49
 COST_SIDE = {"SPY": 0.5e-4}                  # per side; every other ETF 1.5 bp
@@ -77,11 +82,22 @@ def frame(bars: pd.DataFrame, lead: pd.DataFrame, stats: pd.DataFrame | None = N
     nxt1 = lo.groupby(g).shift(-1)
     nxt6 = lo.groupby(g).shift(-1 - HOLD)
     fwd = np.exp(nxt6 - nxt1) - 1
+    fwd30 = np.exp(lo.groupby(g).shift(-1 - HOLD_E2) - nxt1) - 1
+    first_open = lo.groupby(g).transform("first")
+    lead_first = lg.groupby(g).transform("first")
+    prev_close = pd.Series(date, index=df.index).map(lc.groupby(g).last().shift(1)).astype(float)
+    r15, r60, lr15, lr30 = back(lc, 15), back(lc, 60), back(lg, 15), back(lg, 30)
+    rv30 = np.sqrt((r1 * r1).groupby(g).rolling(30, min_periods=5).mean().reset_index(level=0, drop=True))
     out = pd.DataFrame({
         "date": date, "m": m, "sigma": sigma.to_numpy(),
         "r1": r1 / sigma, "r5": r5 / sigma, "r30": r30 / sigma, "lead1": lr1 / sigma, "lead5": lr5 / sigma,
         "resid5": (r5 - beta * lr5) / sigma, "loc5": loc5, "volz": volz, "vwap": vwap / sigma,
-        "fwd": fwd, "y": fwd / sigma}, index=df.index)
+        "fwd": fwd, "y": fwd / sigma,
+        "r15": r15 / sigma, "r60": r60 / sigma, "rday": (lc - first_open) / sigma,
+        "gap": ((first_open - prev_close) / sigma).fillna(0.0), "rv30": (rv30 / sigma).fillna(1.0),
+        "lead15": lr15 / sigma, "lead30": lr30 / sigma, "leadday": (lg - lead_first) / sigma,
+        "resid30": (back(lc, 30) - beta * lr30) / sigma, "tod": m / 390.0,
+        "fwd30": fwd30, "y30": fwd30 / sigma}, index=df.index)
     out.attrs["rolled"] = rolled
     return out
 
@@ -142,3 +158,10 @@ def targets(pred: dict[str, float], sigma: dict[str, float], gross: float,
         if abs(ret) > 2 * cost(s):
             w[s] = float(np.sign(ret)) * gross / len(universe)
     return w
+
+
+def ranks(panel: pd.DataFrame) -> pd.DataFrame:
+    """E2's cross-sectional features: rank (-0.5..0.5) of the 30-minute return and of the return since the open
+    among the ETFs at the same bar."""
+    grp = panel.groupby(["date", "m"])
+    return panel.assign(xs_r30=grp["r30"].rank(pct=True) - 0.5, xs_rday=grp["rday"].rank(pct=True) - 0.5)

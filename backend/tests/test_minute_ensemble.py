@@ -22,7 +22,7 @@ def test_frame_has_no_lookahead_and_fills_missing_minutes():
     assert len(f) == 30 * 390
     cut = a["ts"].iloc[-200]
     g = me.frame(a[a["ts"] <= cut], lead[lead["ts"] <= cut])
-    cols = list(me.FEATURES) + ["sigma"]
+    cols = [c for c in me.FEATURES_E2 if not c.startswith("xs_")] + ["sigma"]  # E1 and E2 features
     pd.testing.assert_frame_equal(f.loc[:cut, cols], g.loc[:cut, cols])
     assert f["sigma"].iloc[:5 * 390].isna().all() and f["sigma"].iloc[-1] > 0
 

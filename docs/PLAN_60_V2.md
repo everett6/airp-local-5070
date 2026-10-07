@@ -2434,3 +2434,10 @@ draws, seed 7) 98.75% interval of the Sharpe above 0; net return > 0 in each OOS
 **If one passes:** Autopilot Day trades it (paper, live as the user chose), same leverage and risk rules; if both
 pass, the higher Sharpe. **If both fail:** Autopilot Day keeps E1, and price-only day trading on these bars is
 recorded as tested out at 5 and 30 minutes with linear, tree and neural models.
+
+**E2 result (run once 2026-10-07 ~03:15 UTC): both FAIL.** OOS 936 days, 3.0x gross.
+M-GBT (trees): net Sharpe **-2.13** (98.75% CI [-3.99, -0.61]); **+1.11 before costs**; -11.1 bp a day net; in a
+position 22% of the time; years -39%, -30%, +2.8%, -22%. M-NN: net **-4.76** (CI [-6.07, -3.51]); -0.05 before
+costs; years all negative. The trees find a real but small 30-minute signal; trading it costs more than it earns.
+The network finds nothing. Per the rule: Autopilot Day keeps E1; price-only day trading on these bars is tested out
+at 5 and 30 minutes with linear, tree and neural models. No variant.
