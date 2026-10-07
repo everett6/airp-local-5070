@@ -2475,3 +2475,15 @@ heartbeat and flattens Day's symbols if Day stalls in its window; incident log; 
 Reports (#34 calibration, #35 abstention, #38 controls, #39 attribution, #48 evidence) are descriptive; nothing in
 them changes trading. #30 needs the user's labels: a benchmark of constructed trap cases ships, and real cases are
 queued for human review.
+
+**O1 addendum, research quality (fixed before any code, 2026-10-07 ~00:50 ET):**
+- *#31 syndication:* pages whose text overlaps heavily (word 5-gram Jaccard >= 0.5) are one source; the coverage
+  rule "two non-SEC domains" becomes "two independent non-SEC sources". Records carry `independent_sources`.
+- *#32 freshness:* each fact on Bonsai's card is tagged NEW (not in memory before this run), KNOWN (seen before,
+  with the date first seen) or OLD (its own date more than 30 days before the research).
+- *#29 evidence freeze:* a page dated after the research time is dropped before reading; each record gets a
+  timestamp audit (published <= retrieved <= decided) and any violation is listed as an audit exception.
+- *#28 feeds:* a check script compares E1's features on IEX bars (live) with SIP bars (training) for recent
+  sessions; the result is shown with Day's label. Nothing in Day's model changes.
+- *#30:* a benchmark of constructed trap cases (guidance revisions, fiscal periods, losses, units, GAAP vs adjusted)
+  with known answers, and a queue of real saved facts for the user to verify in the app.
