@@ -42,3 +42,16 @@ no leverage changes, no downloads, no shutdown.
 - Day restarted with the fixes (LIVE paper, waiting for the open). 908 tests pass.
 - Night: the drawdown kill now uses logged, verified closes for both strategies, and the 4% breaker is latched for
   the session; applied at the next research gap with a Night restart (tests run first; reverted if any fail).
+
+## Result at 07:05 PDT (end of the window)
+- Night restarted 23:03 with review #8/#11 (583e490b); 908 tests passed before the restart. Reconciled clean.
+- Pre-open check 06:15: no incidents, no account gate, no open intents, LIVE on, no PAUSE/STOP/HALT/KILLED.
+- Day (live paper) at the open: 6 decisions by 10:00 ET, 1-4 s after each bar, 0 orders. Every ETF's predicted
+  move (0.01-0.16 bp) is below its round trip (1-3 bp), so the cost rule keeps it flat. The failed E1 model sees no
+  edge after costs; nothing was changed to make it trade.
+- Night at the open: 129 orders submitted; 2,325 attempts refused by the account risk check, mostly "spread
+  exceeds limit" (150 bp) on 91 mid-cap names whose free IEX quote is wide at the open; they retry every loop.
+  Not caused by tonight's changes (the risk check is unchanged; 6 Oct had the same reason on 6 names). Limits were
+  not loosened. Open item: retry such names less often (noise only) or wait for spreads to narrow after the open.
+- App rebuilt with the Fund control additions. Codex use tonight: two gpt-6.1-sol medium tasks; weekly usage 16% at
+  the last check (84% left).
