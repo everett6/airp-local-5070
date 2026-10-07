@@ -78,7 +78,7 @@ Status key:
 | 36 | Chronological validation with overlap controls | done | Walk-forward in E1/E2; non-overlapping holds; bootstrap by day |
 | 37 | Every attempt tracked | done | Registry (failures included) shown on Fund control |
 | 38 | Simple controls | done | Seeded random-side and momentum-side shadow lots for every AI lot, scored the same way |
-| 39 | Attribution | partial | By horizon, side, label, support, memory; execution slippage separately. Regime is carried on each lot but not yet split out in the report. |
+| 39 | Attribution | done | By horizon, market regime, side, label, support, memory; execution slippage separately |
 | 40 | Constrained self-improvement | done | Hard ceilings in code; no process can loosen a limit or a pass rule |
 | 41 | Mode shown prominently | done | Mode bar on Fund control: research / paper orders / simulated / real money never |
 | 42 | Buttons say what they do | done | e.g. "Start Autopilot Night (research + Alpaca PAPER orders)"; the old "Auto-trade" labels renamed |
@@ -86,7 +86,7 @@ Status key:
 | 44 | Opportunity funnel | done | Companies → researched → … → evaluated, with drop reasons |
 | 45 | Account-risk dashboard | done | Gross, net, beta-net, pending, headroom, ownership, themes, breakers, ceilings |
 | 46 | Acknowledged vs filled | done | Order states shown separately |
-| 47 | Performance with execution quality | partial | Equity and drawdown on Autopilot, slippage on Fund control. Turnover and spread paid are not shown yet; they need fills, which start at the next open. |
+| 47 | Performance with execution quality | done | Equity and drawdown on Autopilot; slippage, turnover (and as a multiple of equity) and quoted half-spread paid on Fund control; filled in as fills arrive |
 | 48 | Evidence quality | done | Sample, backtest or forward, result for every test; feed check; audit exceptions; fact-check accuracy |
 | 49 | Incident timeline | done | What failed, what was exposed, the fallback, the condition to resume, and the resolution |
 | 50 | Separate pause, cancel and close | done | Three controls per autopilot; each is confirmed from the broker |

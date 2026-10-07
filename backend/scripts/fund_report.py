@@ -66,6 +66,27 @@ def entry_session(decided_at: str) -> date:
     return at.add_sessions(d, 0)
 
 
+def regimes(path: Path) -> dict[str, str]:
+    """Night's recorded regime per entry session; later decisions take precedence."""
+    out: dict[str, str] = {}
+    try:
+        with path.open() as f:
+            for line in f:
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(r, dict):
+                    continue
+                if ((r.get("type") == "decision" or r.get("kind") == "decision")
+                        and isinstance(r.get("session"), str)
+                        and isinstance(r.get("regime"), str)):
+                    out[r["session"]] = r["regime"]
+    except OSError:
+        pass
+    return out
+
+
 def bars(a: Alpaca | None, symbols: list[str], start: date) -> dict[str, dict[str, tuple[float, float]]]:
     """Daily (open, close) per symbol per date from Alpaca's free bars, cached once a New York day."""
     today = datetime.now(NY).date().isoformat()
@@ -111,7 +132,8 @@ def summary(r: list[float]) -> dict[str, Any]:
             "ci": [float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))] if boots else None}
 
 
-def evaluate_calls(recs: list[dict[str, Any]], px: dict[str, Any]) -> dict[str, Any]:
+def evaluate_calls(recs: list[dict[str, Any]], px: dict[str, Any], *,
+                   regime_by_session: dict[str, str] | None = None) -> dict[str, Any]:
     rows, abstain = [], []
     for r in recs:
         if r.get("status") != "decided" or not r.get("decided_at"):
@@ -130,11 +152,15 @@ def evaluate_calls(recs: list[dict[str, Any]], px: dict[str, Any]) -> dict[str, 
             if v is not None:
                 rows.append({"ticker": r["ticker"], "horizon": h, "label": LABEL.get(lab, lab), "side": side,
                              "support": (support.get(h) or {}).get("support", "?"), "memory": bool(r.get("memory")),
+                             "regime": (regime_by_session or {}).get(e.isoformat(), "unknown"),
                              "ret": v})
-    by = lambda k: {str(g): summary([x["ret"] for x in rows if x[k] == g])
-                    for g in sorted({x[k] for x in rows}, key=str)}
+    def by(k: str) -> dict[str, Any]:
+        return {str(g): summary([x["ret"] for x in rows if x[k] == g])
+                for g in sorted({x[k] for x in rows}, key=str)}
+
     return {"all": summary([x["ret"] for x in rows]), "calibration_by_label": by("label"),
-            "by_horizon": by("horizon"), "by_side": by("side"), "by_support": by("support"), "by_memory": by("memory"),
+            "by_horizon": by("horizon"), "by_regime": by("regime"), "by_side": by("side"),
+            "by_support": by("support"), "by_memory": by("memory"),
             "abstention": {"n": len(abstain), "mean_abs_move_missed": float(np.mean(abstain)) if abstain else None,
                            "note": "size of the hedged move on calls the judge left without a side"},
             "target": "side x [(close at exit / open at entry - 1) - beta x QQQ's], entry = first session after the "
@@ -184,9 +210,18 @@ def orders_view(intents: dict[str, dict[str, Any]]) -> dict[str, Any]:
     return {"by_state": dict(Counter(r["state"] for r in intents.values())), "recent": recent}
 
 
+def half_spread(r: dict[str, Any]) -> float | None:
+    bid, ask = float(r.get("bid") or 0), float(r.get("ask") or 0)
+    if 0 < bid <= ask:
+        return (ask - bid) / (ask + bid) * 1e4
+    return float(r["spread_bp"]) / 2 if r.get("spread_bp") is not None else None
+
+
 def execution(a: Alpaca | None) -> dict[str, Any]:
-    """#47: fills against the decision reference price in the risk audit (slippage), per strategy."""
-    out: dict[str, Any] = {"slippage_bp": {}, "fills": 0}
+    """#47: fill slippage, gross filled notional and quoted half-spread, per strategy."""
+    out: dict[str, Any] = {"slippage_bp": {}, "fills": 0, "turnover_notional": {},
+                           "turnover_total": 0.0, "turnover_equity_multiple": None,
+                           "spread_paid_bp": {}}
     if a is None:
         return out
     try:
@@ -194,14 +229,20 @@ def execution(a: Alpaca | None) -> dict[str, Any]:
     except BrokerError:
         return out
     ref: dict[str, float] = {}
+    spreads: dict[str, float] = {}
     for d in (FWD / "full_auto" / "execution", FWD / "algo" / "execution"):
         for line in (d / "ledger.jsonl").read_text().splitlines() if (d / "ledger.jsonl").exists() else []:
             try:
                 r = json.loads(line)
             except ValueError:
                 continue
-            if r.get("kind") == "risk" and r.get("ref_price"):
-                ref[r.get("client_order_id", "")] = float(r["ref_price"])
+            if r.get("kind") == "risk" or r.get("type") == "risk":
+                cid = r.get("client_order_id", "")
+                if r.get("ref_price"):
+                    ref[cid] = float(r["ref_price"])
+                spread = half_spread(r)
+                if spread is not None:
+                    spreads[cid] = spread
     orders = {}
     try:
         for o in a._get(f"{PAPER}/orders", status="all", limit=500):
@@ -209,14 +250,30 @@ def execution(a: Alpaca | None) -> dict[str, Any]:
     except BrokerError:
         pass
     slip: dict[str, list[float]] = defaultdict(list)
+    paid: dict[str, list[float]] = defaultdict(list)
+    turnover: dict[str, float] = defaultdict(float)
     for f in acts:
         cid = orders.get(f.get("order_id", ""), "")
+        turnover[cid[:2]] += float(f["qty"]) * float(f["price"])
+        if cid in spreads:
+            paid[cid[:2]].append(spreads[cid])
         r = ref.get(cid)
         if r:
             sgn = 1 if f.get("side") == "buy" else -1
             slip[cid[:2]].append(sgn * (float(f["price"]) / r - 1) * 1e4)
     out["fills"] = len(acts)
     out["slippage_bp"] = {k: {"n": len(v), "mean": float(np.mean(v))} for k, v in slip.items()}
+    out["spread_paid_bp"] = {k: {"n": len(v), "mean": float(np.mean(v))}
+                             for k, v in paid.items()}
+    if not spreads:
+        out["spread_note"] = "quotes not recorded on the risk lines"
+    out["turnover_notional"], out["turnover_total"] = dict(turnover), sum(turnover.values())
+    try:
+        equity = float(a._get(f"{PAPER}/account").get("equity") or 0)
+    except BrokerError:
+        equity = 0
+    if equity > 0:
+        out["turnover_equity_multiple"] = out["turnover_total"] / equity
     return out
 
 
@@ -279,6 +336,7 @@ def main() -> None:
     k, s = key("AIRP_AUTO_ALPACA_KEY_ID"), key("AIRP_AUTO_ALPACA_SECRET_KEY")
     a = Alpaca(k, s, PAPER, risk_policy=ab.SANDBOX_RISK, audit_path=FWD / "account" / "report") if k and s else None
     recs = calls()
+    regime_by_session = regimes(FWD / "full_auto" / "thoughts.jsonl")
     state = load(FWD / "full_auto" / "state.json", {})
     syms = sorted({r["ticker"].replace("-", ".") for r in recs} | {"QQQ"}
                   | {c["symbol"].replace("-", ".") for c in state.get("controls", [])})
@@ -290,7 +348,9 @@ def main() -> None:
     intents = ab.Book().intents()
     import full_auto
     universe = len(full_auto.research_list())
-    out = {"at": datetime.now(UTC).isoformat(), "calls": evaluate_calls(recs, px), "controls": controls(state, px),
+    out = {"at": datetime.now(UTC).isoformat(),
+           "calls": evaluate_calls(recs, px, regime_by_session=regime_by_session),
+           "controls": controls(state, px),
            "funnel": funnel(recs, state, intents, universe), "orders": orders_view(intents), "execution": execution(a),
            "risk": risk(a, state), "evidence": evidence(), "audit_exceptions": audit_exceptions(recs),
            "incidents": sorted(ab.Book().incidents(), key=lambda r: (r["state"] != "open", r["at"]), reverse=False)[:50],
