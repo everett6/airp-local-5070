@@ -300,6 +300,8 @@ class Alpaca:
             leg.status, leg.order_id = "submitted", r.json().get("id")
         elif r.status_code == 422 and "client_order_id" in r.text:  # sent before (a crash after submit): look it up
             self.refresh(leg)
+        elif r.status_code >= 500:  # the broker may have accepted it: follow it by its client id, never resend
+            leg.status, leg.note = "submitted", f"HTTP {r.status_code}: outcome unknown"
         else:
             leg.status, leg.note = "rejected", f"HTTP {r.status_code} {r.text[:160]}"
         if self.risk_policy is not None:

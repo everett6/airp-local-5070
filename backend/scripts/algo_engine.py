@@ -66,7 +66,9 @@ def config() -> dict[str, Any]:
         got = json.loads(CONFIG.read_text())
     except (OSError, ValueError):
         got = {}
-    return {**DEFAULTS, **{k: v for k, v in got.items() if k in DEFAULTS}}
+    out = {**DEFAULTS, **{k: v for k, v in got.items() if k in DEFAULTS}}
+    out["gross"] = min(float(out["gross"]), ab.CEILINGS["day_gross"])  # the hard ceiling, even on a live reload
+    return out
 
 
 def minute(hm: str) -> int:
@@ -512,8 +514,8 @@ class Engine:
                         self.done.add(m)
                         pending = None
                         cfg = config()
-                        if m + 1 >= minute(cfg["end"]) or m >= FLAT_AT:
-                            self.flat_done = True
+                        if (m + 1 >= minute(cfg["end"]) or m >= FLAT_AT) and self.mode() != "live":
+                            self.flat_done = True  # live: only the guard sets it, after a verified flatten
                         await self.decide(m, t_bar)
                 quiet = time.monotonic() - self.last_bar_wall
                 if quiet > config()["stale_flat_s"] and self.book["w"] and self.mode() == "shadow":

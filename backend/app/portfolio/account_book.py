@@ -180,6 +180,16 @@ def signed_positions(positions: list[dict[str, Any]]) -> dict[str, float]:
     return {p["symbol"]: abs(float(p["qty"])) * (-1 if p.get("side") == "short" else 1) for p in positions}
 
 
+def account_gate(book: Book) -> str:
+    """Why no strategy may add risk now: the account kill switch, the 35% drawdown kill, or an order whose outcome
+    is unknown (it may be live at the broker) until reconcile resolves it. Reductions stay allowed."""
+    fwd = book.root.parent
+    if (fwd / "HALT").exists() or (fwd / "full_auto" / "KILLED").exists():
+        return "kill switch or 35% drawdown kill"
+    amb = [r for r in book.intents().values() if r.get("ambiguous") and r["state"] in OPEN_STATES]
+    return f"{len(amb)} order(s) with an unknown outcome; reconcile first" if amb else ""
+
+
 def send_batch(a: Alpaca, book: Book, strategy: str, session: date, decision: str, orders: list[dict[str, Any]],
                prices: dict[str, float], limit_bp: float | None = None, quote_age_s: float | None = None,
                max_spread_bp: float | None = None, tif: str = "day") -> list[Leg]:
@@ -207,9 +217,20 @@ def send_batch(a: Alpaca, book: Book, strategy: str, session: date, decision: st
             quotes.update(a._get(f"{DATA}/v2/stocks/quotes/latest", symbols=",".join(names[i:i + 100]),
                                  feed="iex")["quotes"])
         held = signed_positions(positions)
+        gate = account_gate(book)
         floor = now - timedelta(seconds=policy.max_quote_age_s)
         for o in orders:
             sym = o["symbol"]
+            if not o.get("to", 0.0):  # a close is sized from the holding read under the lock, never a stale read
+                cur = held.get(sym, 0.0) + sum((1 if p["side"] == "buy" else -1)
+                                               * (float(p["qty"]) - float(p.get("filled_qty") or 0))
+                                               for p in pending if p["symbol"] == sym)  # working orders count
+                if not cur:
+                    leg = Leg(sym, sym, o["side"], 0.0, tif, "", prices.get(sym, 0.0))
+                    leg.status, leg.note = "rejected", "NOTHING TO CLOSE: already flat at the broker"
+                    legs.append(leg)
+                    continue
+                o = {**o, "side": "sell" if cur > 0 else "buy", "qty": abs(cur), "to": 0.0}
             cid = client_id(strategy, session, decision, sym, o["side"], o.get("to", 0.0))
             leg = Leg(sym, sym, o["side"], float(o["qty"]), tif, cid, prices.get(sym, 0.0))
             reducing = abs(o.get("to", 0.0)) < abs(held.get(sym, 0.0)) and o.get("to", 0.0) * held.get(sym, 0.0) >= 0
@@ -222,7 +243,9 @@ def send_batch(a: Alpaca, book: Book, strategy: str, session: date, decision: st
             for k in range(6):  # attempt k of the same intent; a final unfilled attempt allows the next one
                 leg.client_order_id = cid if k == 0 else f"{cid[:44]}-r{k}"
                 got = a.c.get(f"{PAPER}/orders:by_client_order_id", params={"client_order_id": leg.client_order_id})
-                if got.status_code != 200 or got.json().get("status") not in ("canceled", "expired", "rejected"):
+                prev = got.json() if got.status_code == 200 else {}
+                if (got.status_code != 200 or prev.get("status") not in ("canceled", "expired", "rejected")
+                        or float(prev.get("filled_qty") or 0) > 0):  # a partly filled attempt is never replayed
                     break
             assert got is not None
             cid = leg.client_order_id
@@ -233,6 +256,11 @@ def send_batch(a: Alpaca, book: Book, strategy: str, session: date, decision: st
                 continue
             if got.status_code != 404:
                 leg.status, leg.note = "rejected", f"order lookup HTTP {got.status_code}: not sent"
+                book.intent(leg, strategy, "rejected")
+                legs.append(leg)
+                continue
+            if gate and not reducing:
+                leg.status, leg.note = "rejected", "ACCOUNT GATE: " + gate
                 book.intent(leg, strategy, "rejected")
                 legs.append(leg)
                 continue
@@ -269,9 +297,13 @@ def send_batch(a: Alpaca, book: Book, strategy: str, session: date, decision: st
             except Exception as exc:  # noqa: BLE001 - an ambiguous send: the intent stays open for reconcile
                 leg.status, leg.note = "submitted", f"reply lost ({type(exc).__name__}); reconcile will look it up"
                 book.intent(leg, strategy, "submitted", ambiguous=True)
+                pending.append({"symbol": sym, "side": leg.side, "qty": leg.qty, "filled_qty": 0})
+                gate = gate or "an order in this batch has an unknown outcome"
                 legs.append(leg)
                 continue
-            book.intent(leg, strategy, leg.status)
+            unknown = "outcome unknown" in leg.note
+            book.intent(leg, strategy, leg.status, **({"ambiguous": True} if unknown else {}))
+            gate = gate or ("an order in this batch has an unknown outcome" if unknown else "")
             if leg.status == "submitted":
                 pending.append({"symbol": sym, "side": leg.side, "qty": leg.qty, "filled_qty": 0})
                 if not verdict.get("reducing"):
@@ -328,7 +360,7 @@ def flatten(a: Alpaca, book: Book, strategy: str, session: date, why: str, price
             a.c.delete(f"{PAPER}/orders/{o['id']}")
     pos, _ = owned(a, target)
     orders_out = [{"symbol": s, "side": "sell" if q > 0 else "buy", "qty": abs(q), "to": 0.0} for s, q in pos.items() if q]
-    legs = send_batch(a, book, actor, session, "flat", orders_out, prices or {}) if orders_out else []
+    legs = send_batch(a, book, actor, session, f"fl{datetime.now(UTC):%H%M%S%f}", orders_out, prices or {}) if orders_out else []
     wait_final(a, book, actor, legs, timeout_s=min(verify_s, 30.0), sleep=sleep)
     deadline = time.monotonic() + verify_s
     while True:

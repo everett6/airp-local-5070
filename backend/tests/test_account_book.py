@@ -209,3 +209,80 @@ def test_restore_from_backup_reconciles_instead_of_replaying(tmp_path: Any) -> N
     assert ab.reconcile(br, r, "day")["ok"]
     ab.send_batch(br, r, "day", SESSION, "m59", order, {})  # the same decision replayed after the restore
     assert len(br.sent) == 1 and r.open_intents("day")[0]["state"] == "submitted"
+
+
+def test_unknown_outcome_blocks_new_risk_account_wide_but_not_reductions(tmp_path: Any) -> None:
+    b, br = book(tmp_path), FakeBroker({"XLE": 10})
+    br.lose_reply.add("XLF")
+    ab.send_batch(br, b, "day", SESSION, "m29", [{"symbol": "XLF", "side": "buy", "qty": 10, "to": 10}], {"XLF": 100})
+    add = ab.send_batch(br, b, "night", SESSION, "s", [{"symbol": "AAPL", "side": "buy", "qty": 5, "to": 5}],
+                        {"AAPL": 100})
+    assert add[0].status == "rejected" and "ACCOUNT GATE" in add[0].note
+    red = ab.send_batch(br, b, "day", SESSION, "m34", [{"symbol": "XLE", "side": "sell", "qty": 5, "to": 5}],
+                        {"XLE": 100})
+    assert red[0].status == "submitted" and br.pos["XLE"] == 5
+    assert ab.reconcile(br, b, "day")["ok"] and not ab.account_gate(b)  # resolved by id: new risk allowed again
+
+
+def test_close_is_sized_from_holdings_under_the_lock(tmp_path: Any) -> None:
+    b, br = book(tmp_path), FakeBroker({"XLF": 5})  # the caller read +10 before Day reduced to +5
+    legs = ab.send_batch(br, b, "watchdog", SESSION, "fl1", [{"symbol": "XLF", "side": "sell", "qty": 10, "to": 0}],
+                         {"XLF": 100})
+    assert legs[0].qty == 5 and br.pos["XLF"] == 0
+    again = ab.send_batch(br, b, "watchdog", SESSION, "fl2", [{"symbol": "XLF", "side": "sell", "qty": 10, "to": 0}],
+                          {"XLF": 100})
+    assert again[0].status == "rejected" and "NOTHING TO CLOSE" in again[0].note and br.pos["XLF"] == 0
+
+
+def test_second_flatten_in_a_session_closes_a_reopened_position(tmp_path: Any) -> None:
+    b, br = book(tmp_path), FakeBroker({"XLF": 10})
+    assert ab.flatten(br, b, "day", SESSION, "first", verify_s=0, sleep=lambda _s: None)["flat"]
+    br.pos["XLF"] = 10  # reopened later the same session
+    assert ab.flatten(br, b, "day", SESSION, "second", verify_s=0, sleep=lambda _s: None)["flat"]
+    assert br.pos["XLF"] == 0
+
+
+def test_partly_filled_attempt_is_not_replayed(tmp_path: Any) -> None:
+    b, br = book(tmp_path), FakeBroker()
+    br.partial.add("XLF")
+    order = [{"symbol": "XLF", "side": "buy", "qty": 10, "to": 10}]
+    first = ab.send_batch(br, b, "day", SESSION, "m29", order, {"XLF": 100})
+    br.orders[first[0].client_order_id]["status"] = "canceled"  # 5 filled, then canceled
+    ab.send_batch(br, b, "day", SESSION, "m29", order, {"XLF": 100})
+    assert len(br.sent) == 1 and br.pos["XLF"] == 5
+
+
+def test_drawdown_kill_blocks_day_additions(tmp_path: Any) -> None:
+    b, br = ab.Book(tmp_path / "account"), FakeBroker({"XLE": 10})
+    (tmp_path / "full_auto").mkdir()
+    (tmp_path / "full_auto" / "KILLED").write_text("x")
+    add = ab.send_batch(br, b, "day", SESSION, "m29", [{"symbol": "XLF", "side": "buy", "qty": 10, "to": 10}],
+                        {"XLF": 100})
+    assert add[0].status == "rejected" and "kill" in add[0].note and not br.sent
+    red = ab.send_batch(br, b, "day", SESSION, "m29", [{"symbol": "XLE", "side": "sell", "qty": 10, "to": 0}],
+                        {"XLE": 100})
+    assert red[0].status == "submitted" and br.pos["XLE"] == 0
+
+
+def test_close_counts_a_working_close_and_does_not_double_it(tmp_path: Any) -> None:
+    b, br = book(tmp_path), FakeBroker({"XLF": 10})
+    br.stuck.add("XLF")
+    first = ab.send_batch(br, b, "day", SESSION, "fl1", [{"symbol": "XLF", "side": "sell", "qty": 10, "to": 0}],
+                          {"XLF": 100})
+    br.pos["XLF"] = 10  # the stuck close has not filled yet
+    again = ab.send_batch(br, b, "watchdog", SESSION, "fl2", [{"symbol": "XLF", "side": "sell", "qty": 10, "to": 0}],
+                          {"XLF": 100})
+    assert first[0].status == "submitted" and "NOTHING TO CLOSE" in again[0].note and len(br.sent) == 1
+
+
+def test_http_5xx_is_an_unknown_outcome_that_gates_new_risk(tmp_path: Any) -> None:
+    class Flaky(FakeBroker):
+        def _submit(self, leg: Leg) -> None:
+            super()._submit(leg)
+            leg.status, leg.order_id, leg.note = "submitted", None, "HTTP 503: outcome unknown"
+
+    b, br = book(tmp_path), Flaky()
+    ab.send_batch(br, b, "day", SESSION, "m29", [{"symbol": "XLF", "side": "buy", "qty": 10, "to": 10},
+                                                 {"symbol": "XLE", "side": "buy", "qty": 10, "to": 10}], {})
+    assert br.sent == [ab.client_id("day", SESSION, "m29", "XLF", "buy", 10)]  # XLE waits for reconcile
+    assert "unknown outcome" in ab.account_gate(b)
