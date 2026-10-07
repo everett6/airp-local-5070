@@ -2406,3 +2406,31 @@ facts are reused; Bonsai's card gets a dated "past research" block (earlier fact
 short note on the area (recent facts from the same theme). Research budget per company: 8 minutes first time,
 5 minutes with memory (was 10). Records carry `memory: true|false`. Accuracy is NOT claimed: D13 keeps its rule
 (every day call of the deep pipeline) and its report will add the memory/no-memory split; no new test is run.
+
+## E2: custom day-trading models, gradient-boosted trees and a neural network (user request 2026-10-06 ~23:00 ET; spec fixed before any code)
+
+**Relation to E1, stated openly.** E1 (linear, 5-minute horizon) failed on the same 14 ETFs and the same bars.
+E2 is a separate test of two nonlinear model families, written before any E2 code or result. Two changes are
+fixed up front, for a reason known from E1, not from E2 data: E1's predicted 5-minute moves were about 15x smaller
+than costs, so E2 uses a **30-minute** horizon. Two models are tested, so the confidence level is Bonferroni
+corrected (98.75%). Run once; no variants afterwards.
+
+**Data, universe, costs:** as E1 (14 ETFs, Alpaca SIP 1-minute bars, 0.5 bp SPY / 1.5 bp others per side).
+**Features** (all known at the decision bar's close): the 9 E1 features; own return over 15 and 60 minutes and
+since the open; the opening gap; realized 30-minute volatility over sigma; leader return over 15 and 30 minutes and
+since the open; 30-minute beta residual; time of day; cross-sectional rank (-0.5..0.5) of the 30-minute return
+and of the return since the open among the 14 ETFs. Returns are scaled by sigma as in E1.
+**Target:** open of bar t+1 to open of bar t+31, divided by sigma. **Decisions:** 10:00, 10:30, .. 15:00 ET (bar
+indexes 29, 59, .., 329); hold 30 minutes; flat by 15:30.
+**Models** (scikit-learn, fixed settings): M-GBT HistGradientBoostingRegressor(max_iter 300, learning_rate 0.05,
+max_leaf_nodes 31, min_samples_leaf 500, l2 1.0, random_state 7); M-NN MLPRegressor(hidden (32, 16), alpha 1e-3,
+early_stopping, max_iter 50, random_state 7) on standardized features, trained on a seeded sample of at most
+400,000 rows. Walk-forward: refit at each quarter start on all data before it (training from 2021-01-04);
+out-of-sample 2023-01-03 .. 2026-09-25.
+**Trading rule:** as E1: hold a symbol (side = sign) only if |predicted return| > its round-trip cost; each held
+symbol gets 3.0/14 of equity.
+**Pass, per model (all three):** OOS annualized Sharpe of daily net returns >= 1.0; day-block bootstrap (2,000
+draws, seed 7) 98.75% interval of the Sharpe above 0; net return > 0 in each OOS calendar year.
+**If one passes:** Autopilot Day trades it (paper, live as the user chose), same leverage and risk rules; if both
+pass, the higher Sharpe. **If both fail:** Autopilot Day keeps E1, and price-only day trading on these bars is
+recorded as tested out at 5 and 30 minutes with linear, tree and neural models.
