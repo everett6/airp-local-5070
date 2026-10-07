@@ -41,3 +41,12 @@ def test_controls_are_seeded_and_mirror_the_lot():
     a = fa.controls(lot("A", 5, 0.05), mom=-1)
     assert [c["kind"] for c in a] == ["random", "momentum"] and a[1]["side"] == -1
     assert a == fa.controls(lot("A", 5, 0.05), mom=-1) and all(c["weight"] == 0.05 for c in a)
+
+
+def test_why_none_gives_the_concrete_reason():
+    rec = {"decided_at": "2026-10-07T01:00:00+00:00", "ratings": {"short": 3, "mid": 3}}
+    assert fa.why_none(rec, [], "A").startswith("PASS")
+    rec = {**rec, "ratings": {"short": 5, "mid": 3}}
+    assert "already planned" in fa.why_none(rec, [lot("A", 5, 0.1)], "A")
+    assert "theme rule" in fa.why_none({**rec, "theme_horizons": ["mid"]}, [], "A")
+    assert "sizing" in fa.why_none(rec, [lot("B", 5, 0.1)], "A")

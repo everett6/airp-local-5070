@@ -349,6 +349,18 @@ class Sandbox:
             raise BrokerError(f"close all: HTTP {r.status_code}")
 
 
+def why_none(rec: dict[str, Any], lots: list[dict[str, Any]], ticker: str) -> str:
+    """O1 #43: why a decided call made no new lot."""
+    sided = {h: v for h, v in (rec.get("ratings") or {}).items() if v != 3}
+    if not sided:
+        return "PASS: the judge gave no side on any horizon"
+    if any(x["symbol"] == ticker and x.get("decided_at") == rec.get("decided_at") for x in lots):
+        return "already planned from this research (open or finished)"
+    if rec.get("theme_horizons") and not set(sided) & set(rec["theme_horizons"]):
+        return f"theme rule: this stock trades only on {', '.join(rec['theme_horizons'])}, which got no side"
+    return "sizing rules gave 0 (weak support or against the market regime)"
+
+
 def unstrong(lots: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """O1 #13: undo the x2 for "strong" ratings (1 and 5), then rescale so the open book's gross is unchanged."""
     before = sum(x["weight"] for x in lots if x["state"] == "open")
@@ -645,7 +657,7 @@ class Controller:
                 self.no_trade(t, rec, [f"research {age_h:.0f} h old (limit {self.cfg.max_age_h:.0f} h)"])
                 continue
             made = at.new_lots(rec, session, self.mkt, self.cfg, self.state["lots"])
-            reasons = [] if made else ["no side called, already held, or sized to 0"]
+            reasons = [] if made else [why_none(rec, self.state["lots"], t)]  # O1 #43: the concrete reason
             lots = [x for x in made if x["horizon"] != "day"]  # Night: day trading is Autopilot Day (no AI)
             reasons += [f"{x['horizon']}: day trades belong to Autopilot Day" for x in made if x["horizon"] == "day"]
             keep = []
