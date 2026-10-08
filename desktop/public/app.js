@@ -427,7 +427,7 @@ const views = {
     const fresh = (d.universe || []).length ? d.fresh / d.universe.length : null;
     const batch = cur ? Math.min(1, (Date.now() - Date.parse(cur.started_at)) / Math.max(1, Date.parse(cur.deadline_at) - Date.parse(cur.started_at))) : null;
     const nightBars = `${progressBar(fresh, `Research fresh (last 20 h): <b>${fmt(d.fresh)} of ${fmt((d.universe || []).length)}</b> companies${rs.memory != null ? ` · ${fmt(rs.memory)} with saved memory` : ''}`, !!job)}
-      ${cur ? progressBar(batch, `Now researching <b>${cur.tickers.map(esc).join(', ')}</b> · started ${esc(when(cur.started_at))} · time budget ${fmt(cur.budget_min)} min a company`, true) : `<p class="tiny muted">${job ? 'Between research batches (scheduled jobs and the GPU come first).' : 'Not running.'}</p>`}`;
+      ${cur ? progressBar(batch, `Now researching <b>${cur.tickers.map(esc).join(', ')}</b> · started ${esc(when(cur.started_at))} · time budget ${fmt(cur.budget_min)} min a company`, true) : job && rs.paused ? `<div class="banner warn"><b>Research is waiting for the GPU.</b> ${esc(rs.paused)}. Trading continues; no company is charged a failed attempt. A reboot after a driver update usually fixes it.</div>` : `<p class="tiny muted">${job ? 'Between research batches (scheduled jobs and the GPU come first).' : 'Not running.'}</p>`}`;
     const ds = day.status || {}, dc = day.config || {};
     const w0 = hmMin(dc.start || '09:35'), w1 = hmMin(dc.end || '15:55'), nowM = nyMinutes();
     const closed = ds.state === 'waiting' || !dayJob;

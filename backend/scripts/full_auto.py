@@ -237,6 +237,21 @@ def research_due(companies: list[dict[str, Any]], latest: dict[str, dict[str, An
     return [c for _, c in sorted(due, key=lambda x: -x[0])]
 
 
+def gpu_problem(timeout_s: float = 20.0) -> str | None:
+    """Why the GPU cannot run Jan and Bonsai now, None when it can. A broken driver (say a half-finished upgrade:
+    "Driver/library version mismatch") would load the models on the CPU, every company would fail its GPU check, and
+    two failures rest a company for 24 hours. So research waits instead, and the companies are not charged."""
+    try:
+        r = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True,
+                           text=True, timeout=timeout_s, check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"nvidia-smi did not run ({type(exc).__name__})"
+    if r.returncode or not r.stdout.strip():
+        msg = (r.stdout + r.stderr).strip().splitlines()
+        return f"nvidia-smi failed (rc {r.returncode}): {msg[0][:160] if msg else 'no output'}"
+    return None
+
+
 def research_all_active(now: datetime, path: Path = FWD / "research_all" / "progress.json") -> bool:
     """True while scripts/research_all.py keeps the research fresh (it then owns the GPU and the research list)."""
     p = load(path, {})
@@ -454,6 +469,7 @@ class Controller:
         self.last = {"equity": float("-inf"), "fills": float("-inf"), "regime": float("-inf"), "keys": float("-inf")}
         self.mkt = "unknown"
         self.backlog = False
+        self.gpu_paused: str | None = None
         self.market_open = False
         self.reconciled = False
         self.adv = {c["ticker"].replace("-", "."): float(c.get("dollar_volume") or 0) for c in self.companies}
@@ -494,11 +510,12 @@ class Controller:
                     self.child.wait()
             rc = self.child.returncode
             latest = decisions(self.names)
+            gpu = gpu_problem()  # the GPU failed during the batch: the companies are not to blame
             for t in self.child_batch:
                 rec = latest.get(t)
-                if not rec or datetime.fromisoformat(rec["decided_at"]) < self.child_started:
+                if not gpu and (not rec or datetime.fromisoformat(rec["decided_at"]) < self.child_started):
                     self.state["attempts"].setdefault(t, []).append(now.isoformat())
-            self.log("research_done", tickers=self.child_batch, code=rc)
+            self.log("research_done", tickers=self.child_batch, code=rc, **({"gpu_problem": gpu} if gpu else {}))
             self.status.setdefault("research", {}).pop("current", None)
             self.child_lock.close()
             self.child, self.child_lock, self.child_batch = None, None, []
@@ -511,6 +528,13 @@ class Controller:
         self.status["research"] = {"due": len(due), "total": len(self.companies),
                                    "memory": sum(1 for c in self.companies if (rm.ROOT / f"{c['ticker']}.json").exists())}
         if not due:
+            return
+        gpu = gpu_problem()
+        if gpu != self.gpu_paused:  # log changes only, not every loop
+            self.log("research_paused" if gpu else "research_resumed", reason=gpu or "GPU usable again")
+            self.gpu_paused = gpu
+        if gpu:
+            self.status["research"]["paused"] = gpu
             return
         lock = (FWD / "autorun.lock").open("a")
         try:

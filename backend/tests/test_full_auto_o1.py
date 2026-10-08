@@ -50,3 +50,36 @@ def test_why_none_gives_the_concrete_reason():
     assert "already planned" in fa.why_none(rec, [lot("A", 5, 0.1)], "A")
     assert "theme rule" in fa.why_none({**rec, "theme_horizons": ["mid"]}, [], "A")
     assert "sizing" in fa.why_none(rec, [lot("B", 5, 0.1)], "A")
+
+
+def test_gpu_problem_reports_a_broken_driver(monkeypatch):
+    import subprocess
+    broken = subprocess.CompletedProcess([], 18, "Failed to initialize NVML: Driver/library version mismatch\n", "")
+    monkeypatch.setattr(fa.subprocess, "run", lambda *a, **k: broken)
+    assert "version mismatch" in fa.gpu_problem()
+    ok = subprocess.CompletedProcess([], 0, "NVIDIA GeForce RTX 5070\n", "")
+    monkeypatch.setattr(fa.subprocess, "run", lambda *a, **k: ok)
+    assert fa.gpu_problem() is None
+
+
+def test_research_waits_on_a_broken_gpu_and_charges_no_company(monkeypatch, tmp_path):
+    from datetime import timedelta
+
+    import desktop_run
+    now = fa.now_utc()
+    c = object.__new__(fa.Controller)
+    c.child, c.gpu_paused, c.names = None, None, {"AAA"}
+    c.companies, c.state, c.status, logged = [{"ticker": "AAA"}], {"attempts": {}}, {}, []
+    c.log = lambda kind, **f: logged.append(kind)
+    monkeypatch.setattr(fa, "DIR", tmp_path)
+    monkeypatch.setattr(desktop_run, "next_slot", lambda _now: now + timedelta(hours=5))
+    monkeypatch.setattr(fa, "research_all_active", lambda _now: False)
+    monkeypatch.setattr(fa, "decisions", lambda names: {})
+    monkeypatch.setattr(fa, "gpu_problem", lambda: "nvidia-smi failed (rc 18)")
+    started = []
+    monkeypatch.setattr(fa.subprocess, "Popen", lambda *a, **k: started.append(a))
+    c.research_tick(now)
+    c.research_tick(now)
+    assert started == [] and c.state["attempts"] == {}
+    assert logged == ["research_paused"]  # once, not every loop
+    assert c.status["research"]["paused"].startswith("nvidia-smi failed")
