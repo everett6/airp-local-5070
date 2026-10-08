@@ -28,3 +28,6 @@ set 1 to go back). One Bonsai lane serves one request at a time, so model calls 
 timeout pauses while it waits for the lane, so queueing cannot cause a timeout. In the synthetic test, 4 companies with
 lookups finish more than 1.3x faster. The real gain comes from Night's `loads.judge_lane_wait_s` and `judge_s`;
 the estimate before measuring is 1.2–1.4x on the judge stage.
+First live batch (8 Oct 04:39 UTC, 3 companies judged): Bonsai was busy 326 s of the 329 s judge stage, against
+about 438 s run one after another (109 s of model time plus about 37 s of lookups per company), so **about 1.33x**.
+Lane wait was 158 s, no call timed out, and all 3 were decided. That is one batch, so check it again over a night.
