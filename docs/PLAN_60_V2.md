@@ -2487,3 +2487,51 @@ queued for human review.
   sessions; the result is shown with Day's label. Nothing in Day's model changes.
 - *#30:* a benchmark of constructed trap cases (guidance revisions, fiscal periods, losses, units, GAAP vs adjusted)
   with known answers, and a queue of real saved facts for the user to verify in the app.
+
+## BZ2: Ternary Bonsai 2 27B as Night's judge (the user's yes 2026-10-07 ~21:40 PDT; spec fixed 21:45 PDT, before any BZ2 code or reply)
+
+**Question.** Does PrismML's Ternary Bonsai 2 27B judge Night's company cards at least as well as the deployed
+`bonsai-27b:latest`? Is it fast enough to replace it? Bonsai 2 is the next release of the same model family, so the
+research rule stays Jan-v1-4B + Bonsai. The vendor reports 84.78 against 80.98 for the previous ternary Bonsai on 14
+benchmarks; that is its claim, not ours.
+
+**Card set (frozen now).** For each ticker, take the latest deep-research row with `status == "decided"` and
+`decided_at` on 2026-10-07 UTC, using its stored `judge_card` as is. That is 167 cards from a single pipeline version.
+The script writes the sorted (ticker, decided_at) list and its sha256 before the first call. No card made after this
+spec is added.
+
+**Arms.** Each arm makes one call per card: system = `forced_call.PROMPT`, user = `judge_card`, then `forced_check`
+over day/short/medium/long. Neither arm gets a repair attempt, lookups or the double check, so both get the same work.
+- **A:** `bonsai-27b:latest` (the deployed Ollama blob) on a private Ollama, num_ctx 16384, num_predict 1600,
+  temperature 0, think off, format json. These are Night's settings.
+- **B:** `Ternary-Bonsai-2-27B-PQ2_0.gguf` (prism-ml/Ternary-Bonsai-2-27B-gguf) on llama-server from
+  PrismML-Eng/llama.cpp tag `prism-b10754-2459f68`, built here with CUDA arch 120. Flags: `-c 16384 -np 1 -ngl 99 -fa
+  on -b 1024 -ub 1024`, f16 KV, temperature 0, `reasoning_effort: "none"`, max_tokens 1600, JSON response format.
+  PQ2_0 is the vendor's faster decode on Blackwell cards.
+
+**Running.** One smoke test on a fixed non-card prompt checks that B's output is coherent; a runtime that crashes or
+writes garbage may be swapped once, for the vendor's CUDA 12.8 build, before any card is judged. Cards run in chunks
+of 10, and the arm that goes first alternates by chunk. Night's research and the forward runner come first: a chunk
+starts only when it holds `results/forward/autorun.lock` and nothing else is on the GPU. Each model server stops at
+the end of each chunk.
+
+**Measures.**
+- V: the valid-call rate, meaning the share of cards where the reply parses and every horizon gets a side.
+- S: median wall time per call, and decode tok/s.
+- Agreement on side per horizon.
+- Q: for every (card, horizon) where both arms took a side, the signed hedged return, scored as
+  `fund_report.score` (entry = the first session after `decided_at`, exit = entry + `auto_trader.HOLD[h]`).
+
+**Verdict.** Night's judge switches to B only if all three conditions hold. Otherwise it stays on A.
+- V: B's valid-call rate is at least A's minus 2 points.
+- S: B's median call time is at most 1.5x A's.
+- Q: on short-horizon calls (5 sessions, the primary outcome) scored for both arms, B's mean signed return is at least
+  A's, and B's hit rate is at least A's minus 2 points.
+
+V and S are decided on the run day. Q is scored once, by script, when at least 90% of short horizons have matured,
+expected around 15 October. The script records pass or fail with `register()`. No variants: no thinking-mode rerun,
+no PTQ1_0 rerun, no other prompt, no second run.
+
+**Honest limits.** Around 160 pairs cannot show skill. This is a "not worse" swap rule for a vendor-improved model in
+the same family. The AI calls have been losing (fund report, 7 Oct), and BZ2 does not change that finding. Both
+models predate 7 Oct 2026, so they cannot know the outcomes.
