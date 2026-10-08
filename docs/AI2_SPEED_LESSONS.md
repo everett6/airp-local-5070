@@ -23,7 +23,8 @@ prompt tokens in 4,822 s, against 14,481 s of request time in total. Jan read 2.
 | n-gram speculative decoding | Not applied. AI2 found it does not produce identical replies. Ollama doesn't offer it, and Bonsai is a hybrid model (KV shifting is off for it), so support is uncertain. It would need its own measured trial. |
 | Thread pinning, CPU threads | Not relevant: no layers run on the CPU. |
 
-**Next speed step (needs a working GPU and a test run):** judge two companies at once so one uses the GPU while
-the other waits on its 37 s of web lookups. Ollama keeps one slot, so replies stay one at a time. The 150 s
-per-call timeouts would first have to stop counting time spent waiting in the queue. Expected gain is 1.2–1.4x on the
-judge stage (estimated, not measured).
+**Applied 7 Oct (late):** two companies are now judged at once (`app/sandbox/judge_lane.py`, `AIRP_JUDGE_OVERLAP=2`;
+set 1 to go back). One Bonsai lane serves one request at a time, so model calls never run together, and a call's
+timeout pauses while it waits for the lane, so queueing cannot cause a timeout. In the synthetic test, 4 companies with
+lookups finish more than 1.3x faster. The real gain comes from Night's `loads.judge_lane_wait_s` and `judge_s`;
+the estimate before measuring is 1.2–1.4x on the judge stage.

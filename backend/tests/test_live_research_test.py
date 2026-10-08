@@ -191,4 +191,4 @@ def test_two_company_deep_batch_loads_each_model_once_and_checks_four_horizons(m
     assert all(c['status'] == 'decided' for c in summary['companies'])
     assert all(set(c['ratings']) == {'day', 'short', 'medium', 'long'} for c in summary['companies'])
     assert models['unloaded'] == [L.JAN, 'bonsai-27b:latest']
-    assert set(summary['loads']) == {'jan_server_start_s', 'bonsai_server_start_s'}
+    assert set(summary['loads']) == {'jan_server_start_s', 'bonsai_server_start_s', 'judge_lane_wait_s'}

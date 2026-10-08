@@ -36,6 +36,7 @@ from app.sandbox.forced_call import PROMPT as FORCED_PROMPT
 from app.sandbox.forced_call import check as forced_check
 from app.sandbox.gpu_lock import gpu_job, gpu_priority
 from app.sandbox.jail import AgentJail, JailLimits
+from app.sandbox.judge_lane import Lane, budget, run_overlapped
 from app.sandbox.judge_lookup import (
     CHECK_HEADER,
     double_check,
@@ -137,6 +138,8 @@ class ResearchFailure(ValueError):
 
 
 DEEP = False
+# companies judged at once on the one Bonsai lane (app/sandbox/judge_lane.py); 1 = one after another
+JUDGE_OVERLAP = int(os.environ.get("AIRP_JUDGE_OVERLAP", "2"))
 WIDE = False  # deep research with every page read by parallel Jan readers (app/sandbox/page_readers.py)
 COMPANY_NAME = ""
 COMPANY_NAMES: dict[str, str] = {}
@@ -345,14 +348,15 @@ async def run_cohort(tickers: tuple[str, ...], out: Path, budget_experiment: boo
     if any(r["status"] == "researched" for r in rows):
         judge = OllamaLLM("bonsai-27b:latest", base_url="http://127.0.0.1:11447", concurrency=1,
                           num_ctx=16384 if DEEP else 8192, num_predict=1600 if DEEP else 700, cache=False, require_gpu=True)
+        judge = Lane(judge)
         t0 = time.monotonic()
         srv = Ollama(11447, MODELS, 1, out / "bonsai.log")
         SERVERS.append(srv)
         loads["bonsai_server_start_s"] = time.monotonic() - t0
         try:
-            for index, row in enumerate(rows):
+            async def judge_row(index: int, row: dict[str, Any]) -> None:
                 if row["status"] != "researched":
-                    continue
+                    return
                 t = time.monotonic()
                 if budget_experiment:
                     from budget_experiment import pair
@@ -369,13 +373,13 @@ async def run_cohort(tickers: tuple[str, ...], out: Path, budget_experiment: boo
                     row["total_latency_s"] = time.monotonic() - started
                     write_atomic(out / f"{row['ticker']}.json", json.dumps(row, indent=1) + "\n")
                     print(f"{row['ticker']}: matched budget experiment {row['judge_s']:.1f}s — {row['status']}", flush=True)
-                    continue
+                    return
                 card = row["card"] = row["card"] + (rm.past_block(row["ticker"]) if DEEP else "")
                 if DEEP:  # Bonsai looks up what the thin card lacks; only source text is added (judge_lookup.py)
                     gw = FreeLiveGateway.from_env("live", max_result_chars=12000, timeout_cap_s=15, tool_cache=None,
                                                   as_of=datetime.now(UTC))
                     try:
-                        async with asyncio.timeout(240):
+                        async with budget(240):
                             look = await lookups(judge, gw, card, gw.specs_for_prompt())
                         row["lookup_s"] = time.monotonic() - t
                     except (TimeoutError, RuntimeError, OSError, httpx.HTTPError) as exc:
@@ -391,7 +395,7 @@ async def run_cohort(tickers: tuple[str, ...], out: Path, budget_experiment: boo
                             repair = "" if not attempt else "\nEvery horizon needs label 1, 2, 4 or 5. Return the full JSON."
                             if attempt == 2:  # last try on the shorter card (without the lookups)
                                 card = row["judge_card"] = row["card"]
-                            async with asyncio.timeout(150):
+                            async with budget(150):
                                 reply, overflow = await ask(judge, FORCED_PROMPT + repair, card)
                             raw = parse(reply)
                             verdict = forced_check(None if overflow else raw, card, tuple(horizons))
@@ -405,7 +409,7 @@ async def run_cohort(tickers: tuple[str, ...], out: Path, budget_experiment: boo
                             gw2 = FreeLiveGateway.from_env("live", max_result_chars=12000, timeout_cap_s=15,
                                                            tool_cache=None, as_of=datetime.now(UTC))
                             try:
-                                async with asyncio.timeout(200):
+                                async with budget(200):
                                     chk = await double_check(judge, gw2, card, reply, gw2.specs_for_prompt())
                             except (TimeoutError, RuntimeError, OSError, httpx.HTTPError) as exc:
                                 chk = {"steps": [], "evidence": "", "error": type(exc).__name__}
@@ -414,7 +418,7 @@ async def run_cohort(tickers: tuple[str, ...], out: Path, budget_experiment: boo
                             draft_verdict, draft_reply = verdict, reply
                             checked_card = card + CHECK_HEADER + chk["evidence"] if chk["evidence"].strip() else card
                             try:
-                                async with asyncio.timeout(150):
+                                async with budget(150):
                                     reply2, overflow2 = await ask(judge, revise_prompt(FORCED_PROMPT, draft_reply), checked_card)
                                 raw2 = parse(reply2)
                                 verdict2 = forced_check(None if overflow2 else raw2, checked_card, tuple(horizons))
@@ -443,7 +447,7 @@ async def run_cohort(tickers: tuple[str, ...], out: Path, budget_experiment: boo
                                        and 12 <= len(raw[h]["invalidation_quote"]) <= 240 and raw[h]["invalidation_quote"] in card},
                                    decided_at=datetime.now(UTC).isoformat())
                         raise _Decided
-                    async with asyncio.timeout(120):
+                    async with budget(120):
                         reply, overflow = await ask(judge, prompt, card)
                     raw = parse(reply)
                     if raw is None or overflow:
@@ -472,6 +476,10 @@ async def run_cohort(tickers: tuple[str, ...], out: Path, budget_experiment: boo
                     rm.remember(row)
                 print(f"{row['ticker']}: research {row['research_s']:.1f}s; judge {row['judge_s']:.1f}s; "
                       f"cohort-to-decision {row['total_latency_s']:.1f}s — {row['status']}", flush=True)
+
+            # two companies at once: one uses Bonsai while the other waits on its web lookups (judge_lane.py)
+            await run_overlapped(rows, judge_row, 1 if budget_experiment else JUDGE_OVERLAP)
+            loads["judge_lane_wait_s"] = round(judge.waited_s, 1)
         finally:
             try:
                 await judge.unload()
